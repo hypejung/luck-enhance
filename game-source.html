@@ -126,6 +126,29 @@
   .enhrates b { color: var(--text); }
   .warn { color: #ff8a8a; }
 
+  /* ===== 강화기 연출 (+15부터, +20/+25에서 더 극적으로) ===== */
+  #enhFxZone { position: relative; }
+  #enhFxOverlay { position: absolute; inset: -20px; pointer-events: none; z-index: 20; overflow: visible; }
+  .enh-particle { position: absolute; left: 50%; top: 50%; font-size: 20px; opacity: 0; white-space: nowrap; }
+  .enh-particle.big { font-size: 30px; }
+  .enh-particle.huge { font-size: 42px; }
+  @keyframes enhRise { 0%{opacity:0; transform:translate(-50%,-50%) scale(.4) translateY(0);} 15%{opacity:1; transform:translate(-50%,-50%) scale(1.1) translateY(-10px);} 100%{opacity:0; transform:translate(-50%,-50%) scale(1) translateY(-70px);} }
+  .enh-particle.fly { animation: enhRise 1.1s ease-out forwards; }
+  @keyframes enhFlashGold { 0%{box-shadow:0 0 0 0 rgba(255,214,64,0);} 15%{box-shadow:0 0 40px 14px rgba(255,214,64,.85);} 100%{box-shadow:0 0 0 0 rgba(255,214,64,0);} }
+  @keyframes enhFlashGoldBig { 0%{box-shadow:0 0 0 0 rgba(255,214,64,0);} 12%{box-shadow:0 0 70px 26px rgba(255,225,100,1);} 100%{box-shadow:0 0 0 0 rgba(255,214,64,0);} }
+  #enhBtn.fx-success { animation: enhFlashGold .9s ease-out; }
+  #enhBtn.fx-success-2 { animation: enhFlashGoldBig 1.2s ease-out; }
+  #enhBtn.fx-success-3 { animation: enhFlashGoldBig 1.6s ease-out; }
+  @keyframes enhSag { 0%{filter:brightness(1) saturate(1);} 30%{filter:brightness(.55) saturate(.3);} 100%{filter:brightness(1) saturate(1);} }
+  #enhBtn.fx-fail { animation: enhSag .8s ease-in-out; }
+  #enhBtn.fx-fail-2 { animation: enhSag 1.1s ease-in-out; }
+  #enhBtn.fx-fail-3 { animation: enhSag 1.5s ease-in-out; }
+  @keyframes enhDoom { 0%{filter:brightness(1) hue-rotate(0deg);} 10%{filter:brightness(1.8) hue-rotate(-30deg);} 25%{filter:brightness(.35) saturate(.2);} 100%{filter:brightness(1) hue-rotate(0deg) saturate(1);} }
+  @keyframes enhShakeBig { 0%,100%{transform:translateX(0) rotate(0);} 15%{transform:translateX(-14px) rotate(-3deg);} 35%{transform:translateX(12px) rotate(2deg);} 55%{transform:translateX(-10px) rotate(-2deg);} 75%{transform:translateX(8px) rotate(1deg);} }
+  #enhBtn.fx-destroy { animation: enhDoom 1s ease-in-out, enhShakeBig .6s ease-in-out; }
+  #enhBtn.fx-destroy-2 { animation: enhDoom 1.3s ease-in-out, enhShakeBig .8s ease-in-out 2; }
+  #enhBtn.fx-destroy-3 { animation: enhDoom 1.8s ease-in-out, enhShakeBig 1s ease-in-out 3; }
+
   /* ===== 능력치 ===== */
   .statgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; }
   .statcell { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
@@ -264,7 +287,10 @@
       <div id="enhweapon"></div>
       <div id="enhstat"></div>
       <div class="enhrates" id="enhrates"></div>
-      <button class="primary big" id="enhBtn">강화하기</button>
+      <div id="enhFxZone">
+        <button class="primary big" id="enhBtn">강화하기</button>
+        <div id="enhFxOverlay"></div>
+      </div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">단계 -1</span> · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
         <b style="color:var(--unique)">3단계마다 돌파</b> 시 공격력 상승폭 UP (리스크 클수록 리턴 커짐) · 고강화는 등급 차이도 뒤집습니다!
@@ -455,29 +481,37 @@ const EFFECTS = {
 // - 성공/파괴 확률은 뒤로 갈수록 거의 절벽처럼 나빠짐. 기대 시행 횟수를 직접 선형대수로
 //   풀어서 검증함: +20 약 350회, +24 약 23만회, +28 약 346억회, +30 약 142조회(기대값).
 //   즉 +20~24는 "열심히 하면 되는" 영역, +28+는 "확률상 불가능" 영역이 되도록 설계.
+// 능력치(장신구+룬+훈련+무기특성 등 "스탯"으로만 쌓이는 값)의 최종 상한.
+// 무기 등급/강화 자체의 배율은 여기 포함되지 않음 — 순수 확률/배율형 스탯만 제한.
+const DMG_CAPS = {
+  critChance: 0.5,   // 치명타 확률 최대 50%
+  critMult: 2.5,      // 치명타 피해 최대 2.5배
+  extraChance: 0.25,  // 연타(추가공격) 확률 최대 25%
+};
 const ENH = {
   maxLevel: 30,
-  atkGrowthBase: 0.1,
-  atkGrowthLinear: 0.065,   // 레벨이 오를수록 성장률 자체가 선형으로 커짐(가속형)
-  atkGrowthSurge: 0.35,
+  atkGrowthBase: 0.13,
+  atkGrowthLinear: 0.105,   // 레벨이 오를수록 성장률 자체가 선형으로 커짐(가속형)
+  atkGrowthSurge: 0.45,
   atkGrowthSurgeEvery: 3,
-  // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%)
+  // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%). +10~19는 완만하게(꾸준히 진행
+  // 가능), +20부터 절벽 — "고레벨 강화"만 훨씬 어려워지도록 비대칭으로 재설계.
   success: [
     100, 100, 98, 96, 94,          // +0 ~ +4
-    92, 90, 88, 85, 82,            // +5 ~ +9
-    78, 74, 70, 65, 60,            // +10 ~ +14
-    54, 48, 42, 36, 30,            // +15 ~ +19
-    24, 19, 15, 11, 8,             // +20 ~ +24
-    6, 4, 3, 2, 1.2,               // +25 ~ +29
+    92, 90, 88, 86, 84,            // +5 ~ +9
+    82, 80, 78, 75, 72,            // +10 ~ +14
+    69, 66, 63, 59, 55,            // +15 ~ +19
+    30, 20, 13, 8, 5,              // +20 ~ +24
+    3, 1.8, 1, 0.5, 0.25,          // +25 ~ +29
   ],
   // 실패 시 파괴 확률(%): index = 현재 단계. 0이면 파괴 없음(단계만 -1)
   destroy: [
     0, 0, 0, 0, 0,                 // +0 ~ +4
     0, 0, 0, 0, 0,                 // +5 ~ +9
-    2, 3, 4, 5, 7,                 // +10 ~ +14
-    9, 12, 15, 18, 22,             // +15 ~ +19
-    26, 30, 35, 40, 45,            // +20 ~ +24
-    50, 55, 60, 65, 70,            // +25 ~ +29
+    1, 1, 2, 2, 3,                 // +10 ~ +14
+    4, 5, 6, 8, 10,                // +15 ~ +19
+    30, 36, 42, 48, 55,            // +20 ~ +24
+    60, 65, 70, 75, 80,            // +25 ~ +29
   ],
 };
 
@@ -594,15 +628,15 @@ function runeSlotsForGrade(grade) { return Math.min(7, grade + 1); }
 // 장비(등급/강화/장신구/룬)와 별개로 골드를 태워서 영구적으로 키우는 스탯. 레벨이 오를수록
 // 비용이 거듭제곱으로 커지지만 지수 성장은 아니라서(costExp) 아주 높은 레벨까지도 계속 투자 가능.
 const TRAINING = {
-  atk:        { name: '근력 훈련', desc: '공격력 +2%/레벨',        perLevel: 0.02,  baseCost: 80,  costExp: 1.25 },
-  atkSpeed:   { name: '신속 훈련', desc: '공격속도 +2%/레벨',      perLevel: 0.02,  baseCost: 80,  costExp: 1.25 },
-  critChance: { name: '치명 훈련', desc: '치명타 확률 +0.3%p/레벨', perLevel: 0.003, baseCost: 100, costExp: 1.28 },
-  critDamage: { name: '파괴 훈련', desc: '치명타 피해 +1%p/레벨',   perLevel: 0.01,  baseCost: 100, costExp: 1.28 },
-  extraAtk:   { name: '연격 훈련', desc: '연타 확률 +0.3%p/레벨',   perLevel: 0.003, baseCost: 100, costExp: 1.28 },
-  bossDmg:    { name: '살육 훈련', desc: '보스 피해량 +2%/레벨',    perLevel: 0.02,  baseCost: 90,  costExp: 1.26 },
+  atk:        { name: '근력 훈련', desc: '공격력 +1.2%/레벨',        perLevel: 0.012,  baseCost: 150, costExp: 1.35 },
+  atkSpeed:   { name: '신속 훈련', desc: '공격속도 +1.2%/레벨',      perLevel: 0.012,  baseCost: 150, costExp: 1.35 },
+  critChance: { name: '치명 훈련', desc: '치명타 확률 +0.15%p/레벨', perLevel: 0.0015, baseCost: 200, costExp: 1.4 },
+  critDamage: { name: '파괴 훈련', desc: '치명타 피해 +0.5%p/레벨',  perLevel: 0.005,  baseCost: 200, costExp: 1.4 },
+  extraAtk:   { name: '연격 훈련', desc: '연타 확률 +0.15%p/레벨',   perLevel: 0.0015, baseCost: 200, costExp: 1.4 },
+  bossDmg:    { name: '살육 훈련', desc: '보스 피해량 +1.2%/레벨',   perLevel: 0.012,  baseCost: 170, costExp: 1.32 },
 };
 const TRAINING_TIER_STEP = 10;     // 이 레벨 단위마다 비용이 큰 폭으로 튐
-const TRAINING_TIER_JUMP = 100;    // 티어 하나 오를 때마다 비용 배수 (10레벨마다 ×100)
+const TRAINING_TIER_JUMP = 150;    // 티어 하나 오를 때마다 비용 배수 (10레벨마다 ×150, 기존보다 강화)
 function trainingLevel(key) { return (S && S.training && S.training[key]) || 0; }
 function trainingCost(key) {
   const t = TRAINING[key];
@@ -620,31 +654,35 @@ function trainStat(key) {
 }
 
 // 사냥터별 장신구 (index = 사냥터 번호 - 1, 등급은 해당 사냥터 최고 등급 재료와 동일)
-const ACCESSORIES = [
-  { name: '슬라임 반지',        eff: { gold: 0.06 } },
-  { name: '박쥐 날개 부적',     eff: { speed: 0.06 } },
-  { name: '버섯 목걸이',        eff: { atk: 0.06 } },
-  { name: '달그림자 이빨 귀걸이', eff: { luck: 0.06 } },
-  { name: '고블린 황금 반지',   eff: { gold: 0.10 } },
-  { name: '해골 갑주 팔찌',     eff: { atk: 0.10 } },
-  { name: '오크 전투 팔찌',     eff: { speed: 0.10 } },
-  { name: '여왕거미의 눈 부적', eff: { luck: 0.10 } },
-  { name: '골렘 코어 목걸이',   eff: { atk: 0.14 } },
-  { name: '심해 진주 목걸이',   eff: { gold: 0.14 } },
-  { name: '죽음의 기수 장갑',   eff: { speed: 0.14 } },
-  { name: '황금 미노 뿔 반지',  eff: { atk: 0.18 } },
-  { name: '지혜의 오브',        eff: { enh: 3 } },
-  { name: '폭풍의 깃털 부적',   eff: { luck: 0.18 } },
-  { name: '영혼 항아리 반지',   eff: { gold: 0.18 } },
-  { name: '핏빛 뿔 팔찌',       eff: { atk: 0.22 } },
-  { name: '베히모스 가죽 팔찌', eff: { speed: 0.22 } },
-  { name: '심연의 눈 부적',     eff: { luck: 0.25 } },
-  { name: '용왕의 눈 반지',     eff: { atk: 0.26 } },
-  { name: '신의 유물',          eff: { gold: 0.20, luck: 0.20, enh: 3 } },
+// 8가지 스탯 종류를 순환 배정 + 층이 오를수록 커지는 연속적인 파워 예산으로 값을 산출해서
+// (구버전엔 같은 등급대 4개가 거의 같은 수치였음) 층마다 실제로 다른 수치가 나오도록 함.
+// 스탯별 효율 계수: 상한이 낮고 체감 임팩트가 큰 치명타/연타류는 계수를 낮게, 상시 적용되는
+// 골드/공격력/공속류는 1.0 근처로, 보스전에서만 쓰이는 보스피해는 조금 더 높게 보정.
+const ACC_NAMES = [
+  '슬라임 반지', '박쥐 날개 부적', '버섯 목걸이', '달그림자 이빨 귀걸이',
+  '고블린 황금 반지', '해골 갑주 팔찌', '오크 전투 팔찌', '여왕거미의 눈 부적',
+  '골렘 코어 목걸이', '심해 진주 목걸이', '죽음의 기수 장갑', '황금 미노 뿔 반지',
+  '지혜의 오브', '폭풍의 깃털 부적', '영혼 항아리 반지', '핏빛 뿔 팔찌',
+  '베히모스 가죽 팔찌', '심연의 눈 부적', '용왕의 눈 반지', '신의 유물',
 ];
+const ACC_STAT_POOL = ['atk', 'speed', 'gold', 'luck', 'critChance', 'critDamage', 'extraAtk', 'bossDmg'];
+const ACC_STAT_EFF = { atk: 1.0, speed: 1.0, gold: 1.05, luck: 0.95, critChance: 0.22, critDamage: 0.55, extraAtk: 0.18, bossDmg: 1.3 };
+function genAccessories() {
+  const list = [];
+  for (let f = 0; f < ACC_NAMES.length; f++) {
+    if (f === 12) { list.push({ name: ACC_NAMES[f], eff: { enh: 3 } }); continue; }
+    if (f === 19) { list.push({ name: ACC_NAMES[f], eff: { gold: 0.20, luck: 0.20, enh: 4 } }); continue; }
+    const budget = 0.05 + f * 0.021; // 층이 오를수록 완만하게 커지는 파워 예산
+    const statKey = ACC_STAT_POOL[f % ACC_STAT_POOL.length];
+    const val = +(budget * ACC_STAT_EFF[statKey]).toFixed(3);
+    list.push({ name: ACC_NAMES[f], eff: { [statKey]: val } });
+  }
+  return list;
+}
+const ACCESSORIES = genAccessories();
 const FLOOR = {
   goldBase: 12, goldGrowth: 1.42,   // 1단계 골드 10 → 20단계 약 13,000 (아래 goldMult로 최종 배수 적용)
-  goldMult: 200,                    // "운빨강화" 개편: 강화 시행 횟수를 크게 늘리기 위한 골드 수급 배수
+  goldMult: 50,                     // "운빨강화" 개편: 강화 시행 횟수를 늘리기 위한 골드 수급 배수
   unlockKills: 10,                  // 다음 사냥터 해금 조건 (처치 수)
   boxDrop: 0.004,                   // 랜덤박스 드롭 확률 (0.4%)
   weaponDrop: 0.006,                // 무기 드롭 확률 (0.6%)
@@ -659,10 +697,11 @@ const BOXES = [
   { name: '고급 랜덤박스', icon: '🎁', cost: 2500,
     weapon: [[0,15],[1,25],[2,12],[3,3]], gold: 0.437, box: [[2,1],[3,0.3]] },
   { name: '희귀 랜덤박스', icon: '🎊', cost: 12000,
-    weapon: [[1,20],[2,28],[3,3],[4,0.5]], gold: 0.475, box: [[3,1]] },
+    weapon: [[1,20],[2,28],[3,3],[4,0.05]], gold: 0.4795, box: [[3,1]] },
   { name: '전설 랜덤박스', icon: '🏆', cost: 60000,
-    weapon: [[2,25],[3,28],[4,1],[5,0.1]], gold: 0.439, box: [[3,2]] },
+    weapon: [[2,25],[3,28],[4,0.1],[5,0.01]], gold: 0.4499, box: [[3,2]] },
 ];
+// 레전더리(4)/신화(5) 등급 무기 드롭 확률을 추가로 10배 이상 낮춤 (희귀 0.5%→0.05%, 전설 1%/0.1%→0.1%/0.01%)
 
 // ---------- 룬 ----------
 // 일반 스탯 룬(등급 0~3: 일반/레어/에픽/유니크)은 5가지 전투 스탯 중 하나를 무작위로 부여.
@@ -883,9 +922,51 @@ function floatText(msg) {
   host.appendChild(el);
   setTimeout(() => el.remove(), 950);
 }
+
+// 강화 연출 (+15부터, +20/+25에서 더 극적으로). outcome: 'success' | 'fail' | 'destroy'
+const ENH_FX_PARTICLES = {
+  success: ['✨', '💫', '⭐', '🌟'],
+  fail: ['💧', '😔', '☁️'],
+  destroy: ['💥', '☠️', '🔥', '💔'],
+};
+function enhFxTier(level) {
+  if (level >= 25) return 3;
+  if (level >= 20) return 2;
+  if (level >= 15) return 1;
+  return 0;
+}
+function playEnhanceFx(outcome, level) {
+  const tier = enhFxTier(level);
+  if (tier === 0) return; // +15 미만은 연출 없음
+  const btn = $('enhBtn');
+  const overlay = $('enhFxOverlay');
+  if (!btn || !overlay) return;
+  const cls = tier >= 3 ? `fx-${outcome}-3` : tier >= 2 ? `fx-${outcome}-2` : `fx-${outcome}`;
+  ['fx-success', 'fx-success-2', 'fx-success-3', 'fx-fail', 'fx-fail-2', 'fx-fail-3', 'fx-destroy', 'fx-destroy-2', 'fx-destroy-3']
+    .forEach(c => btn.classList.remove(c));
+  // 리플로우를 강제해서 같은 클래스를 연달아 줘도 애니메이션이 다시 재생되게 함
+  void btn.offsetWidth;
+  btn.classList.add(cls);
+  const duration = 900 + tier * 350;
+  setTimeout(() => btn.classList.remove(cls), duration);
+
+  const pool = ENH_FX_PARTICLES[outcome];
+  const count = 4 + tier * 4;
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement('span');
+    el.className = 'enh-particle fly' + (tier >= 3 ? ' huge' : tier >= 2 ? ' big' : '');
+    el.textContent = pool[Math.floor(Math.random() * pool.length)];
+    const spread = 40 + tier * 25;
+    const dx = (Math.random() - 0.5) * spread;
+    el.style.marginLeft = dx + 'px';
+    el.style.animationDelay = (Math.random() * 0.25 * tier) + 's';
+    overlay.appendChild(el);
+    setTimeout(() => el.remove(), 1600);
+  }
+}
 // 장신구 효과 합산 (일반 최대 ACC_SLOTS개 + 보스 장신구, 세트 효과 포함)
 function accEff() {
-  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0 };
+  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, bossDmg: 0 };
   if (S && Array.isArray(S.accEquipped)) {
     for (const eq of S.accEquipped) {
       const a = ACCESSORIES[eq.floor];
@@ -1298,9 +1379,13 @@ function attack(w) {
     floatText('⚡ 신벌!');
     return;
   }
-  // 치명타 확률/배율 = 무기 효과 + 룬 스탯 + 무기 종류 특성 합산 (발동 알림은 화면 텍스트로만)
-  const critChance = (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance');
-  const critMult = (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage');
+  // 치명타 확률/배율 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
+  // (발동 알림은 화면 텍스트로만)
+  const ae2 = accEff();
+  const critChance = Math.min(DMG_CAPS.critChance,
+    (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance);
+  const critMult = Math.min(DMG_CAPS.critMult,
+    (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage);
   if (critChance > 0 && Math.random() < critChance) {
     dmg *= critMult;
     floatText('💥 치명타!');
@@ -1313,8 +1398,9 @@ function attack(w) {
     mon.hp -= spellDmg;
     floatText('🔮 주문 작렬!');
   }
-  // 연타 효과 = 무기 효과 + 룬 스탯 + 무기 종류 특성 합산
-  const extraChance = (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra');
+  // 연타 효과 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
+  const extraChance = Math.min(DMG_CAPS.extraChance,
+    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk);
   if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= dmg;
     floatText('⚡ 연타!');
@@ -1342,6 +1428,7 @@ function bossDmgBonus() {
     bonus += typeTrait(w, 'bossDmg');
   }
   bonus += trainingValue('bossDmg');
+  bonus += accEff().bossDmg;
   return bonus;
 }
 
@@ -1466,9 +1553,11 @@ function tryEnhance() {
   S.gold -= cost;
   if (matNeed > 0) consumeHighMats(matNeed);
 
+  const attemptLevel = w.enhance; // FX 연출 강도 판단용 (변경 전 단계)
   const chance = Math.min(100, ENH.success[w.enhance] + accEff().enh);
   if (Math.random() * 100 < chance) {
     w.enhance++;
+    playEnhanceFx('success', attemptLevel);
     if (isSurgeLevel(w.enhance)) {
       log(`🎉 <b>+${w.enhance} 돌파 성공!</b> 공격력 상승폭 대폭 UP! ${gradeTag(w)}`, 'lg-prim');
     } else {
@@ -1479,8 +1568,10 @@ function tryEnhance() {
     // 맨손은 파괴되지 않고 +0으로 초기화
     if (isFist(w)) {
       w.enhance = 0;
+      playEnhanceFx('fail', attemptLevel);
       log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
     } else if (Math.random() * 100 < dChance) {
+      playEnhanceFx('destroy', attemptLevel);
       log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}`, 'lg-bad');
       S.destroyedCount++;
       S.weapons = S.weapons.filter(x => x.id !== w.id);
@@ -1501,6 +1592,7 @@ function tryEnhance() {
       return;
     } else {
       w.enhance = Math.max(0, w.enhance - 1);
+      playEnhanceFx('fail', attemptLevel);
       log(`❌ 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
     }
   }
@@ -2001,9 +2093,9 @@ function computeStats() {
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const atk = w ? weaponAtk(w) : 0;
   const spd = w ? weaponSpeed(w) : 0;
-  const critChance = Math.min(100, ((e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance')) * 100);
-  const critMultPct = ((e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage')) * 100;
-  const extraChance = Math.min(100, ((e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk')) * 100);
+  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance) * 100;
+  const critMultPct = Math.min(DMG_CAPS.critMult, (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage) * 100;
+  const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk) * 100;
   return {
     atk, spd, dps: atk * spd,
     critChance, critMultPct, extraChance,
@@ -2090,6 +2182,10 @@ function accEffText(eff) {
   if (eff.speed) parts.push(`⚡ 공속 +${Math.round(eff.speed * 100)}%`);
   if (eff.luck) parts.push(`🍀 행운(드롭률) +${Math.round(eff.luck * 100)}%`);
   if (eff.enh) parts.push(`🔨 강화 확률 +${eff.enh}%p`);
+  if (eff.critChance) parts.push(`💥 치명타 확률 +${(eff.critChance * 100).toFixed(1)}%p`);
+  if (eff.critDamage) parts.push(`💢 치명타 피해 +${Math.round(eff.critDamage * 100)}%p`);
+  if (eff.extraAtk) parts.push(`⚡ 연타 확률 +${(eff.extraAtk * 100).toFixed(1)}%p`);
+  if (eff.bossDmg) parts.push(`👹 보스 피해량 +${Math.round(eff.bossDmg * 100)}%`);
   return parts.join(' · ');
 }
 

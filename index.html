@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>운빨강화하기</title>
+<style>
+  body {
+    background: #12121a; color: #e8e8f0;
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    min-height: 100vh; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; margin: 0;
+  }
+  .box { text-align: center; padding: 20px; }
+  .spin { font-size: 48px; animation: spin 1.5s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .msg { margin-top: 16px; font-size: 15px; color: #9a9ab0; }
+  .err { color: #ff7a7a; font-size: 14px; margin-top: 12px; display: none; }
+  a { color: #ffd54a; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="spin">🍀</div>
+  <div class="msg" id="msg">운빨강화하기 로딩 중...</div>
+  <div class="err" id="err"></div>
+</div>
+<script>
+'use strict';
+(async function() {
+  const msg = document.getElementById('msg');
+  const err = document.getElementById('err');
+  try {
+    // 캐시 무력화를 위한 타임스탬프
+    const bust = '?t=' + Date.now();
+    const res = await fetch('index.html.gz' + bust, { cache: 'no-store' });
+    if (!res.ok) throw new Error('다운로드 실패 (HTTP ' + res.status + ')');
+    const buf = await res.arrayBuffer();
+    const ds = new DecompressionStream('gzip');
+    const stream = new Response(buf).body.pipeThrough(ds);
+    const html = await new Response(stream).text();
+    // 게임 문서로 교체
+    document.open();
+    document.write(html);
+    document.close();
+  } catch (e) {
+    msg.textContent = '로딩 실패!';
+    err.style.display = 'block';
+    err.innerHTML = e.message + '<br><br>새로고침을 시도하거나 잠시 후 다시 접속해 주세요.';
+  }
+})();
+</script>
+</body>
+</html>

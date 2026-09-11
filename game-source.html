@@ -837,34 +837,36 @@ function dropRoll() {
 }
 
 // 재료 드롭: 일반 재료(높은 확률), 레어 재료(중간), 에픽 재료(낮음)
+// matSlot(0/1/2)은 사냥터 내 재료 슬롯(=FLOORS[f].mats의 인덱스)이고, 실제 아이템 등급은
+// MAT_TIERS[tierIdx][matSlot]로 별도 계산한다. 슬롯 인덱스와 등급 인덱스를 혼동하면
+// (구버전 버그) 사냥터 5구간 이상에서 조합에 필요한 '0|1' 키가 채워지지 않아 조합이 불가능해짐.
 function dropMaterials(isU, luck) {
   const f = S.floor;
-  const tierIdx = Math.min(3, Math.floor(f / 5));  // 구간: 0~4 / 5~9 / 10~14 / 15~19
-  const F = FLOORS[f];
-  const grades = MAT_TIERS[tierIdx]; // [일반급, 레어급, 에픽급] 실제 등급 index
 
   // 일반 재료 (두 종류 중 하나)
   const commonChance = (0.5 + luck) * (isU ? 2 : 1);
   if (Math.random() < Math.min(0.95, commonChance)) {
-    addMat(f, grades[0]);
+    addMat(f, 0);
   }
   // 레어 재료
   const rareChance = (0.12 + luck * 0.5) * (isU ? 4 : 1);
   if (Math.random() < Math.min(0.9, rareChance)) {
-    addMat(f, grades[1]);
+    addMat(f, 1);
   }
   // 에픽(최고) 재료
   const epicChance = (0.03 + luck * 0.15) * (isU ? 8 : 1);
   if (Math.random() < Math.min(0.8, epicChance)) {
-    addMat(f, grades[2]);
+    addMat(f, 2);
   }
 }
 
-function addMat(f, matGrade) {
-  const key = f + '|' + matGrade;
+function addMat(f, matSlot) {
+  const key = f + '|' + matSlot;
   S.mats[key] = (S.mats[key] || 0) + 1;
-  const name = FLOORS[f].mats[matGrade];
-  const gname = GRADES[matGrade].name;
+  const name = FLOORS[f].mats[matSlot];
+  const tierIdx = Math.min(3, Math.floor(f / 5));
+  const actualGrade = MAT_TIERS[tierIdx][matSlot];
+  const gname = GRADES[actualGrade].name;
   log(`🌿 재료 획득: <span class="grade-${gname}">${name}</span> (보유 ${S.mats[key]})`);
 }
 
@@ -1292,6 +1294,21 @@ function migrate(d) {
     }
     d.migratedGradeShift = true;
   }
+  // 재료 키 버그 수정: dropMaterials가 슬롯(0/1/2) 대신 실제 등급 index를 키로 써서
+  // 사냥터 5구간 이상(스켈레톤/오크전사 등)에서 조합 재료('f|0','f|1')가 전혀 쌓이지 않던 문제.
+  // 기존에 잘못된 등급 index로 저장된 재료를 올바른 슬롯 키로 옮겨준다.
+  if (d.migratedMatKeys !== true) {
+    const fixed = {};
+    for (const key of Object.keys(d.mats)) {
+      const [f, g] = key.split('|').map(Number);
+      const tierIdx = Math.min(3, Math.floor(f / 5));
+      const slot = MAT_TIERS[tierIdx].indexOf(g);
+      const newKey = f + '|' + (slot >= 0 ? slot : g); // slot을 못 찾으면(이미 올바른 슬롯 키) 그대로 유지
+      fixed[newKey] = (fixed[newKey] || 0) + d.mats[key];
+    }
+    d.mats = fixed;
+    d.migratedMatKeys = true;
+  }
   // 죽은 무기 참조 정리 (id가 인벤토리에 없으면 해제)
   if (d.equipped != null && !d.weapons.some(w => w.id === d.equipped)) d.equipped = null;
   return d;
@@ -1614,7 +1631,8 @@ function renderMatSell() {
     const [f, g] = key.split('|').map(Number);
     if (f >= FLOORS.length) continue;
     const F = FLOORS[f];
-    const gname = GRADES[g].name;
+    const tierIdx = Math.min(3, Math.floor(f / 5));
+    const gname = GRADES[MAT_TIERS[tierIdx][g]].name;
     const price = matSellPrice(f, g);
     const div = document.createElement('div');
     div.className = 'invitem';

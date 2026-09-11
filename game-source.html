@@ -978,10 +978,9 @@ function dropRoll() {
 
   // 골드
   let gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
-  // 골드 러시(룬 특수효과): 확률로 골드 2배
+  // 골드 러시(룬 특수효과): 확률로 골드 2배 — 발동 알림은 화면 텍스트로만
   if (weaponHasSpecial(w, 'goldrush') && Math.random() < RUNE_SPECIALS.goldrush.proc) {
     gold *= 2;
-    log(`💰 <b>골드 러시!</b> 골드 2배!`, 'lg-gold');
     floatText('💰 골드 러시!');
   }
   S.gold += gold;
@@ -1008,10 +1007,9 @@ function dropRoll() {
     if (grade >= 4) { log(`✨ 레전더리 이상 무기가 나왔습니다!!`, 'lg-prim'); }
   }
 
-  // 미다스의 손(룬 특수효과): 확률로 랜덤박스(일반~에픽) 즉시 획득
+  // 미다스의 손(룬 특수효과): 확률로 랜덤박스(일반~에픽) 즉시 획득 — 발동 알림은 화면 텍스트로만
   if (weaponHasSpecial(w, 'midastouch') && Math.random() < RUNE_SPECIALS.midastouch.proc) {
     const idx = wrand([[0, 60], [1, 30], [2, 10]]);
-    log(`🌟 <b>미다스의 손!</b> 랜덤박스 즉시 획득!`, 'lg-prim');
     floatText('🌟 미다스의 손!');
     giveBox(idx, '미다스의 손');
   }
@@ -1027,8 +1025,8 @@ function dropRoll() {
   renderTop(); renderFloorUI();
 
   // 연쇄 처치(룬 특수효과): 확률로 처치 보상을 한 번 더 획득 (드물게 연쇄로 이어질 수 있음)
+  // 발동 알림은 화면 텍스트로만 — 실제 보상은 재귀 호출된 dropRoll()의 일반 로그로 남음
   if (weaponHasSpecial(w, 'chainslayer') && Math.random() < RUNE_SPECIALS.chainslayer.proc) {
-    log(`🔗 <b>연쇄 처치!</b> 처치 보상을 한 번 더 획득합니다.`, 'lg-prim');
     floatText('🔗 연쇄 처치!');
     dropRoll();
   }
@@ -1202,25 +1200,22 @@ function tick(dt) {
 
 function attack(w) {
   let dmg = weaponAtk(w) * (0.9 + Math.random() * 0.2);
-  let msg = null;
   const e = w.effect ? EFFECTS[w.effect] : null;
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
     dmg *= 1 + bossDmgBonus();
   }
-  // 신벌(룬 특수효과): 보스 제외 즉사
+  // 신벌(룬 특수효과): 보스 제외 즉사 — 화면 텍스트로만 알림(로그에는 남기지 않음)
   if (!bossFight.active && weaponHasSpecial(w, 'divinestrike') && Math.random() < RUNE_SPECIALS.divinestrike.proc) {
     mon.hp = 0;
-    log(`⚡ <b>신벌!</b> 몬스터를 즉시 처치했습니다!`, 'lg-prim');
     floatText('⚡ 신벌!');
     return;
   }
-  // 치명타 확률/배율 = 무기 효과 + 룬 스탯 합산
+  // 치명타 확률/배율 = 무기 효과 + 룬 스탯 합산 (발동 알림은 화면 텍스트로만)
   const critChance = (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100;
   const critMult = (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100;
   if (critChance > 0 && Math.random() < critChance) {
     dmg *= critMult;
-    msg = `💥 치명타! ${fmt(dmg)} 데미지`;
     floatText('💥 치명타!');
   }
   mon.hp -= dmg;
@@ -1228,16 +1223,13 @@ function attack(w) {
   const extraChance = (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100;
   if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= dmg;
-    msg = (msg ? msg + ' + 연타!' : `⚡ 연타! ${fmt(dmg)} 데미지`);
     floatText('⚡ 연타!');
   }
   // 더블 스트라이크(룬 특수효과): 별도 확률로 이번 타격 피해를 한 번 더 적용
   if (weaponHasSpecial(w, 'doublestrike') && Math.random() < RUNE_SPECIALS.doublestrike.proc) {
     mon.hp -= dmg;
-    msg = (msg ? msg + ' + 더블 스트라이크!' : `🌀 더블 스트라이크! ${fmt(dmg)} 데미지 추가`);
     floatText('🌀 더블 스트라이크!');
   }
-  if (msg) { log(msg); }
 }
 
 /* ===================== 보스 전투 ===================== */

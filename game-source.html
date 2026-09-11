@@ -1,0 +1,1822 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>운빨강화하기</title>
+<style>
+  :root {
+    --bg: #12121a;
+    --panel: #1c1c28;
+    --panel2: #242433;
+    --border: #3a3a4d;
+    --text: #e8e8f0;
+    --sub: #9a9ab0;
+    --gold: #ffd54a;
+    --common: #b0b0b0;
+    --rare: #4aa3ff;
+    --epic: #b05cff;
+    --unique: #ff9e2c;
+    --legend: #ff4a5e;
+    --prim: #6cf0c2;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: radial-gradient(ellipse at top, #1a1a2a 0%, var(--bg) 70%);
+    color: var(--text);
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 12px;
+    user-select: none;
+  }
+  #wrap { width: 100%; max-width: 760px; }
+
+  /* ===== 상단 바 ===== */
+  #topbar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 16px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 10px; flex-wrap: wrap; gap: 8px;
+  }
+  #title { font-size: 20px; font-weight: bold; }
+  #title span { color: var(--gold); }
+  .stat { font-size: 15px; margin-left: 14px; }
+  .stat b { color: var(--gold); }
+  #dpsshow { color: var(--sub); font-size: 13px; }
+
+  /* ===== 탭 ===== */
+  #tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+  .tab {
+    flex: 1; text-align: center; padding: 10px 4px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: bold;
+    color: var(--sub); transition: all .15s;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.on { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
+
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 10px;
+  }
+  .panel h3 { margin-bottom: 10px; font-size: 16px; color: var(--gold); }
+
+  button {
+    background: var(--panel2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; cursor: pointer; font-size: 14px; font-family: inherit;
+    transition: all .12s;
+  }
+  button:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: #3d3d1f; border-color: var(--gold); color: var(--gold); }
+  button.danger { border-color: #a33; color: #ff8a8a; }
+  button.big { width: 100%; padding: 14px; font-size: 16px; font-weight: bold; }
+
+  /* ===== 사냥터 ===== */
+  #floorbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+  #floortitle { font-size: 18px; font-weight: bold; }
+  #floorbtns { display: flex; gap: 4px; flex-wrap: wrap; }
+  .fbtn {
+    min-width: 34px; padding: 6px 4px; font-size: 13px; border-radius: 6px;
+  }
+  .fbtn.on { border-color: var(--gold); color: var(--gold); background: #3d3d1f; }
+  .fbtn.locked { opacity: .3; }
+
+  #monbox { text-align: center; padding: 10px 0; }
+  #monemoji { font-size: 64px; line-height: 1.2; }
+  #monname { font-size: 18px; margin: 4px 0; }
+  #hpbarWrap {
+    width: 100%; height: 22px; background: #333; border-radius: 11px;
+    overflow: hidden; border: 1px solid var(--border); margin: 8px 0;
+  }
+  #hpbar {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, #e04545, #ff7a5c);
+    transition: width .1s;
+  }
+  #hptext { font-size: 13px; color: var(--sub); }
+
+  #huntinfo { display: flex; justify-content: space-between; font-size: 13px; color: var(--sub); margin-top: 8px; flex-wrap: wrap; gap: 4px; }
+  #dropinfo { font-size: 12px; color: var(--sub); margin-top: 6px; text-align: center; }
+
+  /* ===== 강화 ===== */
+  #enhweapon { text-align: center; margin-bottom: 14px; }
+  #enhweptitle { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+  .enhnum { color: var(--gold); }
+  #enhwepeffect { font-size: 13px; margin: 6px 0; }
+  #enhstat { display: flex; justify-content: space-around; margin: 10px 0; font-size: 14px; }
+  #enhstat div { text-align: center; }
+  #enhstat b { display: block; font-size: 18px; margin-top: 2px; }
+  .enhrates { font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0; }
+  .enhrates b { color: var(--text); }
+  .warn { color: #ff8a8a; }
+
+  /* ===== 인벤토리 ===== */
+  .invitem {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 14px;
+  }
+  .invitem.equipped { border-color: var(--gold); background: #2d2a1a; }
+  .invitem .wn { font-weight: bold; }
+  .invitem .wi { color: var(--sub); font-size: 12px; }
+  .invitem .btns { display: flex; gap: 6px; }
+  .invitem button { padding: 5px 10px; font-size: 12px; }
+
+  /* ===== 랜덤박스 ===== */
+  .boxrow {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 8px;
+  }
+  .boxrow .bi { font-size: 12px; color: var(--sub); margin-top: 2px; }
+
+  /* ===== 도박 ===== */
+  #betbtns { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+  #betresult { text-align: center; font-size: 22px; font-weight: bold; min-height: 34px; margin: 12px 0; }
+  #gachaslot { text-align: center; font-size: 15px; margin: 10px 0; min-height: 48px; }
+
+  /* ===== 로그 ===== */
+  #logpanel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 10px 14px; height: 140px; overflow-y: auto; font-size: 12.5px;
+    color: var(--sub);
+  }
+  #logpanel div { margin-bottom: 3px; }
+  .lg-gold { color: var(--gold); }
+  .lg-good { color: #7de08a; }
+  .lg-bad { color: #ff7a7a; }
+  .lg-epic { color: var(--epic); }
+  .lg-prim { color: var(--prim); }
+
+  #savebar { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+  #savebar button { font-size: 12px; padding: 6px 10px; color: var(--sub); }
+
+  .grade-일반 { color: var(--common); }
+  .grade-레어 { color: var(--rare); }
+  .grade-에픽 { color: var(--epic); }
+  .grade-유니크 { color: var(--unique); }
+  .grade-레전더리 { color: var(--legend); }
+  .grade-신화 { color: #ff7cf0; text-shadow: 0 0 8px #ff7cf0; }
+  .grade-태초 { color: var(--prim); text-shadow: 0 0 8px var(--prim); }
+
+  .flash { animation: flash .4s; }
+  @keyframes flash { 0%{filter:brightness(3)} 100%{filter:brightness(1)} }
+  .shake { animation: shake .35s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+
+  /* 보스 등장/진행중 연출 */
+  #monemoji.boss-appear { animation: bossAppear .7s cubic-bezier(.2,2.5,.4,1); }
+  @keyframes bossAppear {
+    0% { transform: scale(0.2) rotate(-20deg); filter: brightness(3) drop-shadow(0 0 30px #ff7cf0); }
+    60% { transform: scale(1.3) rotate(5deg); filter: brightness(1.6) drop-shadow(0 0 25px #ff7cf0); }
+    100% { transform: scale(1) rotate(0); filter: brightness(1); }
+  }
+  #monemoji.boss-glow { animation: bossGlow 1.6s ease-in-out infinite; filter: drop-shadow(0 0 14px #ff7cf0); }
+  @keyframes bossGlow {
+    0%,100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
+
+  @media (max-width: 480px) {
+    #monemoji { font-size: 52px; }
+    .tab { font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="topbar">
+    <div id="title">🍀 운빨<span>강화</span>하기</div>
+    <div>
+      <span class="stat">💰 <b id="gold">0</b></span>
+      <span class="stat" id="dpsshow">DPS 0</span>
+    </div>
+  </div>
+
+  <div id="tabs">
+    <div class="tab on" data-tab="hunt">⚔️ 사냥터</div>
+    <div class="tab" data-tab="enhance">🔨 강화기</div>
+    <div class="tab" data-tab="craft">🧪 조합</div>
+    <div class="tab" data-tab="inventory">🎒 가방</div>
+    <div class="tab" data-tab="box">🎁 랜덤박스</div>
+    <div class="tab" data-tab="gamble">🎲 도박장</div>
+  </div>
+
+  <!-- 사냥터 -->
+  <div id="tab-hunt">
+    <div class="panel">
+      <div id="floorbar">
+        <div id="floortitle"></div>
+        <div id="floorbtns"></div>
+      </div>
+      <div id="monbox">
+        <div id="monemoji">❓</div>
+        <div id="monname"></div>
+        <div id="hpbarWrap"><div id="hpbar"></div></div>
+        <div id="hptext"></div>
+      </div>
+      <div id="huntinfo">
+        <span id="killcount"></span>
+        <span id="floorreward"></span>
+      </div>
+      <div id="dropinfo"></div>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button class="primary big" id="autoBtn">⏸ 사냥 중지</button>
+      </div>
+      <div style="margin-top:8px; display:flex; gap:8px;">
+        <button class="big" id="bossBtn" style="flex:1; border-color:#ff7cf0; color:#ff7cf0; font-weight:bold;">👹 보스 도전</button>
+        <button class="big danger" id="bossFleeBtn" style="flex:0 0 130px; display:none;">🏳️ 보스 포기</button>
+      </div>
+      <div style="text-align:center; margin-top:6px; font-size:12px; color:var(--sub);">
+        보스 HP는 이 사냥터 몬스터의 100배 · <span class="warn">1분 제한</span> · 승리 시 골드 대량 + <span class="grade-신화">신화 등급</span> 보스무기/보스장신구 드롭 (각 0.7% / 0.9%) · 재도전 쿨타임 1시간
+      </div>
+    </div>
+  </div>
+
+  <!-- 강화기 -->
+  <div id="tab-enhance" style="display:none">
+    <div class="panel">
+      <h3>🔨 무기 강화기</h3>
+      <div id="enhweapon"></div>
+      <div id="enhstat"></div>
+      <div class="enhrates" id="enhrates"></div>
+      <button class="primary big" id="enhBtn">강화하기</button>
+      <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
+        강화 실패 시 <span class="warn">단계 -1</span> · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
+        <b style="color:var(--unique)">+10 / +20 / +30 돌파</b> 시 공격력 대폭 상승 (리스크 클수록 리턴 커짐)
+      </div>
+    </div>
+  </div>
+
+  <!-- 조합 -->
+  <div id="tab-craft" style="display:none">
+    <div class="panel">
+      <h3>🧪 재료 & 장신구 조합</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료: <b>일반 재료 12개 + 레어 재료 4개</b><br>
+        장신구 등급은 사냥터 구간이 높을수록 올라갑니다. (장착 중인 장신구 효과가 항상 적용됩니다)<br>
+        💡 <b>+15 이상 강화</b>에는 고급(에픽+) 재료가 소모됩니다. 판매할지 강화에 쓸지 선택하세요!
+      </div>
+      <div id="accEqBox" style="margin-bottom:12px;"></div>
+      <div id="craftlist"></div>
+    </div>
+    <div class="panel">
+      <h3>🌿 보유 재료 & 판매</h3>
+      <div id="matselllist"></div>
+    </div>
+    <div class="panel">
+      <h3>👹 보스 장신구 <span style="font-size:12px;color:var(--sub)">— 보스 격파 시 낮은 확률로 획득 (신화 등급)</span></h3>
+      <div id="bossaccbox"></div>
+    </div>
+  </div>
+
+  <!-- 가방 -->
+  <div id="tab-inventory" style="display:none">
+    <div class="panel">
+      <h3>🎒 가방 <span style="font-size:12px;color:var(--sub)" id="invcount"></span></h3>
+      <div id="invlist"></div>
+    </div>
+  </div>
+
+  <!-- 랜덤박스 -->
+  <div id="tab-box" style="display:none">
+    <div class="panel">
+      <h3>🎁 랜덤박스 상점</h3>
+      <div id="boxlist"></div>
+      <div id="gachaslot"></div>
+    </div>
+  </div>
+
+  <!-- 도박장 -->
+  <div id="tab-gamble" style="display:none">
+    <div class="panel">
+      <h3>🎲 골드 도박장</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
+        테이블마다 최소 금액이 다릅니다. 걸은 골드가 <b style="color:#ff7a7a">전부 날아가거나</b> <b style="color:var(--gold)">순삭을 넘어 대박</b>이 날 수 있습니다.
+      </div>
+      <div id="tablebtns" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px;"></div>
+      <div id="tabledesc" style="font-size:13px; margin-bottom:8px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border);"></div>
+      <div id="betresult"></div>
+      <div id="betbtns">
+        <button data-bet="0.1">10% 걸기</button>
+        <button data-bet="0.25">25% 걸기</button>
+        <button data-bet="0.5">50% 걸기</button>
+        <button data-bet="1">올인 🔥</button>
+      </div>
+      <div id="gamblog" style="font-size:13px; color:var(--sub); min-height:20px; text-align:center;"></div>
+    </div>
+  </div>
+
+  <div id="logpanel"></div>
+  <div id="savebar">
+    <button id="saveBtn">💾 저장</button>
+    <button id="exportBtn">📤 저장코드 내보내기</button>
+    <button id="importBtn">📥 저장코드 불러오기</button>
+    <button id="resetBtn" class="danger">🗑 초기화</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* ======================================================================
+ *  운빨강화하기 - 밸런스/컨텐츠 수정은 이 아래 CONFIG 부분만 건드리면 됩니다
+ * ====================================================================== */
+
+// ---------- 무기 등급 ----------
+const GRADES = [
+  { name: '일반',      atk: 10,    enhanceCost: 40,     sell: 30,     color: '#b0b0b0' },
+  { name: '레어',      atk: 28,    enhanceCost: 200,    sell: 150,    color: '#4aa3ff' },
+  { name: '에픽',      atk: 75,    enhanceCost: 1000,   sell: 700,    color: '#b05cff' },
+  { name: '유니크',    atk: 200,   enhanceCost: 5000,   sell: 3500,   color: '#ff9e2c' },
+  { name: '레전더리',  atk: 550,   enhanceCost: 25000,  sell: 18000,  color: '#ff4a5e' },
+  { name: '신화',      atk: 950,   enhanceCost: 60000,  sell: 45000,  color: '#ff7cf0' },
+  { name: '태초',      atk: 1600,  enhanceCost: 120000, sell: 90000,  color: '#6cf0c2' },
+];
+
+// ---------- 무기 종류 (공속 = 초당 공격 횟수, 데미지 배율) ----------
+const WEAPON_TYPES = [
+  { name: '단검',   icon: '🗡️', speed: 1.8, dmgMult: 0.68 },
+  { name: '검',     icon: '⚔️', speed: 1.2, dmgMult: 0.90 },
+  { name: '도끼',   icon: '🪓', speed: 0.8, dmgMult: 1.35 },
+  { name: '창',     icon: '🔱', speed: 1.0, dmgMult: 1.10 },
+  { name: '활',     icon: '🏹', speed: 1.4, dmgMult: 0.78 },
+  { name: '지팡이', icon: '🪄', speed: 0.9, dmgMult: 1.25 },
+  { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65 },
+];
+// DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷
+
+// ---------- 맨손 (무기가 전부 파괴되면 맨손으로 싸움) ----------
+// 맨손은 파괴되지 않고, 강화 실패 시 +0으로 초기화
+const FIST = { type: '맨손', icon: '✊', speed: 2.5, dmgMult: 0.5, grade: 0 };
+function isFist(w) { return w && w.type === FIST.type; }
+function makeFist(enhance) {
+  return { id: 0, grade: FIST.grade, type: FIST.type, icon: FIST.icon, enhance: enhance || 0, effect: null, fist: true };
+}
+
+// ---------- 특수 효과 (레전더리 이상) ----------
+const EFFECTS = {
+  // 레전더리
+  blood:    { name: '피의 갈망',     desc: '공격 시 12% 확률로 치명타 (피해 2배)', grade: 4, crit: { chance: 0.12, mult: 2 } },
+  hunter:   { name: '사냥꾼의 본능', desc: '골드 획득 +35%, 아이템 드롭률 +30%',    grade: 4, gold: 0.35, drop: 0.30 },
+  flurry:   { name: '연격',          desc: '공격 시 18% 확률로 즉시 재공격',        grade: 4, extra: 0.18 },
+  // 신화
+  dragonslayer: { name: '용살자의 서약', desc: '보스에게 피해 +100%', grade: 5, bossDmg: 1.0 },
+  monarch:      { name: '군주의 위엄',   desc: '골드 획득 +50%, 드롭률 +50%', grade: 5, gold: 0.5, drop: 0.5 },
+  timelord:     { name: '시간의 지배자', desc: '공격 시 35% 확률로 즉시 재공격', grade: 5, extra: 0.35 },
+  // 태초
+  downfall: { name: '몰락의 일격',   desc: '공격 시 25% 확률로 치명타 (피해 3배)', grade: 6, crit: { chance: 0.25, mult: 3 } },
+  midas:    { name: '황금의 손길',   desc: '골드 획득 +80%, 아이템 드롭률 +60%',    grade: 6, gold: 0.80, drop: 0.60 },
+  clone:    { name: '분신난무',      desc: '공격 시 30% 확률로 2연타',              grade: 6, extra: 0.30 },
+};
+
+// ---------- 강화 설정 (최대 +30, 리스크 클수록 리턴 커짐) ----------
+const ENH = {
+  maxLevel: 30,
+  atkPerLevel: 0.15,          // 강화 1단계당 공격력 +15%
+  // 돌파 보너스: [단계, 배율] — 도달하면 곱연산으로 누적 적용
+  milestones: [[10, 1.25], [20, 1.4], [30, 1.6]],
+  // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%)
+  success: [
+    100, 100, 95, 92, 90,          // +0 ~ +4
+    87, 85, 82, 80, 77,            // +5 ~ +9
+    75, 72, 70, 67, 65,            // +10 ~ +14
+    62, 60, 57, 55, 52,            // +15 ~ +19
+    50, 47, 45, 42, 40,            // +20 ~ +24
+    37, 35, 32, 30, 27,            // +25 ~ +29
+  ],
+  // 실패 시 파괴 확률(%): index = 현재 단계. 0이면 파괴 없음(단계만 -1)
+  destroy: [
+    0, 0, 0, 0, 0,                 // +0 ~ +4
+    0, 0, 0, 0, 0,                 // +5 ~ +9
+    10, 10, 12, 12, 14,            // +10 ~ +14
+    14, 16, 16, 18, 18,            // +15 ~ +19
+    20, 20, 22, 22, 24,            // +20 ~ +24
+    24, 26, 26, 28, 30,            // +25 ~ +29
+  ],
+};
+
+// ---------- 사냥터 (20단계) ----------
+const FLOORS = [
+  { name: '초원',      monster: '슬라임',        emoji: '🟢', hp: 60,
+    mats: ['슬라임 젤액', '슬라임 핵', '황금 슬라임 왕관'],
+    boss: { name: '젤라트라, 천 년의 젤 왕', emoji: '👑' } },
+  { name: '동굴',      monster: '야생 박쥐',     emoji: '🦇', hp: 120,
+    mats: ['박쥐 날개막', '박쥐의 귀', '여왕박쥐의 손톱'],
+    boss: { name: '노스페라투, 심연의 숨', emoji: '🖤' } },
+  { name: '숲길',      monster: '독버섯',        emoji: '🍄', hp: 240,
+    mats: ['버섯 가루', '포자 주머니', '무지갯빛 대버섯'],
+    boss: { name: '미아크, 부패의 근원', emoji: '💀' } },
+  { name: '숲깊은곳',  monster: '들늑대',        emoji: '🐺', hp: 480,
+    mats: ['잿빛 늑대 가죽', '늑대 송곳니', '달그림자 송곳니'],
+    boss: { name: '펜리르, 달을 삼키는 자', emoji: '🌑' } },
+  { name: '고블린 마을', monster: '고블린',      emoji: '👺', hp: 950,
+    mats: ['고블린 가죽', '고블린 목걸이', '고블린 송곳니'],
+    boss: { name: '그르쉬나크, 백전의 약탈왕', emoji: '⚔️' } },
+  { name: '폐허',      monster: '스켈레톤',      emoji: '💀', hp: 1900,
+    mats: ['낡은 뼈 조각', '스켈레톤의 갑주', '해골 군주의 두개골'],
+    boss: { name: '오시리우스, 무덤의 군주', emoji: '⚱️' } },
+  { name: '오크 진지', monster: '오크 전사',     emoji: '👹', hp: 3800,
+    mats: ['오크 전투 가죽', '오크의 어깨 보호대', '오크 대장의 도끼 파편'],
+    boss: { name: '크러시 브루트, 산을 부수는 자', emoji: '💥' } },
+  { name: '거미 둥지', monster: '독거미',        emoji: '🕷️', hp: 7500,
+    mats: ['거미줄 실', '거미 독샘', '여왕거미의 눈'],
+    boss: { name: '아라크네라, 거미줄의 여제', emoji: '🕸️' } },
+  { name: '고대 유적', monster: '골렘 파수병',   emoji: '🗿', hp: 15000,
+    mats: ['돌 파편', '고대 청동 기어', '골렘의 마력 코어'],
+    boss: { name: '아틀라스, 천계의 문지기', emoji: '🗿' } },
+  { name: '늪지대',    monster: '리저드맨',      emoji: '🦎', hp: 30000,
+    mats: ['리저드 비늘', '리저드 가시갑옷 파편', '심해 진주'],
+    boss: { name: '바실리스크, 늪을 뒤흔든 자', emoji: '🐍' } },
+  { name: '저주받은 성', monster: '해골 기사',   emoji: '☠️', hp: 60000,
+    mats: ['녹슨 갑옷 파편', '기사의 문장', '죽음의 검 파편'],
+    boss: { name: '모르드레드, 파멸의 흑기사', emoji: '🗡️' } },
+  { name: '미궁',      monster: '미노타우르스',  emoji: '🐂', hp: 120000,
+    mats: ['두꺼운 뿔', '미로의 나침반', '황금 미노타우르스 뿔'],
+    boss: { name: '아스테리온, 미궁의 절망', emoji: '🪓' } },
+  { name: '어둠의 탑', monster: '암흑 마법사',   emoji: '🧙', hp: 240000,
+    mats: ['마나 결정', '저주받은 마도서 페이지', '어둠의 마력 구슬'],
+    boss: { name: '네크로티스, 금서를 삼킨 자', emoji: '📕' } },
+  { name: '하늘섬',    monster: '와이번',        emoji: '🐉', hp: 480000,
+    mats: ['와이번 비늘', '바람의 날개뼈', '폭풍의 심장'],
+    boss: { name: '퀴라사에, 폭풍의 계승자', emoji: '🌩️' } },
+  { name: '죽음의 땅', monster: '리치 로드',     emoji: '🧟', hp: 950000,
+    mats: ['영혼의 재', '리치의 관 조각', '영혼 항아리'],
+    boss: { name: '베즐무트, 영혼을 재는 자', emoji: '⚱️' } },
+  { name: '마계 입구', monster: '데몬 워리어',   emoji: '😈', hp: 1900000,
+    mats: ['데몬 가죽', '항복한 악마의 뿔', '마왕의 피 한 병'],
+    boss: { name: '발자크, 핏빛 계약의 마왕', emoji: '🩸' } },
+  { name: '마계 심부', monster: '베히모스',      emoji: '🦣', hp: 3800000,
+    mats: ['두꺼운 마수 가죽', '베히모스의 뼈', '베히모스의 심장'],
+    boss: { name: '단테스, 대지를 걷는 재앙', emoji: '🏔️' } },
+  { name: '심연',      monster: '심연의 감시자', emoji: '👁️', hp: 7600000,
+    mats: ['심연의 안와', '감시자의 결정 눈', '심연의 심장'],
+    boss: { name: '아자토스, 만물을 바라보는 눈', emoji: '👁️' } },
+  { name: '용의 둥지', monster: '고대 드래곤',   emoji: '🐲', hp: 15000000,
+    mats: ['드래곤 비늘', '용의 이빨', '용왕의 눈'],
+    boss: { name: '니드호그, 세계수를 갉는 재앙', emoji: '🐉' } },
+  { name: '신들의 영역', monster: '몰락한 신',   emoji: '😇', hp: 30000000,
+    mats: ['잿빛 신의 파편', '몰락한 신의 깃털', '태초의 신성'],
+    boss: { name: '루멘 아르카, 광휘를 버린 신왕', emoji: '💫' } },
+];
+
+// ---------- 보스 시스템 ----------
+const BOSS = {
+  timeLimit: 60,          // 1분 제한
+  cooldown: 3600 * 1000,  // 1시간
+  hpMult: 100,            // 체력 = 사냥터 몬스터 × 100
+  weaponDrop: 0.007,      // 신화 보스무기 드롭 (0.7%)
+  accDrop: 0.009,         // 신화 보스장신구 드롭 (0.9%)
+  goldMult: 50,           // 승리 보상 골드 (처치당 골드 × 50)
+};
+
+// 신화 등급 무기 특수 효과는 EFFECTS에 통합 (grade: 5)
+
+// 보스 장신구 (세트 효과 포함, index = 사냥터 번호)
+const BOSS_ACCS = [
+  { name: '킹 슬라임의 왕관',   eff: { gold: 0.08 } },
+  { name: '흡혈박쥐의 속곗니',  eff: { speed: 0.08 } },
+  { name: '버섯왕의 포자왕관',  eff: { atk: 0.08 } },
+  { name: '월광 늑대의 영혼석', eff: { luck: 0.08 } },
+  { name: '족장의 정복자 반지', eff: { gold: 0.12 } },
+  { name: '대군주의 사슬',      eff: { atk: 0.12 } },
+  { name: '대족장의 투혼 팔찌', eff: { speed: 0.12 } },
+  { name: '여왕의 밀실 열쇠',   eff: { luck: 0.12 } },
+  { name: '수호자의 심장 코어', eff: { atk: 0.16 } },
+  { name: '리저드 제왕의 진주', eff: { gold: 0.16 } },
+  { name: '기수의 파멸 장갑',   eff: { speed: 0.16 } },
+  { name: '제왕의 황금 나침반', eff: { atk: 0.20 } },
+  { name: '대현자의 금서',      eff: { enh: 4 } },
+  { name: '여왕의 폭풍 깃털',   eff: { luck: 0.20 } },
+  { name: '리치킹의 영혼 반지', eff: { gold: 0.20 } },
+  { name: '데몬로드의 계약서',  eff: { atk: 0.24 } },
+  { name: '베히모스의 대퇴골',  eff: { speed: 0.24 } },
+  { name: '심연의 밀봉 인장',   eff: { luck: 0.28 } },
+  { name: '용왕의 심장',        eff: { atk: 0.30 } },
+  { name: '신왕의 태초 인장',   eff: { gold: 0.25, luck: 0.25, enh: 4 } },
+];
+
+// ---------- 재료/장신구 ----------
+// 사냥터 구간별 재료 등급 (일반/레어/에픽 → 레어/에픽/유니크 → 에픽/유니크/레전더리 → 유니크/레전더리/태초)
+const MAT_TIERS = [[0, 1, 2], [1, 2, 3], [2, 3, 4], [3, 4, 5]];
+const UNIQUE_CHANCE = 0.008;   // 유니크 몬스터 출현 확률 (0.8%)
+const CRAFT_COST = { n0: 12, n1: 4 };  // 일반 재료 12개 + 레어 재료 4개
+
+// 사냥터별 장신구 (index = 사냥터 번호 - 1, 등급은 해당 사냥터 최고 등급 재료와 동일)
+const ACCESSORIES = [
+  { name: '슬라임 반지',        eff: { gold: 0.06 } },
+  { name: '박쥐 날개 부적',     eff: { speed: 0.06 } },
+  { name: '버섯 목걸이',        eff: { atk: 0.06 } },
+  { name: '달그림자 이빨 귀걸이', eff: { luck: 0.06 } },
+  { name: '고블린 황금 반지',   eff: { gold: 0.10 } },
+  { name: '해골 갑주 팔찌',     eff: { atk: 0.10 } },
+  { name: '오크 전투 팔찌',     eff: { speed: 0.10 } },
+  { name: '여왕거미의 눈 부적', eff: { luck: 0.10 } },
+  { name: '골렘 코어 목걸이',   eff: { atk: 0.14 } },
+  { name: '심해 진주 목걸이',   eff: { gold: 0.14 } },
+  { name: '죽음의 기수 장갑',   eff: { speed: 0.14 } },
+  { name: '황금 미노 뿔 반지',  eff: { atk: 0.18 } },
+  { name: '지혜의 오브',        eff: { enh: 3 } },
+  { name: '폭풍의 깃털 부적',   eff: { luck: 0.18 } },
+  { name: '영혼 항아리 반지',   eff: { gold: 0.18 } },
+  { name: '핏빛 뿔 팔찌',       eff: { atk: 0.22 } },
+  { name: '베히모스 가죽 팔찌', eff: { speed: 0.22 } },
+  { name: '심연의 눈 부적',     eff: { luck: 0.25 } },
+  { name: '용왕의 눈 반지',     eff: { atk: 0.26 } },
+  { name: '신의 유물',          eff: { gold: 0.20, luck: 0.20, enh: 3 } },
+];
+const FLOOR = {
+  goldBase: 12, goldGrowth: 1.42,   // 1단계 골드 10 → 20단계 약 13,000
+  unlockKills: 10,                  // 다음 사냥터 해금 조건 (처치 수)
+  boxDrop: 0.004,                   // 랜덤박스 드롭 확률 (0.4%)
+  weaponDrop: 0.006,                // 무기 드롭 확률 (0.6%)
+};
+
+// ---------- 랜덤박스 ----------
+const BOXES = [
+  { name: '일반 랜덤박스', icon: '📦', cost: 500,
+    weapon: [[0,35],[1,12.5],[2,2.5]], gold: 0.42, box: [[1,8]] },
+  { name: '고급 랜덤박스', icon: '🎁', cost: 2500,
+    weapon: [[0,15],[1,25],[2,12],[3,3]], gold: 0.33, box: [[2,9],[3,3]] },
+  { name: '희귀 랜덤박스', icon: '🎊', cost: 12000,
+    weapon: [[1,20],[2,28],[3,10],[4,2]], gold: 0.25, box: [[3,15]] },
+  { name: '전설 랜덤박스', icon: '🏆', cost: 60000,
+    weapon: [[2,25],[3,28],[4,10],[5,2]], gold: 0.25, box: [[3,10]] },
+];
+
+// ---------- 도박 ----------
+const GAMBLE = [
+  { mult: -1.0, weight: 30 },  // 전액 손실
+  { mult: -0.5, weight: 22 },
+  { mult:  0.0, weight: 12 },
+  { mult:  0.5, weight: 18 },
+  { mult:  1.0, weight: 11 },
+  { mult:  2.0, weight:  6 },
+  { mult:  5.0, weight:  0.3 },  // 잭팟 (기존 3% → 0.3%)
+];
+
+// ---------- 도박장 테이블 ----------
+const GAMBLE_TABLES = [
+  { name: '🌱 초급 테이블', min: 100,    icon: '🌱', desc: '가볍게 즐기는 테이블. 손해도 가볍다.' },
+  { name: '🎲 중급 테이블', min: 1000,   icon: '🎲', desc: '어느 정도 자본이 있어야 앉을 수 있다.' },
+  { name: '💎 고급 테이블', min: 10000,  icon: '💎', desc: '승부사들의 자리. 한 판이 크게 흔들린다.' },
+  { name: '🎩 타짜 테이블', min: 100000, icon: '🎩', desc: '운빨을 증명하는 곳. 올인하는 자만이 남는다.' },
+];
+
+/* ===================== 게임 상태 ===================== */
+let S = null;   // state
+let uid = 1;
+
+function newState() {
+  return {
+    gold: 0,
+    floor: 0,          // 현재 선택 사냥터 (index)
+    unlocked: 1,       // 해금된 사냥터 수
+    kills: {},         // floor -> 처치 수
+    totalKills: 0,
+    weapons: [],       // 인벤토리
+    equipped: null,    // 무기 id
+    mats: {},          // 재료: { "사냥터|재료등급": count }
+    accs: [],          // 보유 장신구: [{ floor, grade }]
+    accEquipped: null, // 장착 장신구: { floor, grade } or null
+    bossAccs: [],      // 보스 장신구: [{ floor }] (신화 등급)
+    bossAccEquipped: null, // 장착 보스 장신구: floor or null
+    bossCooldowns: {}, // 사냥터별 보스 쿨타임 종료 시각 (timestamp)
+    uniqueKills: 0,
+    bossWins: 0,
+    auto: true,
+    gambleTable: 0,    // 선택된 도박 테이블 (0~3)
+    lastSeen: null,    // 마지막 접속 시각 (오프라인 보상용)
+    boxCount: 0,
+    gambleCount: 0,
+    destroyedCount: 0,
+  };
+}
+
+function defaultWeapon() {
+  return genWeapon(0);
+}
+
+/* ===================== 무기 생성 ===================== */
+function genWeapon(gradeIdx) {
+  const t = WEAPON_TYPES[Math.floor(Math.random() * WEAPON_TYPES.length)];
+  const g = GRADES[gradeIdx];
+  const w = {
+    id: uid++,
+    grade: gradeIdx,
+    type: t.name,
+    icon: t.icon,
+    enhance: 0,
+    effect: null,
+  };
+  if (gradeIdx >= 4) {
+    const pool = Object.values(EFFECTS).filter(e => e.grade === gradeIdx);
+    w.effect = pool[Math.floor(Math.random() * pool.length)].name;
+  }
+  return w;
+}
+
+function weaponAtk(w) {
+  const g = GRADES[w.grade];
+  const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
+  const base = g.atk * t.dmgMult;
+  const enhMult = (1 + ENH.atkPerLevel * w.enhance) * milestoneMult(w.enhance);
+  return base * enhMult * (1 + accEff().atk);
+}
+// 돌파 보너스 배율 (도달한 마일스톤을 모두 곱함)
+function milestoneMult(enh) {
+  let m = 1;
+  for (const [lv, mult] of ENH.milestones) {
+    if (enh >= lv) m *= mult;
+  }
+  return m;
+}
+function weaponSpeed(w) {
+  const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
+  return t.speed * (1 + accEff().speed);
+}
+// 장신구 효과 합산 (일반 + 보스 장신구, 세트 효과 포함)
+function accEff() {
+  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0 };
+  if (S && S.accEquipped) {
+    const a = ACCESSORIES[S.accEquipped.floor];
+    if (a) for (const [k, v] of Object.entries(a.eff)) eff[k] += v;
+  }
+  // 보스 장신구
+  if (S && S.bossAccEquipped != null) {
+    const b = BOSS_ACCS[S.bossAccEquipped];
+    if (b) for (const [k, v] of Object.entries(b.eff)) eff[k] += v;
+  }
+  // 세트 효과: 같은 사냥터의 보스무기 + 보스장신구 → 해당 사냥터에서 보너스
+  const setFloor = bossSetFloor();
+  if (setFloor != null && S && S.floor === setFloor) {
+    eff.gold += 0.5;   // 해당 사냥터 골드 +50%
+    eff.luck += 0.5;   // 해당 사냥터 드롭률 +50%
+    eff.atk  += 0.3;   // 해당 사냥터 공격력 +30%
+  }
+  return eff;
+}
+// 세트 효과가 발동하는 사냥터 (보스무기 floor와 보스장신구 floor가 같으면)
+function bossSetFloor() {
+  if (!S || S.bossAccEquipped == null) return null;
+  const w = getEquipped();
+  if (!w || w.bossFloor === undefined) return null;
+  return w.bossFloor === S.bossAccEquipped ? w.bossFloor : null;
+}
+// 보스 무기/보스 장신구 여부
+function isBossWeapon(w) { return w && w.bossFloor !== undefined; }
+function getEquipped() {
+  return S.weapons.find(w => w.id === S.equipped) || null;
+}
+function playerDPS() {
+  const w = getEquipped();
+  if (!w) return 0;
+  return weaponAtk(w) * weaponSpeed(w);
+}
+function enhanceCost(w) {
+  // 저단계 비용 50% 인하: 기본비용 × 0.5 × (단계+1) × 완만한 증가
+  return Math.floor(GRADES[w.grade].enhanceCost * (w.enhance + 1) * (1 + w.enhance * 0.04) * 0.5);
+}
+
+// 고레벨 강화에 필요한 고급 재료 수 (에픽 등급 이상 재료)
+// +15 강화부터 필요: +15→1개 ... +29→15개
+const HIGH_MAT_START = 15;
+function highMatsNeeded(enhance) {
+  return enhance >= HIGH_MAT_START ? enhance - (HIGH_MAT_START - 1) : 0;
+}
+// 보유 고급 재료 수 (각 사냥터의 3번째(에픽급) 재료 = matGrade 2)
+function countHighMats() {
+  let n = 0;
+  for (const key in S.mats) {
+    const g = +key.split('|')[1];
+    if (g >= 2) n += S.mats[key];
+  }
+  return n;
+}
+// 고급 재료 소모: 낮은 사냥터(저티어) 재료부터
+function consumeHighMats(n) {
+  const keys = Object.keys(S.mats).filter(k => +k.split('|')[1] >= 2 && S.mats[k] > 0);
+  keys.sort((a, b) => {
+    const [fa, ga] = a.split('|').map(Number);
+    const [fb, gb] = b.split('|').map(Number);
+    return fa - fb || ga - gb;
+  });
+  for (const k of keys) {
+    if (n <= 0) break;
+    const use = Math.min(n, S.mats[k]);
+    S.mats[k] -= use;
+    n -= use;
+    if (S.mats[k] <= 0) delete S.mats[k];
+  }
+  return n <= 0;
+}
+
+// 재료 판매가 (사냥터 골드 기준: 일반 1.5배 / 레어 4배 / 에픽 10배)
+function matSellPrice(f, g) {
+  const mult = [1.5, 4, 10][g] || 1;
+  return Math.max(1, Math.floor(floorGold(f) * mult));
+}
+function sellPrice(w) {
+  const g = GRADES[w.grade] || GRADES[0];
+  const enh = typeof w.enhance === 'number' && w.enhance >= 0 ? w.enhance : 0;
+  // 고강화 무기는 돌파 배율만큼 가치 폭등: (1 + 단계×0.2) × 돌파배율²
+  const ms = milestoneMult(enh);
+  return Math.max(1, Math.floor(g.sell * (1 + enh * 0.2) * ms * ms * (w.effect ? 5 : 1)));
+}
+
+/* ===================== 유틸 ===================== */
+const $ = id => document.getElementById(id);
+function fmt(n) {
+  n = Math.floor(n);
+  if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, '') + '억';
+  if (n >= 1e4) return (n / 1e4).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + '만';
+  return n.toLocaleString();
+}
+function gradeTag(w) {
+  const g = GRADES[w.grade];
+  const eff = w.effect ? ` <span style="font-size:12px">[${EFFECTS[w.effect] ? EFFECTS[w.effect].name : w.effect}]</span>` : '';
+  const boss = w.bossFloor !== undefined ? ' 👹' : '';
+  const fist = isFist(w) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
+  return `<span class="grade-${g.name}">${g.name} ${w.icon}${w.type}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}`;
+}
+function wrand(pairs) { // [[value, weight], ...]
+  let total = pairs.reduce((s, p) => s + p[1], 0);
+  let r = Math.random() * total;
+  for (const [v, w] of pairs) { r -= w; if (r <= 0) return v; }
+  return pairs[pairs.length - 1][0];
+}
+function log(msg, cls) {
+  const el = document.createElement('div');
+  if (cls) el.className = cls;
+  el.innerHTML = msg;
+  const lp = $('logpanel');
+  lp.prepend(el);
+  while (lp.children.length > 60) lp.lastChild.remove();
+}
+
+/* ===================== 사냥 로직 ===================== */
+const mon = { hp: 0, maxHp: 0, atkTimer: 0, spawnTimer: 0, dead: false, unique: false };
+
+function floorGold(f) {
+  return Math.floor(FLOOR.goldBase * Math.pow(FLOOR.goldGrowth, f));
+}
+function floorHp(f) { return FLOORS[f].hp; }
+
+function spawnMonster() {
+  mon.maxHp = floorHp(S.floor);
+  mon.hp = mon.maxHp;
+  mon.dead = false;
+  mon.atkTimer = 0;
+  // 유니크 몬스터 판정
+  mon.unique = Math.random() < UNIQUE_CHANCE;
+  if (mon.unique) {
+    const boss = FLOORS[S.floor].boss;
+    mon.maxHp = Math.floor(floorHp(S.floor) * 4);
+    mon.hp = mon.maxHp;
+    $('monemoji').textContent = boss.emoji;
+    $('monname').innerHTML = `<span class="grade-태초">⭐ 유니크 ${boss.name}</span>`;
+    log(`⚠️ 유니크 몬스터 <b>${boss.name}</b> 출현! (골드 10배, 레어 재료 대량!)`, 'lg-prim');
+  } else {
+    renderMonster();
+  }
+  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
+  renderHP();
+}
+
+function dropRoll() {
+  const w = getEquipped();
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const ae = accEff();
+  const luck = ae.luck;
+  let dropMul = (e && e.drop ? 1 + e.drop : 1) * (1 + luck);
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  const isU = mon.unique;
+
+  if (isU) goldMul *= 10;
+
+  // 골드
+  const gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
+  S.gold += gold;
+  log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}`);
+
+  // 재료 드롭 (항상 1~2개)
+  dropMaterials(isU, luck);
+
+  // 랜덤박스 드롭
+  if (Math.random() < FLOOR.boxDrop * dropMul) {
+    const tier = S.floor >= 12 ? 2 : S.floor >= 6 ? 1 : 0;
+    const idx = wrand([[tier, 70], [Math.min(tier + 1, 3), 30]]);
+    S.boxCount++;
+    giveBox(idx, '사냥 드롭');
+  }
+  // 무기 드롭
+  else if (Math.random() < FLOOR.weaponDrop * dropMul) {
+    const grade = floorWeaponGrade(S.floor);
+    const nw = genWeapon(grade);
+    addWeapon(nw);
+    log(`🎁 무기 드롭! ${gradeTag(nw)}`, grade >= 3 ? 'lg-epic' : 'lg-good');
+    if (grade >= 4) { log(`✨ 레전더리 이상 무기가 나왔습니다!!`, 'lg-prim'); }
+  }
+
+  // 처치 수 & 해금
+  S.kills[S.floor] = (S.kills[S.floor] || 0) + 1;
+  S.totalKills++;
+  if (isU) { S.uniqueKills++; }
+  if (S.floor + 1 < FLOORS.length && (S.kills[S.floor] || 0) >= FLOOR.unlockKills && S.unlocked < S.floor + 2) {
+    S.unlocked = Math.max(S.unlocked, S.floor + 2);
+    log(`🔓 사냥터 [${FLOORS[S.floor + 1].name}] 해금!`, 'lg-gold');
+  }
+  renderTop(); renderFloorUI();
+}
+
+// 재료 드롭: 일반 재료(높은 확률), 레어 재료(중간), 에픽 재료(낮음)
+function dropMaterials(isU, luck) {
+  const f = S.floor;
+  const tierIdx = Math.min(3, Math.floor(f / 5));  // 구간: 0~4 / 5~9 / 10~14 / 15~19
+  const F = FLOORS[f];
+  const grades = MAT_TIERS[tierIdx]; // [일반급, 레어급, 에픽급] 실제 등급 index
+
+  // 일반 재료 (두 종류 중 하나)
+  const commonChance = (0.5 + luck) * (isU ? 2 : 1);
+  if (Math.random() < Math.min(0.95, commonChance)) {
+    addMat(f, grades[0]);
+  }
+  // 레어 재료
+  const rareChance = (0.12 + luck * 0.5) * (isU ? 4 : 1);
+  if (Math.random() < Math.min(0.9, rareChance)) {
+    addMat(f, grades[1]);
+  }
+  // 에픽(최고) 재료
+  const epicChance = (0.03 + luck * 0.15) * (isU ? 8 : 1);
+  if (Math.random() < Math.min(0.8, epicChance)) {
+    addMat(f, grades[2]);
+  }
+}
+
+function addMat(f, matGrade) {
+  const key = f + '|' + matGrade;
+  S.mats[key] = (S.mats[key] || 0) + 1;
+  const name = FLOORS[f].mats[matGrade];
+  const gname = GRADES[matGrade].name;
+  log(`🌿 재료 획득: <span class="grade-${gname}">${name}</span> (보유 ${S.mats[key]})`);
+}
+
+// 조합 가능 여부 확인
+function canCraft(f) {
+  const key0 = f + '|0', key1 = f + '|1';
+  return (S.mats[key0] || 0) >= CRAFT_COST.n0 && (S.mats[key1] || 0) >= CRAFT_COST.n1;
+}
+
+function craftAccessory(f) {
+  if (!canCraft(f)) { log('재료가 부족합니다!', 'lg-bad'); return; }
+  const key0 = f + '|0', key1 = f + '|1';
+  S.mats[key0] -= CRAFT_COST.n0;
+  S.mats[key1] -= CRAFT_COST.n1;
+  // 장신구 등급 = 해당 사냥터의 최고 등급 재료 등급
+  const tierIdx = Math.min(3, Math.floor(f / 5));
+  const accGrade = MAT_TIERS[tierIdx][2];
+  const acc = { floor: f, grade: accGrade };
+  S.accs.push(acc);
+  const a = ACCESSORIES[f];
+  const gname = GRADES[accGrade].name;
+  log(`🔨 장신구 제작 성공! <span class="grade-${gname}">${gname} [${a.name}]</span>`, 'lg-good');
+  renderCraft();
+  save();
+}
+
+function floorWeaponGrade(f) {
+  const wts = [];
+  const common = Math.max(0, 60 - f * 5);
+  if (common > 0) wts.push([0, common]);
+  wts.push([1, 30 + f * 2]);
+  if (f >= 5)  wts.push([2, f * 1.5]);
+  if (f >= 10) wts.push([3, (f - 9) * 2]);
+  if (f >= 15) wts.push([4, (f - 14) * 1.2]);
+  if (f >= 18) wts.push([5, (f - 17) * 0.5]);
+  return wrand(wts);
+}
+
+function giveBox(idx, src) {
+  openBox(idx, src);
+}
+
+// 박스를 바로 개봉 (인벤토리 보관 없이 즉시 개봉 방식)
+function openBox(idx, src) {
+  const b = BOXES[idx];
+  const roll = Math.random();
+  let acc = 0;
+  const wChance = b.weapon ? b.weapon.reduce((s, p) => s + p[1], 0) / 100 : 0;
+  const bChance = b.box ? b.box.reduce((s, p) => s + p[1], 0) / 100 : 0;
+  const gChance = b.gold;
+
+  if (roll < wChance) {
+    const grade = wrand(b.weapon);
+    const nw = genWeapon(grade);
+    addWeapon(nw);
+    log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 무기! ${gradeTag(nw)}`, grade >= 3 ? 'lg-epic' : 'lg-good');
+    if (grade >= 4) log(`🌟 축하합니다! ${GRADES[grade].name} 등급 무기를 획득했습니다!`, 'lg-prim');
+    if (currentTab === 'box') $('gachaslot').innerHTML = `${b.icon} <b>${b.name}</b> 결과:<br>${gradeTag(nw)}<br><span style="font-size:12px;color:var(--sub)">공격력 ${fmt(weaponAtk(nw))} | 공속 ${weaponSpeed(nw).toFixed(1)}/초</span>`;
+  } else if (roll < wChance + bChance) {
+    const ni = wrand(b.box);
+    log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 상자 등장! ${BOXES[ni].icon} <b>${BOXES[ni].name}</b> 획득!`, 'lg-gold');
+    openBox(ni, '연쇄 개봉');
+    if (currentTab === 'box') $('gachaslot').innerHTML = `🎉 <b>${BOXES[ni].name}</b> 연쇄 개봉! 로그를 확인하세요!`;
+  } else {
+    const g = Math.floor(b.cost * (0.3 + Math.random() * 1.7)); // 30% ~ 200%
+    S.gold += g;
+    log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 골드 +${fmt(g)}`, g > b.cost ? 'lg-gold' : '');
+    if (currentTab === 'box') $('gachaslot').innerHTML = `${b.icon} <b>${b.name}</b> 결과:<br>💰 +${fmt(g)} 골드 ${g > b.cost ? '(이득!)' : '(아...'}`;
+  }
+  renderTop();
+  save();
+}
+
+function addWeapon(w) {
+  if (S.weapons.length >= 60) {
+    // 가방이 가득 차면 맨손을 자동 판매 목록에서 제외하고 가장 약한 무기를 판매
+    const sellable = S.weapons.filter(x => !isFist(x) && x.id !== S.equipped);
+    if (!sellable.length) {
+      const price = sellPrice(w);
+      S.gold += price;
+      log(`🎒 가방이 가득 차서 자동 판매: +${fmt(price)} 골드`);
+      return;
+    }
+    const weakest = [...sellable].sort((a, b) => weaponAtk(a) - weaponAtk(b))[0];
+    const price = sellPrice(weakest);
+    S.gold += price;
+    S.weapons = S.weapons.filter(x => x.id !== weakest.id);
+    log(`🎒 가방이 가득 차서 가장 약한 무기 자동 판매: ${gradeTag(weakest)} → +${fmt(price)} 골드`);
+    return;
+  }
+  S.weapons.push(w);
+  if (!S.equipped) S.equipped = w.id;
+}
+
+/* ===================== 게임 루프 ===================== */
+function tick(dt) {
+  // 보스전 진행 중: 타이머 감소
+  if (bossFight.active) {
+    bossFight.timeLeft -= dt;
+    renderBossBtn();
+    if (bossFight.timeLeft <= 0) { endBossFight(false); return; }
+  }
+  if (mon.dead) {
+    mon.spawnTimer -= dt;
+    if (mon.spawnTimer <= 0) spawnMonster();
+    return;
+  }
+  const w = getEquipped();
+  if (!w) return;
+  mon.atkTimer += dt * weaponSpeed(w);
+  let attacked = false;
+  while (mon.atkTimer >= 1) {
+    mon.atkTimer -= 1;
+    attack(w);
+    attacked = true;
+    if (mon.hp <= 0) break;
+  }
+  if (attacked) {
+    mon.hp = Math.max(0, mon.hp);
+    renderHP();
+    if (mon.hp <= 0) {
+      mon.dead = true;
+      mon.spawnTimer = 0.35;
+      $('monemoji').classList.add('flash');
+      setTimeout(() => $('monemoji').classList.remove('flash'), 400);
+      if (bossFight.active) {
+        endBossFight(true);
+      } else {
+        dropRoll();
+        renderFloorUI();
+      }
+    }
+  }
+}
+
+function attack(w) {
+  let dmg = weaponAtk(w) * (0.9 + Math.random() * 0.2);
+  let msg = null;
+  const e = w.effect ? EFFECTS[w.effect] : null;
+  // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
+  if (bossFight.active) {
+    dmg *= 1 + bossDmgBonus();
+  }
+  if (e && e.crit && Math.random() < e.crit.chance) {
+    dmg *= e.crit.mult;
+    msg = `💥 치명타! [${e.name}] ${fmt(dmg)} 데미지`;
+  }
+  mon.hp -= dmg;
+  // 연타 효과
+  if (e && e.extra && Math.random() < e.extra) {
+    mon.hp -= dmg;
+    msg = (msg ? msg + ' + 연타!' : `⚡ 연타! ${fmt(dmg)} 데미지`);
+  }
+  if (msg) { log(msg); }
+}
+
+/* ===================== 보스 전투 ===================== */
+const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0 };
+
+// 보스 데미지 보너스: 세트 효과(+30%) + 용살자의 서약(+100%)
+function bossDmgBonus() {
+  let bonus = 0;
+  const w = getEquipped();
+  if (w) {
+    const e = w.effect ? EFFECTS[w.effect] : null;
+    if (e && e.bossDmg) bonus += e.bossDmg;
+  }
+  return bonus;
+}
+
+function startBossFight() {
+  const f = S.floor;
+  const cdEnd = S.bossCooldowns[f] || 0;
+  if (Date.now() < cdEnd) {
+    const left = Math.ceil((cdEnd - Date.now()) / 60000);
+    log(`⏳ 보스 재도전 쿨타임: ${left}분 남았습니다.`, 'lg-bad');
+    return;
+  }
+  if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
+  bossFight.active = true;
+  bossFight.floor = f;
+  bossFight.timeLeft = BOSS.timeLimit;
+  mon.unique = false;
+  mon.maxHp = floorHp(f) * BOSS.hpMult;
+  mon.hp = mon.maxHp;
+  mon.dead = false;
+  mon.atkTimer = 0;
+  const F = FLOORS[f];
+  const b = F.boss;
+  $('monemoji').textContent = b.emoji;
+  $('monemoji').classList.add('boss-appear');
+  $('monname').innerHTML = `<span class="grade-신화" style="font-size:19px">👑 ${b.name}</span> <span style="font-size:12px;color:#ff7cf0;">★ BOSS ★</span>`;
+  $('floortitle').innerHTML = `👹 <span class="grade-신화">보스전 — ${b.name}</span>`;
+  log(`⚔️ <b>보스전 시작!</b> <span class="grade-신화">${b.name}</span> — 1분 안에 처치하세요! (HP: ${fmt(mon.maxHp)})`, 'lg-prim');
+  setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
+  $('monemoji').classList.add('boss-glow');
+  renderBossBtn(); renderHP();
+}
+
+function endBossFight(win) {
+  bossFight.active = false;
+  $('monemoji').classList.remove('boss-glow');
+  const f = bossFight.floor;
+  const F = FLOORS[f];
+  if (win) {
+    S.bossWins++;
+    S.bossCooldowns[f] = Date.now() + BOSS.cooldown;
+    const goldMul = 1 + accEff().gold;
+    const gold = Math.floor(floorGold(f) * BOSS.goldMult * goldMul);
+    S.gold += gold;
+    log(`🏆 <b><span class="grade-신화">${F.boss.name}</span> 격파!</b> +${fmt(gold)} 골드 (1시간 후 재도전 가능)`, 'lg-prim');
+    // 승리 연출
+    $('monemoji').classList.add('boss-appear');
+    setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
+    // 신화 보스무기 드롭
+    if (Math.random() < BOSS.weaponDrop * (1 + accEff().luck)) {
+      const t = WEAPON_TYPES[Math.floor(Math.random() * WEAPON_TYPES.length)];
+      const pool = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === 5);
+      const nw = {
+        id: uid++, grade: 5, type: t.name, icon: t.icon, enhance: 0,
+        effect: pool[Math.floor(Math.random() * pool.length)],
+        bossFloor: f,   // 보스무기 표식
+      };
+      addWeapon(nw);
+      log(`💎 <b>신화 보스무기 드롭!</b> ${gradeTag(nw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
+    }
+    // 신화 보스장신구 드롭
+    if (Math.random() < BOSS.accDrop * (1 + accEff().luck)) {
+      if (S.bossAccs.some(bf => bf === f)) {
+        log(`보스 장신구는 이미 보유 중이라 골드로 대체 지급됩니다.`);
+        S.gold += Math.floor(floorGold(f) * 10);
+      } else {
+        S.bossAccs.push(f);
+        log(`📿 <b>신화 보스장신구 드롭!</b> [${BOSS_ACCS[f].name}] — 조합 탭에서 장착하세요!`, 'lg-prim');
+      }
+    }
+  } else {
+    log(`⏰ 시간 초과! 보스 [${F.boss.name}]에게 패배했습니다. (쿨타임 없이 즉시 재도전 가능)`, 'lg-bad');
+  }
+  spawnMonster();
+  renderBossBtn(); renderTop(); save();
+}
+
+function renderBossBtn() {
+  const el = $('bossBtn');
+  const flee = $('bossFleeBtn');
+  if (!el) return;
+  if (bossFight.active) {
+    el.textContent = `⏱ 보스전 진행중... ${Math.ceil(bossFight.timeLeft)}초`;
+    el.disabled = true;
+    if (flee) flee.style.display = '';
+    return;
+  }
+  if (flee) flee.style.display = 'none';
+  const cdEnd = S.bossCooldowns[S.floor] || 0;
+  const now = Date.now();
+  if (now < cdEnd) {
+    const left = Math.ceil((cdEnd - now) / 60000);
+    el.textContent = `⏳ 쿨타임 ${left}분`;
+    el.disabled = true;
+  } else {
+    el.textContent = `👹 보스 도전 [${FLOORS[S.floor].boss.name}]`;
+    el.disabled = false;
+  }
+}
+
+// 보스 포기: 패배 처리와 동일 (쿨타임 없음)
+function fleeBoss() {
+  if (!bossFight.active) return;
+  if (!confirm('보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)')) return;
+  log('🏳️ 보스전을 포기했습니다.', 'lg-bad');
+  endBossFight(false);
+}
+
+/* ===================== 강화 ===================== */
+function tryEnhance() {
+  const w = getEquipped();
+  if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
+  if (w.enhance >= ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
+  const cost = enhanceCost(w);
+  if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
+  // +15 이상: 고급 재료 필요
+  const matNeed = highMatsNeeded(w.enhance);
+  if (matNeed > 0 && countHighMats() < matNeed) {
+    log(`고급 재료가 부족합니다! (필요 ${matNeed}개, 보유 ${countHighMats()}개) — 사냥터에서 에픽 등급 재료를 모으세요`, 'lg-bad');
+    return;
+  }
+  S.gold -= cost;
+  if (matNeed > 0) consumeHighMats(matNeed);
+
+  const chance = Math.min(100, ENH.success[w.enhance] + accEff().enh);
+  if (Math.random() * 100 < chance) {
+    w.enhance++;
+    const ms = ENH.milestones.find(([lv]) => lv === w.enhance);
+    if (ms) {
+      log(`🎉 <b>${w.enhance}돌파 성공!</b> 공격력 ×${ms[1]} 보너스 활성! ${gradeTag(w)}`, 'lg-prim');
+    } else {
+      log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(1)}%)`, 'lg-good');
+    }
+  } else {
+    const dChance = ENH.destroy[w.enhance];
+    // 맨손은 파괴되지 않고 +0으로 초기화
+    if (isFist(w)) {
+      w.enhance = 0;
+      log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
+    } else if (Math.random() * 100 < dChance) {
+      log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}`, 'lg-bad');
+      S.destroyedCount++;
+      S.weapons = S.weapons.filter(x => x.id !== w.id);
+      S.equipped = null;
+      const best = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a))[0];
+      if (best) {
+        S.equipped = best.id;
+        log(`자동으로 다음 무기 장착: ${gradeTag(best)}`);
+      } else {
+        // 무기가 전부 파괴됨 → 맨손 지급
+        const fist = makeFist(0);
+        S.weapons.push(fist);
+        S.equipped = fist.id;
+        log(`✊ 더 이상 무기가 없습니다... <b>맨손으로 싸웁니다.</b> (맨손도 강화 가능! 파괴 대신 +0 초기화)`, 'lg-prim');
+      }
+      renderEnhance(); renderInventory(); renderTop();
+      save();
+      return;
+    } else {
+      w.enhance = Math.max(0, w.enhance - 1);
+      log(`❌ 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
+    }
+  }
+  renderEnhance(); renderInventory(); renderTop();
+  $('enhBtn').classList.add('shake');
+  setTimeout(() => $('enhBtn').classList.remove('shake'), 350);
+  save();
+}
+
+/* ===================== 도박 ===================== */
+function gamble(ratio) {
+  const tbl = GAMBLE_TABLES[S.gambleTable] || GAMBLE_TABLES[0];
+  let bet = Math.floor(S.gold * ratio);
+  if (bet <= 0) { log('도박할 골드가 없습니다!', 'lg-bad'); return; }
+  if (S.gold < tbl.min) {
+    log(`💰 ${tbl.name}의 최소 금액은 ${fmt(tbl.min)} 골드입니다. (보유: ${fmt(S.gold)})`, 'lg-bad');
+    return;
+  }
+  if (bet < tbl.min) bet = tbl.min;  // 최소 금액 보장
+  S.gold -= bet;
+  S.gambleCount++;
+  const gm = wrand(GAMBLE.map(g => [g.mult, g.weight]));
+  const result = Math.floor(bet * gm);
+  S.gold += bet + result;
+  const br = $('betresult');
+  if (gm >= 2) {
+    br.innerHTML = `<span style="color:var(--gold)">🎉 잭팟!! +${gm * 100}% (+${fmt(result)})</span>`;
+    log(`🎲 도박 대박! ${fmt(bet)} → <b style="color:var(--gold)">+${fmt(result)}</b> (총 ${fmt(S.gold)})`, 'lg-gold');
+  } else if (gm > 0) {
+    br.innerHTML = `<span style="color:#7de08a">📈 +${gm * 100}% (+${fmt(result)})</span>`;
+    log(`🎲 도박 성공! ${fmt(bet)} 걸고 +${fmt(result)} 획득`);
+  } else if (gm === 0) {
+    br.innerHTML = `<span style="color:var(--sub)">😐 본전 (-0%)</span>`;
+    log(`🎲 도박 결과: 본전 (${fmt(bet)})`);
+  } else if (gm > -1) {
+    br.innerHTML = `<span style="color:#ff7a7a">📉 ${gm * 100}% (-${fmt(-result)})</span>`;
+    log(`🎲 도박 실패... ${fmt(bet)} 걸고 -${fmt(-result)} 손실`, 'lg-bad');
+  } else {
+    br.innerHTML = `<span style="color:#ff4444">💀 전액 손실... (-${fmt(bet)})</span>`;
+    log(`🎲 도박 전액 손실... ${fmt(bet)} 골드가 증발했습니다`, 'lg-bad');
+  }
+  renderTop();
+  save();
+}
+
+// 도박장 테이블 렌더링
+function renderGambleTables() {
+  const tb = $('tablebtns');
+  if (!tb) return;
+  tb.innerHTML = '';
+  GAMBLE_TABLES.forEach((t, i) => {
+    const b = document.createElement('button');
+    const afford = S.gold >= t.min;
+    b.innerHTML = `${t.name}<br><span style="font-size:11px; color:${afford ? 'var(--gold)' : '#ff7a7a'}">최소 ${fmt(t.min)}</span>`;
+    b.style.flex = '1';
+    b.style.minWidth = '140px';
+    b.style.fontWeight = i === S.gambleTable ? 'bold' : 'normal';
+    b.style.borderColor = i === S.gambleTable ? 'var(--gold)' : '';
+    b.style.color = i === S.gambleTable ? 'var(--gold)' : (afford ? '' : 'var(--sub)');
+    b.onclick = () => {
+      S.gambleTable = i;
+      $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b>)`;
+      renderGambleTables();
+      save();
+    };
+    tb.appendChild(b);
+  });
+  const t = GAMBLE_TABLES[S.gambleTable] || GAMBLE_TABLES[0];
+  $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b>)`;
+}
+
+/* ===================== 저장 / 불러오기 ===================== */
+const SAVE_KEY = 'luckEnhance_v1';
+let resetting = false;  // 초기화 중에는 저장 금지
+function save() {
+  if (resetting) return;
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
+}
+// 이전 버전 저장 데이터에 빠진 필드를 채워주는 마이그레이션
+function migrate(d) {
+  const base = newState();
+  for (const k of Object.keys(base)) {
+    if (d[k] === undefined) d[k] = base[k];
+  }
+  if (typeof d.mats !== 'object' || d.mats === null || Array.isArray(d.mats)) d.mats = {};
+  if (!Array.isArray(d.accs)) d.accs = [];
+  if (!Array.isArray(d.bossAccs)) d.bossAccs = [];
+  if (d.bossAccEquipped === undefined) d.bossAccEquipped = null;
+  if (typeof d.bossCooldowns !== 'object' || d.bossCooldowns === null) d.bossCooldowns = {};
+  if (typeof d.bossWins !== 'number') d.bossWins = 0;
+  if (!Array.isArray(d.weapons)) d.weapons = [];
+  if (d.gold !== d.gold || typeof d.gold !== 'number') d.gold = 0; // NaN 방지
+  // 신화 등급 신설(5)에 따른 구버전 태초(5) 무기 → 태초(6) 이동
+  if (d.migratedGradeShift !== true) {
+    for (const w of d.weapons) {
+      if (w.grade === 5) w.grade = 6;
+    }
+    for (const a of d.accs) {
+      if (a.grade === 5) a.grade = 6;
+    }
+    d.migratedGradeShift = true;
+  }
+  // 죽은 무기 참조 정리 (id가 인벤토리에 없으면 해제)
+  if (d.equipped != null && !d.weapons.some(w => w.id === d.equipped)) d.equipped = null;
+  return d;
+}
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = migrate(JSON.parse(raw));
+    // 무이드 정리
+    uid = data.weapons.reduce((m, w) => Math.max(m, w.id), 0) + 1;
+    return data;
+  } catch (e) { return null; }
+}
+function exportSave() {
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+  prompt('아래 저장코드를 복사해서 보관하세요:', code);
+}
+function importSave() {
+  const code = prompt('저장코드를 붙여넣으세요:');
+  if (!code) return;
+  try {
+    const data = migrate(JSON.parse(decodeURIComponent(escape(atob(code.trim())))));
+    if (typeof data.gold !== 'number' || !Array.isArray(data.weapons)) throw 0;
+    S = data;
+    if (!getEquipped() && S.weapons.length) S.equipped = S.weapons[0].id;
+    save(); location.reload();
+  } catch (e) { alert('잘못된 저장코드입니다.'); }
+}
+
+/* ===================== 렌더 ===================== */
+let currentTab = 'hunt';
+
+function renderTop() {
+  $('gold').textContent = fmt(S.gold);
+  $('dpsshow').textContent = 'DPS ' + fmt(playerDPS());
+}
+
+function renderMonster() {
+  const F = FLOORS[S.floor];
+  $('monemoji').textContent = F.emoji;
+  $('monname').textContent = F.monster;
+  $('floortitle').innerHTML = `🗺️ ${S.floor + 1}단계. ${F.name}`;
+  renderFloorUI();
+}
+
+// 유니크 몬스터 HP 감소 시 시각 효과 (이름 유지)
+function renderUniqueName() {
+  if (mon.unique) {
+    const boss = FLOORS[S.floor].boss;
+    $('monname').innerHTML = `<span class="grade-태초">⭐ 유니크 ${boss.name}</span>`;
+  }
+}
+
+function renderHP() {
+  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
+  $('hpbar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  $('hptext').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
+}
+
+function renderFloorUI() {
+  const F = FLOORS[S.floor];
+  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
+  $('hpbar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  $('hptext').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
+  const k = S.kills[S.floor] || 0;
+  const need = S.floor + 1 < FLOORS.length ? FLOOR.unlockKills : null;
+  $('killcount').textContent = `처치 ${fmt(k)}회 (누적 ${fmt(S.totalKills)})`;
+  $('floorreward').textContent = `처치당 약 ${fmt(floorGold(S.floor))} 골드`;
+  const nextUnlock = (S.floor + 1 < FLOORS.length && (S.kills[S.floor] || 0) >= FLOOR.unlockKills)
+    ? '' : (S.floor + 1 < FLOORS.length ? ` | 다음 단계까지 ${FLOOR.unlockKills - k}마리` : '');
+  $('dropinfo').innerHTML = `드롭: 🎁 랜덤박스 ${(FLOOR.boxDrop * 100).toFixed(1)}% · ⚔️ 무기 ${(FLOOR.weaponDrop * 100).toFixed(1)}%${nextUnlock}`;
+  renderFloorBtns();
+}
+
+function renderFloorBtns() {
+  const fb = $('floorbtns');
+  fb.innerHTML = '';
+  for (let i = 0; i < FLOORS.length; i++) {
+    const b = document.createElement('button');
+    b.className = 'fbtn' + (i === S.floor ? ' on' : '') + (i >= S.unlocked ? ' locked' : '');
+    b.textContent = i + 1;
+    b.title = FLOORS[i].name;
+    if (i < S.unlocked) {
+      b.onclick = () => {
+        if (bossFight.active) { endBossFight(false); log('사냥터 이동으로 보스전이 중단되었습니다.', 'lg-bad'); }
+        S.floor = i; spawnMonster(); renderFloorBtns(); renderFloorUI(); renderBossBtn(); save();
+      };
+    } else {
+      b.disabled = true;
+    }
+    fb.appendChild(b);
+  }
+}
+
+function renderEnhance() {
+  const w = getEquipped();
+  const box = $('enhweapon');
+  if (!w) {
+    box.innerHTML = `<div style="color:var(--sub)">장착된 무기가 없습니다. 사냥을 하거나 가방에서 무기를 장착하세요.</div>`;
+    $('enhstat').innerHTML = ''; $('enhrates').innerHTML = ''; $('enhBtn').disabled = true;
+    return;
+  }
+  $('enhBtn').disabled = false;
+  const atk = weaponAtk(w);
+  const maxed = w.enhance >= ENH.maxLevel;
+  const nextAtk = maxed ? 0 : weaponAtk({ ...w, enhance: w.enhance + 1 });
+  const cost = maxed ? 0 : enhanceCost(w);
+  const chance = maxed ? 0 : Math.min(100, ENH.success[w.enhance] + accEff().enh);
+  const dChance = maxed ? 0 : ENH.destroy[w.enhance];
+  const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
+  const matHave = countHighMats();
+  const matOk = matNeed === 0 || matHave >= matNeed;
+  const matText = matNeed > 0
+    ? `<div>고급 재료<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matHave}/${matNeed}</b></div>`
+    : '';
+  box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
+    <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
+    ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}`;
+  $('enhstat').innerHTML = `
+    <div>공격력<b>${fmt(atk)}</b></div>
+    <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
+    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
+    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : chance + '%'}</b></div>${matText}`;
+  const nextMs = ENH.milestones.find(([lv]) => lv > w.enhance);
+  const msText = nextMs
+    ? `<span style="color:var(--unique)">🎯 ${nextMs[0]}돌파 시 공격력 ×${nextMs[1]}!</span> · `
+    : '';
+  const matNote = matNeed > 0 && !matOk
+    ? ` · <span class="warn">고급 재료 부족 (에픽+ 등급 재료 ${matNeed}개 필요)</span>` : '';
+  $('enhrates').innerHTML = maxed
+    ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
+    : isFist(w)
+      ? `${msText}✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
+      : `${msText}실패 시: 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
+}
+
+function renderInventory() {
+  const list = $('invlist');
+  $('invcount').textContent = `(${S.weapons.length}/60)`;
+  if (!S.weapons.length) {
+    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">가방이 비어 있습니다. 사냥이나 랜덤박스로 무기를 얻으세요.</div>';
+    return;
+  }
+  const sorted = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a));
+  list.innerHTML = '';
+  for (const w of sorted) {
+    const div = document.createElement('div');
+    div.className = 'invitem' + (w.id === S.equipped ? ' equipped' : '');
+    div.innerHTML = `
+      <div><div class="wn">${gradeTag(w)}</div>
+      <div class="wi">공격력 ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · 판매가 ${fmt(sellPrice(w))}</div></div>
+      <div class="btns"></div>`;
+    const btns = div.querySelector('.btns');
+    if (w.id === S.equipped) {
+      const eq = document.createElement('button');
+      eq.textContent = '장착중';
+      eq.disabled = true;
+      btns.appendChild(eq);
+    } else if (!isFist(w)) {
+      const eq = document.createElement('button');
+      eq.textContent = '장착';
+      eq.onclick = () => { S.equipped = w.id; renderAll(); save(); };
+      btns.appendChild(eq);
+    }
+    // 맨손은 판매 불가
+    if (isFist(w)) {
+      const note = document.createElement('button');
+      note.textContent = '소유 무기 없음';
+      note.disabled = true;
+      btns.appendChild(note);
+    } else {
+    const sel = document.createElement('button');
+    sel.textContent = '판매';
+    sel.className = 'danger';
+    sel.onclick = () => {
+      // 이미 판매된(목록에 없는) 무기면 무시 — 중복 클릭 방지
+      if (!S.weapons.some(x => x.id === w.id)) { renderInventory(); return; }
+      if (w.id === S.equipped) { log('장착 중인 무기는 판매할 수 없습니다.', 'lg-bad'); return; }
+      const price = sellPrice(w);
+      S.gold += price;
+      S.weapons = S.weapons.filter(x => x.id !== w.id);
+      log(`판매: ${gradeTag(w)} → +${fmt(price)} 골드`);
+      renderAll(); save();
+    };
+    btns.appendChild(sel);
+    }
+    list.appendChild(div);
+  }
+}
+
+function renderBoxes() {
+  const list = $('boxlist');
+  list.innerHTML = '';
+  for (let i = 0; i < BOXES.length; i++) {
+    const b = BOXES[i];
+    const div = document.createElement('div');
+    div.className = 'boxrow';
+    const wDesc = b.weapon ? b.weapon.map(([g, wt]) => `${GRADES[g].name} ${wt}%`).join(' / ') : '';
+    const bDesc = b.box ? b.box.map(([bi, wt]) => `${BOXES[bi].name} ${wt}%`).join(' / ') : '';
+    div.innerHTML = `
+      <div><div style="font-weight:bold">${b.icon} ${b.name} <span style="font-size:12px;color:var(--sub)">(개봉 ${b.cost ? fmt(b.cost) : 0}골드 상당)</span></div>
+      <div class="bi">⚔️ 무기: ${wDesc}</div>
+      <div class="bi">💰 골드: 박스값의 30%~200%${bDesc ? ` · 🎁 상자: ${bDesc}` : ''}</div></div>
+      <div class="btns"><button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost)}</span></button></div>`;
+    div.querySelector('button').onclick = () => {
+      if (S.gold < b.cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
+      S.gold -= b.cost;
+      renderTop();
+      openBox(i, '');
+    };
+    list.appendChild(div);
+  }
+}
+
+function renderGamble() {
+  // 정적 UI, 버튼은 초기화에서 바인딩
+}
+
+function renderAll() {
+  renderTop(); renderFloorUI(); renderMonster();
+  renderEnhance(); renderCraft(); renderInventory(); renderBoxes();
+}
+
+function switchTab(name) {
+  currentTab = name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
+  for (const t of ['hunt', 'enhance', 'craft', 'inventory', 'box', 'gamble']) {
+    $('tab-' + t).style.display = t === name ? '' : 'none';
+  }
+  if (name === 'enhance') renderEnhance();
+  if (name === 'craft') renderCraft();
+  if (name === 'inventory') renderInventory();
+  if (name === 'box') renderBoxes();
+  if (name === 'gamble') renderGambleTables();
+}
+
+// 장신구 효과 설명 문자열
+function accEffText(eff) {
+  const parts = [];
+  if (eff.gold) parts.push(`💰 골드 +${Math.round(eff.gold * 100)}%`);
+  if (eff.atk) parts.push(`⚔️ 공격력 +${Math.round(eff.atk * 100)}%`);
+  if (eff.speed) parts.push(`⚡ 공속 +${Math.round(eff.speed * 100)}%`);
+  if (eff.luck) parts.push(`🍀 행운(드롭률) +${Math.round(eff.luck * 100)}%`);
+  if (eff.enh) parts.push(`🔨 강화 확률 +${eff.enh}%p`);
+  return parts.join(' · ');
+}
+
+function renderCraft() {
+  renderMatSell();
+  // 장착 장신구 표시
+  const eq = $('accEqBox');
+  if (S.accEquipped) {
+    const a = ACCESSORIES[S.accEquipped.floor];
+    const gname = GRADES[S.accEquipped.grade].name;
+    eq.innerHTML = `<div class="invitem equipped"><div><div class="wn"><span class="grade-${gname}">${gname} [${a.name}]</span> <span style="font-size:12px;color:var(--sub)">(장착중)</span></div>
+      <div class="wi">${accEffText(a.eff)}</div></div>
+      <div class="btns"><button class="danger" id="accUneqBtn">해제</button></div></div>`;
+    $('accUneqBtn').onclick = () => { S.accEquipped = null; renderCraft(); renderTop(); save(); };
+  } else {
+    eq.innerHTML = `<div style="font-size:13px;color:var(--sub);padding:6px 0;">장착 중인 장신구가 없습니다.</div>`;
+  }
+
+  // 조합 가능 목록 (해금된 사냥터만)
+  const list = $('craftlist');
+  list.innerHTML = '';
+  for (let f = 0; f < FLOORS.length; f++) {
+    if (f >= S.unlocked) break;
+    const F = FLOORS[f];
+    const tierIdx = Math.min(3, Math.floor(f / 5));
+    const grades = MAT_TIERS[tierIdx];
+    const accGrade = grades[2];
+    const gname = GRADES[accGrade].name;
+    const c0 = S.mats[f + '|0'] || 0, c1 = S.mats[f + '|1'] || 0;
+    const c2 = S.mats[f + '|2'] || 0;
+    const ok = canCraft(f);
+    const owned = S.accs.some(a => a.floor === f);
+    const div = document.createElement('div');
+    div.className = 'invitem';
+    div.innerHTML = `
+      <div><div class="wn"><span class="grade-${gname}">${GRADES[accGrade].name}</span> 📿 ${ACCESSORIES[f].name}</div>
+      <div class="wi">효과: ${accEffText(ACCESSORIES[f].eff)}</div>
+      <div class="wi">재료: ${F.mats[0]} <b class="${c0 >= CRAFT_COST.n0 ? 'lg-good' : ''}">${c0}/${CRAFT_COST.n0}</b> · ${F.mats[1]} <b class="${c1 >= CRAFT_COST.n1 ? 'lg-good' : ''}">${c1}/${CRAFT_COST.n1}</b>${c2 ? ` · <span class="grade-${GRADES[grades[2]].name}">${F.mats[2]}</span> ${c2}개` : ''}</div></div>
+      <div class="btns"></div>`;
+    const btns = div.querySelector('.btns');
+    if (owned) {
+      const b = document.createElement('button');
+      b.textContent = '보유함';
+      b.disabled = true;
+      btns.appendChild(b);
+    } else {
+      const b = document.createElement('button');
+      b.textContent = '조합';
+      b.className = 'primary';
+      b.disabled = !ok;
+      b.onclick = () => craftAccessory(f);
+      btns.appendChild(b);
+    }
+    list.appendChild(div);
+  }
+}
+
+// 재료 판매 목록
+function renderMatSell() {
+  renderBossAccs();
+  const list = $('matselllist');
+  if (!list) return;
+  list.innerHTML = '';
+  const keys = Object.keys(S.mats).filter(k => S.mats[k] > 0);
+  if (!keys.length) {
+    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 재료가 없습니다. 사냥터에서 재료를 모으세요.</div>';
+    return;
+  }
+  keys.sort((a, b) => {
+    const [fa, ga] = a.split('|').map(Number);
+    const [fb, gb] = b.split('|').map(Number);
+    return fa - fb || ga - gb;
+  });
+  for (const key of keys) {
+    const [f, g] = key.split('|').map(Number);
+    if (f >= FLOORS.length) continue;
+    const F = FLOORS[f];
+    const gname = GRADES[g].name;
+    const price = matSellPrice(f, g);
+    const div = document.createElement('div');
+    div.className = 'invitem';
+    div.innerHTML = `
+      <div><div class="wn"><span class="grade-${gname}">${F.mats[g] || '???'} ×${S.mats[key]}</span></div>
+      <div class="wi">개당 판매가 ${fmt(price)} 골드</div></div>
+      <div class="btns"></div>`;
+    const btns = div.querySelector('.btns');
+    // 1개 판매
+    const b1 = document.createElement('button');
+    b1.textContent = '1개 판매';
+    b1.onclick = () => sellMat(key, 1);
+    btns.appendChild(b1);
+    // 전량 판매
+    const bAll = document.createElement('button');
+    bAll.textContent = '전량 판매';
+    bAll.className = 'primary';
+    bAll.onclick = () => sellMat(key, S.mats[key]);
+    btns.appendChild(bAll);
+    list.appendChild(div);
+  }
+}
+
+function sellMat(key, n) {
+  const have = S.mats[key] || 0;
+  n = Math.min(n, have);
+  if (n <= 0) return;
+  const [f, g] = key.split('|').map(Number);
+  const price = matSellPrice(f, g) * n;
+  S.mats[key] -= n;
+  if (S.mats[key] <= 0) delete S.mats[key];
+  S.gold += price;
+  log(`판매: ${FLOORS[f].mats[g]} ×${n} → +${fmt(price)} 골드`);
+  renderTop(); renderCraft(); save();
+}
+
+// 보스 장신구 목록 & 장착
+function renderBossAccs() {
+  const box = $('bossaccbox');
+  if (!box) return;
+  if (!S.bossAccs.length) {
+    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">아직 보스 장신구가 없습니다. 각 사냥터의 보스를 격파해 획득하세요! (0.9%)</div>';
+    return;
+  }
+  box.innerHTML = '';
+  for (const f of S.bossAccs) {
+    const b = BOSS_ACCS[f];
+    if (!b) continue;
+    const equipped = S.bossAccEquipped === f;
+    const setOn = equipped && bossSetFloor() === f;
+    const div = document.createElement('div');
+    div.className = 'invitem' + (equipped ? ' equipped' : '');
+    div.innerHTML = `
+      <div><div class="wn"><span class="grade-신화">신화 👹 [${b.name}]</span>${setOn ? ' <span style="color:var(--unique);font-size:12px">✨ 세트 발동중!</span>' : ''}</div>
+      <div class="wi">${accEffText(b.eff)} · 세트 효과: ${f + 1}단계 사냥터에서 공격력/골드/드롭률 대폭 상승</div></div>
+      <div class="btns"></div>`;
+    const btns = div.querySelector('.btns');
+    const bt = document.createElement('button');
+    if (equipped) {
+      bt.textContent = '장착중';
+      bt.disabled = true;
+    } else {
+      bt.textContent = '장착';
+      bt.className = 'primary';
+      bt.onclick = () => { S.bossAccEquipped = f; renderCraft(); renderTop(); save(); };
+    }
+    btns.appendChild(bt);
+    box.appendChild(div);
+  }
+}
+
+/* ===================== 초기화 ===================== */
+function init() {
+  S = load();
+  if (!S) {
+    S = newState();
+    const w = defaultWeapon();
+    S.weapons.push(w);
+    S.equipped = w.id;
+    log('🍀 <b>운빨강화하기</b>에 오신 것을 환영합니다!', 'lg-gold');
+    log('사냥터에서 골드를 모아 무기를 강화하세요!');
+    log('시작 무기를 지급했습니다. 사냥으로 골드를 모아보세요!');
+  } else {
+    log('💾 저장된 진행 상황을 불러왔습니다.');
+  }
+  // 이전 버전 호환: effect 검증
+  for (const w of S.weapons) {
+    if (w.effect && !EFFECTS[w.effect]) w.effect = null;
+  }
+  // 장착 무기가 없으면 자동 장착 (파괴/판매 후 저장된 세이브 대응)
+  if (!getEquipped() && S.weapons.length) {
+    const best = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a))[0];
+    S.equipped = best.id;
+    log(`장착된 무기가 없어 자동 장착: ${gradeTag(best)}`);
+  }
+  // 무기가 하나도 없으면 맨손 지급
+  if (!S.weapons.length) {
+    const fist = makeFist(0);
+    S.weapons.push(fist);
+    S.equipped = fist.id;
+    log('✊ 소유한 무기가 없어 <b>맨손으로 시작합니다.</b> (맨손도 강화 가능!)', 'lg-prim');
+  }
+
+  // 탭
+  document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
+  // 강화
+  $('enhBtn').onclick = tryEnhance;
+  // 도박
+  document.querySelectorAll('#betbtns button').forEach(b => b.onclick = () => gamble(parseFloat(b.dataset.bet)));
+  // 저장 버튼
+  $('saveBtn').onclick = () => { save(); log('💾 저장 완료!', 'lg-good'); };
+  $('exportBtn').onclick = exportSave;
+  $('importBtn').onclick = importSave;
+  $('resetBtn').onclick = () => {
+    if (confirm('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?')) {
+      resetting = true;  // 언로드 핸들러가 재저장하는 것을 차단
+      localStorage.removeItem(SAVE_KEY);
+      location.reload();
+    }
+  };
+  // 자동 사냥 토글
+  $('autoBtn').onclick = () => {
+    S.auto = !S.auto;
+    updateAutoBtn();
+    save();
+  };
+  updateAutoBtn();
+  // 보스 도전
+  $('bossBtn').onclick = startBossFight;
+  // 보스 포기
+  $('bossFleeBtn').onclick = fleeBoss;
+
+  spawnMonster();
+  renderAll();
+  renderBoxes();
+  renderBossBtn();
+
+  // 루프 (10 tick/sec) — 에러가 나도 루프가 죽지 않도록 방어
+  let last = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    const dt = Math.min(0.25, (now - last) / 1000);
+    last = now;
+    try {
+      if (S.auto) tick(dt);
+    } catch (e) {
+      console.error('tick error:', e);
+    }
+  }, 100);
+  // 자동 저장 (10초)
+  setInterval(save, 10000);
+
+  // ===== 백그라운드/오프라인 보상 =====
+  // 탭이 숨겨지거나 닫힐 때 시각 기록 (save() 내부에서 resetting 체크)
+  const markLeave = () => {
+    if (resetting) return;
+    S.lastSeen = Date.now();
+    save();
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) markLeave();
+    else grantOffline();
+  });
+  window.addEventListener('beforeunload', markLeave);
+  window.addEventListener('pagehide', markLeave);
+
+  function grantOffline() {
+    if (!S.lastSeen || !S.auto) { return; }
+    const awaySec = Math.floor((Date.now() - S.lastSeen) / 1000);
+    if (awaySec < 10) return;  // 10초 미만이면 무시
+    S.lastSeen = null;
+
+    // 오프라인 사냥: 실제 장비 DPS 기반 (재료/드롭 제외, 최대 8시간, 효율 70%)
+    const capped = Math.min(awaySec, 8 * 3600);
+    const dps = playerDPS();
+    const monHp = floorHp(S.floor);
+    if (dps <= 0) return;
+    const killSec = monHp / dps;             // 한 마리 잡는 데 걸리는 시간
+    const kills = Math.floor(capped / killSec);
+    if (kills <= 0) {
+      log(`🌙 자리를 비운 동안 사냥터 몬스터를 잡지 못했습니다. (장비를 더 강화하세요!)`);
+      return;
+    }
+    const w = getEquipped();
+    const e = w && w.effect ? EFFECTS[w.effect] : null;
+    const goldMul = (1 + accEff().gold) * (1 + (e && e.gold ? e.gold : 0));
+    const gold = Math.floor(floorGold(S.floor) * goldMul * kills * 0.7); // 오프라인 효율 70%
+    S.gold += gold;
+    const h = Math.floor(capped / 3600), m = Math.floor((capped % 3600) / 60), s = capped % 60;
+    const t = h > 0 ? `${h}시간 ${m}분` : m > 0 ? `${m}분 ${s}초` : `${s}초`;
+    log(`🌙 <b>오프라인 사냥 완료!</b> ${t} 동안 약 ${fmt(kills)}마리 사냥 → <b style="color:var(--gold)">+${fmt(gold)} 골드</b> (오프라인 효율 70%)`, 'lg-gold');
+    renderTop();
+    save();
+  }
+  grantOffline();  // 페이지 로드 시에도 확인 (브라우저 재시작 케이스)
+}
+
+function updateAutoBtn() {
+  const b = $('autoBtn');
+  b.textContent = S.auto ? '⏸ 사냥 중지' : '▶ 자동 사냥 시작';
+  b.classList.toggle('primary', !S.auto);
+}
+
+init();
+</script>
+</body>
+</html>

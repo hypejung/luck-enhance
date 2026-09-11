@@ -282,6 +282,13 @@
       <h3>📊 내 능력치</h3>
       <div id="statsBox"></div>
     </div>
+    <div class="panel">
+      <h3>🏋️ 능력치 훈련</h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">
+        골드를 소모해 장비와 무관하게 영구적으로 능력치를 올립니다. 레벨 제한 없음 — 비용은 레벨이 오를수록 계속 비싸지지만, 후반 층의 막대한 골드 수입을 투자할 곳이 됩니다.
+      </div>
+      <div id="trainingBox"></div>
+    </div>
   </div>
 
   <!-- 조합 -->
@@ -290,7 +297,7 @@
       <h3>🧪 재료 & 장신구 조합</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료: <b>일반 재료 12개 + 레어 재료 4개</b><br>
-        장신구 등급은 사냥터 구간이 높을수록 올라갑니다. (장착 중인 장신구 효과가 항상 적용됩니다)<br>
+        장신구 등급은 사냥터 구간이 높을수록 올라갑니다. 최대 <b>5개</b>까지 동시 장착 가능(장착 중인 장신구 효과는 항상 합산 적용)<br>
         💡 <b>+15 이상 강화</b>에는 고급(에픽+) 재료가 소모됩니다. 판매할지 강화에 쓸지 선택하세요!
       </div>
       <div id="accEqBox" style="margin-bottom:12px;"></div>
@@ -328,7 +335,7 @@
     <div class="panel">
       <h3>🔮 룬 상점</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 1개 장착할 수 있습니다 (무기당 1슬롯).
+        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다. 슬롯 수는 무기 등급에 따라 늘어납니다(일반 1개 ~ 태초 7개).
         <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다.
       </div>
       <div id="runeboxlist"></div>
@@ -403,7 +410,7 @@ const WEAPON_TYPES = [
 const FIST = { type: '맨손', icon: '✊', speed: 2.5, dmgMult: 0.5, grade: 0 };
 function isFist(w) { return w && w.type === FIST.type; }
 function makeFist(enhance) {
-  return { id: 0, grade: FIST.grade, type: FIST.type, icon: FIST.icon, enhance: enhance || 0, effect: null, fist: true };
+  return { id: 0, grade: FIST.grade, type: FIST.type, icon: FIST.icon, enhance: enhance || 0, effect: null, runes: [], fist: true };
 }
 
 // ---------- 특수 효과 (레전더리 이상) ----------
@@ -555,6 +562,34 @@ const BOSS_ACCS = [
 const MAT_TIERS = [[0, 1, 2], [1, 2, 3], [2, 3, 4], [3, 4, 5]];
 const UNIQUE_CHANCE = 0.008;   // 유니크 몬스터 출현 확률 (0.8%)
 const CRAFT_COST = { n0: 12, n1: 4 };  // 일반 재료 12개 + 레어 재료 4개
+const ACC_SLOTS = 5;  // 동시 장착 가능한 일반 장신구 수 (보스 장신구는 별도 1슬롯)
+// 무기 룬 슬롯 수 = 등급이 오를수록 늘어남 (일반=1 ... 태초=7), +15 강화해야 슬롯이 열림
+function runeSlotsForGrade(grade) { return Math.min(7, grade + 1); }
+
+// ---------- 능력치 훈련 (골드 소모, 레벨 무제한) ----------
+// 장비(등급/강화/장신구/룬)와 별개로 골드를 태워서 영구적으로 키우는 스탯. 레벨이 오를수록
+// 비용이 거듭제곱으로 커지지만 지수 성장은 아니라서(costExp) 아주 높은 레벨까지도 계속 투자 가능.
+const TRAINING = {
+  atk:        { name: '근력 훈련', desc: '공격력 +2%/레벨',        perLevel: 0.02,  baseCost: 80,  costExp: 1.25 },
+  atkSpeed:   { name: '신속 훈련', desc: '공격속도 +2%/레벨',      perLevel: 0.02,  baseCost: 80,  costExp: 1.25 },
+  critChance: { name: '치명 훈련', desc: '치명타 확률 +0.3%p/레벨', perLevel: 0.003, baseCost: 100, costExp: 1.28 },
+  critDamage: { name: '파괴 훈련', desc: '치명타 피해 +1%p/레벨',   perLevel: 0.01,  baseCost: 100, costExp: 1.28 },
+  extraAtk:   { name: '연격 훈련', desc: '연타 확률 +0.3%p/레벨',   perLevel: 0.003, baseCost: 100, costExp: 1.28 },
+  bossDmg:    { name: '살육 훈련', desc: '보스 피해량 +2%/레벨',    perLevel: 0.02,  baseCost: 90,  costExp: 1.26 },
+};
+function trainingLevel(key) { return (S && S.training && S.training[key]) || 0; }
+function trainingCost(key) {
+  const t = TRAINING[key];
+  return Math.round(t.baseCost * Math.pow(trainingLevel(key) + 1, t.costExp));
+}
+function trainingValue(key) { return trainingLevel(key) * TRAINING[key].perLevel; }
+function trainStat(key) {
+  const cost = trainingCost(key);
+  if (S.gold < cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
+  S.gold -= cost;
+  S.training[key] = trainingLevel(key) + 1;
+  renderTop(); renderStats(); save();
+}
 
 // 사냥터별 장신구 (index = 사냥터 번호 - 1, 등급은 해당 사냥터 최고 등급 재료와 동일)
 const ACCESSORIES = [
@@ -706,7 +741,7 @@ function newState() {
     equipped: null,    // 무기 id
     mats: {},          // 재료: { "사냥터|재료등급": count }
     accs: [],          // 보유 장신구: [{ floor, grade }]
-    accEquipped: null, // 장착 장신구: { floor, grade } or null
+    accEquipped: [],   // 장착 장신구(최대 ACC_SLOTS개): [{ floor, grade }, ...]
     bossAccs: [],      // 보스 장신구: [{ floor }] (신화 등급)
     bossAccEquipped: null, // 장착 보스 장신구: floor or null
     bossCooldowns: {}, // 사냥터별 보스 쿨타임 종료 시각 (timestamp)
@@ -719,6 +754,7 @@ function newState() {
     gambleCount: 0,
     destroyedCount: 0,
     runes: [],         // 보유 룬(미장착): [{ id, grade, key }]
+    training: {},      // 능력치 훈련 레벨: { atk, atkSpeed, critChance, critDamage, extraAtk, bossDmg }
   };
 }
 
@@ -737,6 +773,7 @@ function genWeapon(gradeIdx) {
     icon: t.icon,
     enhance: 0,
     effect: null,
+    runes: [],
   };
   if (gradeIdx >= 4) {
     // EFFECTS[w.effect]로 조회하므로 표시용 이름이 아니라 실제 키를 저장해야 함
@@ -789,21 +826,24 @@ function runeDesc(rune) {
   if (!rune) return '';
   return rune.grade <= 3 ? RUNE_STATS[rune.key].desc(RUNE_STATS[rune.key].values[rune.grade]) : RUNE_SPECIALS[rune.key].desc;
 }
-// 장착된 무기의 룬이 주는 특정 일반 스탯 보너스(%, %p 단위 그대로 반환). 없으면 0.
+// 장착된 무기의 룬 슬롯(전부)이 주는 특정 일반 스탯 보너스 합계(%, %p 단위 그대로 반환).
 function weaponRuneStat(w, statKey) {
-  if (!w || !w.rune) return 0;
-  const r = w.rune;
-  if (r.grade <= 3) return r.key === statKey ? RUNE_STATS[statKey].values[r.grade] : 0;
-  // 전능의 룬(태초): 5개 일반 스탯에 균일하게 보너스 부여
-  if (r.key === 'omnirune' && RUNE_STAT_KEYS.includes(statKey)) return RUNE_SPECIALS.omnirune.value;
-  return 0;
+  if (!w || !Array.isArray(w.runes)) return 0;
+  let total = 0;
+  for (const r of w.runes) {
+    if (r.grade <= 3) { if (r.key === statKey) total += RUNE_STATS[statKey].values[r.grade]; }
+    else if (r.key === 'omnirune' && RUNE_STAT_KEYS.includes(statKey)) total += RUNE_SPECIALS.omnirune.value; // 전능의 룬: 5개 스탯에 균일 보너스
+  }
+  return total;
 }
-// 장착된 무기가 특정 룬 특수효과를 갖고 있는지
-function weaponHasSpecial(w, specialKey) {
-  return !!(w && w.rune && w.rune.grade >= 4 && w.rune.key === specialKey);
+// 장착된 무기의 룬 슬롯 중 특정 특수효과를 가진 룬의 개수 (여러 개 장착하면 중첩)
+function weaponSpecialCount(w, specialKey) {
+  if (!w || !Array.isArray(w.runes)) return 0;
+  return w.runes.filter(r => r.grade >= 4 && r.key === specialKey).length;
 }
-function weaponBossTimeBonus(w) { return weaponHasSpecial(w, 'timedilation') ? RUNE_SPECIALS.timedilation.bonus : 0; }
-function weaponCooldownMult(w) { return weaponHasSpecial(w, 'bossrush') ? RUNE_SPECIALS.bossrush.mult : 1; }
+function weaponHasSpecial(w, specialKey) { return weaponSpecialCount(w, specialKey) > 0; }
+function weaponBossTimeBonus(w) { return weaponSpecialCount(w, 'timedilation') * RUNE_SPECIALS.timedilation.bonus; }
+function weaponCooldownMult(w) { return Math.pow(RUNE_SPECIALS.bossrush.mult, weaponSpecialCount(w, 'bossrush')); }
 // 전투 화면에 잠깐 떠오르는 효과 발동 텍스트
 function floatText(msg) {
   const host = $('monbox');
@@ -814,12 +854,14 @@ function floatText(msg) {
   host.appendChild(el);
   setTimeout(() => el.remove(), 950);
 }
-// 장신구 효과 합산 (일반 + 보스 장신구, 세트 효과 포함)
+// 장신구 효과 합산 (일반 최대 ACC_SLOTS개 + 보스 장신구, 세트 효과 포함)
 function accEff() {
   const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0 };
-  if (S && S.accEquipped) {
-    const a = ACCESSORIES[S.accEquipped.floor];
-    if (a) for (const [k, v] of Object.entries(a.eff)) eff[k] += v;
+  if (S && Array.isArray(S.accEquipped)) {
+    for (const eq of S.accEquipped) {
+      const a = ACCESSORIES[eq.floor];
+      if (a) for (const [k, v] of Object.entries(a.eff)) eff[k] += v;
+    }
   }
   // 보스 장신구
   if (S && S.bossAccEquipped != null) {
@@ -833,6 +875,9 @@ function accEff() {
     eff.luck += 0.5;   // 해당 사냥터 드롭률 +50%
     eff.atk  += 0.3;   // 해당 사냥터 공격력 +30%
   }
+  // 능력치 훈련 (장비와 무관하게 항상 적용)
+  eff.atk += trainingValue('atk');
+  eff.speed += trainingValue('atkSpeed');
   return eff;
 }
 // 세트 효과가 발동하는 사냥터 (보스무기 floor와 보스장신구 floor가 같으면)
@@ -914,7 +959,12 @@ function fmt(n) {
 function gradeTag(w) {
   const g = GRADES[w.grade];
   const eff = w.effect ? ` <span style="font-size:12px">[${EFFECTS[w.effect] ? EFFECTS[w.effect].name : w.effect}]</span>` : '';
-  const rune = w.rune ? ` <span style="font-size:12px">🔮[${runeName(w.rune)}]</span>` : '';
+  const runeList = Array.isArray(w.runes) ? w.runes : [];
+  const rune = runeList.length
+    ? (runeList.length === 1
+        ? ` <span style="font-size:12px">🔮[${runeName(runeList[0])}]</span>`
+        : ` <span style="font-size:12px">🔮×${runeList.length}</span>`)
+    : '';
   const boss = w.bossFloor !== undefined ? ' 👹' : '';
   const fist = isFist(w) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
   return `<span class="grade-${g.name}">${g.name} ${w.icon}${w.type}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}${rune}`;
@@ -973,15 +1023,17 @@ function dropRoll() {
   const isU = mon.unique;
 
   if (isU) goldMul *= 10;
-  // 전능의 룬(태초): 골드 획득 +20%
-  if (weaponHasSpecial(w, 'omnirune')) goldMul *= 1.2;
+  // 전능의 룬(태초): 골드 획득 +20% (여러 개 장착하면 곱연산 중첩)
+  goldMul *= Math.pow(1.2, weaponSpecialCount(w, 'omnirune'));
 
   // 골드
   let gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
-  // 골드 러시(룬 특수효과): 확률로 골드 2배 — 발동 알림은 화면 텍스트로만
-  if (weaponHasSpecial(w, 'goldrush') && Math.random() < RUNE_SPECIALS.goldrush.proc) {
-    gold *= 2;
-    floatText('💰 골드 러시!');
+  // 골드 러시(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공할 때마다 골드 2배 — 발동 알림은 화면 텍스트로만
+  for (let i = 0; i < weaponSpecialCount(w, 'goldrush'); i++) {
+    if (Math.random() < RUNE_SPECIALS.goldrush.proc) {
+      gold *= 2;
+      floatText('💰 골드 러시!');
+    }
   }
   S.gold += gold;
   log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}`);
@@ -989,8 +1041,8 @@ function dropRoll() {
   // 재료 드롭 (항상 1~2개)
   dropMaterials(isU, luck);
 
-  // 박스 자석(룬 특수효과): 랜덤박스 드롭 확률 배수
-  const boxMagnetMult = weaponHasSpecial(w, 'boxmagnet') ? RUNE_SPECIALS.boxmagnet.mult : 1;
+  // 박스 자석(룬 특수효과): 랜덤박스 드롭 확률 배수 (여러 개 장착하면 곱연산 중첩)
+  const boxMagnetMult = Math.pow(RUNE_SPECIALS.boxmagnet.mult, weaponSpecialCount(w, 'boxmagnet'));
   // 랜덤박스 드롭
   if (Math.random() < FLOOR.boxDrop * dropMul * boxMagnetMult) {
     const tier = S.floor >= 12 ? 2 : S.floor >= 6 ? 1 : 0;
@@ -1007,11 +1059,13 @@ function dropRoll() {
     if (grade >= 4) { log(`✨ 레전더리 이상 무기가 나왔습니다!!`, 'lg-prim'); }
   }
 
-  // 미다스의 손(룬 특수효과): 확률로 랜덤박스(일반~에픽) 즉시 획득 — 발동 알림은 화면 텍스트로만
-  if (weaponHasSpecial(w, 'midastouch') && Math.random() < RUNE_SPECIALS.midastouch.proc) {
-    const idx = wrand([[0, 60], [1, 30], [2, 10]]);
-    floatText('🌟 미다스의 손!');
-    giveBox(idx, '미다스의 손');
+  // 미다스의 손(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정 — 발동 알림은 화면 텍스트로만
+  for (let i = 0; i < weaponSpecialCount(w, 'midastouch'); i++) {
+    if (Math.random() < RUNE_SPECIALS.midastouch.proc) {
+      const idx = wrand([[0, 60], [1, 30], [2, 10]]);
+      floatText('🌟 미다스의 손!');
+      giveBox(idx, '미다스의 손');
+    }
   }
 
   // 처치 수 & 해금
@@ -1024,11 +1078,13 @@ function dropRoll() {
   }
   renderTop(); renderFloorUI();
 
-  // 연쇄 처치(룬 특수효과): 확률로 처치 보상을 한 번 더 획득 (드물게 연쇄로 이어질 수 있음)
+  // 연쇄 처치(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공 시 처치 보상을 한 번 더 획득
   // 발동 알림은 화면 텍스트로만 — 실제 보상은 재귀 호출된 dropRoll()의 일반 로그로 남음
-  if (weaponHasSpecial(w, 'chainslayer') && Math.random() < RUNE_SPECIALS.chainslayer.proc) {
-    floatText('🔗 연쇄 처치!');
-    dropRoll();
+  for (let i = 0; i < weaponSpecialCount(w, 'chainslayer'); i++) {
+    if (Math.random() < RUNE_SPECIALS.chainslayer.proc) {
+      floatText('🔗 연쇄 처치!');
+      dropRoll();
+    }
   }
 }
 
@@ -1205,30 +1261,33 @@ function attack(w) {
   if (bossFight.active) {
     dmg *= 1 + bossDmgBonus();
   }
-  // 신벌(룬 특수효과): 보스 제외 즉사 — 화면 텍스트로만 알림(로그에는 남기지 않음)
-  if (!bossFight.active && weaponHasSpecial(w, 'divinestrike') && Math.random() < RUNE_SPECIALS.divinestrike.proc) {
+  // 신벌(룬 특수효과): 보스 제외 즉사 — 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
+  const divineCount = weaponSpecialCount(w, 'divinestrike');
+  if (!bossFight.active && divineCount > 0 && Math.random() < 1 - Math.pow(1 - RUNE_SPECIALS.divinestrike.proc, divineCount)) {
     mon.hp = 0;
     floatText('⚡ 신벌!');
     return;
   }
   // 치명타 확률/배율 = 무기 효과 + 룬 스탯 합산 (발동 알림은 화면 텍스트로만)
-  const critChance = (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100;
-  const critMult = (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100;
+  const critChance = (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance');
+  const critMult = (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage');
   if (critChance > 0 && Math.random() < critChance) {
     dmg *= critMult;
     floatText('💥 치명타!');
   }
   mon.hp -= dmg;
   // 연타 효과 = 무기 효과 + 룬 스탯 합산
-  const extraChance = (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100;
+  const extraChance = (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk');
   if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= dmg;
     floatText('⚡ 연타!');
   }
-  // 더블 스트라이크(룬 특수효과): 별도 확률로 이번 타격 피해를 한 번 더 적용
-  if (weaponHasSpecial(w, 'doublestrike') && Math.random() < RUNE_SPECIALS.doublestrike.proc) {
-    mon.hp -= dmg;
-    floatText('🌀 더블 스트라이크!');
+  // 더블 스트라이크(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공할 때마다 이번 타격 피해를 한 번 더 적용
+  for (let i = 0; i < weaponSpecialCount(w, 'doublestrike'); i++) {
+    if (Math.random() < RUNE_SPECIALS.doublestrike.proc) {
+      mon.hp -= dmg;
+      floatText('🌀 더블 스트라이크!');
+    }
   }
 }
 
@@ -1244,6 +1303,7 @@ function bossDmgBonus() {
     if (e && e.bossDmg) bonus += e.bossDmg;
     bonus += weaponRuneStat(w, 'bossDmg') / 100;
   }
+  bonus += trainingValue('bossDmg');
   return bonus;
 }
 
@@ -1298,6 +1358,7 @@ function endBossFight(win) {
       const nw = {
         id: uid++, grade: 5, type: t.name, icon: t.icon, enhance: 0,
         effect: pool[Math.floor(Math.random() * pool.length)],
+        runes: [],
         bossFloor: f,   // 보스무기 표식
       };
       addWeapon(nw);
@@ -1488,6 +1549,9 @@ function migrate(d) {
   }
   if (typeof d.mats !== 'object' || d.mats === null || Array.isArray(d.mats)) d.mats = {};
   if (!Array.isArray(d.accs)) d.accs = [];
+  // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
+  if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
+  if (d.accEquipped.length > ACC_SLOTS) d.accEquipped = d.accEquipped.slice(0, ACC_SLOTS);
   if (!Array.isArray(d.bossAccs)) d.bossAccs = [];
   if (d.bossAccEquipped === undefined) d.bossAccEquipped = null;
   if (typeof d.bossCooldowns !== 'object' || d.bossCooldowns === null) d.bossCooldowns = {};
@@ -1531,6 +1595,11 @@ function migrate(d) {
     }
     d.migratedEffectKeys = true;
   }
+  // 룬 다중 장착(등급별 최대 7슬롯) 도입 이전 세이브는 무기당 rune이 단일 객체였음 → 배열로 변환
+  for (const w of d.weapons) {
+    if (!Array.isArray(w.runes)) w.runes = w.rune ? [w.rune] : [];
+    delete w.rune;
+  }
   // 죽은 무기 참조 정리 (id가 인벤토리에 없으면 해제)
   if (d.equipped != null && !d.weapons.some(w => w.id === d.equipped)) d.equipped = null;
   return d;
@@ -1543,7 +1612,7 @@ function load() {
     // 무이드 정리
     uid = data.weapons.reduce((m, w) => Math.max(m, w.id), 0) + 1;
     // 룬 uid 정리 (보유 룬 + 무기에 장착된 룬 전부 확인)
-    const equippedRuneIds = data.weapons.filter(w => w.rune).map(w => w.rune.id);
+    const equippedRuneIds = data.weapons.flatMap(w => Array.isArray(w.runes) ? w.runes.map(r => r.id) : []);
     runeUid = [...data.runes.map(r => r.id), ...equippedRuneIds].reduce((m, id) => Math.max(m, id), 0) + 1;
     return data;
   } catch (e) { return null; }
@@ -1653,7 +1722,7 @@ function renderEnhance() {
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
     <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
-    ${w.rune ? `<div class="lg-prim">🔮 [${runeName(w.rune)}] ${runeDesc(w.rune)}</div>` : ''}`;
+    ${(w.runes || []).map(r => `<div class="lg-prim">🔮 [${runeName(r)}] ${runeDesc(r)}</div>`).join('')}`;
   $('enhstat').innerHTML = `
     <div>공격력<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
@@ -1685,13 +1754,21 @@ function renderEnhRune() {
     box.innerHTML = `<div style="color:var(--sub);font-size:13px;">룬은 <b style="color:var(--unique)">+15</b> 이상 강화한 무기에만 장착할 수 있습니다. (현재 +${w.enhance})</div>`;
     return;
   }
-  if (w.rune) {
-    const gname = GRADES[w.rune.grade].name;
-    box.innerHTML = `<div class="invitem equipped"><div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(w.rune)}</span></div>
-      <div class="wi">${runeDesc(w.rune)}</div></div><div class="btns"><button class="danger" id="runeUneqBtn">해제</button></div></div>`;
-    $('runeUneqBtn').onclick = unequipRuneFromCurrentWeapon;
+  const maxSlots = runeSlotsForGrade(w.grade);
+  const runes = w.runes || [];
+  box.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">룬 슬롯 ${runes.length}/${maxSlots} (무기 등급이 오를수록 슬롯 증가, 최대 7개)</div>`;
+  if (runes.length) {
+    for (const r of runes) {
+      const gname = GRADES[r.grade].name;
+      const div = document.createElement('div');
+      div.className = 'invitem equipped';
+      div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
+        <div class="wi">${runeDesc(r)}</div></div><div class="btns"><button class="danger">해제</button></div>`;
+      div.querySelector('button').onclick = () => unequipRuneFromCurrentWeapon(r.id);
+      box.appendChild(div);
+    }
   } else {
-    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">장착된 룬이 없습니다. 🔮 룬 탭에서 보유한 룬을 장착하세요.</div>`;
+    box.insertAdjacentHTML('beforeend', `<div style="color:var(--sub);font-size:13px;">장착된 룬이 없습니다. 🔮 룬 탭에서 보유한 룬을 장착하세요.</div>`);
   }
 }
 
@@ -1705,15 +1782,16 @@ function renderInventory() {
   const sorted = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a));
   list.innerHTML = '';
   for (const w of sorted) {
-    const hasDetail = !!(w.effect || w.rune);
+    const runes = w.runes || [];
+    const hasDetail = !!(w.effect || runes.length);
     const expanded = hasDetail && expandedWeapons.has(w.id);
     const div = document.createElement('div');
     div.className = 'invitem' + (w.id === S.equipped ? ' equipped' : '');
     const detailHtml = expanded
       ? `<div class="wi" style="margin-top:4px;padding:6px 8px;background:var(--panel2);border-radius:6px">
           ${w.effect && EFFECTS[w.effect] ? `✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}` : ''}
-          ${w.effect && w.rune ? '<br>' : ''}
-          ${w.rune ? `🔮 [${runeName(w.rune)}] ${runeDesc(w.rune)}` : ''}
+          ${w.effect && runes.length ? '<br>' : ''}
+          ${runes.map(r => `🔮 [${runeName(r)}] ${runeDesc(r)}`).join('<br>')}
         </div>`
       : '';
     div.innerHTML = `
@@ -1810,21 +1888,25 @@ function equipRuneToCurrentWeapon(runeId) {
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
   if (isFist(w)) { log('맨손에는 룬을 장착할 수 없습니다.', 'lg-bad'); return; }
   if (w.enhance < 15) { log('룬은 +15 이상 강화한 무기에만 장착할 수 있습니다.', 'lg-bad'); return; }
+  if (!Array.isArray(w.runes)) w.runes = [];
+  const maxSlots = runeSlotsForGrade(w.grade);
+  if (w.runes.length >= maxSlots) { log(`이 무기는 룬을 최대 ${maxSlots}개까지 장착할 수 있습니다. (등급이 오르면 슬롯이 늘어납니다)`, 'lg-bad'); return; }
   const idx = S.runes.findIndex(r => r.id === runeId);
   if (idx < 0) return;
   const rune = S.runes[idx];
   S.runes.splice(idx, 1);
-  if (w.rune) S.runes.push(w.rune); // 기존에 장착돼 있던 룬은 보유 목록으로 반환
-  w.rune = rune;
-  log(`🔮 ${gradeTag(w)}에 <span class="grade-${GRADES[rune.grade].name}">${runeName(rune)}</span> 장착!`, 'lg-good');
+  w.runes.push(rune);
+  log(`🔮 ${gradeTag(w)}에 <span class="grade-${GRADES[rune.grade].name}">${runeName(rune)}</span> 장착! (${w.runes.length}/${maxSlots})`, 'lg-good');
   renderRuneTab(); renderEnhance(); save();
 }
 
-function unequipRuneFromCurrentWeapon() {
+function unequipRuneFromCurrentWeapon(runeId) {
   const w = getEquipped();
-  if (!w || !w.rune) return;
-  S.runes.push(w.rune);
-  w.rune = null;
+  if (!w || !Array.isArray(w.runes)) return;
+  const idx = w.runes.findIndex(r => r.id === runeId);
+  if (idx < 0) return;
+  S.runes.push(w.runes[idx]);
+  w.runes.splice(idx, 1);
   log('룬을 해제했습니다.');
   renderRuneTab(); renderEnhance(); save();
 }
@@ -1879,9 +1961,9 @@ function computeStats() {
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const atk = w ? weaponAtk(w) : 0;
   const spd = w ? weaponSpeed(w) : 0;
-  const critChance = Math.min(100, ((e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100) * 100);
-  const critMultPct = ((e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100) * 100;
-  const extraChance = Math.min(100, ((e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100) * 100);
+  const critChance = Math.min(100, ((e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance')) * 100);
+  const critMultPct = ((e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage')) * 100;
+  const extraChance = Math.min(100, ((e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk')) * 100);
   return {
     atk, spd, dps: atk * spd,
     critChance, critMultPct, extraChance,
@@ -1913,6 +1995,27 @@ function renderStats() {
       <div class="statcell"><div class="sl">공격속도 보너스(장신구)</div><div class="sv">+${s.speedAccBonus.toFixed(0)}%</div></div>
     </div>
     <div style="margin-top:10px;font-size:12px;color:var(--sub)">장착 무기: ${gradeTag(w)}</div>`;
+  renderTraining();
+}
+
+function renderTraining() {
+  const box = $('trainingBox');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const key of Object.keys(TRAINING)) {
+    const t = TRAINING[key];
+    const lvl = trainingLevel(key);
+    const cost = trainingCost(key);
+    const div = document.createElement('div');
+    div.className = 'invitem';
+    div.innerHTML = `<div><div class="wn">${t.name} <span style="font-size:12px;color:var(--sub)">Lv.${lvl}</span></div>
+      <div class="wi">${t.desc} · 누적 보너스 ${(trainingValue(key) * 100).toFixed(1)}${key === 'critChance' || key === 'extraAtk' ? '%p' : key === 'critDamage' ? '%p' : '%'}</div></div>
+      <div class="btns"><button class="primary">훈련<br><span style="font-size:11px">💰 ${fmt(cost)}</span></button></div>`;
+    const bt = div.querySelector('button');
+    bt.disabled = S.gold < cost;
+    bt.onclick = () => trainStat(key);
+    box.appendChild(div);
+  }
 }
 
 function renderGamble() {
@@ -1950,19 +2053,34 @@ function accEffText(eff) {
   return parts.join(' · ');
 }
 
+function unequipAcc(floor) {
+  S.accEquipped = S.accEquipped.filter(eq => eq.floor !== floor);
+  renderCraft(); renderTop(); save();
+}
+function equipAcc(floor, grade) {
+  if (S.accEquipped.length >= ACC_SLOTS) { log(`장신구는 최대 ${ACC_SLOTS}개까지 장착할 수 있습니다.`, 'lg-bad'); return; }
+  S.accEquipped.push({ floor, grade });
+  renderCraft(); renderTop(); save();
+}
 function renderCraft() {
   renderMatSell();
-  // 장착 장신구 표시
+  // 장착 장신구 표시 (최대 ACC_SLOTS개)
   const eq = $('accEqBox');
-  if (S.accEquipped) {
-    const a = ACCESSORIES[S.accEquipped.floor];
-    const gname = GRADES[S.accEquipped.grade].name;
-    eq.innerHTML = `<div class="invitem equipped"><div><div class="wn"><span class="grade-${gname}">${gname} [${a.name}]</span> <span style="font-size:12px;color:var(--sub)">(장착중)</span></div>
-      <div class="wi">${accEffText(a.eff)}</div></div>
-      <div class="btns"><button class="danger" id="accUneqBtn">해제</button></div></div>`;
-    $('accUneqBtn').onclick = () => { S.accEquipped = null; renderCraft(); renderTop(); save(); };
+  eq.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">장착 슬롯 ${S.accEquipped.length}/${ACC_SLOTS}</div>`;
+  if (S.accEquipped.length) {
+    for (const slot of S.accEquipped) {
+      const a = ACCESSORIES[slot.floor];
+      const gname = GRADES[slot.grade].name;
+      const div = document.createElement('div');
+      div.className = 'invitem equipped';
+      div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} [${a.name}]</span></div>
+        <div class="wi">${accEffText(a.eff)}</div></div>
+        <div class="btns"><button class="danger">해제</button></div>`;
+      div.querySelector('button').onclick = () => unequipAcc(slot.floor);
+      eq.appendChild(div);
+    }
   } else {
-    eq.innerHTML = `<div style="font-size:13px;color:var(--sub);padding:6px 0;">장착 중인 장신구가 없습니다.</div>`;
+    eq.insertAdjacentHTML('beforeend', `<div style="font-size:13px;color:var(--sub);padding:6px 0;">장착 중인 장신구가 없습니다.</div>`);
   }
 
   // 조합 가능 목록 (해금된 사냥터만)
@@ -1979,7 +2097,7 @@ function renderCraft() {
     const c2 = S.mats[f + '|2'] || 0;
     const ok = canCraft(f);
     const owned = S.accs.some(a => a.floor === f);
-    const equipped = owned && !!(S.accEquipped && S.accEquipped.floor === f);
+    const equipped = owned && S.accEquipped.some(eq => eq.floor === f);
     const div = document.createElement('div');
     div.className = 'invitem' + (equipped ? ' equipped' : '');
     div.innerHTML = `
@@ -1994,9 +2112,10 @@ function renderCraft() {
         b.textContent = '장착중';
         b.disabled = true;
       } else {
-        b.textContent = '장착';
+        b.textContent = S.accEquipped.length >= ACC_SLOTS ? `장착 (${ACC_SLOTS}/${ACC_SLOTS} 꽉참)` : '장착';
         b.className = 'primary';
-        b.onclick = () => { S.accEquipped = { floor: f, grade: accGrade }; renderCraft(); renderTop(); save(); };
+        b.disabled = S.accEquipped.length >= ACC_SLOTS;
+        b.onclick = () => equipAcc(f, accGrade);
       }
       btns.appendChild(b);
     } else {

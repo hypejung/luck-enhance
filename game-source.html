@@ -248,7 +248,7 @@
       <button class="primary big" id="enhBtn">강화하기</button>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">단계 -1</span> · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
-        <b style="color:var(--unique)">+10 / +20 / +30 돌파</b> 시 공격력 대폭 상승 (리스크 클수록 리턴 커짐)
+        <b style="color:var(--unique)">3단계마다 돌파</b> 시 공격력 상승폭 UP (리스크 클수록 리턴 커짐) · 고강화는 등급 차이도 뒤집습니다!
       </div>
     </div>
   </div>
@@ -377,9 +377,11 @@ const EFFECTS = {
 // ---------- 강화 설정 (최대 +30, 리스크 클수록 리턴 커짐) ----------
 const ENH = {
   maxLevel: 30,
-  atkPerLevel: 0.15,          // 강화 1단계당 공격력 +15%
-  // 돌파 보너스: [단계, 배율] — 도달하면 곱연산으로 누적 적용
-  milestones: [[10, 1.25], [20, 1.4], [30, 1.6]],
+  // 강화 1단계당 공격력 증가율(곱연산 누적). 3단계마다 증가폭이 커져서(서지) 고강화로 갈수록
+  // 등급 차이를 뛰어넘을 만큼 강해짐 — 예: 일반 +30이면 레전더리 +0(4등급 위)을 막 이길 수 있는 수준.
+  atkGrowthBase: 0.088,
+  atkGrowthSurge: 0.19,
+  atkGrowthSurgeEvery: 3,
   // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%)
   success: [
     100, 100, 95, 92, 90,          // +0 ~ +4
@@ -624,17 +626,18 @@ function weaponAtk(w) {
   const g = GRADES[w.grade];
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
   const base = g.atk * t.dmgMult;
-  const enhMult = (1 + ENH.atkPerLevel * w.enhance) * milestoneMult(w.enhance);
-  return base * enhMult * (1 + accEff().atk);
+  return base * enhAtkMult(w.enhance) * (1 + accEff().atk);
 }
-// 돌파 보너스 배율 (도달한 마일스톤을 모두 곱함)
-function milestoneMult(enh) {
+// 강화 단계별 누적 공격력 배율 (단계마다 곱연산 성장, 서지 단계마다 성장폭 확대)
+function enhAtkMult(enh) {
   let m = 1;
-  for (const [lv, mult] of ENH.milestones) {
-    if (enh >= lv) m *= mult;
+  for (let lv = 1; lv <= enh; lv++) {
+    const growth = ENH.atkGrowthBase + (lv % ENH.atkGrowthSurgeEvery === 0 ? ENH.atkGrowthSurge : 0);
+    m *= (1 + growth);
   }
   return m;
 }
+function isSurgeLevel(lv) { return lv > 0 && lv % ENH.atkGrowthSurgeEvery === 0; }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
   return t.speed * (1 + accEff().speed);
@@ -723,9 +726,9 @@ function matSellPrice(f, g) {
 function sellPrice(w) {
   const g = GRADES[w.grade] || GRADES[0];
   const enh = typeof w.enhance === 'number' && w.enhance >= 0 ? w.enhance : 0;
-  // 고강화 무기는 돌파 배율만큼 가치 폭등: (1 + 단계×0.2) × 돌파배율²
-  const ms = milestoneMult(enh);
-  return Math.max(1, Math.floor(g.sell * (1 + enh * 0.2) * ms * ms * (w.effect ? 5 : 1)));
+  // 고강화 무기는 공격력 배율만큼 가치 폭등: (1 + 단계×0.2) × 공격력배율
+  const ms = enhAtkMult(enh);
+  return Math.max(1, Math.floor(g.sell * (1 + enh * 0.2) * ms * (w.effect ? 5 : 1)));
 }
 
 /* ===================== 유틸 ===================== */
@@ -1155,9 +1158,8 @@ function tryEnhance() {
   const chance = Math.min(100, ENH.success[w.enhance] + accEff().enh);
   if (Math.random() * 100 < chance) {
     w.enhance++;
-    const ms = ENH.milestones.find(([lv]) => lv === w.enhance);
-    if (ms) {
-      log(`🎉 <b>${w.enhance}돌파 성공!</b> 공격력 ×${ms[1]} 보너스 활성! ${gradeTag(w)}`, 'lg-prim');
+    if (isSurgeLevel(w.enhance)) {
+      log(`🎉 <b>+${w.enhance} 돌파 성공!</b> 공격력 상승폭 대폭 UP! ${gradeTag(w)}`, 'lg-prim');
     } else {
       log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(1)}%)`, 'lg-good');
     }
@@ -1414,9 +1416,9 @@ function renderEnhance() {
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : chance + '%'}</b></div>${matText}`;
-  const nextMs = ENH.milestones.find(([lv]) => lv > w.enhance);
-  const msText = nextMs
-    ? `<span style="color:var(--unique)">🎯 ${nextMs[0]}돌파 시 공격력 ×${nextMs[1]}!</span> · `
+  const nextSurge = maxed ? null : Math.ceil((w.enhance + 1) / ENH.atkGrowthSurgeEvery) * ENH.atkGrowthSurgeEvery;
+  const msText = nextSurge
+    ? `<span style="color:var(--unique)">🎯 +${nextSurge} 돌파 시 공격력 상승폭 UP!</span> · `
     : '';
   const matNote = matNeed > 0 && !matOk
     ? ` · <span class="warn">고급 재료 부족 (에픽+ 등급 재료 ${matNeed}개 필요)</span>` : '';

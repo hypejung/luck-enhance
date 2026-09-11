@@ -231,7 +231,7 @@
 <body>
 <div id="wrap">
   <div id="topbar">
-    <div id="title">🍀 운빨<span>강화</span>하기</div>
+    <div id="title">🍀 운빨<span>강화</span>하기<span id="eggBadges"></span></div>
     <div>
       <span class="stat">💰 <b id="gold">0</b></span>
       <span class="stat" id="dpsshow">DPS 0</span>
@@ -292,8 +292,8 @@
         <div id="enhFxOverlay"></div>
       </div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
-        강화 실패 시 <span class="warn">단계 -1</span> · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
-        <b style="color:var(--unique)">3단계마다 돌파</b> 시 공격력 상승폭 UP (리스크 클수록 리턴 커짐) · 고강화는 등급 차이도 뒤집습니다!
+        강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
+        <b style="color:var(--unique)">3단계마다 돌파</b> 시 공격력 상승폭 UP · 등급이 높을수록 +15 이상 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다!
       </div>
     </div>
     <div class="panel">
@@ -343,7 +343,21 @@
   <div id="tab-inventory" style="display:none">
     <div class="panel">
       <h3>🎒 가방 <span style="font-size:12px;color:var(--sub)" id="invcount"></span></h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        🗑️ 자동판매:
+        <select id="autoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
+        이하 + 강화 0인 무기 획득 시 즉시 판매
+        <button id="autoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
+      </div>
       <div id="invlist"></div>
+    </div>
+    <div class="panel">
+      <h3>🌌 태초의 유물</h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">
+        사냥터마다 숨겨진 단 하나뿐인 유물. 평범한 몬스터로는 평균 100억 마리에 한 번,
+        엘리트는 5배, 보스는 10배 확률로 발견됩니다. 장착 슬롯 없이 보유만 해도 항상 발동합니다.
+      </div>
+      <div id="genesisList"></div>
     </div>
   </div>
 
@@ -494,15 +508,17 @@ const ENH = {
   atkGrowthLinear: 0.105,   // 레벨이 오를수록 성장률 자체가 선형으로 커짐(가속형)
   atkGrowthSurge: 0.45,
   atkGrowthSurgeEvery: 3,
-  // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%). +10~19는 완만하게(꾸준히 진행
-  // 가능), +20부터 절벽 — "고레벨 강화"만 훨씬 어려워지도록 비대칭으로 재설계.
+  gradeGrowthBonus: 0.016,  // 등급 1당 매 레벨 성장률에 추가되는 보너스(고등급 성공 시 더 큰 보상)
+  gradeSuccessExp: 0.22,    // 등급 1당 성공확률 지수에 더해지는 값(+15 이상부터, 클수록 고등급이 훨씬 불리)
+  // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%). +10까지는 유하게 봐주다가
+  // 그 이후로 급격히 떨어짐. 등급별 추가 페널티는 gradeAdjustedSuccess()에서 적용.
   success: [
     100, 100, 98, 96, 94,          // +0 ~ +4
     92, 90, 88, 86, 84,            // +5 ~ +9
-    82, 80, 78, 75, 72,            // +10 ~ +14
-    69, 66, 63, 59, 55,            // +15 ~ +19
-    30, 20, 13, 8, 5,              // +20 ~ +24
-    3, 1.8, 1, 0.5, 0.25,          // +25 ~ +29
+    78, 68, 60, 52, 45,            // +10 ~ +14
+    39, 33, 28, 23, 19,            // +15 ~ +19
+    14, 10, 7, 5, 3.5,             // +20 ~ +24
+    2.5, 1.5, 0.8, 0.4, 0.2,       // +25 ~ +29
   ],
   // 실패 시 파괴 확률(%): index = 현재 단계. 0이면 파괴 없음(단계만 -1)
   destroy: [
@@ -615,6 +631,100 @@ const BOSS_ACCS = [
   { name: '신왕의 태초 인장',   eff: { gold: 0.25, luck: 0.25, enh: 4 } },
 ];
 
+// ---------- 태초의 유물 (Genesis Artifacts) ----------
+// 각 사냥터(floor)마다 1개씩, 총 20개의 유니크 하드코딩 아이템. 장착 슬롯을 차지하지
+// 않고 "보유하는 순간부터" 항상 발동하는 진짜 컬렉션형 보상. 평범한 킬로는 사실상
+// 평생 못 볼 확률(1/100억)이고 엘리트/보스는 그보다 훨씬 유리함.
+// 하나씩 천천히 채워나가는 컨텐츠라 아직 비어있는 슬롯은 null로 둔다.
+const GENESIS_BASE_CHANCE = 1e-10; // 사냥터 몬스터 1마리당 기본 확률
+const GENESIS_ELITE_MULT = 5;      // 엘리트(유니크) 몬스터는 5배
+const GENESIS_BOSS_MULT = 10;      // 보스 몬스터는 10배
+const GENESIS_ARTIFACTS = [
+  { // floor 0 — 초원 — 슬라임
+    id: 'gluttony',
+    floor: 0,
+    type: 'accessory',
+    name: '글러트니의 목걸이',
+    subtitle: 'The Gluttony',
+    icon: '📿',
+    art: 'assets/artifacts/gluttony_necklace.svg',
+    lore: `옛날, 아직 초원에 이름조차 없던 시절.
+
+그곳에는 태초의 슬라임 하나가 있었다.
+
+녀석에게는 배가 불러오는 순간이 없었다.
+풀을 먹고, 흙을 먹고, 짐승을 먹고,
+마침내 초원에 존재하는 모든 것을 집어삼키려 했다.
+
+그러나 가장 두려운 것은 그 탐욕의 크기가 아니었다.
+
+공격조차 먹어치웠다는 것.
+
+칼날은 몸에 닿기도 전에 사라졌고,
+불꽃은 삼켜져 꺼졌으며,
+번개와 저주마저 그 안에서 흔적 없이 소멸했다.
+
+상처를 입지 않는 것이 아니었다.
+
+상처가 될 수 있는 것 자체를 먹어 없애버린 것이다.
+
+사람들은 그것을 칠죄종의 이름으로 불렀다.
+
+글러트니(Gluttony).
+
+끝없는 허기.
+끝없는 탐욕.
+그리고 모든 것을 자신의 일부로 만들어버리는 포식.
+
+이 목걸이는 그 태초의 탐욕을 담고 있다고 전해진다.`,
+    effectsText: [
+      '끝없는 허기: 태초를 제외한 모든 아이템의 드랍률이 10배, 골드 획득량이 10배 상승한다.',
+      '끝없는 탐욕: 아이템 획득 시 10% 확률로 10배로 획득한다. 재료 또는 무기 판매 시에도 10% 확률로 10배의 골드를 획득한다.',
+    ],
+  },
+  null, null, null, null, null, null, null, null, null,
+  null, null, null, null, null, null, null, null, null,
+];
+function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
+function grantGenesisArtifact(artifact) {
+  S.genesisOwned.push(artifact.id);
+  log(`🌌🌌🌌 <b style="color:#6cf0c2">[태초의 유물] ${artifact.name}</b>을(를) 획득했습니다!!! 🌌🌌🌌`, 'lg-prim');
+  log(`가방 탭에서 유물의 이야기를 확인해보세요.`, 'lg-prim');
+  renderInventory(); renderTop(); save();
+}
+// 사냥터별 유물이 아직 없다면 극희박한 확률로 드랍 시도. kindMult: 1=일반, 5=엘리트, 10=보스
+function rollGenesisArtifact(floorIdx, kindMult) {
+  const artifact = GENESIS_ARTIFACTS[floorIdx];
+  if (!artifact || hasGenesis(artifact.id)) return;
+  if (Math.random() < GENESIS_BASE_CHANCE * kindMult) grantGenesisArtifact(artifact);
+}
+
+// ---------- 이스터에그 ----------
+// 정답은 유저에게 알려주지 않고 저장소의 EASTER_EGGS.md에만 기록한다. 달성하면 타이틀
+// 옆에 뱃지가 붙는다. 조건은 코드 곳곳(강화/도박/사냥/인벤토리)에 흩어져 있음.
+const EASTER_EGGS = {
+  midnight:   { icon: '🌙', name: '자정의 방문자',   desc: '깊은 밤에 조용히 접속했다' },
+  blacksmith: { icon: '⚒️', name: '불굴의 대장장이', desc: '수많은 실패에도 망치를 놓지 않았다' },
+  collector:  { icon: '🎭', name: '만물 수집가',     desc: '세상의 모든 무기 종류를 한 가방에 모았다' },
+  allin:      { icon: '🎰', name: '멈출 수 없는 손', desc: '올인의 유혹에서 헤어나오지 못했다' },
+  noBox:      { icon: '🙈', name: '박스는 필요없다', desc: '오직 실력(?)만으로 정상에 도달했다' },
+};
+function unlockEgg(id) {
+  if (!S.eggs) S.eggs = {};
+  if (S.eggs[id]) return;
+  S.eggs[id] = true;
+  const egg = EASTER_EGGS[id];
+  log(`🥚 <b>이스터에그 발견!</b> ${egg.icon} <span style="color:var(--unique)">[${egg.name}]</span> — ${egg.desc}`, 'lg-prim');
+  renderEggBadges();
+  save();
+}
+function renderEggBadges() {
+  const el = $('eggBadges');
+  if (!el || !S.eggs) return;
+  const owned = Object.keys(S.eggs).filter(id => S.eggs[id] && EASTER_EGGS[id]);
+  el.innerHTML = owned.map(id => `<span title="${EASTER_EGGS[id].name}: ${EASTER_EGGS[id].desc}" style="margin-left:5px;cursor:help;">${EASTER_EGGS[id].icon}</span>`).join('');
+}
+
 // ---------- 재료/장신구 ----------
 // 사냥터 구간별 재료 등급 (일반/레어/에픽 → 레어/에픽/유니크 → 에픽/유니크/레전더리 → 유니크/레전더리/태초)
 const MAT_TIERS = [[0, 1, 2], [1, 2, 3], [2, 3, 4], [3, 4, 5]];
@@ -726,6 +836,8 @@ const RUNE_SPECIALS = {
   midastouch:   { name: '미다스의 손',     grade: 6, proc: 0.08, desc: '몬스터 처치 시 8% 확률로 랜덤박스(일반~에픽) 즉시 획득' },
   divinestrike: { name: '신벌',            grade: 6, proc: 0.02, desc: '공격 시 2% 확률로 몬스터 즉시 처치 (보스 제외)' },
   omnirune:     { name: '전능의 룬',       grade: 6, value: 8,   desc: '모든 일반 스탯(공속/치확/치피/연타/보스피해) +8%p, 골드 획득 +20%' },
+  elitehunter:  { name: '정예 사냥꾼',     grade: 5, bonus: 0.02, desc: '엘리트(유니크) 몬스터 출현 확률 +2%p' },
+  luckygambler: { name: '도박의 신',       grade: 6, proc: 0.25, desc: '도박장에서 손해가 나오면 25% 확률로 즉시 재도전(더 나은 결과가 나올 때까지는 아니고 한 번 더 굴림)' },
 };
 const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
 for (const [k, v] of Object.entries(RUNE_SPECIALS)) RUNE_SPECIALS_BY_GRADE[v.grade].push(k);
@@ -766,11 +878,19 @@ function avgGoldTo15(grade) {
   return sum;
 }
 const RUNE_BOX_ICONS = ['📦', '🎁', '🎊', '💠', '🏆', '✨', '🌌'];
+// targetGrade(t+2)가 최고 등급(6)을 넘어서는 상위 3개 박스(레전더리/신화/태초 룬박스)는
+// 전부 avgGoldTo15(6)으로 수렴해서 가격이 똑같아지던 버그가 있었음 — 넘치는 단계만큼
+// 추가 배수(4배씩)를 곱해서 계속 비싸지도록 수정.
+function runeBoxCost(t) {
+  const targetGrade = t + 2;
+  const overflow = Math.max(0, targetGrade - 6);
+  return Math.round(avgGoldTo15(Math.min(6, targetGrade)) * Math.pow(4, overflow));
+}
 const RUNE_BOXES = [0, 1, 2, 3, 4, 5, 6].map(t => ({
   tier: t,
   name: GRADES[t].name + ' 룬박스',
   icon: RUNE_BOX_ICONS[t],
-  cost: avgGoldTo15(Math.min(6, t + 2)),
+  cost: runeBoxCost(t),
   dropTable: buildRuneDropTable(t),
 }));
 
@@ -823,6 +943,10 @@ function newState() {
     destroyedCount: 0,
     runes: [],         // 보유 룬(미장착): [{ id, grade, key }]
     training: {},      // 능력치 훈련 레벨: { atk, atkSpeed, critChance, critDamage, extraAtk, bossDmg }
+    autoSellGrade: null, // 이 등급 이하 + 강화0 무기는 획득 즉시 자동판매 (null=끔)
+    genesisOwned: [],  // 보유한 태초의 유물 id 목록
+    eggs: {},          // 달성한 이스터에그: { eggId: true }
+    allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
   };
 }
 
@@ -856,16 +980,28 @@ function weaponAtk(w) {
   const g = GRADES[w.grade];
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
   const base = g.atk * t.dmgMult;
-  return base * enhAtkMult(w.enhance) * (1 + accEff().atk + typeTrait(w, 'atk'));
+  return base * enhAtkMult(w.enhance, w.grade) * (1 + accEff().atk + typeTrait(w, 'atk'));
 }
-// 강화 단계별 누적 공격력 배율 (단계마다 곱연산 성장, 서지 단계마다 성장폭 확대)
-function enhAtkMult(enh) {
+// 강화 단계별 누적 공격력 배율 (단계마다 곱연산 성장, 서지 단계마다 성장폭 확대).
+// 등급이 높을수록 성공 확률은 훨씬 가파르게 낮아지는 대신(gradeSuccessMult 참고),
+// 한 번 성공했을 때의 성장폭은 더 크게 보상해준다(gradeGrowthBonus).
+function enhAtkMult(enh, grade) {
+  grade = grade || 0;
   let m = 1;
   for (let lv = 1; lv <= enh; lv++) {
-    const growth = ENH.atkGrowthBase + ENH.atkGrowthLinear * lv + (lv % ENH.atkGrowthSurgeEvery === 0 ? ENH.atkGrowthSurge : 0);
+    const growth = ENH.atkGrowthBase + ENH.atkGrowthLinear * lv + (lv % ENH.atkGrowthSurgeEvery === 0 ? ENH.atkGrowthSurge : 0) + grade * ENH.gradeGrowthBonus;
     m *= (1 + growth);
   }
   return m;
+}
+// 등급별 보정 성공 확률: +15 미만은 등급 무관 동일(ENH.success 그대로), +15부터는
+// 등급이 높을수록 (성공확률)^지수 로 계산해서 훨씬 가파르게 낮아짐. 파괴 확률은
+// 등급과 무관하게 ENH.destroy 그대로 유지 — "터지는 확률"만큼은 공평함.
+function gradeAdjustedSuccess(grade, enhance) {
+  const base = ENH.success[enhance];
+  if (enhance < 15) return base;
+  const exponent = 1 + (grade || 0) * ENH.gradeSuccessExp;
+  return Math.max(0.0000001, Math.pow(base / 100, exponent) * 100);
 }
 function isSurgeLevel(lv) { return lv > 0 && lv % ENH.atkGrowthSurgeEvery === 0; }
 function weaponSpeed(w) {
@@ -1050,12 +1186,27 @@ function matSellPrice(f, g) {
   const mult = [1.5, 4, 10][g] || 1;
   return Math.max(1, Math.floor(floorGold(f) * mult));
 }
+// 강화를 많이 한 무기는 판매도 나름의 "돈벌이 수단"이 되도록 기대 판매가를 공격력
+// 배율만큼 기하급수적으로 키움 (표시용 기대값 — 실제 판매 시엔 운빨이 추가로 붙음)
 function sellPrice(w) {
   const g = GRADES[w.grade] || GRADES[0];
   const enh = typeof w.enhance === 'number' && w.enhance >= 0 ? w.enhance : 0;
-  // 고강화 무기는 공격력 배율만큼 가치 폭등: (1 + 단계×0.2) × 공격력배율
-  const ms = enhAtkMult(enh);
+  const ms = enhAtkMult(enh, w.grade);
   return Math.max(1, Math.floor(g.sell * (1 + enh * 0.2) * ms * (w.effect ? 5 : 1)));
+}
+// 판매 운빨 테이블 — 대부분 무난하지만 드물게 대박(혹은 쪽박)이 남
+const SELL_LUCK = [
+  { mult: 0.3, weight: 18, label: '아... 헐값에...' },
+  { mult: 0.6, weight: 24, label: null },
+  { mult: 1.0, weight: 28, label: null },
+  { mult: 1.6, weight: 16, label: '오, 괜찮은 값에!' },
+  { mult: 3.0, weight: 9,  label: '대박! 좋은 값에 팔렸다!' },
+  { mult: 8.0, weight: 2.5, label: '🎉 초대박!! 엄청난 값에 팔렸다!!' },
+  { mult: 25.0, weight: 0.5, label: '💎💎 전설의 상인을 만났다!! 상상초월 가격!!' },
+];
+function rollSellPrice(basePrice) {
+  const pick = wrand(SELL_LUCK.map(s => [s, s.weight]));
+  return { price: Math.max(1, Math.floor(basePrice * pick.mult)), label: pick.label, mult: pick.mult };
 }
 
 /* ===================== 유틸 ===================== */
@@ -1065,6 +1216,13 @@ function fmt(n) {
   if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, '') + '억';
   if (n >= 1e4) return (n / 1e4).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + '만';
   return n.toLocaleString();
+}
+// 아주 작은 확률(고등급 고강화)도 0%로 뭉개지지 않고 보이도록
+function fmtPct(p) {
+  if (p <= 0) return '0%';
+  if (p >= 1) return (Math.round(p * 100) / 100) + '%';
+  if (p >= 0.001) return p.toFixed(3) + '%';
+  return p.toExponential(2) + '%';
 }
 function gradeTag(w) {
   const g = GRADES[w.grade];
@@ -1107,8 +1265,9 @@ function spawnMonster() {
   mon.hp = mon.maxHp;
   mon.dead = false;
   mon.atkTimer = 0;
-  // 유니크 몬스터 판정
-  mon.unique = Math.random() < UNIQUE_CHANCE;
+  // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
+  const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
+  mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
   if (mon.unique) {
     const boss = FLOORS[S.floor].boss;
     mon.maxHp = Math.floor(floorHp(S.floor) * 4);
@@ -1135,6 +1294,8 @@ function dropRoll() {
   if (isU) goldMul *= 10;
   // 전능의 룬(태초): 골드 획득 +20% (여러 개 장착하면 곱연산 중첩)
   goldMul *= Math.pow(1.2, weaponSpecialCount(w, 'omnirune'));
+  // 끝없는 허기(글러트니의 목걸이): 태초를 제외한 모든 아이템 드랍률 ×10, 골드 획득 ×10
+  if (hasGenesis('gluttony')) { dropMul *= 10; goldMul *= 10; }
 
   // 골드
   let gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
@@ -1185,8 +1346,12 @@ function dropRoll() {
   if (S.floor + 1 < FLOORS.length && (S.kills[S.floor] || 0) >= FLOOR.unlockKills && S.unlocked < S.floor + 2) {
     S.unlocked = Math.max(S.unlocked, S.floor + 2);
     log(`🔓 사냥터 [${FLOORS[S.floor + 1].name}] 해금!`, 'lg-gold');
+    if (S.unlocked >= FLOORS.length && S.boxCount === 0) unlockEgg('noBox');
   }
   renderTop(); renderFloorUI();
+
+  // 태초의 유물: 극희박한 확률로 이 사냥터의 고유 유물 드랍 시도 (엘리트는 5배)
+  rollGenesisArtifact(S.floor, isU ? GENESIS_ELITE_MULT : 1);
 
   // 연쇄 처치(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공 시 처치 보상을 한 번 더 획득
   // 발동 알림은 화면 텍스트로만 — 실제 보상은 재귀 호출된 dropRoll()의 일반 로그로 남음
@@ -1225,12 +1390,15 @@ function dropMaterials(isU, luck) {
 
 function addMat(f, matSlot) {
   const key = f + '|' + matSlot;
-  S.mats[key] = (S.mats[key] || 0) + 1;
+  // 끝없는 탐욕(글러트니의 목걸이): 아이템 획득 시 10% 확률로 10배 획득
+  const bonus = (hasGenesis('gluttony') && Math.random() < 0.1) ? 10 : 1;
+  S.mats[key] = (S.mats[key] || 0) + bonus;
   const name = FLOORS[f].mats[matSlot];
   const tierIdx = Math.min(3, Math.floor(f / 5));
   const actualGrade = MAT_TIERS[tierIdx][matSlot];
   const gname = GRADES[actualGrade].name;
-  log(`🌿 재료 획득: <span class="grade-${gname}">${name}</span> (보유 ${S.mats[key]})`);
+  const bonusTag = bonus > 1 ? ` <span class="lg-prim">(끝없는 탐욕! ×10)</span>` : '';
+  log(`🌿 재료 획득: <span class="grade-${gname}">${name}</span>${bonusTag} (보유 ${S.mats[key]})`);
 }
 
 // 조합 가능 여부 확인
@@ -1304,6 +1472,13 @@ function openBox(idx, src) {
 }
 
 function addWeapon(w) {
+  // 자동판매 필터: 지정 등급 이하 + 강화수치 0인 새 무기는 획득 즉시 자동 판매
+  if (S.autoSellGrade != null && w.grade <= S.autoSellGrade && w.enhance === 0) {
+    const price = sellPrice(w);
+    S.gold += price;
+    log(`🗑️ 자동판매(${GRADES[w.grade].name} 이하): ${gradeTag(w)} → +${fmt(price)} 골드`);
+    return;
+  }
   if (S.weapons.length >= 60) {
     // 가방이 가득 차면 맨손을 자동 판매 목록에서 제외하고 가장 약한 무기를 판매
     const sellable = S.weapons.filter(x => !isFist(x) && x.id !== S.equipped);
@@ -1322,6 +1497,7 @@ function addWeapon(w) {
   }
   S.weapons.push(w);
   if (!S.equipped) S.equipped = w.id;
+  if (WEAPON_TYPES.every(t => S.weapons.some(x => x.type === t.name))) unlockEgg('collector');
 }
 
 /* ===================== 게임 루프 ===================== */
@@ -1473,6 +1649,8 @@ function endBossFight(win) {
     const gold = Math.floor(floorGold(f) * BOSS.goldMult * goldMul);
     S.gold += gold;
     log(`🏆 <b><span class="grade-신화">${F.boss.name}</span> 격파!</b> +${fmt(gold)} 골드 (1시간 후 재도전 가능)`, 'lg-prim');
+    // 태초의 유물: 보스 처치는 10배 확률로 시도
+    rollGenesisArtifact(f, GENESIS_BOSS_MULT);
     // 승리 연출
     $('monemoji').classList.add('boss-appear');
     setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
@@ -1554,14 +1732,14 @@ function tryEnhance() {
   if (matNeed > 0) consumeHighMats(matNeed);
 
   const attemptLevel = w.enhance; // FX 연출 강도 판단용 (변경 전 단계)
-  const chance = Math.min(100, ENH.success[w.enhance] + accEff().enh);
+  const chance = Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + accEff().enh);
   if (Math.random() * 100 < chance) {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
     if (isSurgeLevel(w.enhance)) {
       log(`🎉 <b>+${w.enhance} 돌파 성공!</b> 공격력 상승폭 대폭 UP! ${gradeTag(w)}`, 'lg-prim');
     } else {
-      log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(1)}%)`, 'lg-good');
+      log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
     }
   } else {
     const dChance = effectiveDestroyChance(w);
@@ -1574,6 +1752,7 @@ function tryEnhance() {
       playEnhanceFx('destroy', attemptLevel);
       log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}`, 'lg-bad');
       S.destroyedCount++;
+      if (S.destroyedCount >= 50) unlockEgg('blacksmith');
       S.weapons = S.weapons.filter(x => x.id !== w.id);
       S.equipped = null;
       const best = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a))[0];
@@ -1590,6 +1769,10 @@ function tryEnhance() {
       renderEnhance(); renderInventory(); renderTop();
       save();
       return;
+    } else if (Math.random() < 0.5) {
+      // 유지: 실패해도 단계가 그대로 유지됨 (파괴도, 하락도 아닌 세 번째 결과)
+      playEnhanceFx('fail', attemptLevel);
+      log(`😮‍💨 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
     } else {
       w.enhance = Math.max(0, w.enhance - 1);
       playEnhanceFx('fail', attemptLevel);
@@ -1614,9 +1797,16 @@ function gamble(ratio) {
   if (bet < tbl.min) bet = tbl.min;  // 최소 금액 보장
   S.gold -= bet;
   S.gambleCount++;
-  const gm = wrand(GAMBLE.map(g => [g.mult, g.weight]));
+  let gm = wrand(GAMBLE.map(g => [g.mult, g.weight]));
+  // 도박의 신(룬 특수효과): 손해가 나오면 확률적으로 한 번 더 굴림
+  let luckyReroll = false;
+  if (gm < 0 && weaponSpecialCount(getEquipped(), 'luckygambler') > 0 && Math.random() < RUNE_SPECIALS.luckygambler.proc) {
+    gm = wrand(GAMBLE.map(g => [g.mult, g.weight]));
+    luckyReroll = true;
+  }
   const result = Math.floor(bet * gm);
   S.gold += bet + result;
+  if (luckyReroll) log('🍀 <b>도박의 신</b> 발동! 손해가 나오자 즉시 재도전했습니다.', 'lg-prim');
   const br = $('betresult');
   if (gm >= 2) {
     br.innerHTML = `<span style="color:var(--gold)">🎉 잭팟!! +${gm * 100}% (+${fmt(result)})</span>`;
@@ -1633,6 +1823,14 @@ function gamble(ratio) {
   } else {
     br.innerHTML = `<span style="color:#ff4444">💀 전액 손실... (-${fmt(bet)})</span>`;
     log(`🎲 도박 전액 손실... ${fmt(bet)} 골드가 증발했습니다`, 'lg-bad');
+  }
+  if (ratio >= 1) {
+    if (gm < 0) {
+      S.allinLossStreak = (S.allinLossStreak || 0) + 1;
+      if (S.allinLossStreak >= 5) unlockEgg('allin');
+    } else {
+      S.allinLossStreak = 0;
+    }
   }
   renderTop();
   save();
@@ -1669,6 +1867,8 @@ const SAVE_KEY = 'luckEnhance_v1';
 let resetting = false;  // 초기화 중에는 저장 금지
 function save() {
   if (resetting) return;
+  const hr = new Date().getHours();
+  if (hr === 0 && S.eggs && !S.eggs.midnight) unlockEgg('midnight');
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
 }
 // 이전 버전 저장 데이터에 빠진 필드를 채워주는 마이그레이션
@@ -1841,7 +2041,7 @@ function renderEnhance() {
   const maxed = w.enhance >= ENH.maxLevel;
   const nextAtk = maxed ? 0 : weaponAtk({ ...w, enhance: w.enhance + 1 });
   const cost = maxed ? 0 : enhanceCost(w);
-  const chance = maxed ? 0 : Math.min(100, ENH.success[w.enhance] + accEff().enh);
+  const chance = maxed ? 0 : Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + accEff().enh);
   const dChance = maxed ? 0 : effectiveDestroyChance(w);
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
   const matHave = countHighMats();
@@ -1859,7 +2059,7 @@ function renderEnhance() {
     <div>${atkLabel(w)}<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
-    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : chance + '%'}</b></div>${matText}`;
+    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}`;
   const nextSurge = maxed ? null : Math.ceil((w.enhance + 1) / ENH.atkGrowthSurgeEvery) * ENH.atkGrowthSurgeEvery;
   const msText = nextSurge
     ? `<span style="color:var(--unique)">🎯 +${nextSurge} 돌파 시 공격력 상승폭 UP!</span> · `
@@ -1904,9 +2104,65 @@ function renderEnhRune() {
   }
 }
 
+function setupAutoSellControls() {
+  const sel = $('autoSellSelect');
+  if (!sel) return;
+  if (!sel.dataset.built) {
+    sel.innerHTML = '<option value="">끔</option>' + GRADES.map((g, i) => `<option value="${i}">${g.name}</option>`).join('');
+    sel.dataset.built = '1';
+    sel.onchange = () => {
+      S.autoSellGrade = sel.value === '' ? null : +sel.value;
+      save();
+    };
+    $('autoSellCleanBtn').onclick = () => {
+      if (S.autoSellGrade == null) { log('먼저 자동판매 등급을 선택하세요.', 'lg-bad'); return; }
+      const targets = S.weapons.filter(w => !isFist(w) && w.id !== S.equipped && w.grade <= S.autoSellGrade && w.enhance === 0);
+      if (!targets.length) { log('정리할 무기가 없습니다.'); return; }
+      let total = 0;
+      for (const w of targets) total += sellPrice(w);
+      S.gold += total;
+      const ids = new Set(targets.map(w => w.id));
+      S.weapons = S.weapons.filter(w => !ids.has(w.id));
+      log(`🗑️ 가방 일괄 정리: ${targets.length}개 판매 → +${fmt(total)} 골드`, 'lg-good');
+      renderAll(); save();
+    };
+  }
+  sel.value = S.autoSellGrade == null ? '' : String(S.autoSellGrade);
+}
+function renderGenesisList() {
+  const box = $('genesisList');
+  if (!box) return;
+  const implemented = GENESIS_ARTIFACTS.map((a, i) => ({ a, i })).filter(x => x.a);
+  if (!implemented.length) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">아직 공개된 유물이 없습니다.</div>'; return; }
+  box.innerHTML = '';
+  for (const { a } of implemented) {
+    const owned = hasGenesis(a.id);
+    const div = document.createElement('div');
+    div.className = 'invitem' + (owned ? ' equipped' : '');
+    if (owned) {
+      div.innerHTML = `
+        <div style="display:flex; gap:12px; align-items:flex-start; width:100%;">
+          <img src="${a.art}" alt="${a.name}" style="width:90px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--border);flex-shrink:0;" onerror="this.style.display='none'">
+          <div style="flex:1;min-width:0;">
+            <div class="wn">🌌 ${a.name} <span style="font-size:12px;color:var(--sub)">— ${a.subtitle}</span></div>
+            <div class="wi" style="white-space:pre-line;margin-top:6px;line-height:1.5;">${a.lore}</div>
+            <div style="margin-top:8px;">
+              ${a.effectsText.map(t => `<div class="wi" style="color:var(--unique)">✨ ${t}</div>`).join('')}
+            </div>
+          </div>
+        </div>`;
+    } else {
+      div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(${FLOORS[a.floor].name} — ${FLOORS[a.floor].monster})</span></div>
+        <div class="wi">아직 발견하지 못한 태초의 유물입니다.</div></div>`;
+    }
+    box.appendChild(div);
+  }
+}
 function renderInventory() {
   const list = $('invlist');
   $('invcount').textContent = `(${S.weapons.length}/60)`;
+  setupAutoSellControls();
+  renderGenesisList();
   if (!S.weapons.length) {
     list.innerHTML = '<div style="color:var(--sub);font-size:13px;">가방이 비어 있습니다. 사냥이나 랜덤박스로 무기를 얻으세요.</div>';
     return;
@@ -1963,10 +2219,14 @@ function renderInventory() {
       // 이미 판매된(목록에 없는) 무기면 무시 — 중복 클릭 방지
       if (!S.weapons.some(x => x.id === w.id)) { renderInventory(); return; }
       if (w.id === S.equipped) { log('장착 중인 무기는 판매할 수 없습니다.', 'lg-bad'); return; }
-      const price = sellPrice(w);
-      S.gold += price;
+      const roll = rollSellPrice(sellPrice(w));
+      // 끝없는 탐욕(글러트니의 목걸이): 판매 시 10% 확률로 추가 10배
+      const jackpot = hasGenesis('gluttony') && Math.random() < 0.1;
+      const finalPrice = jackpot ? roll.price * 10 : roll.price;
+      S.gold += finalPrice;
       S.weapons = S.weapons.filter(x => x.id !== w.id);
-      log(`판매: ${gradeTag(w)} → +${fmt(price)} 골드`);
+      const tag = jackpot ? ' <span class="lg-prim">(끝없는 탐욕! ×10 추가!)</span>' : (roll.label ? ` <span class="${roll.mult >= 3 ? 'lg-prim' : ''}">(${roll.label})</span>` : '');
+      log(`판매: ${gradeTag(w)} → +${fmt(finalPrice)} 골드${tag}`);
       renderAll(); save();
     };
     btns.appendChild(sel);
@@ -1988,15 +2248,33 @@ function renderBoxes() {
       <div><div style="font-weight:bold">${b.icon} ${b.name} <span style="font-size:12px;color:var(--sub)">(개봉 ${b.cost ? fmt(b.cost) : 0}골드 상당)</span></div>
       <div class="bi">⚔️ 무기: ${wDesc}</div>
       <div class="bi">💰 골드: 박스값의 30%~200%${bDesc ? ` · 🎁 상자: ${bDesc}` : ''}</div></div>
-      <div class="btns"><button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost)}</span></button></div>`;
-    div.querySelector('button').onclick = () => {
+      <div class="btns">
+        <button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost)}</span></button>
+        <button class="primary" data-idx10="${i}">×10 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost * 10)}</span></button>
+      </div>`;
+    div.querySelector('button[data-idx]').onclick = () => {
       if (S.gold < b.cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
       S.gold -= b.cost;
       renderTop();
       openBox(i, '');
     };
+    div.querySelector('button[data-idx10]').onclick = () => buyBoxesBulk(i, 10);
     list.appendChild(div);
   }
+}
+// 랜덤박스 묶음 구매(최대 count개, 감당 가능한 만큼만 실제 구매)
+function buyBoxesBulk(i, count) {
+  const b = BOXES[i];
+  let bought = 0;
+  for (let n = 0; n < count; n++) {
+    if (S.gold < b.cost) break;
+    S.gold -= b.cost;
+    openBox(i, '');
+    bought++;
+  }
+  if (bought === 0) { log('골드가 부족합니다!', 'lg-bad'); return; }
+  if (bought < count) log(`골드가 부족해서 ${bought}개만 개봉했습니다.`, 'lg-bad');
+  renderTop(); renderBoxes();
 }
 
 /* ===================== 룬 상점/인벤토리 ===================== */
@@ -2054,11 +2332,31 @@ function renderRuneTab() {
     div.innerHTML = `
       <div><div style="font-weight:bold">${b.icon} ${b.name}</div>
       <div class="bi">🔮 등급 확률: ${dDesc}</div></div>
-      <div class="btns"><button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost)}</span></button></div>`;
-    div.querySelector('button').onclick = () => openRuneBox(i);
+      <div class="btns">
+        <button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost)}</span></button>
+        <button class="primary" data-idx10="${i}">×10 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost * 10)}</span></button>
+      </div>`;
+    div.querySelector('button[data-idx]').onclick = () => openRuneBox(i);
+    div.querySelector('button[data-idx10]').onclick = () => buyRuneBoxesBulk(i, 10);
     list.appendChild(div);
   });
   renderRuneInventory();
+}
+// 룬박스 묶음 구매(최대 count개, 감당 가능한 만큼만 실제 구매)
+function buyRuneBoxesBulk(i, count) {
+  const b = RUNE_BOXES[i];
+  let bought = 0;
+  for (let n = 0; n < count; n++) {
+    if (S.gold < b.cost) break;
+    S.gold -= b.cost;
+    const grade = wrand(b.dropTable);
+    S.runes.push(genRune(grade));
+    bought++;
+  }
+  if (bought === 0) { log('골드가 부족합니다!', 'lg-bad'); return; }
+  log(`🔮 [${b.name}] ×${bought} 개봉 완료!`, 'lg-good');
+  if (bought < count) log(`골드가 부족해서 ${bought}개만 개봉했습니다.`, 'lg-bad');
+  renderTop(); renderRuneTab(); save();
 }
 
 function renderRuneInventory() {
@@ -2157,6 +2455,7 @@ function renderGamble() {
 function renderAll() {
   renderTop(); renderFloorUI(); renderMonster();
   renderEnhance(); renderCraft(); renderInventory(); renderBoxes(); renderRuneTab(); renderStats();
+  renderEggBadges();
 }
 
 function switchTab(name) {
@@ -2316,11 +2615,14 @@ function sellMat(key, n) {
   n = Math.min(n, have);
   if (n <= 0) return;
   const [f, g] = key.split('|').map(Number);
-  const price = matSellPrice(f, g) * n;
+  let price = matSellPrice(f, g) * n;
+  // 끝없는 탐욕(글러트니의 목걸이): 판매 시 10% 확률로 10배 골드
+  const jackpot = hasGenesis('gluttony') && Math.random() < 0.1;
+  if (jackpot) price *= 10;
   S.mats[key] -= n;
   if (S.mats[key] <= 0) delete S.mats[key];
   S.gold += price;
-  log(`판매: ${FLOORS[f].mats[g]} ×${n} → +${fmt(price)} 골드`);
+  log(`판매: ${FLOORS[f].mats[g]} ×${n} → +${fmt(price)} 골드${jackpot ? ' <span class="lg-prim">(끝없는 탐욕! ×10)</span>' : ''}`);
   renderTop(); renderCraft(); save();
 }
 

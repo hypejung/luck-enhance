@@ -394,16 +394,31 @@ const GRADES = [
 ];
 
 // ---------- 무기 종류 (공속 = 초당 공격 횟수, 데미지 배율) ----------
+// 종류마다 고유 특성(trait)을 부여해서 같은 등급/강화라도 플레이 체감이 다르게 만듦.
+// 지팡이는 공격력 대신 "마력" 개념으로, 평타 대신 확률적으로 주문을 터뜨려 큰 피해를 줌.
 const WEAPON_TYPES = [
-  { name: '단검',   icon: '🗡️', speed: 1.8, dmgMult: 0.68 },
-  { name: '검',     icon: '⚔️', speed: 1.2, dmgMult: 0.90 },
-  { name: '도끼',   icon: '🪓', speed: 0.8, dmgMult: 1.35 },
-  { name: '창',     icon: '🔱', speed: 1.0, dmgMult: 1.10 },
-  { name: '활',     icon: '🏹', speed: 1.4, dmgMult: 0.78 },
-  { name: '지팡이', icon: '🪄', speed: 0.9, dmgMult: 1.25 },
-  { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65 },
+  { name: '단검',   icon: '🗡️', speed: 1.8,  dmgMult: 0.68, trait: { extra: 0.08 },                    traitDesc: '연타 확률 +8%' },
+  { name: '검',     icon: '⚔️', speed: 1.2,  dmgMult: 0.90, trait: { atk: 0.15 },                       traitDesc: '공격력 +15%' },
+  { name: '쌍검',   icon: '🤺', speed: 1.5,  dmgMult: 0.85, trait: { critChance: 0.10, critDamage: 0.40 }, traitDesc: '치명타 확률 +10%p, 치명타 피해 +40%p' },
+  { name: '도끼',   icon: '🪓', speed: 0.8,  dmgMult: 1.35, trait: { bossDmg: 0.25 },                   traitDesc: '보스 피해량 +25%' },
+  { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critDamage: 0.30 },                traitDesc: '치명타 피해 +30%p' },
+  { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedBonus: 0.15 },                traitDesc: '공격속도 +15%' },
+  { name: '지팡이', icon: '🪄', speed: 0.9,  dmgMult: 1.25, trait: { spellProc: 0.25, spellMult: 3 },   traitDesc: '공격력은 "마력"으로 작용, 25% 확률로 주문 작렬(피해 3배)' },
+  { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65, trait: { destroyReduce: 0.3 },              traitDesc: '강화 파괴 확률 -30%' },
 ];
-// DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷
+function typeTrait(w, key) {
+  if (!w) return 0;
+  const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
+  return (t && t.trait && t.trait[key]) || 0;
+}
+// 지팡이는 "공격력" 대신 "마력"으로 표기(수치/계산은 동일, 표시만 다름)
+function atkLabel(w) { return (w && w.type === '지팡이') ? '마력' : '공격력'; }
+// 둔기 특성(파괴 확률 감소)까지 반영한 실제 파괴 확률
+function effectiveDestroyChance(w) {
+  const base = ENH.destroy[w.enhance] || 0;
+  return Math.round(base * (1 - typeTrait(w, 'destroyReduce')) * 10) / 10;
+}
+// DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷(+고유 특성으로 개성 부여)
 
 // ---------- 맨손 (무기가 전부 파괴되면 맨손으로 싸움) ----------
 // 맨손은 파괴되지 않고, 강화 실패 시 +0으로 초기화
@@ -413,8 +428,12 @@ function makeFist(enhance) {
   return { id: 0, grade: FIST.grade, type: FIST.type, icon: FIST.icon, enhance: enhance || 0, effect: null, runes: [], fist: true };
 }
 
-// ---------- 특수 효과 (레전더리 이상) ----------
+// ---------- 특수 효과 (유니크 이상, 등급마다 3종씩 고유 패시브) ----------
 const EFFECTS = {
+  // 유니크
+  keen:    { name: '예리함',       desc: '공격 시 8% 확률로 치명타 (피해 1.8배)', grade: 3, crit: { chance: 0.08, mult: 1.8 } },
+  fortune: { name: '사냥의 감각',  desc: '골드 획득 +20%, 아이템 드롭률 +15%',    grade: 3, gold: 0.20, drop: 0.15 },
+  swift:   { name: '쾌속',         desc: '공격 시 10% 확률로 즉시 재공격',        grade: 3, extra: 0.10 },
   // 레전더리
   blood:    { name: '피의 갈망',     desc: '공격 시 12% 확률로 치명타 (피해 2배)', grade: 4, crit: { chance: 0.12, mult: 2 } },
   hunter:   { name: '사냥꾼의 본능', desc: '골드 획득 +35%, 아이템 드롭률 +30%',    grade: 4, gold: 0.35, drop: 0.30 },
@@ -429,31 +448,36 @@ const EFFECTS = {
   clone:    { name: '분신난무',      desc: '공격 시 30% 확률로 2연타',              grade: 6, extra: 0.30 },
 };
 
-// ---------- 강화 설정 (최대 +30, 리스크 클수록 리턴 커짐) ----------
+// ---------- 강화 설정 (최대 +30, "운빨강화"의 핵심 — 진짜 도박) ----------
+// +30을 "일반 무기로 20층 보스까지 전부 한 방에 끝내는 졸업 스펙"으로 놓고 역산해서 설계함.
+// - 공격력 성장은 단계가 오를수록 성장'률' 자체가 커지는 가속형 곱연산(3단계 서지 유지).
+//   growth(lv) = base + linear*lv + (3단계마다 surge) → +30 누적 배율 약 80억 배.
+// - 성공/파괴 확률은 뒤로 갈수록 거의 절벽처럼 나빠짐. 기대 시행 횟수를 직접 선형대수로
+//   풀어서 검증함: +20 약 350회, +24 약 23만회, +28 약 346억회, +30 약 142조회(기대값).
+//   즉 +20~24는 "열심히 하면 되는" 영역, +28+는 "확률상 불가능" 영역이 되도록 설계.
 const ENH = {
   maxLevel: 30,
-  // 강화 1단계당 공격력 증가율(곱연산 누적). 3단계마다 증가폭이 커져서(서지) 고강화로 갈수록
-  // 등급 차이를 뛰어넘을 만큼 강해짐 — 예: 일반 +30이면 레전더리 +0(4등급 위)을 막 이길 수 있는 수준.
-  atkGrowthBase: 0.088,
-  atkGrowthSurge: 0.19,
+  atkGrowthBase: 0.1,
+  atkGrowthLinear: 0.065,   // 레벨이 오를수록 성장률 자체가 선형으로 커짐(가속형)
+  atkGrowthSurge: 0.35,
   atkGrowthSurgeEvery: 3,
   // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%)
   success: [
-    100, 100, 95, 92, 90,          // +0 ~ +4
-    87, 85, 82, 80, 77,            // +5 ~ +9
-    75, 72, 70, 67, 65,            // +10 ~ +14
-    62, 60, 57, 55, 52,            // +15 ~ +19
-    50, 47, 45, 42, 40,            // +20 ~ +24
-    37, 35, 32, 30, 27,            // +25 ~ +29
+    100, 100, 98, 96, 94,          // +0 ~ +4
+    92, 90, 88, 85, 82,            // +5 ~ +9
+    78, 74, 70, 65, 60,            // +10 ~ +14
+    54, 48, 42, 36, 30,            // +15 ~ +19
+    24, 19, 15, 11, 8,             // +20 ~ +24
+    6, 4, 3, 2, 1.2,               // +25 ~ +29
   ],
   // 실패 시 파괴 확률(%): index = 현재 단계. 0이면 파괴 없음(단계만 -1)
   destroy: [
     0, 0, 0, 0, 0,                 // +0 ~ +4
     0, 0, 0, 0, 0,                 // +5 ~ +9
-    1, 2, 4, 6, 9,                 // +10 ~ +14
-    12, 14, 16, 18, 19,            // +15 ~ +19
-    20, 20, 22, 22, 24,            // +20 ~ +24
-    24, 26, 26, 28, 30,            // +25 ~ +29
+    2, 3, 4, 5, 7,                 // +10 ~ +14
+    9, 12, 15, 18, 22,             // +15 ~ +19
+    26, 30, 35, 40, 45,            // +20 ~ +24
+    50, 55, 60, 65, 70,            // +25 ~ +29
   ],
 };
 
@@ -577,10 +601,14 @@ const TRAINING = {
   extraAtk:   { name: '연격 훈련', desc: '연타 확률 +0.3%p/레벨',   perLevel: 0.003, baseCost: 100, costExp: 1.28 },
   bossDmg:    { name: '살육 훈련', desc: '보스 피해량 +2%/레벨',    perLevel: 0.02,  baseCost: 90,  costExp: 1.26 },
 };
+const TRAINING_TIER_STEP = 10;     // 이 레벨 단위마다 비용이 큰 폭으로 튐
+const TRAINING_TIER_JUMP = 100;    // 티어 하나 오를 때마다 비용 배수 (10레벨마다 ×100)
 function trainingLevel(key) { return (S && S.training && S.training[key]) || 0; }
 function trainingCost(key) {
   const t = TRAINING[key];
-  return Math.round(t.baseCost * Math.pow(trainingLevel(key) + 1, t.costExp));
+  const lvl = trainingLevel(key);
+  const tier = Math.floor(lvl / TRAINING_TIER_STEP);
+  return Math.round(t.baseCost * Math.pow(lvl + 1, t.costExp) * Math.pow(TRAINING_TIER_JUMP, tier));
 }
 function trainingValue(key) { return trainingLevel(key) * TRAINING[key].perLevel; }
 function trainStat(key) {
@@ -615,7 +643,8 @@ const ACCESSORIES = [
   { name: '신의 유물',          eff: { gold: 0.20, luck: 0.20, enh: 3 } },
 ];
 const FLOOR = {
-  goldBase: 12, goldGrowth: 1.42,   // 1단계 골드 10 → 20단계 약 13,000
+  goldBase: 12, goldGrowth: 1.42,   // 1단계 골드 10 → 20단계 약 13,000 (아래 goldMult로 최종 배수 적용)
+  goldMult: 200,                    // "운빨강화" 개편: 강화 시행 횟수를 크게 늘리기 위한 골드 수급 배수
   unlockKills: 10,                  // 다음 사냥터 해금 조건 (처치 수)
   boxDrop: 0.004,                   // 랜덤박스 드롭 확률 (0.4%)
   weaponDrop: 0.006,                // 무기 드롭 확률 (0.6%)
@@ -775,7 +804,7 @@ function genWeapon(gradeIdx) {
     effect: null,
     runes: [],
   };
-  if (gradeIdx >= 4) {
+  if (gradeIdx >= 3) {
     // EFFECTS[w.effect]로 조회하므로 표시용 이름이 아니라 실제 키를 저장해야 함
     // (예전엔 .name을 저장해서 크리티컬/연타/골드보너스 등 효과가 전혀 발동하지 않던 버그)
     const keys = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === gradeIdx);
@@ -788,13 +817,13 @@ function weaponAtk(w) {
   const g = GRADES[w.grade];
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
   const base = g.atk * t.dmgMult;
-  return base * enhAtkMult(w.enhance) * (1 + accEff().atk);
+  return base * enhAtkMult(w.enhance) * (1 + accEff().atk + typeTrait(w, 'atk'));
 }
 // 강화 단계별 누적 공격력 배율 (단계마다 곱연산 성장, 서지 단계마다 성장폭 확대)
 function enhAtkMult(enh) {
   let m = 1;
   for (let lv = 1; lv <= enh; lv++) {
-    const growth = ENH.atkGrowthBase + (lv % ENH.atkGrowthSurgeEvery === 0 ? ENH.atkGrowthSurge : 0);
+    const growth = ENH.atkGrowthBase + ENH.atkGrowthLinear * lv + (lv % ENH.atkGrowthSurgeEvery === 0 ? ENH.atkGrowthSurge : 0);
     m *= (1 + growth);
   }
   return m;
@@ -802,7 +831,7 @@ function enhAtkMult(enh) {
 function isSurgeLevel(lv) { return lv > 0 && lv % ENH.atkGrowthSurgeEvery === 0; }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
-  return t.speed * (1 + accEff().speed) * (1 + weaponRuneStat(w, 'atkSpeed') / 100);
+  return t.speed * (1 + accEff().speed + typeTrait(w, 'speedBonus')) * (1 + weaponRuneStat(w, 'atkSpeed') / 100);
 }
 
 /* ===================== 룬 ===================== */
@@ -988,7 +1017,7 @@ function log(msg, cls) {
 const mon = { hp: 0, maxHp: 0, atkTimer: 0, spawnTimer: 0, dead: false, unique: false };
 
 function floorGold(f) {
-  return Math.floor(FLOOR.goldBase * Math.pow(FLOOR.goldGrowth, f));
+  return Math.floor(FLOOR.goldBase * Math.pow(FLOOR.goldGrowth, f) * FLOOR.goldMult);
 }
 function floorHp(f) { return FLOORS[f].hp; }
 
@@ -1105,8 +1134,9 @@ function dropMaterials(isU, luck) {
   if (Math.random() < Math.min(0.9, rareChance)) {
     addMat(f, 1);
   }
-  // 에픽(최고) 재료
-  const epicChance = (0.03 + luck * 0.15) * (isU ? 8 : 1);
+  // 에픽(최고) 재료 — "운빨강화" 개편으로 골드/강화 시행 횟수가 크게 늘어난 만큼
+  // 고급 재료 파밍이 병목이 되지 않도록 기본 확률을 상향(3%→15%)
+  const epicChance = (0.15 + luck * 0.3) * (isU ? 8 : 1);
   if (Math.random() < Math.min(0.8, epicChance)) {
     addMat(f, 2);
   }
@@ -1176,7 +1206,7 @@ function openBox(idx, src) {
     addWeapon(nw);
     log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 무기! ${gradeTag(nw)}`, grade >= 3 ? 'lg-epic' : 'lg-good');
     if (grade >= 4) log(`🌟 축하합니다! ${GRADES[grade].name} 등급 무기를 획득했습니다!`, 'lg-prim');
-    if (currentTab === 'box') $('gachaslot').innerHTML = `${b.icon} <b>${b.name}</b> 결과:<br>${gradeTag(nw)}<br><span style="font-size:12px;color:var(--sub)">공격력 ${fmt(weaponAtk(nw))} | 공속 ${weaponSpeed(nw).toFixed(1)}/초</span>`;
+    if (currentTab === 'box') $('gachaslot').innerHTML = `${b.icon} <b>${b.name}</b> 결과:<br>${gradeTag(nw)}<br><span style="font-size:12px;color:var(--sub)">${atkLabel(nw)} ${fmt(weaponAtk(nw))} | 공속 ${weaponSpeed(nw).toFixed(1)}/초</span>`;
   } else if (roll < wChance + bChance) {
     const ni = wrand(b.box);
     log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 상자 등장! ${BOXES[ni].icon} <b>${BOXES[ni].name}</b> 획득!`, 'lg-gold');
@@ -1268,16 +1298,23 @@ function attack(w) {
     floatText('⚡ 신벌!');
     return;
   }
-  // 치명타 확률/배율 = 무기 효과 + 룬 스탯 합산 (발동 알림은 화면 텍스트로만)
-  const critChance = (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance');
-  const critMult = (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage');
+  // 치명타 확률/배율 = 무기 효과 + 룬 스탯 + 무기 종류 특성 합산 (발동 알림은 화면 텍스트로만)
+  const critChance = (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance');
+  const critMult = (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage');
   if (critChance > 0 && Math.random() < critChance) {
     dmg *= critMult;
     floatText('💥 치명타!');
   }
   mon.hp -= dmg;
-  // 연타 효과 = 무기 효과 + 룬 스탯 합산
-  const extraChance = (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk');
+  // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
+  const spellProc = typeTrait(w, 'spellProc');
+  if (spellProc > 0 && Math.random() < spellProc) {
+    const spellDmg = dmg * (typeTrait(w, 'spellMult') || 1);
+    mon.hp -= spellDmg;
+    floatText('🔮 주문 작렬!');
+  }
+  // 연타 효과 = 무기 효과 + 룬 스탯 + 무기 종류 특성 합산
+  const extraChance = (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra');
   if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= dmg;
     floatText('⚡ 연타!');
@@ -1302,6 +1339,7 @@ function bossDmgBonus() {
     const e = w.effect ? EFFECTS[w.effect] : null;
     if (e && e.bossDmg) bonus += e.bossDmg;
     bonus += weaponRuneStat(w, 'bossDmg') / 100;
+    bonus += typeTrait(w, 'bossDmg');
   }
   bonus += trainingValue('bossDmg');
   return bonus;
@@ -1437,7 +1475,7 @@ function tryEnhance() {
       log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(1)}%)`, 'lg-good');
     }
   } else {
-    const dChance = ENH.destroy[w.enhance];
+    const dChance = effectiveDestroyChance(w);
     // 맨손은 파괴되지 않고 +0으로 초기화
     if (isFist(w)) {
       w.enhance = 0;
@@ -1712,19 +1750,21 @@ function renderEnhance() {
   const nextAtk = maxed ? 0 : weaponAtk({ ...w, enhance: w.enhance + 1 });
   const cost = maxed ? 0 : enhanceCost(w);
   const chance = maxed ? 0 : Math.min(100, ENH.success[w.enhance] + accEff().enh);
-  const dChance = maxed ? 0 : ENH.destroy[w.enhance];
+  const dChance = maxed ? 0 : effectiveDestroyChance(w);
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
   const matHave = countHighMats();
   const matOk = matNeed === 0 || matHave >= matNeed;
   const matText = matNeed > 0
     ? `<div>고급 재료<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matHave}/${matNeed}</b></div>`
     : '';
+  const typeInfo = isFist(w) ? null : WEAPON_TYPES.find(x => x.name === w.type);
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
     <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
+    ${typeInfo ? `<div style="font-size:12px;color:var(--sub)">🗡️ ${typeInfo.name} 특성: ${typeInfo.traitDesc}</div>` : ''}
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
     ${(w.runes || []).map(r => `<div class="lg-prim">🔮 [${runeName(r)}] ${runeDesc(r)}</div>`).join('')}`;
   $('enhstat').innerHTML = `
-    <div>공격력<b>${fmt(atk)}</b></div>
+    <div>${atkLabel(w)}<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : chance + '%'}</b></div>${matText}`;
@@ -1796,7 +1836,7 @@ function renderInventory() {
       : '';
     div.innerHTML = `
       <div><div class="wn"${hasDetail ? ' style="cursor:pointer"' : ''}>${gradeTag(w)}${hasDetail ? ` <span style="font-size:11px;color:var(--sub)">${expanded ? '▴ 효과 접기' : '▾ 효과 보기'}</span>` : ''}</div>
-      <div class="wi">공격력 ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · 판매가 ${fmt(sellPrice(w))}</div>
+      <div class="wi">${atkLabel(w)} ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · 판매가 ${fmt(sellPrice(w))}</div>
       ${detailHtml}</div>
       <div class="btns"></div>`;
     if (hasDetail) {
@@ -1982,7 +2022,7 @@ function renderStats() {
   const s = computeStats();
   box.innerHTML = `
     <div class="statgrid">
-      <div class="statcell"><div class="sl">공격력</div><div class="sv">${fmt(s.atk)}</div></div>
+      <div class="statcell"><div class="sl">${atkLabel(w)}</div><div class="sv">${fmt(s.atk)}</div></div>
       <div class="statcell"><div class="sl">공격속도</div><div class="sv">${s.spd.toFixed(2)}/초</div></div>
       <div class="statcell"><div class="sl">DPS</div><div class="sv">${fmt(s.dps)}</div></div>
       <div class="statcell"><div class="sl">치명타 확률</div><div class="sv">${s.critChance.toFixed(1)}%</div></div>

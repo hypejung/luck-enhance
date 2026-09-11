@@ -86,9 +86,20 @@
   .fbtn.on { border-color: var(--gold); color: var(--gold); background: #3d3d1f; }
   .fbtn.locked { opacity: .3; }
 
-  #monbox { text-align: center; padding: 10px 0; }
+  #monbox { text-align: center; padding: 10px 0; position: relative; }
   #monemoji { font-size: 64px; line-height: 1.2; }
   #monname { font-size: 18px; margin: 4px 0; }
+  .floatmsg {
+    position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
+    font-weight: bold; font-size: 15px; color: var(--unique);
+    text-shadow: 0 1px 4px rgba(0,0,0,.7); pointer-events: none; white-space: nowrap;
+    animation: floatup .9s ease-out forwards; z-index: 5;
+  }
+  @keyframes floatup {
+    0%   { opacity: 0; transform: translate(-50%, -30%) scale(.85); }
+    15%  { opacity: 1; transform: translate(-50%, -55%) scale(1.05); }
+    100% { opacity: 0; transform: translate(-50%, -95%) scale(1); }
+  }
   #hpbarWrap {
     width: 100%; height: 22px; background: #333; border-radius: 11px;
     overflow: hidden; border: 1px solid var(--border); margin: 8px 0;
@@ -114,6 +125,12 @@
   .enhrates { font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0; }
   .enhrates b { color: var(--text); }
   .warn { color: #ff8a8a; }
+
+  /* ===== 능력치 ===== */
+  .statgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; }
+  .statcell { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .statcell .sl { font-size: 11px; color: var(--sub); }
+  .statcell .sv { font-size: 16px; font-weight: bold; margin-top: 2px; }
 
   /* ===== 인벤토리 ===== */
   .invitem {
@@ -201,9 +218,11 @@
   <div id="tabs">
     <div class="tab on" data-tab="hunt">⚔️ 사냥터</div>
     <div class="tab" data-tab="enhance">🔨 강화기</div>
+    <div class="tab" data-tab="stats">📊 능력치</div>
     <div class="tab" data-tab="craft">🧪 조합</div>
     <div class="tab" data-tab="inventory">🎒 가방</div>
     <div class="tab" data-tab="box">🎁 랜덤박스</div>
+    <div class="tab" data-tab="rune">🔮 룬</div>
     <div class="tab" data-tab="gamble">🎲 도박장</div>
   </div>
 
@@ -251,6 +270,18 @@
         <b style="color:var(--unique)">3단계마다 돌파</b> 시 공격력 상승폭 UP (리스크 클수록 리턴 커짐) · 고강화는 등급 차이도 뒤집습니다!
       </div>
     </div>
+    <div class="panel">
+      <h3>🔮 장착 무기의 룬</h3>
+      <div id="enhruneBox"></div>
+    </div>
+  </div>
+
+  <!-- 능력치 -->
+  <div id="tab-stats" style="display:none">
+    <div class="panel">
+      <h3>📊 내 능력치</h3>
+      <div id="statsBox"></div>
+    </div>
   </div>
 
   <!-- 조합 -->
@@ -289,6 +320,23 @@
       <h3>🎁 랜덤박스 상점</h3>
       <div id="boxlist"></div>
       <div id="gachaslot"></div>
+    </div>
+  </div>
+
+  <!-- 룬 -->
+  <div id="tab-rune" style="display:none">
+    <div class="panel">
+      <h3>🔮 룬 상점</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 1개 장착할 수 있습니다 (무기당 1슬롯).
+        <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다.
+      </div>
+      <div id="runeboxlist"></div>
+      <div id="runegachaslot"></div>
+    </div>
+    <div class="panel">
+      <h3>🎒 보유 룬</h3>
+      <div id="runeinvlist"></div>
     </div>
   </div>
 
@@ -540,15 +588,88 @@ const FLOOR = {
 
 // ---------- 랜덤박스 ----------
 const BOXES = [
+  // 상위 박스(연쇄 개봉) 확률은 전 구간 1%대로 하향, 레전더리/신화 확률도 대폭 하향.
+  // 줄어든 확률만큼은 모두 gold 쪽으로 흡수(다른 등급 드롭률은 그대로 유지).
   { name: '일반 랜덤박스', icon: '📦', cost: 500,
-    weapon: [[0,35],[1,12.5],[2,2.5]], gold: 0.42, box: [[1,8]] },
+    weapon: [[0,35],[1,12.5],[2,2.5]], gold: 0.49, box: [[1,1]] },
   { name: '고급 랜덤박스', icon: '🎁', cost: 2500,
-    weapon: [[0,15],[1,25],[2,12],[3,3]], gold: 0.33, box: [[2,9],[3,3]] },
+    weapon: [[0,15],[1,25],[2,12],[3,3]], gold: 0.437, box: [[2,1],[3,0.3]] },
   { name: '희귀 랜덤박스', icon: '🎊', cost: 12000,
-    weapon: [[1,20],[2,28],[3,10],[4,2]], gold: 0.25, box: [[3,15]] },
+    weapon: [[1,20],[2,28],[3,3],[4,0.5]], gold: 0.475, box: [[3,1]] },
   { name: '전설 랜덤박스', icon: '🏆', cost: 60000,
-    weapon: [[2,25],[3,28],[4,10],[5,2]], gold: 0.25, box: [[3,10]] },
+    weapon: [[2,25],[3,28],[4,1],[5,0.1]], gold: 0.439, box: [[3,2]] },
 ];
+
+// ---------- 룬 ----------
+// 일반 스탯 룬(등급 0~3: 일반/레어/에픽/유니크)은 5가지 전투 스탯 중 하나를 무작위로 부여.
+// 레전더리 이상(4~6) 룬은 스탯 대신 창의적인 특수 효과를 부여.
+const RUNE_STATS = {
+  atkSpeed:   { name: '질풍의 룬', values: [3, 7, 14, 25],   desc: v => `공격속도 +${v}%` },
+  critChance: { name: '정밀의 룬', values: [2, 5, 10, 18],   desc: v => `치명타 확률 +${v}%p` },
+  critDamage: { name: '파괴의 룬', values: [10, 25, 50, 90], desc: v => `치명타 피해 +${v}%p` },
+  extraAtk:   { name: '연격의 룬', values: [2, 5, 10, 18],   desc: v => `연타(추가공격) 확률 +${v}%` },
+  bossDmg:    { name: '살육의 룬', values: [4, 10, 20, 35],  desc: v => `보스 피해량 +${v}%` },
+};
+const RUNE_STAT_KEYS = Object.keys(RUNE_STATS);
+
+// 레전더리(4)/신화(5)/태초(6) 등급 룬 전용 특수 효과 (등급당 3종)
+const RUNE_SPECIALS = {
+  doublestrike: { name: '더블 스트라이크', grade: 4, proc: 0.08, desc: '공격 시 8% 확률로 이번 타격 피해를 한 번 더 적용' },
+  goldrush:     { name: '골드 러시',       grade: 4, proc: 0.20, desc: '몬스터 처치 시 20% 확률로 처치 골드 2배' },
+  boxmagnet:    { name: '박스 자석',       grade: 4, mult: 2,    desc: '랜덤박스 드롭 확률 2배' },
+  chainslayer:  { name: '연쇄 처치',       grade: 5, proc: 0.15, desc: '몬스터 처치 시 15% 확률로 처치 보상(골드/재료/드롭)을 한 번 더 획득' },
+  timedilation: { name: '시간 왜곡',       grade: 5, bonus: 20,  desc: '보스전 제한시간 +20초' },
+  bossrush:     { name: '보스 러시',       grade: 5, mult: 0.5,  desc: '보스 재도전 쿨타임 50% 감소' },
+  midastouch:   { name: '미다스의 손',     grade: 6, proc: 0.08, desc: '몬스터 처치 시 8% 확률로 랜덤박스(일반~에픽) 즉시 획득' },
+  divinestrike: { name: '신벌',            grade: 6, proc: 0.02, desc: '공격 시 2% 확률로 몬스터 즉시 처치 (보스 제외)' },
+  omnirune:     { name: '전능의 룬',       grade: 6, value: 8,   desc: '모든 일반 스탯(공속/치확/치피/연타/보스피해) +8%p, 골드 획득 +20%' },
+};
+const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
+for (const [k, v] of Object.entries(RUNE_SPECIALS)) RUNE_SPECIALS_BY_GRADE[v.grade].push(k);
+
+// 룬박스 등급별 "자기 등급" 룬이 나올 확률(%) — 박스 등급이 올라갈수록 헤드라인 확률은 계속 낮아짐 (태초=0.01%)
+const RUNE_HEADLINE = [90, 20, 5, 1, 0.2, 0.04, 0.01];
+// 일반 룬박스는 레어/에픽 확률도 직접 지정(요청 스펙 그대로), 나머지 등급/박스는 자동 분배
+const RUNE_PINNED = { 0: { 1: 5, 2: 1 } };
+function buildRuneDropTable(boxTier) {
+  const pinned = { [boxTier]: RUNE_HEADLINE[boxTier], ...(RUNE_PINNED[boxTier] || {}) };
+  const pinnedSum = Object.values(pinned).reduce((a, b) => a + b, 0);
+  const remain = 100 - pinnedSum;
+  const belowGrades = [0, 1, 2, 3, 4, 5, 6].filter(g => g < boxTier && !(g in pinned));
+  const aboveGrades = [0, 1, 2, 3, 4, 5, 6].filter(g => g > boxTier && !(g in pinned));
+  // 박스 등급보다 "높은" 룬 전체 확률은 박스 등급이 오를수록 빠르게 줄어든다(상위 룬은 항상 희귀해야 함).
+  // 나머지(대부분)는 박스 등급 이하(주로 바로 아래 등급)로 흘러간다 — below/above 총량을 먼저 분리한 뒤
+  // 각 그룹 안에서 헤드라인과 가까운 등급일수록 더 많이 받도록 지수적으로 분배.
+  const aboveTotal = aboveGrades.length ? Math.min(remain, 4 * Math.pow(0.4, boxTier)) : 0;
+  const belowTotal = remain - aboveTotal;
+  const table = [];
+  const distribute = (grades, total, base, distFn) => {
+    if (!grades.length || total <= 0) return;
+    let wsum = 0;
+    const ws = grades.map(g => { const w = Math.pow(base, distFn(g)); wsum += w; return [g, w]; });
+    for (const [g, w] of ws) table.push([g, +(total * w / wsum).toFixed(4)]);
+  };
+  distribute(belowGrades, belowTotal, 3, g => g - boxTier);       // dist<0 → 헤드라인에 가까울수록 큰 비중
+  distribute(aboveGrades, aboveTotal, 6, g => boxTier - g);       // dist<0 → 헤드라인에 가까울수록 큰 비중, 훨씬 가파르게 감소
+  for (const [g, p] of Object.entries(pinned)) table.push([+g, p]);
+  table.sort((a, b) => a[0] - b[0]);
+  return table;
+}
+// 룬박스 가격 = 박스 등급보다 2단계 높은 등급의 무기를 +15까지 강화하는 데 드는 평균 골드
+// (예: 일반 룬박스 → 에픽 무기 +15 평균 골드)
+function avgGoldTo15(grade) {
+  let sum = 0;
+  for (let e = 0; e < 15; e++) sum += enhanceCost({ grade, enhance: e });
+  return sum;
+}
+const RUNE_BOX_ICONS = ['📦', '🎁', '🎊', '💠', '🏆', '✨', '🌌'];
+const RUNE_BOXES = [0, 1, 2, 3, 4, 5, 6].map(t => ({
+  tier: t,
+  name: GRADES[t].name + ' 룬박스',
+  icon: RUNE_BOX_ICONS[t],
+  cost: avgGoldTo15(Math.min(6, t + 2)),
+  dropTable: buildRuneDropTable(t),
+}));
 
 // ---------- 도박 ----------
 const GAMBLE = [
@@ -572,6 +693,7 @@ const GAMBLE_TABLES = [
 /* ===================== 게임 상태 ===================== */
 let S = null;   // state
 let uid = 1;
+let expandedWeapons = new Set(); // 가방에서 "효과 보기"로 펼친 무기 id (세이브 대상 아님)
 
 function newState() {
   return {
@@ -596,6 +718,7 @@ function newState() {
     boxCount: 0,
     gambleCount: 0,
     destroyedCount: 0,
+    runes: [],         // 보유 룬(미장착): [{ id, grade, key }]
   };
 }
 
@@ -616,8 +739,10 @@ function genWeapon(gradeIdx) {
     effect: null,
   };
   if (gradeIdx >= 4) {
-    const pool = Object.values(EFFECTS).filter(e => e.grade === gradeIdx);
-    w.effect = pool[Math.floor(Math.random() * pool.length)].name;
+    // EFFECTS[w.effect]로 조회하므로 표시용 이름이 아니라 실제 키를 저장해야 함
+    // (예전엔 .name을 저장해서 크리티컬/연타/골드보너스 등 효과가 전혀 발동하지 않던 버그)
+    const keys = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === gradeIdx);
+    w.effect = keys[Math.floor(Math.random() * keys.length)];
   }
   return w;
 }
@@ -640,7 +765,54 @@ function enhAtkMult(enh) {
 function isSurgeLevel(lv) { return lv > 0 && lv % ENH.atkGrowthSurgeEvery === 0; }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
-  return t.speed * (1 + accEff().speed);
+  return t.speed * (1 + accEff().speed) * (1 + weaponRuneStat(w, 'atkSpeed') / 100);
+}
+
+/* ===================== 룬 ===================== */
+let runeUid = 1;
+function genRune(grade) {
+  let key;
+  if (grade <= 3) {
+    key = RUNE_STAT_KEYS[Math.floor(Math.random() * RUNE_STAT_KEYS.length)];
+  } else {
+    const pool = RUNE_SPECIALS_BY_GRADE[grade];
+    key = pool[Math.floor(Math.random() * pool.length)];
+  }
+  return { id: runeUid++, grade, key };
+}
+function runeDef(rune) {
+  if (!rune) return null;
+  return rune.grade <= 3 ? RUNE_STATS[rune.key] : RUNE_SPECIALS[rune.key];
+}
+function runeName(rune) { const d = runeDef(rune); return d ? d.name : ''; }
+function runeDesc(rune) {
+  if (!rune) return '';
+  return rune.grade <= 3 ? RUNE_STATS[rune.key].desc(RUNE_STATS[rune.key].values[rune.grade]) : RUNE_SPECIALS[rune.key].desc;
+}
+// 장착된 무기의 룬이 주는 특정 일반 스탯 보너스(%, %p 단위 그대로 반환). 없으면 0.
+function weaponRuneStat(w, statKey) {
+  if (!w || !w.rune) return 0;
+  const r = w.rune;
+  if (r.grade <= 3) return r.key === statKey ? RUNE_STATS[statKey].values[r.grade] : 0;
+  // 전능의 룬(태초): 5개 일반 스탯에 균일하게 보너스 부여
+  if (r.key === 'omnirune' && RUNE_STAT_KEYS.includes(statKey)) return RUNE_SPECIALS.omnirune.value;
+  return 0;
+}
+// 장착된 무기가 특정 룬 특수효과를 갖고 있는지
+function weaponHasSpecial(w, specialKey) {
+  return !!(w && w.rune && w.rune.grade >= 4 && w.rune.key === specialKey);
+}
+function weaponBossTimeBonus(w) { return weaponHasSpecial(w, 'timedilation') ? RUNE_SPECIALS.timedilation.bonus : 0; }
+function weaponCooldownMult(w) { return weaponHasSpecial(w, 'bossrush') ? RUNE_SPECIALS.bossrush.mult : 1; }
+// 전투 화면에 잠깐 떠오르는 효과 발동 텍스트
+function floatText(msg) {
+  const host = $('monbox');
+  if (!host) return;
+  const el = document.createElement('div');
+  el.className = 'floatmsg';
+  el.textContent = msg;
+  host.appendChild(el);
+  setTimeout(() => el.remove(), 950);
 }
 // 장신구 효과 합산 (일반 + 보스 장신구, 세트 효과 포함)
 function accEff() {
@@ -742,9 +914,10 @@ function fmt(n) {
 function gradeTag(w) {
   const g = GRADES[w.grade];
   const eff = w.effect ? ` <span style="font-size:12px">[${EFFECTS[w.effect] ? EFFECTS[w.effect].name : w.effect}]</span>` : '';
+  const rune = w.rune ? ` <span style="font-size:12px">🔮[${runeName(w.rune)}]</span>` : '';
   const boss = w.bossFloor !== undefined ? ' 👹' : '';
   const fist = isFist(w) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
-  return `<span class="grade-${g.name}">${g.name} ${w.icon}${w.type}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}`;
+  return `<span class="grade-${g.name}">${g.name} ${w.icon}${w.type}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}${rune}`;
 }
 function wrand(pairs) { // [[value, weight], ...]
   let total = pairs.reduce((s, p) => s + p[1], 0);
@@ -800,17 +973,27 @@ function dropRoll() {
   const isU = mon.unique;
 
   if (isU) goldMul *= 10;
+  // 전능의 룬(태초): 골드 획득 +20%
+  if (weaponHasSpecial(w, 'omnirune')) goldMul *= 1.2;
 
   // 골드
-  const gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
+  let gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
+  // 골드 러시(룬 특수효과): 확률로 골드 2배
+  if (weaponHasSpecial(w, 'goldrush') && Math.random() < RUNE_SPECIALS.goldrush.proc) {
+    gold *= 2;
+    log(`💰 <b>골드 러시!</b> 골드 2배!`, 'lg-gold');
+    floatText('💰 골드 러시!');
+  }
   S.gold += gold;
   log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}`);
 
   // 재료 드롭 (항상 1~2개)
   dropMaterials(isU, luck);
 
+  // 박스 자석(룬 특수효과): 랜덤박스 드롭 확률 배수
+  const boxMagnetMult = weaponHasSpecial(w, 'boxmagnet') ? RUNE_SPECIALS.boxmagnet.mult : 1;
   // 랜덤박스 드롭
-  if (Math.random() < FLOOR.boxDrop * dropMul) {
+  if (Math.random() < FLOOR.boxDrop * dropMul * boxMagnetMult) {
     const tier = S.floor >= 12 ? 2 : S.floor >= 6 ? 1 : 0;
     const idx = wrand([[tier, 70], [Math.min(tier + 1, 3), 30]]);
     S.boxCount++;
@@ -825,6 +1008,14 @@ function dropRoll() {
     if (grade >= 4) { log(`✨ 레전더리 이상 무기가 나왔습니다!!`, 'lg-prim'); }
   }
 
+  // 미다스의 손(룬 특수효과): 확률로 랜덤박스(일반~에픽) 즉시 획득
+  if (weaponHasSpecial(w, 'midastouch') && Math.random() < RUNE_SPECIALS.midastouch.proc) {
+    const idx = wrand([[0, 60], [1, 30], [2, 10]]);
+    log(`🌟 <b>미다스의 손!</b> 랜덤박스 즉시 획득!`, 'lg-prim');
+    floatText('🌟 미다스의 손!');
+    giveBox(idx, '미다스의 손');
+  }
+
   // 처치 수 & 해금
   S.kills[S.floor] = (S.kills[S.floor] || 0) + 1;
   S.totalKills++;
@@ -834,6 +1025,13 @@ function dropRoll() {
     log(`🔓 사냥터 [${FLOORS[S.floor + 1].name}] 해금!`, 'lg-gold');
   }
   renderTop(); renderFloorUI();
+
+  // 연쇄 처치(룬 특수효과): 확률로 처치 보상을 한 번 더 획득 (드물게 연쇄로 이어질 수 있음)
+  if (weaponHasSpecial(w, 'chainslayer') && Math.random() < RUNE_SPECIALS.chainslayer.proc) {
+    log(`🔗 <b>연쇄 처치!</b> 처치 보상을 한 번 더 획득합니다.`, 'lg-prim');
+    floatText('🔗 연쇄 처치!');
+    dropRoll();
+  }
 }
 
 // 재료 드롭: 일반 재료(높은 확률), 레어 재료(중간), 에픽 재료(낮음)
@@ -1010,15 +1208,34 @@ function attack(w) {
   if (bossFight.active) {
     dmg *= 1 + bossDmgBonus();
   }
-  if (e && e.crit && Math.random() < e.crit.chance) {
-    dmg *= e.crit.mult;
-    msg = `💥 치명타! [${e.name}] ${fmt(dmg)} 데미지`;
+  // 신벌(룬 특수효과): 보스 제외 즉사
+  if (!bossFight.active && weaponHasSpecial(w, 'divinestrike') && Math.random() < RUNE_SPECIALS.divinestrike.proc) {
+    mon.hp = 0;
+    log(`⚡ <b>신벌!</b> 몬스터를 즉시 처치했습니다!`, 'lg-prim');
+    floatText('⚡ 신벌!');
+    return;
+  }
+  // 치명타 확률/배율 = 무기 효과 + 룬 스탯 합산
+  const critChance = (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100;
+  const critMult = (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100;
+  if (critChance > 0 && Math.random() < critChance) {
+    dmg *= critMult;
+    msg = `💥 치명타! ${fmt(dmg)} 데미지`;
+    floatText('💥 치명타!');
   }
   mon.hp -= dmg;
-  // 연타 효과
-  if (e && e.extra && Math.random() < e.extra) {
+  // 연타 효과 = 무기 효과 + 룬 스탯 합산
+  const extraChance = (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100;
+  if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= dmg;
     msg = (msg ? msg + ' + 연타!' : `⚡ 연타! ${fmt(dmg)} 데미지`);
+    floatText('⚡ 연타!');
+  }
+  // 더블 스트라이크(룬 특수효과): 별도 확률로 이번 타격 피해를 한 번 더 적용
+  if (weaponHasSpecial(w, 'doublestrike') && Math.random() < RUNE_SPECIALS.doublestrike.proc) {
+    mon.hp -= dmg;
+    msg = (msg ? msg + ' + 더블 스트라이크!' : `🌀 더블 스트라이크! ${fmt(dmg)} 데미지 추가`);
+    floatText('🌀 더블 스트라이크!');
   }
   if (msg) { log(msg); }
 }
@@ -1033,6 +1250,7 @@ function bossDmgBonus() {
   if (w) {
     const e = w.effect ? EFFECTS[w.effect] : null;
     if (e && e.bossDmg) bonus += e.bossDmg;
+    bonus += weaponRuneStat(w, 'bossDmg') / 100;
   }
   return bonus;
 }
@@ -1048,7 +1266,7 @@ function startBossFight() {
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   bossFight.active = true;
   bossFight.floor = f;
-  bossFight.timeLeft = BOSS.timeLimit;
+  bossFight.timeLeft = BOSS.timeLimit + weaponBossTimeBonus(getEquipped());
   mon.unique = false;
   mon.maxHp = floorHp(f) * BOSS.hpMult;
   mon.hp = mon.maxHp;
@@ -1073,7 +1291,7 @@ function endBossFight(win) {
   const F = FLOORS[f];
   if (win) {
     S.bossWins++;
-    S.bossCooldowns[f] = Date.now() + BOSS.cooldown;
+    S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped());
     const goldMul = 1 + accEff().gold;
     const gold = Math.floor(floorGold(f) * BOSS.goldMult * goldMul);
     S.gold += gold;
@@ -1283,6 +1501,7 @@ function migrate(d) {
   if (typeof d.bossCooldowns !== 'object' || d.bossCooldowns === null) d.bossCooldowns = {};
   if (typeof d.bossWins !== 'number') d.bossWins = 0;
   if (!Array.isArray(d.weapons)) d.weapons = [];
+  if (!Array.isArray(d.runes)) d.runes = [];
   if (d.gold !== d.gold || typeof d.gold !== 'number') d.gold = 0; // NaN 방지
   // 신화 등급 신설(5)에 따른 구버전 태초(5) 무기 → 태초(6) 이동
   if (d.migratedGradeShift !== true) {
@@ -1309,6 +1528,17 @@ function migrate(d) {
     d.mats = fixed;
     d.migratedMatKeys = true;
   }
+  // 무기 효과 키 버그 수정: genWeapon()이 EFFECTS의 키 대신 표시용 이름을 저장해서
+  // 일반 드롭/박스로 얻은 레전더리 이상 무기의 효과(크리티컬/연타/골드보너스/보스피해)가
+  // 전혀 발동하지 않던 문제. 이름으로 실제 키를 역으로 찾아서 복구.
+  if (d.migratedEffectKeys !== true) {
+    const nameToKey = {};
+    for (const [k, v] of Object.entries(EFFECTS)) nameToKey[v.name] = k;
+    for (const w of d.weapons) {
+      if (w.effect && !EFFECTS[w.effect] && nameToKey[w.effect]) w.effect = nameToKey[w.effect];
+    }
+    d.migratedEffectKeys = true;
+  }
   // 죽은 무기 참조 정리 (id가 인벤토리에 없으면 해제)
   if (d.equipped != null && !d.weapons.some(w => w.id === d.equipped)) d.equipped = null;
   return d;
@@ -1320,6 +1550,9 @@ function load() {
     const data = migrate(JSON.parse(raw));
     // 무이드 정리
     uid = data.weapons.reduce((m, w) => Math.max(m, w.id), 0) + 1;
+    // 룬 uid 정리 (보유 룬 + 무기에 장착된 룬 전부 확인)
+    const equippedRuneIds = data.weapons.filter(w => w.rune).map(w => w.rune.id);
+    runeUid = [...data.runes.map(r => r.id), ...equippedRuneIds].reduce((m, id) => Math.max(m, id), 0) + 1;
     return data;
   } catch (e) { return null; }
 }
@@ -1427,7 +1660,8 @@ function renderEnhance() {
     : '';
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
     <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
-    ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}`;
+    ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
+    ${w.rune ? `<div class="lg-prim">🔮 [${runeName(w.rune)}] ${runeDesc(w.rune)}</div>` : ''}`;
   $('enhstat').innerHTML = `
     <div>공격력<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
@@ -1444,6 +1678,29 @@ function renderEnhance() {
     : isFist(w)
       ? `${msText}✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
       : `${msText}실패 시: 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
+  renderEnhRune();
+}
+
+function renderEnhRune() {
+  const box = $('enhruneBox');
+  if (!box) return;
+  const w = getEquipped();
+  if (!w || isFist(w)) {
+    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">맨손에는 룬을 장착할 수 없습니다.</div>';
+    return;
+  }
+  if (w.enhance < 15) {
+    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">룬은 <b style="color:var(--unique)">+15</b> 이상 강화한 무기에만 장착할 수 있습니다. (현재 +${w.enhance})</div>`;
+    return;
+  }
+  if (w.rune) {
+    const gname = GRADES[w.rune.grade].name;
+    box.innerHTML = `<div class="invitem equipped"><div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(w.rune)}</span></div>
+      <div class="wi">${runeDesc(w.rune)}</div></div><div class="btns"><button class="danger" id="runeUneqBtn">해제</button></div></div>`;
+    $('runeUneqBtn').onclick = unequipRuneFromCurrentWeapon;
+  } else {
+    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">장착된 룬이 없습니다. 🔮 룬 탭에서 보유한 룬을 장착하세요.</div>`;
+  }
 }
 
 function renderInventory() {
@@ -1456,12 +1713,28 @@ function renderInventory() {
   const sorted = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a));
   list.innerHTML = '';
   for (const w of sorted) {
+    const hasDetail = !!(w.effect || w.rune);
+    const expanded = hasDetail && expandedWeapons.has(w.id);
     const div = document.createElement('div');
     div.className = 'invitem' + (w.id === S.equipped ? ' equipped' : '');
+    const detailHtml = expanded
+      ? `<div class="wi" style="margin-top:4px;padding:6px 8px;background:var(--panel2);border-radius:6px">
+          ${w.effect && EFFECTS[w.effect] ? `✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}` : ''}
+          ${w.effect && w.rune ? '<br>' : ''}
+          ${w.rune ? `🔮 [${runeName(w.rune)}] ${runeDesc(w.rune)}` : ''}
+        </div>`
+      : '';
     div.innerHTML = `
-      <div><div class="wn">${gradeTag(w)}</div>
-      <div class="wi">공격력 ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · 판매가 ${fmt(sellPrice(w))}</div></div>
+      <div><div class="wn"${hasDetail ? ' style="cursor:pointer"' : ''}>${gradeTag(w)}${hasDetail ? ` <span style="font-size:11px;color:var(--sub)">${expanded ? '▴ 효과 접기' : '▾ 효과 보기'}</span>` : ''}</div>
+      <div class="wi">공격력 ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · 판매가 ${fmt(sellPrice(w))}</div>
+      ${detailHtml}</div>
       <div class="btns"></div>`;
+    if (hasDetail) {
+      div.querySelector('.wn').onclick = () => {
+        if (expandedWeapons.has(w.id)) expandedWeapons.delete(w.id); else expandedWeapons.add(w.id);
+        renderInventory();
+      };
+    }
     const btns = div.querySelector('.btns');
     if (w.id === S.equipped) {
       const eq = document.createElement('button');
@@ -1524,25 +1797,153 @@ function renderBoxes() {
   }
 }
 
+/* ===================== 룬 상점/인벤토리 ===================== */
+function openRuneBox(tier) {
+  const b = RUNE_BOXES[tier];
+  if (S.gold < b.cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
+  S.gold -= b.cost;
+  const grade = wrand(b.dropTable);
+  const rune = genRune(grade);
+  S.runes.push(rune);
+  const gname = GRADES[grade].name;
+  log(`🔮 [${b.name}] → <span class="grade-${gname}">${gname} ${runeName(rune)}</span> 획득! (${runeDesc(rune)})`, grade >= 4 ? 'lg-prim' : 'lg-good');
+  if (currentTab === 'rune') {
+    $('runegachaslot').innerHTML = `${b.icon} <b>${b.name}</b> 결과:<br><span class="grade-${gname}">${gname} 🔮 ${runeName(rune)}</span><br><span style="font-size:12px;color:var(--sub)">${runeDesc(rune)}</span>`;
+  }
+  renderTop(); renderRuneTab(); save();
+}
+
+function equipRuneToCurrentWeapon(runeId) {
+  const w = getEquipped();
+  if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
+  if (isFist(w)) { log('맨손에는 룬을 장착할 수 없습니다.', 'lg-bad'); return; }
+  if (w.enhance < 15) { log('룬은 +15 이상 강화한 무기에만 장착할 수 있습니다.', 'lg-bad'); return; }
+  const idx = S.runes.findIndex(r => r.id === runeId);
+  if (idx < 0) return;
+  const rune = S.runes[idx];
+  S.runes.splice(idx, 1);
+  if (w.rune) S.runes.push(w.rune); // 기존에 장착돼 있던 룬은 보유 목록으로 반환
+  w.rune = rune;
+  log(`🔮 ${gradeTag(w)}에 <span class="grade-${GRADES[rune.grade].name}">${runeName(rune)}</span> 장착!`, 'lg-good');
+  renderRuneTab(); renderEnhance(); save();
+}
+
+function unequipRuneFromCurrentWeapon() {
+  const w = getEquipped();
+  if (!w || !w.rune) return;
+  S.runes.push(w.rune);
+  w.rune = null;
+  log('룬을 해제했습니다.');
+  renderRuneTab(); renderEnhance(); save();
+}
+
+function renderRuneTab() {
+  const list = $('runeboxlist');
+  if (!list) return;
+  list.innerHTML = '';
+  RUNE_BOXES.forEach((b, i) => {
+    const div = document.createElement('div');
+    div.className = 'boxrow';
+    const dDesc = b.dropTable.filter(([, p]) => p >= 0.01).map(([g, p]) => `${GRADES[g].name} ${p}%`).join(' / ');
+    div.innerHTML = `
+      <div><div style="font-weight:bold">${b.icon} ${b.name}</div>
+      <div class="bi">🔮 등급 확률: ${dDesc}</div></div>
+      <div class="btns"><button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost)}</span></button></div>`;
+    div.querySelector('button').onclick = () => openRuneBox(i);
+    list.appendChild(div);
+  });
+  renderRuneInventory();
+}
+
+function renderRuneInventory() {
+  const list = $('runeinvlist');
+  if (!list) return;
+  if (!S.runes.length) {
+    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 룬이 없습니다. 룬박스를 개봉해 획득하세요.</div>';
+    return;
+  }
+  const sorted = [...S.runes].sort((a, b) => b.grade - a.grade);
+  list.innerHTML = '';
+  for (const r of sorted) {
+    const gname = GRADES[r.grade].name;
+    const div = document.createElement('div');
+    div.className = 'invitem';
+    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
+      <div class="wi">${runeDesc(r)}</div></div><div class="btns"></div>`;
+    const btns = div.querySelector('.btns');
+    const bt = document.createElement('button');
+    bt.textContent = '장착 무기에 장착';
+    bt.className = 'primary';
+    bt.onclick = () => equipRuneToCurrentWeapon(r.id);
+    btns.appendChild(bt);
+    list.appendChild(div);
+  }
+}
+
+/* ===================== 능력치 ===================== */
+function computeStats() {
+  const w = getEquipped();
+  const ae = accEff();
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const atk = w ? weaponAtk(w) : 0;
+  const spd = w ? weaponSpeed(w) : 0;
+  const critChance = Math.min(100, ((e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100) * 100);
+  const critMultPct = ((e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100) * 100;
+  const extraChance = Math.min(100, ((e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100) * 100);
+  return {
+    atk, spd, dps: atk * spd,
+    critChance, critMultPct, extraChance,
+    bossBonus: bossDmgBonus() * 100,
+    goldBonus: ((e && e.gold ? e.gold : 0) + ae.gold) * 100,
+    dropBonus: ae.luck * 100,
+    enhBonus: ae.enh,
+    speedAccBonus: ae.speed * 100,
+  };
+}
+function renderStats() {
+  const box = $('statsBox');
+  if (!box) return;
+  const w = getEquipped();
+  if (!w) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">장착된 무기가 없습니다.</div>'; return; }
+  const s = computeStats();
+  box.innerHTML = `
+    <div class="statgrid">
+      <div class="statcell"><div class="sl">공격력</div><div class="sv">${fmt(s.atk)}</div></div>
+      <div class="statcell"><div class="sl">공격속도</div><div class="sv">${s.spd.toFixed(2)}/초</div></div>
+      <div class="statcell"><div class="sl">DPS</div><div class="sv">${fmt(s.dps)}</div></div>
+      <div class="statcell"><div class="sl">치명타 확률</div><div class="sv">${s.critChance.toFixed(1)}%</div></div>
+      <div class="statcell"><div class="sl">치명타 피해</div><div class="sv">${s.critMultPct.toFixed(0)}%</div></div>
+      <div class="statcell"><div class="sl">연타(추가공격) 확률</div><div class="sv">${s.extraChance.toFixed(1)}%</div></div>
+      <div class="statcell"><div class="sl">보스 피해량 보너스</div><div class="sv">+${s.bossBonus.toFixed(0)}%</div></div>
+      <div class="statcell"><div class="sl">골드 획득 보너스</div><div class="sv">+${s.goldBonus.toFixed(0)}%</div></div>
+      <div class="statcell"><div class="sl">아이템 드롭률 보너스</div><div class="sv">+${s.dropBonus.toFixed(0)}%</div></div>
+      <div class="statcell"><div class="sl">강화 성공확률 보너스</div><div class="sv">+${s.enhBonus.toFixed(0)}%p</div></div>
+      <div class="statcell"><div class="sl">공격속도 보너스(장신구)</div><div class="sv">+${s.speedAccBonus.toFixed(0)}%</div></div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--sub)">장착 무기: ${gradeTag(w)}</div>`;
+}
+
 function renderGamble() {
   // 정적 UI, 버튼은 초기화에서 바인딩
 }
 
 function renderAll() {
   renderTop(); renderFloorUI(); renderMonster();
-  renderEnhance(); renderCraft(); renderInventory(); renderBoxes();
+  renderEnhance(); renderCraft(); renderInventory(); renderBoxes(); renderRuneTab(); renderStats();
 }
 
 function switchTab(name) {
   currentTab = name;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'craft', 'inventory', 'box', 'gamble']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'enhance') renderEnhance();
+  if (name === 'stats') renderStats();
   if (name === 'craft') renderCraft();
   if (name === 'inventory') renderInventory();
   if (name === 'box') renderBoxes();
+  if (name === 'rune') renderRuneTab();
   if (name === 'gamble') renderGambleTables();
 }
 
@@ -1586,18 +1987,25 @@ function renderCraft() {
     const c2 = S.mats[f + '|2'] || 0;
     const ok = canCraft(f);
     const owned = S.accs.some(a => a.floor === f);
+    const equipped = owned && !!(S.accEquipped && S.accEquipped.floor === f);
     const div = document.createElement('div');
-    div.className = 'invitem';
+    div.className = 'invitem' + (equipped ? ' equipped' : '');
     div.innerHTML = `
-      <div><div class="wn"><span class="grade-${gname}">${GRADES[accGrade].name}</span> 📿 ${ACCESSORIES[f].name}</div>
+      <div><div class="wn"><span class="grade-${gname}">${GRADES[accGrade].name}</span> 📿 ${ACCESSORIES[f].name}${equipped ? ' <span style="color:var(--unique);font-size:12px">(장착중)</span>' : ''}</div>
       <div class="wi">효과: ${accEffText(ACCESSORIES[f].eff)}</div>
       <div class="wi">재료: ${F.mats[0]} <b class="${c0 >= CRAFT_COST.n0 ? 'lg-good' : ''}">${c0}/${CRAFT_COST.n0}</b> · ${F.mats[1]} <b class="${c1 >= CRAFT_COST.n1 ? 'lg-good' : ''}">${c1}/${CRAFT_COST.n1}</b>${c2 ? ` · <span class="grade-${GRADES[grades[2]].name}">${F.mats[2]}</span> ${c2}개` : ''}</div></div>
       <div class="btns"></div>`;
     const btns = div.querySelector('.btns');
     if (owned) {
       const b = document.createElement('button');
-      b.textContent = '보유함';
-      b.disabled = true;
+      if (equipped) {
+        b.textContent = '장착중';
+        b.disabled = true;
+      } else {
+        b.textContent = '장착';
+        b.className = 'primary';
+        b.onclick = () => { S.accEquipped = { floor: f, grade: accGrade }; renderCraft(); renderTop(); save(); };
+      }
       btns.appendChild(b);
     } else {
       const b = document.createElement('button');

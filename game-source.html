@@ -293,7 +293,8 @@
       </div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
-        <b style="color:var(--unique)">3단계마다 돌파</b> 시 공격력 상승폭 UP · 등급이 높을수록 +15 이상 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다!
+        <b style="color:var(--unique)">+10 이후</b>부터 강화당 공격력 상승폭이 커집니다 · 등급이 높을수록 +15 이상 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다!
+        <br>+15부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다 (일반~레어: 1~6단계 / 에픽~유니크: 7~12단계 / 레전더리~신화: 13~19단계 / 태초: 20단계).
       </div>
     </div>
     <div class="panel">
@@ -1154,23 +1155,41 @@ function enhanceCost(w) {
 }
 
 // 고레벨 강화에 필요한 고급 재료 수 (에픽 등급 이상 재료)
-// +15 강화부터 필요: +15→1개 ... +29→15개
+// +15 강화부터 필요: +15→5개 ... +29→75개 (스팸성 강화 시도를 억제하기 위해 대폭 상향)
 const HIGH_MAT_START = 15;
+const HIGH_MAT_MULT = 5;
 function highMatsNeeded(enhance) {
-  return enhance >= HIGH_MAT_START ? enhance - (HIGH_MAT_START - 1) : 0;
+  return enhance >= HIGH_MAT_START ? (enhance - (HIGH_MAT_START - 1)) * HIGH_MAT_MULT : 0;
 }
-// 보유 고급 재료 수 (각 사냥터의 3번째(에픽급) 재료 = matGrade 2)
-function countHighMats() {
+// 무기 등급별로 사용 가능한 고급 재료의 사냥터 구간(0-index 층 범위)이 정해져 있다.
+// 일반~레어: 1~6단계, 에픽~유니크: 7~12단계, 레전더리~신화: 13~19단계, 태초: 20단계
+function highMatFloorRange(grade) {
+  if (grade <= 1) return [0, 5];
+  if (grade <= 3) return [6, 11];
+  if (grade <= 5) return [12, 18];
+  return [19, 19];
+}
+function highMatFloorLabel(grade) {
+  const [lo, hi] = highMatFloorRange(grade);
+  return lo === hi ? `${hi + 1}단계` : `${lo + 1}~${hi + 1}단계`;
+}
+// 보유 고급 재료 수 (등급별 허용 사냥터 구간의 3번째(에픽급) 재료 = matGrade 2)
+function countHighMats(grade) {
+  const [lo, hi] = highMatFloorRange(grade);
   let n = 0;
   for (const key in S.mats) {
-    const g = +key.split('|')[1];
-    if (g >= 2) n += S.mats[key];
+    const [f, g] = key.split('|').map(Number);
+    if (g >= 2 && f >= lo && f <= hi) n += S.mats[key];
   }
   return n;
 }
-// 고급 재료 소모: 낮은 사냥터(저티어) 재료부터
-function consumeHighMats(n) {
-  const keys = Object.keys(S.mats).filter(k => +k.split('|')[1] >= 2 && S.mats[k] > 0);
+// 고급 재료 소모: 등급별 허용 구간 내에서 낮은 사냥터(저티어) 재료부터
+function consumeHighMats(grade, n) {
+  const [lo, hi] = highMatFloorRange(grade);
+  const keys = Object.keys(S.mats).filter(k => {
+    const [f, g] = k.split('|').map(Number);
+    return g >= 2 && f >= lo && f <= hi && S.mats[k] > 0;
+  });
   keys.sort((a, b) => {
     const [fa, ga] = a.split('|').map(Number);
     const [fb, gb] = b.split('|').map(Number);
@@ -1727,14 +1746,14 @@ function tryEnhance() {
   if (w.enhance >= ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
   const cost = enhanceCost(w);
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
-  // +15 이상: 고급 재료 필요
+  // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름)
   const matNeed = highMatsNeeded(w.enhance);
-  if (matNeed > 0 && countHighMats() < matNeed) {
-    log(`고급 재료가 부족합니다! (필요 ${matNeed}개, 보유 ${countHighMats()}개) — 사냥터에서 에픽 등급 재료를 모으세요`, 'lg-bad');
+  if (matNeed > 0 && countHighMats(w.grade) < matNeed) {
+    log(`고급 재료가 부족합니다! (필요 ${matNeed}개, 보유 ${countHighMats(w.grade)}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으세요`, 'lg-bad');
     return;
   }
   S.gold -= cost;
-  if (matNeed > 0) consumeHighMats(matNeed);
+  if (matNeed > 0) consumeHighMats(w.grade, matNeed);
 
   const attemptLevel = w.enhance; // FX 연출 강도 판단용 (변경 전 단계)
   const chance = Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + accEff().enh);
@@ -2045,10 +2064,10 @@ function renderEnhance() {
   const chance = maxed ? 0 : Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + accEff().enh);
   const dChance = maxed ? 0 : effectiveDestroyChance(w);
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
-  const matHave = countHighMats();
+  const matHave = countHighMats(w.grade);
   const matOk = matNeed === 0 || matHave >= matNeed;
   const matText = matNeed > 0
-    ? `<div>고급 재료<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matHave}/${matNeed}</b></div>`
+    ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matHave}/${matNeed}</b></div>`
     : '';
   const typeInfo = isFist(w) ? null : WEAPON_TYPES.find(x => x.name === w.type);
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
@@ -2062,7 +2081,7 @@ function renderEnhance() {
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}`;
   const matNote = matNeed > 0 && !matOk
-    ? ` · <span class="warn">고급 재료 부족 (에픽+ 등급 재료 ${matNeed}개 필요)</span>` : '';
+    ? ` · <span class="warn">고급 재료 부족 (${highMatFloorLabel(w.grade)} 재료 ${matNeed}개 필요)</span>` : '';
   $('enhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
     : isFist(w)

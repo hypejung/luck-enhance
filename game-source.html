@@ -424,13 +424,13 @@
 
 // ---------- 무기 등급 ----------
 const GRADES = [
-  { name: '일반',      atk: 10,    enhanceCost: 40,     sell: 30,     color: '#b0b0b0' },
-  { name: '레어',      atk: 28,    enhanceCost: 200,    sell: 150,    color: '#4aa3ff' },
-  { name: '에픽',      atk: 75,    enhanceCost: 1000,   sell: 700,    color: '#b05cff' },
-  { name: '유니크',    atk: 200,   enhanceCost: 5000,   sell: 3500,   color: '#ff9e2c' },
-  { name: '레전더리',  atk: 550,   enhanceCost: 25000,  sell: 18000,  color: '#ff4a5e' },
-  { name: '신화',      atk: 950,   enhanceCost: 60000,  sell: 45000,  color: '#ff7cf0' },
-  { name: '태초',      atk: 1600,  enhanceCost: 120000, sell: 90000,  color: '#6cf0c2' },
+  { name: '일반',      atk: 10,    enhanceCost: 300,    sell: 30,     color: '#b0b0b0' },
+  { name: '레어',      atk: 28,    enhanceCost: 1500,   sell: 150,    color: '#4aa3ff' },
+  { name: '에픽',      atk: 75,    enhanceCost: 7500,   sell: 700,    color: '#b05cff' },
+  { name: '유니크',    atk: 200,   enhanceCost: 37500,  sell: 3500,   color: '#ff9e2c' },
+  { name: '레전더리',  atk: 550,   enhanceCost: 187500, sell: 18000,  color: '#ff4a5e' },
+  { name: '신화',      atk: 950,   enhanceCost: 450000, sell: 45000,  color: '#ff7cf0' },
+  { name: '태초',      atk: 1600,  enhanceCost: 900000, sell: 90000,  color: '#6cf0c2' },
 ];
 
 // ---------- 무기 종류 (공속 = 초당 공격 횟수, 데미지 배율) ----------
@@ -504,12 +504,13 @@ const DMG_CAPS = {
 };
 const ENH = {
   maxLevel: 30,
-  atkGrowthBase: 0.13,
+  linearPhase: 10,          // +0 ~ +10: 강화당 공격력이 일정량씩 선형으로만 증가(급등 없음)
+  linearGrowth: 0.5568,     // 선형 구간의 강화 1회당 성장률 (일반 등급 창 기준 +8에서 슬라임 원킷 라인)
+  atkGrowthBase: 0.13,      // +10 이후부터는 다시 가속형 곡선(레벨별 복리 성장)
   atkGrowthLinear: 0.105,   // 레벨이 오를수록 성장률 자체가 선형으로 커짐(가속형)
-  atkGrowthSurge: 0.45,
-  atkGrowthSurgeEvery: 3,
   gradeGrowthBonus: 0.016,  // 등급 1당 매 레벨 성장률에 추가되는 보너스(고등급 성공 시 더 큰 보상)
   gradeSuccessExp: 0.22,    // 등급 1당 성공확률 지수에 더해지는 값(+15 이상부터, 클수록 고등급이 훨씬 불리)
+  costGrowth: 1.4,          // 강화 비용 배율: 등급 기본비용 × costGrowth^강화단계 (기하급수적 상승)
   // 성공확률: index = 현재 강화 단계 → (단계+1)로 갈 확률(%). +10까지는 유하게 봐주다가
   // 그 이후로 급격히 떨어짐. 등급별 추가 페널티는 gradeAdjustedSuccess()에서 적용.
   success: [
@@ -982,14 +983,18 @@ function weaponAtk(w) {
   const base = g.atk * t.dmgMult;
   return base * enhAtkMult(w.enhance, w.grade) * (1 + accEff().atk + typeTrait(w, 'atk'));
 }
-// 강화 단계별 누적 공격력 배율 (단계마다 곱연산 성장, 서지 단계마다 성장폭 확대).
+// 강화 단계별 누적 공격력 배율. +10까지는 강화 1회당 증가폭이 일정한 선형 구간(급등 없음),
+// +10 이후부터는 단계마다 곱연산으로 가속 성장한다.
 // 등급이 높을수록 성공 확률은 훨씬 가파르게 낮아지는 대신(gradeSuccessMult 참고),
 // 한 번 성공했을 때의 성장폭은 더 크게 보상해준다(gradeGrowthBonus).
 function enhAtkMult(enh, grade) {
   grade = grade || 0;
-  let m = 1;
-  for (let lv = 1; lv <= enh; lv++) {
-    const growth = ENH.atkGrowthBase + ENH.atkGrowthLinear * lv + (lv % ENH.atkGrowthSurgeEvery === 0 ? ENH.atkGrowthSurge : 0) + grade * ENH.gradeGrowthBonus;
+  if (enh <= 0) return 1;
+  const cap = Math.min(enh, ENH.linearPhase);
+  const linearPerLevel = ENH.linearGrowth + grade * ENH.gradeGrowthBonus;
+  let m = 1 + linearPerLevel * cap;
+  for (let lv = ENH.linearPhase + 1; lv <= enh; lv++) {
+    const growth = ENH.atkGrowthBase + ENH.atkGrowthLinear * lv + grade * ENH.gradeGrowthBonus;
     m *= (1 + growth);
   }
   return m;
@@ -1003,7 +1008,6 @@ function gradeAdjustedSuccess(grade, enhance) {
   const exponent = 1 + (grade || 0) * ENH.gradeSuccessExp;
   return Math.max(0.0000001, Math.pow(base / 100, exponent) * 100);
 }
-function isSurgeLevel(lv) { return lv > 0 && lv % ENH.atkGrowthSurgeEvery === 0; }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
   return t.speed * (1 + accEff().speed + typeTrait(w, 'speedBonus')) * (1 + weaponRuneStat(w, 'atkSpeed') / 100);
@@ -1144,8 +1148,8 @@ function playerDPS() {
   return weaponAtk(w) * weaponSpeed(w);
 }
 function enhanceCost(w) {
-  // 저단계 비용 50% 인하: 기본비용 × 0.5 × (단계+1) × 완만한 증가
-  return Math.floor(GRADES[w.grade].enhanceCost * (w.enhance + 1) * (1 + w.enhance * 0.04) * 0.5);
+  // 기본비용 × costGrowth^단계 로 기하급수적 상승 (저강화도 결코 싸지 않음)
+  return Math.floor(GRADES[w.grade].enhanceCost * Math.pow(ENH.costGrowth, w.enhance));
 }
 
 // 고레벨 강화에 필요한 고급 재료 수 (에픽 등급 이상 재료)
@@ -1736,11 +1740,7 @@ function tryEnhance() {
   if (Math.random() * 100 < chance) {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
-    if (isSurgeLevel(w.enhance)) {
-      log(`🎉 <b>+${w.enhance} 돌파 성공!</b> 공격력 상승폭 대폭 UP! ${gradeTag(w)}`, 'lg-prim');
-    } else {
-      log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
-    }
+    log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
   } else {
     const dChance = effectiveDestroyChance(w);
     // 맨손은 파괴되지 않고 +0으로 초기화
@@ -2060,17 +2060,13 @@ function renderEnhance() {
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}`;
-  const nextSurge = maxed ? null : Math.ceil((w.enhance + 1) / ENH.atkGrowthSurgeEvery) * ENH.atkGrowthSurgeEvery;
-  const msText = nextSurge
-    ? `<span style="color:var(--unique)">🎯 +${nextSurge} 돌파 시 공격력 상승폭 UP!</span> · `
-    : '';
   const matNote = matNeed > 0 && !matOk
     ? ` · <span class="warn">고급 재료 부족 (에픽+ 등급 재료 ${matNeed}개 필요)</span>` : '';
   $('enhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
     : isFist(w)
-      ? `${msText}✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
-      : `${msText}실패 시: 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
+      ? `✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
+      : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderEnhRune();
 }
 

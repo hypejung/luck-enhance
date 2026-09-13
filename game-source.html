@@ -501,6 +501,7 @@
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         아이콘은 아직 실루엣으로만 보입니다. 클릭(터치)하면 이름이 팝업으로 뜨고, 해당 무기를
         <b style="color:var(--unique)">한 번이라도 획득</b>하면 도감에 정식으로 등록되어 이름·설명·효과를 전부 볼 수 있습니다.
+        (단, <b style="color:var(--legend)">레전더리 이상</b>은 미보유 상태에서도 클릭하면 이름·설명을 미리 볼 수 있습니다.)
       </div>
       <div id="codexGrid"></div>
       <div id="codexDetail" style="font-size:13px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border); min-height:20px;">
@@ -3644,9 +3645,12 @@ function renderCodex() {
       if (unlocked && ent.grade >= 5) cell.style.boxShadow = `0 0 8px ${gcolor}`;
       const badge = ent.variant !== undefined ? `<span class="codex-badge v${ent.variant}">${VARIANT_BADGES[ent.variant] || ''}</span>` : '';
       cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolor}` : ''}">${ent.icon}</span>${badge}`;
-      // 클릭/터치 시 팝업으로 설명 표시 (모바일은 호버가 안 되므로 title 툴팁 대신 사용)
+      // 클릭/터치 시 팝업으로 설명 표시 (모바일은 호버가 안 되므로 title 툴팁 대신 사용).
+      // 레전더리 이상(4~6등급)은 미보유 상태라도 이름·설명·스피릿을 미리 볼 수 있게 공개
+      // (수집 목표를 미리 보여주는 취지). 실제 등급 아이콘 실루엣/카운트는 그대로 유지.
+      const revealDetail = unlocked || (ent.grade >= 4 && !ent.undesigned);
       cell.onclick = () => {
-        if (unlocked) { renderCodexDetail(ent, key); showCodexPopup(codexDetailHtml(ent)); }
+        if (revealDetail) { renderCodexDetail(ent, key); showCodexPopup(codexDetailHtml(ent)); }
         else showCodexPopup(`<div style="color:var(--sub);font-style:italic;">${ent.name}</div>`);
       };
       grid.appendChild(cell);

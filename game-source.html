@@ -353,7 +353,7 @@
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">누군가 남기고 간 낡은 인형 하나. 아무리 때려도 쓰러지지 않고, 새겨진 눈금만이 조용히 움직인다.
         얼마나 강해졌는지 궁금하다면 — 대답은 몸으로 하게 될 것이다.</div>
-        <div>120초 동안 실제로 들어간 데미지를 그대로 기록합니다. 하루 1회, 이월 없음 · 보상은 없고 기록만 남습니다.</div>
+        <div>120초 동안 실제로 들어간 데미지를 그대로 기록합니다. 횟수 제한 없이 언제든 반복 가능 · 보상은 없고 기록만 남습니다.</div>
       </div>
       <div id="punchBattlePanel" style="display:none">
         <div id="punchMonBox">
@@ -1835,7 +1835,7 @@ function newState() {
     blacksmithTraces: [], // 파괴된 고대 무기의 흔적: [{ id, ancientFloor, nameVariant, type, icon, spirit, effect, name }]
     raidTokens: 0,     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
-    punch: { day: null, used: false, best: 0, last: 0 }, // 펀치기계: 일일 1회, 안 쓰면 소멸(뱅킹 없음)
+    punch: { best: 0, last: 0 }, // 펀치기계: 연습용, 횟수 제한 없음
   };
 }
 
@@ -2878,22 +2878,16 @@ function endRaidFight(win) {
   renderBossBtn(); renderTop(); renderRaidTab(); save();
 }
 
-// ---------- 펀치기계 (일일 딜 측정) ----------
+// ---------- 펀치기계 (연습용 딜 측정) ----------
 // 무한(사실상) 체력의 더미를 상대로 120초간 실제로 들어간 누적 데미지를 측정한다.
 // "보스" 취급이라 보스 데미지 보정이 그대로 반영되며, 체력이 절대 0이 되지 않으므로
 // handleKill()이 호출되지 않아 골드/재료/드롭 등 파밍 요소는 발생하지 않는다(순수 측정용).
+// 토벌전 도전 전 딜 점검용으로도 쓸 수 있도록 횟수 제한 없이 언제든 반복 가능하다.
 const PUNCH_TIME_LIMIT = 120;
 const PUNCH_DUMMY_HP = 1e18;
-function punchEnsureDay() {
-  const today = todayKey();
-  if (S.punch.day !== today) { S.punch.day = today; S.punch.used = false; }
-}
 function startPunchFight() {
   if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
-  punchEnsureDay();
-  if (S.punch.used) { log('오늘의 펀치기계 도전은 이미 사용했습니다. (매일 초기화)', 'lg-bad'); return; }
-  S.punch.used = true;
   bossFight.active = true;
   bossFight.isPunch = true;
   bossFight.timeLeft = PUNCH_TIME_LIMIT + weaponBossTimeBonus(getEquipped());
@@ -2925,7 +2919,6 @@ function renderPunchBox() {
   const battlePanel = $('punchBattlePanel');
   const box = $('punchBox');
   if (!box || !battlePanel) return;
-  punchEnsureDay();
   if (bossFight.active && bossFight.isPunch) {
     battlePanel.style.display = '';
     box.style.display = 'none';
@@ -2933,11 +2926,11 @@ function renderPunchBox() {
   }
   battlePanel.style.display = 'none';
   box.style.display = '';
-  const available = !S.punch.used && !bossFight.active;
+  const available = !bossFight.active;
   box.innerHTML = `
     <div style="font-size:13px;margin-bottom:8px;">최근 기록: <b>${fmt(S.punch.last)}</b> · 최고 기록: <b style="color:var(--gold)">${fmt(S.punch.best)}</b></div>
     <button class="primary" id="punchBtn" ${available ? '' : 'disabled'}>🥊 펀치기계 도전 (${PUNCH_TIME_LIMIT}초)</button>
-    <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : (S.punch.used ? '오늘 도전은 이미 사용했습니다. (매일 초기화, 이월 안 됨)' : '하루 1회, 보상은 없고 기록만 측정합니다.')}</div>`;
+    <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : '횟수 제한 없이 언제든 반복할 수 있는 연습용 측정입니다. 보상은 없습니다.'}</div>`;
   const btn = $('punchBtn');
   if (btn) btn.onclick = startPunchFight;
 }
@@ -3547,7 +3540,7 @@ function migrate(d) {
   if (!d.raid || typeof d.raid !== 'object') d.raid = { day: null, count: 0, done: {} };
   if (typeof d.raid.done !== 'object' || d.raid.done === null) d.raid.done = {};
   if (typeof d.raidTokens !== 'number') d.raidTokens = 0;
-  if (!d.punch || typeof d.punch !== 'object') d.punch = { day: null, used: false, best: 0, last: 0 };
+  if (!d.punch || typeof d.punch !== 'object') d.punch = { best: 0, last: 0 };
   if (!Array.isArray(d.accs)) d.accs = [];
   // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];

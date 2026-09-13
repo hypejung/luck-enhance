@@ -327,13 +327,13 @@
         <button class="primary big" id="enhBtn">강화하기</button>
         <div id="enhFxOverlay"></div>
       </div>
-      <div id="destroyProtectBox" style="margin-top:8px;"></div>
+      <div id="advancedEnhanceBox" style="margin-top:8px;"></div>
       <div id="autoEnhanceBox" style="margin-top:8px;"></div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
         <b style="color:var(--unique)">+10 이후</b>부터 강화당 공격력 상승폭이 커집니다 · 등급이 높을수록 +15 이상 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다!
         <br>+15부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다 (일반~레어: 1~6단계 / 에픽~유니크: 7~12단계 / 레전더리~신화: 13~19단계 / 고대: 20단계).
-        <br>+15 이상에서는 <b style="color:var(--unique)">파괴방지</b>를 켜서 파괴 확률을 무시하고 항상 단계를 유지할 수 있습니다 (비용 강화비용의 5배).
+        <br>+15 이상에서는 고급 재료를 <b style="color:var(--unique)">50배</b> 사용하는 <b style="color:var(--unique)">고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
       </div>
     </div>
     <div class="panel">
@@ -1833,7 +1833,6 @@ function newState() {
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
     blacksmithTraces: [], // 파괴된 고대 무기의 흔적: [{ id, ancientFloor, nameVariant, type, icon, spirit, effect, name }]
-    destroyProtect: false, // 파괴방지 on/off (+15 이상, 비용 = 강화비용×5)
     raidTokens: 0,     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
     punch: { day: null, used: false, best: 0, last: 0 }, // 펀치기계: 일일 1회, 안 쓰면 소멸(뱅킹 없음)
@@ -1982,7 +1981,7 @@ const ENH_FX_PARTICLES = {
   success: ['✨', '💫', '⭐', '🌟'],
   fail: ['💧', '😔', '☁️'],
   destroy: ['💥', '☠️', '🔥', '💔'],
-  // 파괴방지/봉인 해제/불멸의 뼈 등으로 파괴가 무효화됐을 때 전용 연출
+  // 봉인 해제/불멸의 뼈 등 고대 스피릿으로 파괴가 무효화됐을 때 전용 연출
   protect: ['🛡️', '🛡️', 'PROTECTED', '✨'],
 };
 function enhFxTier(level) {
@@ -3049,17 +3048,12 @@ function fleeBoss() {
 }
 
 /* ===================== 강화 ===================== */
-// 파괴방지(+15 이상, on/off): 비용은 일반 강화비용의 5배. 켜져 있으면 이번 시도가 파괴로
-// 판정되더라도 파괴 대신 "단계 유지"로 대체된다(봉인 해제/불멸의 뼈와 동일한 방식).
-const DESTROY_PROTECT_START = 15;
-const DESTROY_PROTECT_MULT = 5;
-function destroyProtectEligible(w) { return !isFist(w) && w.enhance >= DESTROY_PROTECT_START; }
-function destroyProtectCost(w) { return Math.round(enhanceCost(w) * DESTROY_PROTECT_MULT); }
-function toggleDestroyProtect() {
-  S.destroyProtect = !S.destroyProtect;
-  log(`🛡️ 파괴방지 ${S.destroyProtect ? 'ON' : 'OFF'}`, 'lg-prim');
-  renderEnhance(); save();
-}
+// 고급 강화(+15 이상): 일반 강화와 동일하게 시도하되, 고급 재료를 50배 소모하는 대신
+// 이번 시도의 파괴 확률이 절반으로 줄어든다(확정 방지는 아님 — 순수 확률 경감).
+const ADVANCED_ENH_MAT_MULT = 50;
+const ADVANCED_ENH_DESTROY_MULT = 0.5;
+function advancedEnhEligible(w) { return !isFist(w) && highMatsNeeded(w.enhance) > 0; }
+function advancedEnhMatCost(w) { return highMatsNeeded(w.enhance) * ADVANCED_ENH_MAT_MULT; }
 
 // ---------- 무기 각인 (메이플스토리 잠재능력 스타일) ----------
 // +15 이상 무기부터 대장장이에서 부여 가능. 항상 2줄(윗줄/아랫줄)이며, "레어" 등급에서
@@ -3216,38 +3210,36 @@ function renderRaidTab() {
   }
 }
 
-function tryEnhance() {
+function tryEnhance(advanced) {
   const w = getEquipped();
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
   if (w.enhance >= ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
+  if (advanced && !advancedEnhEligible(w)) { log('고급 강화는 고급 재료가 필요한 +15 이상부터 사용할 수 있습니다.', 'lg-bad'); return; }
   // 끝나지 않은 맹세(고대 에이션트 스피릿): 대기 중인 무료 강화가 있으면 비용 없이 진행
   const freeThisTry = w.spirit === 'unbrokenoath' && fx.freeEnhance;
   const cost = freeThisTry ? 0 : enhanceCost(w);
-  const protectActive = S.destroyProtect && destroyProtectEligible(w);
-  const protectCost = protectActive ? destroyProtectCost(w) : 0;
-  const totalCost = cost + protectCost;
-  if (S.gold < totalCost) { log(`골드가 부족합니다 (${fmt(totalCost)} 필요${protectCost ? `, 파괴방지 비용 ${fmt(protectCost)} 포함` : ''})`, 'lg-bad'); return; }
-  // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름)
-  const matNeed = highMatsNeeded(w.enhance);
+  if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
+  // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름). 고급 강화는 50배 소모.
+  const matNeed = highMatsNeeded(w.enhance) * (advanced ? ADVANCED_ENH_MAT_MULT : 1);
   if (matNeed > 0 && countHighMats(w.grade) < matNeed) {
     log(`고급 재료가 부족합니다! (필요 ${matNeed}개, 보유 ${countHighMats(w.grade)}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으세요`, 'lg-bad');
     return;
   }
   if (freeThisTry) { fx.freeEnhance = false; log('🕯️ 끝나지 않은 맹세 발동! 이번 강화는 무료입니다.', 'lg-prim'); }
-  S.gold -= totalCost;
+  S.gold -= cost;
   if (matNeed > 0) consumeHighMats(w.grade, matNeed);
+  const advTag = advanced ? ' <span style="color:var(--unique)">[고급 강화]</span>' : '';
 
   const attemptLevel = w.enhance; // FX 연출 강도 판단용 (변경 전 단계)
   const chance = Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + accEff().enh);
   if (Math.random() * 100 < chance) {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
-    log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
+    log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)${advTag}`, 'lg-good');
   } else {
-    const dChance = effectiveDestroyChance(w);
+    const dChance = effectiveDestroyChance(w) * (advanced ? ADVANCED_ENH_DESTROY_MULT : 1);
     // 봉인 해제(고대): 파괴 판정 자체를 무시하고 무조건 유지로 대체
     // 불멸의 뼈(고대): 파괴가 확정된 순간 30% 확률로 무효화(유지로 대체)
-    // 파괴방지(구매형 on/off, +15 이상): 켜져 있으면 위 두 스피릿과 동일하게 파괴 판정 자체를 무시
     const sealbreakActive = w.spirit === 'sealbreak';
     const undyingSave = w.spirit === 'undyingbone' && Math.random() < (ANCIENT_SPIRITS.undyingbone.proc || 0);
     // 맨손은 파괴되지 않고 +0으로 초기화
@@ -3255,9 +3247,9 @@ function tryEnhance() {
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
-    } else if (!sealbreakActive && !undyingSave && !protectActive && Math.random() * 100 < dChance) {
+    } else if (!sealbreakActive && !undyingSave && Math.random() * 100 < dChance) {
       playEnhanceFx('destroy', attemptLevel);
-      log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}`, 'lg-bad');
+      log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}${advTag}`, 'lg-bad');
       S.destroyedCount++;
       if (S.destroyedCount >= 50) unlockEgg('blacksmith');
       // 타락의 유산(고대): 파괴 시 판매가의 절반만큼 골드로 환급
@@ -3291,18 +3283,18 @@ function tryEnhance() {
       save();
       return;
     } else {
-      if (sealbreakActive || undyingSave || protectActive) {
+      if (sealbreakActive || undyingSave) {
         playEnhanceFx('protect', attemptLevel);
-        const spiritName = sealbreakActive ? '봉인 해제' : undyingSave ? '불멸의 뼈' : '파괴방지';
+        const spiritName = sealbreakActive ? '봉인 해제' : '불멸의 뼈';
         log(`🛡️ <b>${spiritName}</b> 발동! 파괴를 막아내고 단계를 유지했습니다. (파괴 확률이었음: ${dChance}%)`, 'lg-prim');
       } else if (Math.random() < 0.5) {
         // 유지: 실패해도 단계가 그대로 유지됨 (파괴도, 하락도 아닌 세 번째 결과)
         playEnhanceFx('fail', attemptLevel);
-        log(`😮‍💨 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
+        log(`😮‍💨 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
       } else {
         w.enhance = Math.max(0, w.enhance - 1);
         playEnhanceFx('fail', attemptLevel);
-        log(`❌ 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
+        log(`❌ 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
       }
       // 끝나지 않은 맹세(고대): 파괴가 아닌 실패 시 낮은 확률로 다음 강화 무료 예약
       if (w.spirit === 'unbrokenoath' && !fx.freeEnhance && Math.random() < (ANCIENT_SPIRITS.unbrokenoath.proc || 0)) {
@@ -3363,14 +3355,13 @@ function autoEnhanceTick() {
   }
   const freeThisTry = cur.spirit === 'unbrokenoath' && fx.freeEnhance;
   const cost = freeThisTry ? 0 : enhanceCost(cur);
-  const protectCost = (S.destroyProtect && destroyProtectEligible(cur)) ? destroyProtectCost(cur) : 0;
-  if (S.gold < cost + protectCost) {
+  if (S.gold < cost) {
     const target = autoEnhanceTarget;
     stopAutoEnhance();
     log(`⚙️ 골드가 부족해 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
     return;
   }
-  tryEnhance();
+  tryEnhance(false);
 }
 
 /* ===================== 도박 ===================== */
@@ -3770,7 +3761,7 @@ function renderEnhance() {
   if (!w) {
     box.innerHTML = `<div style="color:var(--sub)">장착된 무기가 없습니다. 사냥을 하거나 가방에서 무기를 장착하세요.</div>`;
     $('enhstat').innerHTML = ''; $('enhrates').innerHTML = ''; $('enhBtn').disabled = true;
-    $('destroyProtectBox').innerHTML = ''; $('autoEnhanceBox').innerHTML = '';
+    $('advancedEnhanceBox').innerHTML = ''; $('autoEnhanceBox').innerHTML = '';
     return;
   }
   $('enhBtn').disabled = false;
@@ -3796,12 +3787,10 @@ function renderEnhance() {
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
     ${spirit ? `<div class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</div>` : ''}
     ${(w.runes || []).map(r => `<div class="lg-prim">🔮 [${runeName(r)}] ${runeDesc(r)}</div>`).join('')}`;
-  const protectActiveNow = !maxed && S.destroyProtect && destroyProtectEligible(w);
-  const displayCost = cost + (protectActiveNow ? destroyProtectCost(w) : 0);
   $('enhstat').innerHTML = `
     <div>${atkLabel(w)}<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
-    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(displayCost)}</b>${protectActiveNow ? ' <span style="font-size:11px;color:var(--sub)">(파괴방지 포함)</span>' : ''}</div>
+    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}`;
   const matNote = matNeed > 0 && !matOk
     ? ` · <span class="warn">고급 재료 부족 (${highMatFloorLabel(w.grade)} 재료 ${matNeed}개 필요)</span>` : '';
@@ -3810,24 +3799,27 @@ function renderEnhance() {
     : isFist(w)
       ? `✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
       : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
-  renderDestroyProtect(w, maxed);
+  renderAdvancedEnhance(w, maxed);
   renderAutoEnhance(w, maxed);
   renderEnhRune();
 }
 
-function renderDestroyProtect(w, maxed) {
-  const box = $('destroyProtectBox');
+function renderAdvancedEnhance(w, maxed) {
+  const box = $('advancedEnhanceBox');
   if (!box) return;
-  if (maxed || !destroyProtectEligible(w)) {
-    box.innerHTML = isFist(w) ? '' : `<div style="font-size:12px;color:var(--sub);text-align:center;">🛡️ 파괴방지는 <b style="color:var(--unique)">+${DESTROY_PROTECT_START}</b> 이상부터 사용할 수 있습니다.</div>`;
+  if (maxed || !advancedEnhEligible(w)) {
+    box.innerHTML = isFist(w) ? '' : `<div style="font-size:12px;color:var(--sub);text-align:center;">🛠️ 고급 강화는 고급 재료가 필요한 <b style="color:var(--unique)">+15</b> 이상부터 사용할 수 있습니다.</div>`;
     return;
   }
-  const cost = destroyProtectCost(w);
+  const matNeed = advancedEnhMatCost(w);
+  const matHave = countHighMats(w.grade);
+  const matOk = matHave >= matNeed;
   box.innerHTML = `
-    <button class="${S.destroyProtect ? 'primary' : ''}" id="destroyProtectBtn" style="width:100%;">
-      🛡️ 파괴방지 ${S.destroyProtect ? 'ON' : 'OFF'} <span style="font-size:11px;color:var(--sub)">(강화 시 추가 💰 ${fmt(cost)})</span>
+    <button class="${matOk ? 'primary' : ''}" id="advancedEnhBtn" style="width:100%;" ${matOk ? '' : 'disabled'}>
+      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 절반, 고급 재료 ${fmt(matHave)}/${fmt(matNeed)} 소모)</span>
     </button>`;
-  $('destroyProtectBtn').onclick = toggleDestroyProtect;
+  const btn = $('advancedEnhBtn');
+  if (btn) btn.onclick = () => tryEnhance(true);
 }
 
 function renderAutoEnhance(w, maxed) {
@@ -4563,7 +4555,7 @@ function init() {
   // 탭
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
   // 강화
-  $('enhBtn').onclick = tryEnhance;
+  $('enhBtn').onclick = () => tryEnhance(false);
   // 도박
   document.querySelectorAll('#betbtns button').forEach(b => b.onclick = () => gamble(parseFloat(b.dataset.bet)));
   // 저장 버튼

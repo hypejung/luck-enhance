@@ -775,6 +775,11 @@ const fx = {
   infiniteUntil: 0,      // 가속 폭주 버프 만료 시각
   executionerReady: false, // 처단자: 보스전 첫 타격 확정 치명타 대기 중
   ambushReady: false,      // 심연의 기습: 몬스터 스폰 후 첫 타격 확정 치명타 대기 중
+  berserkerUntil: 0,      // 광전사의 피: 공격력 버프 만료 시각
+  poisonStacks: 0, poisonUntil: 0, // 누적 맹독: 스택 수 + 만료 시각
+  quakeCount: 0,           // 거석의 진동: 누적 공격 횟수
+  freeEnhance: false,      // 끝나지 않은 맹세: 다음 강화 비용 무료 대기 중
+  glideUntil: 0,           // 활공: 사냥터 이동 직후 공속 버프 만료 시각
 };
 
 // ---------- 강화 설정 (최대 +30, "운빨강화"의 핵심 — 진짜 도박) ----------
@@ -1013,6 +1018,28 @@ const ANCIENT_SPIRITS = {
           killsPer: 20, bonusPerStack: 0.004 },
   ambush: { name: '심연의 기습', desc: '몬스터가 스폰되면 그 몬스터에 대한 첫 공격은 무조건 치명타로 적중하며, 치명타 피해가 추가로 2배 적용된다.',
             extraMult: 2 },
+  bloodtribute: { name: '피의 조공', desc: '공격 시 15% 확률로 대상에게서 소량의 골드를 흡수한다(처치 골드의 50%).',
+                  proc: 0.15, goldMult: 0.5 },
+  sporeburst: { name: '포자 폭발', desc: '처치 시 5% 확률로 포자가 퍼져 다음 몬스터도 즉시 함께 처치한다.', proc: 0.05 },
+  wolfsprint: { name: '늑대의 질주', desc: '공격속도가 영구히 +12% 증가한다.', speedBonus: 0.12 },
+  goblinsteal: { name: '도둑의 손버릇', desc: '처치 시 10% 확률로 그 처치 골드의 5배를 추가로 "훔쳐서" 획득한다.',
+                 proc: 0.10, mult: 5 },
+  undyingbone: { name: '불멸의 뼈', desc: '강화 파괴가 확정된 순간 30% 확률로 파괴를 무효화하고 단계를 유지한다.', proc: 0.30 },
+  berserkerblood: { name: '광전사의 피', desc: '공격 시 5% 확률로 4초간 공격력이 +15% 증가하는 버프를 얻는다.',
+                     proc: 0.05, dur: 4, bonus: 0.15 },
+  stackpoison: { name: '누적 맹독', desc: '공격 시 20% 확률로 독이 쌓인다(최대 3중첩, 중첩마다 도트 피해 강화, 무기 공격력의 8%/초/스택).',
+                 proc: 0.20, stackMax: 3, dmgPerSecPerStack: 0.08, dur: 4 },
+  quake: { name: '거석의 진동', desc: '공격이 20회 누적될 때마다 무기 공격력 300%의 지진파를 방출한다. 지진파 피해가 몬스터 체력을 넘으면 초과분만큼 몬스터를 추가로 즉시 처치한다.',
+           every: 20, mult: 3.0 },
+  pearl: { name: '늪의 진주', desc: '처치 시 5% 확률로 귀한 "늪지의 흑진주" 재료를 발견한다. 별도로 비싸게 판매할 수 있다.', proc: 0.05 },
+  unbrokenoath: { name: '끝나지 않은 맹세', desc: '강화 실패(파괴 제외) 시 10% 확률로 다음 강화 비용이 무료가 된다.', proc: 0.10 },
+  charge: { name: '돌진', desc: '처치 시 8% 확률로 관성이 남아 다음 몬스터도 함께 처치한다.', proc: 0.08 },
+  sealbreak: { name: '봉인 해제', desc: '강화 실패 시 파괴 확률 판정 자체가 무시되고 무조건 "유지"로 처리된다.' },
+  glide: { name: '활공', desc: '사냥터를 이동한 직후 10초간 공격속도가 크게 상승한다(+80%).', dur: 10, bonus: 0.8 },
+  demonlegacy: { name: '타락의 유산', desc: '이 무기가 강화 파괴로 사라지면, 파괴 당시 판매가의 절반만큼이 골드로 환원되어 즉시 지급된다(일부러 파괴하는 것보다는 항상 파는 쪽이 이득).', sellMult: 0.5 },
+  trampling: { name: '압도적 진군', desc: '처치 시 5% 확률로 사냥터 해금 처치 수 카운트가 2배로 집계된다.', proc: 0.05 },
+  dragonmajesty: { name: '용의 위엄', desc: '이 무기로 보스를 처치하면 보스 장신구 드랍 확률이 2배가 된다.', mult: 2 },
+  fallengod: { name: '몰락한 신의 가호', desc: '오프라인 사냥 효율이 70%에서 90%로 상승한다.', offlineEff: 0.9 },
 };
 const WEAPON_ANCIENT_NAMES = [
   [ // floor 0 — 초원 — 슬라임의 태고 조상: 모든 것을 녹이던 산성 괴물
@@ -1023,7 +1050,110 @@ const WEAPON_ANCIENT_NAMES = [
     { name: '침식하는 이빨', type: '단검', spirit: 'acid', atkMod: 0.95, speedMod: 1.08,
       flavor: '용해체의 이빨 한 조각을 그대로 자루에 박아 넣었다. 스치기만 해도 서서히 녹아 들어간다.' },
   ],
-  null, null, null, null, null, null, null, null, null, null, null, null, null,
+  [ // floor 1 — 동굴 — 야생 박쥐의 태고 조상: 피와 온기를 남김없이 빨아들이던 태고의 흡혈귀
+    { name: '흡혈의 송곳니', type: '단검', spirit: 'bloodtribute', atkMod: 0.95, speedMod: 1.1,
+      flavor: '태고의 흡혈박쥐가 남긴 송곳니. 한 방울의 피도 남기지 않고 빨아들였다.' },
+    { name: '밤그림자 활', type: '활', spirit: 'bloodtribute', atkMod: 1.05, speedMod: 0.97,
+      flavor: '어둠 속에서도 심장 뛰는 소리만으로 과녁을 꿰뚫었다는 태고의 활.' },
+    { name: '박쥐왕의 손톱검', type: '검', spirit: 'bloodtribute', atkMod: 1.0, speedMod: 1.03,
+      flavor: '동굴 전체를 지배했던 박쥐왕의 발톱을 벼려 만든 검.' },
+  ],
+  [ // floor 2 — 숲길 — 독버섯의 태고 조상: 숲 전체에 포자를 퍼뜨리던 태고의 균사체
+    { name: '포자의 단검', type: '단검', spirit: 'sporeburst', atkMod: 0.97, speedMod: 1.06,
+      flavor: '베인 상처마다 포자가 피어올라 숲 전체로 퍼져나갔다는 태고의 단검.' },
+    { name: '균사의 지팡이', type: '지팡이', spirit: 'sporeburst', atkMod: 1.05, speedMod: 0.95,
+      flavor: '땅속 깊이 뻗은 균사로 숲 전체와 이어져 있었다는 지팡이.' },
+    { name: '혼란의 쌍검', type: '쌍검', spirit: 'sporeburst', atkMod: 1.0, speedMod: 1.02,
+      flavor: '포자를 뒤집어쓴 자는 방향 감각을 잃고 스스로를 베었다고 전해진다.' },
+  ],
+  [ // floor 3 — 숲깊은곳 — 들늑대의 태고 조상: 무리를 이끌고 밤새 달리던 태고의 질주자
+    { name: '무리의 첫 이빨', type: '단검', spirit: 'wolfsprint', atkMod: 0.97, speedMod: 1.1,
+      flavor: '무리의 선두에서 가장 먼저 달려나가던 태고 늑대의 첫 번째 이빨.' },
+    { name: '질주하는 발톱검', type: '검', spirit: 'wolfsprint', atkMod: 1.03, speedMod: 1.05,
+      flavor: '발톱이 검으로 굳어진 뒤에도 여전히 달리는 감각을 기억한다.' },
+    { name: '달빛사냥꾼의 활', type: '활', spirit: 'wolfsprint', atkMod: 0.95, speedMod: 1.12,
+      flavor: '달이 뜨는 밤이면 무리 전체가 이 활의 주인을 따라 움직였다.' },
+  ],
+  [ // floor 4 — 고블린 마을 — 고블린의 태고 조상: 무엇이든 훔쳐야 직성이 풀리던 태고의 도적
+    { name: '소매치기의 단검', type: '단검', spirit: 'goblinsteal', atkMod: 0.95, speedMod: 1.08,
+      flavor: '무엇이든 훔쳐야 직성이 풀리던 태고 고블린 두목의 애용품.' },
+    { name: '탐욕의 곤봉', type: '둔기', spirit: 'goblinsteal', atkMod: 1.1, speedMod: 0.92,
+      flavor: '빼앗은 것들의 무게가 고스란히 실려 점점 더 묵직해졌다는 곤봉.' },
+    { name: '도적왕의 지팡이', type: '지팡이', spirit: 'goblinsteal', atkMod: 1.0, speedMod: 1.0,
+      flavor: '고블린 마을 전체의 보물을 긁어모았다는 도적왕의 지팡이.' },
+  ],
+  [ // floor 5 — 폐허 — 스켈레톤의 태고 조상: 부서져도 다시 일어섰다는 태고의 불멸자
+    { name: '불멸의 갈비검', type: '검', spirit: 'undyingbone', atkMod: 1.05, speedMod: 0.97,
+      flavor: '부서져도 다시 이어붙는 태고 해골 전사의 갈비뼈로 벼린 검.' },
+    { name: '백골 창', type: '창', spirit: 'undyingbone', atkMod: 1.08, speedMod: 0.95,
+      flavor: '천 번 부러져도 천 번 다시 일어섰다는 태고의 백골 창.' },
+    { name: '해골왕의 지팡이', type: '지팡이', spirit: 'undyingbone', atkMod: 0.97, speedMod: 1.03,
+      flavor: '죽음조차 완전히 끝맺지 못했다는 폐허의 해골왕이 짚던 지팡이.' },
+  ],
+  [ // floor 6 — 오크 진지 — 오크 전사의 태고 조상: 분노할수록 강해졌다는 태고의 광전사
+    { name: '광전사의 도끼', type: '도끼', spirit: 'berserkerblood', atkMod: 1.1, speedMod: 0.92,
+      flavor: '피가 끓어오르면 아픔조차 느끼지 못했다는 태고 오크 전사의 도끼.' },
+    { name: '전쟁광의 둔기', type: '둔기', spirit: 'berserkerblood', atkMod: 1.12, speedMod: 0.9,
+      flavor: '전투가 길어질수록 오히려 더 강하게 내리쳤다는 전쟁광의 둔기.' },
+    { name: '대제의 파쇄검', type: '검', spirit: 'berserkerblood', atkMod: 1.05, speedMod: 0.98,
+      flavor: '대륙을 정복했던 오크대제가 분노할 때만 뽑아 들었다는 검.' },
+  ],
+  [ // floor 7 — 거미 둥지 — 독거미의 태고 조상: 스칠 때마다 독이 짙어지던 태고의 맹독괴물
+    { name: '맹독의 단검', type: '단검', spirit: 'stackpoison', atkMod: 0.95, speedMod: 1.08,
+      flavor: '찌를 때마다 독이 짙어져, 세 번째 일격은 반드시 치명적이었다.' },
+    { name: '거미줄 활', type: '활', spirit: 'stackpoison', atkMod: 1.0, speedMod: 1.03,
+      flavor: '쏘아진 화살 끝에 거미줄처럼 끈적한 맹독이 묻어났다.' },
+    { name: '여왕거미의 쌍검', type: '쌍검', spirit: 'stackpoison', atkMod: 1.02, speedMod: 1.0,
+      flavor: '여왕거미의 두 앞다리를 그대로 벼려낸 쌍검. 스칠 때마다 독이 쌓인다.' },
+  ],
+  [ // floor 8 — 고대 유적 — 골렘 파수병의 태고 조상: 유적을 뒤흔들던 태고의 거석 파수병
+    { name: '파수병의 주먹돌둔기', type: '둔기', spirit: 'quake', atkMod: 1.1, speedMod: 0.9,
+      flavor: '유적을 지키며 수천 년간 같은 자리를 내리찍던 파수병의 주먹.' },
+    { name: '거석의 도끼', type: '도끼', spirit: 'quake', atkMod: 1.15, speedMod: 0.87,
+      flavor: '한 번 내려칠 때마다 유적 전체가 진동했다는 거석 도끼.' },
+    { name: '고대기계 지팡이', type: '지팡이', spirit: 'quake', atkMod: 1.0, speedMod: 1.0,
+      flavor: '파수병 내부에 새겨진 고대 기계 장치를 그대로 옮겨 담은 지팡이.' },
+  ],
+  [ // floor 9 — 늪지대 — 리저드맨의 태고 조상: 늪 밑바닥의 보물을 품고 있던 태고의 늪지 지배자
+    { name: '늪지대의 창', type: '창', spirit: 'pearl', atkMod: 1.05, speedMod: 0.97,
+      flavor: '늪 밑바닥, 아무도 닿지 못한 곳에서 건져 올렸다는 태고의 창.' },
+    { name: '비늘 단검', type: '단검', spirit: 'pearl', atkMod: 0.97, speedMod: 1.06,
+      flavor: '리저드맨 시조의 비늘 한 장을 그대로 벼려 만든 단검.' },
+    { name: '리저드킹의 쌍검', type: '쌍검', spirit: 'pearl', atkMod: 1.0, speedMod: 1.02,
+      flavor: '늪 전체를 다스렸다는 리저드킹의 앞발톱으로 만든 쌍검.' },
+  ],
+  [ // floor 10 — 저주받은 성 — 해골 기사의 태고 조상: 지키지 못한 맹세에 얽매인 태고의 기사
+    { name: '맹세의 검', type: '검', spirit: 'unbrokenoath', atkMod: 1.05, speedMod: 0.97,
+      flavor: '지키지 못한 맹세 때문에 무덤에서도 눈을 감지 못했다는 기사의 검.' },
+    { name: '저주받은 창', type: '창', spirit: 'unbrokenoath', atkMod: 1.08, speedMod: 0.95,
+      flavor: '성이 무너진 날에도 손에서 놓지 않았다는 저주받은 창.' },
+    { name: '흑기사의 둔기', type: '둔기', spirit: 'unbrokenoath', atkMod: 1.1, speedMod: 0.93,
+      flavor: '맹세를 배신한 자들만을 노렸다는 흑기사의 둔기.' },
+  ],
+  [ // floor 11 — 미궁 — 미노타우르스의 태고 조상: 미궁 벽을 부수며 나아갔다는 태고의 돌진자
+    { name: '미궁의 도끼', type: '도끼', spirit: 'charge', atkMod: 1.1, speedMod: 0.92,
+      flavor: '미궁 벽을 부수며 나아갔다는 태고 미노타우르스의 도끼.' },
+    { name: '황소뿔 둔기', type: '둔기', spirit: 'charge', atkMod: 1.13, speedMod: 0.9,
+      flavor: '한 번 돌진하면 미궁 끝까지 멈추지 않았다는 뿔을 벼린 둔기.' },
+    { name: '절망의 쌍검', type: '쌍검', spirit: 'charge', atkMod: 1.0, speedMod: 1.03,
+      flavor: '길을 잃은 자들의 마지막 절망을 두 자루에 담았다는 쌍검.' },
+  ],
+  [ // floor 12 — 어둠의 탑 — 암흑 마법사의 태고 조상: 운명의 확률 자체를 비틀었다는 태고의 마법사
+    { name: '칠흑의 지팡이', type: '지팡이', spirit: 'sealbreak', atkMod: 1.0, speedMod: 1.0,
+      flavor: '운명의 규칙 자체를 다시 쓰려 했던 태고 마법사의 지팡이.' },
+    { name: '저주받은 마도서검', type: '검', spirit: 'sealbreak', atkMod: 1.03, speedMod: 0.99,
+      flavor: '금서 한 권을 그대로 벼려 만들었다는 검. 페이지마다 확률을 비틀었다.' },
+    { name: '어둠꿰뚫기 단검', type: '단검', spirit: 'sealbreak', atkMod: 0.96, speedMod: 1.08,
+      flavor: '빛이 닿지 않는 탑 꼭대기에서도 표적을 놓치지 않았다.' },
+  ],
+  [ // floor 13 — 하늘섬 — 와이번의 태고 조상: 폭풍을 가르며 활공했다는 태고의 비행자
+    { name: '폭풍날개 활', type: '활', spirit: 'glide', atkMod: 0.97, speedMod: 1.1,
+      flavor: '태고 와이번의 날개뼈로 시위를 메운 활. 활공하듯 화살이 날아간다.' },
+    { name: '뇌창', type: '창', spirit: 'glide', atkMod: 1.05, speedMod: 1.0,
+      flavor: '폭풍 속을 가르며 내리꽂히던 태고 와이번의 발톱을 벼린 창.' },
+    { name: '와이번본 도끼', type: '도끼', spirit: 'glide', atkMod: 1.1, speedMod: 0.93,
+      flavor: '날개뼈의 각도를 그대로 살려 만든 도끼. 휘두를 때마다 바람 소리가 인다.' },
+  ],
   [ // floor 14 — 죽음의 땅 — 리치 로드의 태고 조상: 세상을 멸망 직전까지 몰아넣은 리치왕
     { name: '리치왕의 봉인 지팡이', type: '지팡이', spirit: 'soul', atkMod: 1.0, speedMod: 1.0,
       flavor: '오늘날의 리치로드들이 감히 흉내조차 낼 수 없는, 죽음 그 자체를 다스렸다는 태고의 리치왕이 쓰던 지팡이. 세계가 멸망 직전까지 갔던 그날의 마력이 아직 봉인되어 있다.' },
@@ -1032,7 +1162,22 @@ const WEAPON_ANCIENT_NAMES = [
     { name: '영혼포식자의 낫자루', type: '둔기', spirit: 'soul', atkMod: 0.97, speedMod: 1.05,
       flavor: '리치왕이 거둬들인 무수한 영혼을 짓이겨 굳힌 자루. 휘두를수록 더 많은 영혼을 갈망한다.' },
   ],
-  null, null,
+  [ // floor 15 — 마계 입구 — 데몬 워리어의 태고 조상: 대가 없이는 아무것도 내주지 않던 태고의 계약자
+    { name: '계약의 대검', type: '검', spirit: 'demonlegacy', atkMod: 1.08, speedMod: 0.95,
+      flavor: '대가 없이는 아무것도 내주지 않는다는 태고 악마 전사의 대검.' },
+    { name: '악마의 도끼', type: '도끼', spirit: 'demonlegacy', atkMod: 1.12, speedMod: 0.9,
+      flavor: '부서지는 순간까지도 그 힘의 대가를 남긴다는 도끼.' },
+    { name: '배신자의 창', type: '창', spirit: 'demonlegacy', atkMod: 1.05, speedMod: 0.98,
+      flavor: '계약을 어긴 자에게서 빼앗았다는 창. 부서져도 뭔가는 남는다.' },
+  ],
+  [ // floor 16 — 마계 심부 — 베히모스의 태고 조상: 대륙 전체를 짓밟고 지나갔다는 태고의 거수
+    { name: '거수의 둔기', type: '둔기', spirit: 'trampling', atkMod: 1.15, speedMod: 0.88,
+      flavor: '대륙 전체를 짓밟고 지나갔다는 태고 거수의 뒷다리뼈로 만든 둔기.' },
+    { name: '대지진 도끼', type: '도끼', spirit: 'trampling', atkMod: 1.12, speedMod: 0.9,
+      flavor: '한 걸음 내디딜 때마다 지형이 바뀌었다는 거수의 발톱을 벼린 도끼.' },
+    { name: '베히모스의 늑골창', type: '창', spirit: 'trampling', atkMod: 1.08, speedMod: 0.95,
+      flavor: '멈추지 않는 진군 그 자체였다는 거수의 늑골로 만든 창.' },
+  ],
   [ // floor 17 — 심연 — 심연의 감시자의 태고 조상: 만물을 지켜보다 기습하는 태고의 눈
     { name: '감시자의 단검', type: '단검', spirit: 'ambush', atkMod: 1.0, speedMod: 1.05,
       flavor: '천 개의 눈이 지켜보다가, 눈치채지 못한 순간 단 한 번 깊숙이 박힌다. 그 한 번이면 충분했다.' },
@@ -1041,7 +1186,22 @@ const WEAPON_ANCIENT_NAMES = [
     { name: '천안의 활', type: '활', spirit: 'ambush', atkMod: 0.97, speedMod: 1.08,
       flavor: '수많은 눈으로 동시에 겨눈 화살은 대상이 알아채기도 전에 급소에 박힌다.' },
   ],
-  null, null,
+  [ // floor 18 — 용의 둥지 — 고대 드래곤의 태고 조상: 스스로 인정한 자만이 들 수 있었다는 태고의 용
+    { name: '용살검', type: '검', spirit: 'dragonmajesty', atkMod: 1.1, speedMod: 0.97,
+      flavor: '용을 벤 것이 아니라, 용이 스스로 인정한 자만이 들 수 있었다는 검.' },
+    { name: '드래곤본 창', type: '창', spirit: 'dragonmajesty', atkMod: 1.08, speedMod: 0.98,
+      flavor: '태고 드래곤의 등뼈를 그대로 벼려낸 창. 여전히 위엄이 서려 있다.' },
+    { name: '화염포효 도끼', type: '도끼', spirit: 'dragonmajesty', atkMod: 1.13, speedMod: 0.9,
+      flavor: '포효 한 번에 산이 무너졌다는 태고 드래곤의 이빨로 만든 도끼.' },
+  ],
+  [ // floor 19 — 신들의 영역 — 몰락한 신의 태고 조상: 왕좌에서 내려온 뒤에도 세상을 놓지 못한 신
+    { name: '몰락한 신의 지팡이', type: '지팡이', spirit: 'fallengod', atkMod: 1.0, speedMod: 1.0,
+      flavor: '왕좌에서 내려온 뒤에도 세상을 완전히 놓지는 못했다는 신의 지팡이.' },
+    { name: '최후심판검', type: '검', spirit: 'fallengod', atkMod: 1.1, speedMod: 0.95,
+      flavor: '신들의 마지막 심판이 내려지던 순간, 그 손에 들려 있던 검.' },
+    { name: '타락한 왕홀', type: '둔기', spirit: 'fallengod', atkMod: 1.05, speedMod: 1.0,
+      flavor: '왕관은 부서졌어도 왕홀만은 끝까지 놓지 않았다는 몰락한 신의 마지막 자존심.' },
+  ],
 ];
 function ancientVariant(w) {
   const list = WEAPON_ANCIENT_NAMES[w.ancientFloor];
@@ -1447,6 +1607,10 @@ function weaponSpeed(w) {
   if (w && w.effect === 'accel') stackBonus += fx.accelStacks * (e.stackBonus || 0);
   if (w && w.effect === 'frenzy') stackBonus += fx.frenzyStacks * (e.stackBonus || 0);
   if (w && w.effect === 'sprint' && now < fx.sprintUntil) stackBonus += e.sprintBonus || 0;
+  // 늑대의 질주(고대 에이션트 스피릿): 영구 고정 공속 보너스
+  if (w && w.spirit === 'wolfsprint') stackBonus += ANCIENT_SPIRITS.wolfsprint.speedBonus || 0;
+  // 활공(고대 에이션트 스피릿): 사냥터 이동 직후 한시적 공속 대폭 상승
+  if (w && w.spirit === 'glide' && now < fx.glideUntil) stackBonus += ANCIENT_SPIRITS.glide.bonus || 0;
   let burstMult = 1;
   if (w && w.effect === 'moment' && now < fx.momentUntil) burstMult *= (e.momentMult || 1);
   if (w && w.effect === 'infinite' && now < fx.infiniteUntil) burstMult *= (e.burstMult || 1);
@@ -1801,9 +1965,20 @@ function dropRoll() {
   }
   S.gold += gold;
   log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}${jackpot ? ' <span class="lg-prim">(골드 잭팟!)</span>' : ''}`);
+  // 도둑의 손버릇(고대 에이션트 스피릿): 처치 시 낮은 확률로 그 처치 골드의 배수를 추가로 "훔침"
+  if (w && w.spirit === 'goblinsteal' && Math.random() < ANCIENT_SPIRITS.goblinsteal.proc) {
+    const stolen = Math.floor(floorGold(S.floor) * (ANCIENT_SPIRITS.goblinsteal.mult || 1));
+    S.gold += stolen;
+    log(`🖐️ 도둑의 손버릇! 추가로 +${fmt(stolen)} 골드를 훔쳤습니다.`, 'lg-prim');
+  }
 
   // 재료 드롭 (항상 1~2개)
   dropMaterials(isU, luck);
+  // 늪의 진주(고대 에이션트 스피릿): 처치 시 낮은 확률로 귀한 재료 발견
+  if (w && w.spirit === 'pearl' && Math.random() < ANCIENT_SPIRITS.pearl.proc) {
+    S.mats.pearl = (S.mats.pearl || 0) + 1;
+    log(`🦪 <b>늪지의 흑진주</b>를 발견했습니다! (재료 탭에서 판매 가능, 보유 ${S.mats.pearl}개)`, 'lg-prim');
+  }
 
   // 박스 자석(룬 특수효과): 랜덤박스 드롭 확률 배수 (여러 개 장착하면 곱연산 중첩)
   const boxMagnetMult = Math.pow(RUNE_SPECIALS.boxmagnet.mult, weaponSpecialCount(w, 'boxmagnet'));
@@ -1833,7 +2008,10 @@ function dropRoll() {
   }
 
   // 처치 수 & 해금
-  S.kills[S.floor] = (S.kills[S.floor] || 0) + 1;
+  // 압도적 진군(고대 에이션트 스피릿): 낮은 확률로 해금 처치 수 카운트가 2배로 집계
+  const tramplingProc = w.spirit === 'trampling' && Math.random() < ANCIENT_SPIRITS.trampling.proc;
+  S.kills[S.floor] = (S.kills[S.floor] || 0) + (tramplingProc ? 2 : 1);
+  if (tramplingProc) floatText('🦶 압도적 진군!');
   S.totalKills++;
   if (isU) { S.uniqueKills++; }
   if (S.floor + 1 < FLOORS.length && (S.kills[S.floor] || 0) >= FLOOR.unlockKills && S.unlocked < S.floor + 2) {
@@ -2022,6 +2200,14 @@ function handleKill() {
     }
   }
   spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
+  // 포자 폭발 / 돌진(고대 에이션트 스피릿): 처치 시 낮은 확률로 방금 리스폰된 다음 몬스터도 함께 처치
+  if (w && w.spirit === 'sporeburst' && Math.random() < ANCIENT_SPIRITS.sporeburst.proc) {
+    floatText('🍄 포자 폭발!');
+    handleKill();
+  } else if (w && w.spirit === 'charge' && Math.random() < ANCIENT_SPIRITS.charge.proc) {
+    floatText('🐂 돌진!');
+    handleKill();
+  }
   return 'normal';
 }
 
@@ -2072,6 +2258,19 @@ function tick(dt) {
       killedAny = true;
     }
   }
+  // 누적 맹독(고대 에이션트 스피릿): 만료되지 않았다면 스택 수만큼 도트 피해, 만료되면 스택 초기화
+  if (fx.poisonStacks > 0) {
+    if (nowDecay < fx.poisonUntil) {
+      mon.hp -= weaponAtk(w) * (ANCIENT_SPIRITS.stackpoison.dmgPerSecPerStack || 0) * fx.poisonStacks * dt;
+      attacked = true;
+      if (mon.hp <= 0) {
+        if (handleKill() === 'boss') return;
+        killedAny = true;
+      }
+    } else {
+      fx.poisonStacks = 0;
+    }
+  }
   mon.atkTimer += dt * weaponSpeed(w);
   while (mon.atkTimer >= 1) {
     mon.atkTimer -= 1;
@@ -2090,8 +2289,13 @@ function tick(dt) {
 }
 
 function attack(w) {
+  const now = Date.now();
   let dmg = weaponAtk(w) * (0.9 + Math.random() * 0.2);
   const e = w.effect ? EFFECTS[w.effect] : null;
+  // 광전사의 피(고대 에이션트 스피릿): 버프가 활성화되어 있으면 이번 공격에도 적용
+  if (w.spirit === 'berserkerblood' && now < fx.berserkerUntil) {
+    dmg *= 1 + (ANCIENT_SPIRITS.berserkerblood.bonus || 0);
+  }
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
     dmg *= 1 + bossDmgBonus();
@@ -2106,7 +2310,6 @@ function attack(w) {
   // 치명타 확률/배율 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
   // (발동 알림은 화면 텍스트로만)
   const ae2 = accEff();
-  const now = Date.now();
   // 폭풍의 검(신화 공격속도): 공격속도가 빠를수록 치명타 확률도 함께 상승
   const stormBonus = (w.effect === 'stormblade') ? weaponSpeed(w) * (e.critFromSpeed || 0) : 0;
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus;
@@ -2163,6 +2366,44 @@ function attack(w) {
       fx.bleeds = fx.bleeds || [];
       fx.bleeds.push({ dmgPerSec: weaponAtk(w) * spirit.dmgPerSec, remain: spirit.dur });
       floatText('🧪 부식!');
+    }
+  }
+  // 피의 조공(고대 에이션트 스피릿): 공격 시 낮은 확률로 골드 소량 흡수
+  if (w.spirit === 'bloodtribute' && Math.random() < ANCIENT_SPIRITS.bloodtribute.proc) {
+    const gained = Math.floor(floorGold(S.floor) * ANCIENT_SPIRITS.bloodtribute.goldMult);
+    S.gold += gained;
+    floatText(`🩸 +${fmt(gained)}`);
+  }
+  // 광전사의 피(고대 에이션트 스피릿): 공격 시 낮은 확률로 일시적 공격력 버프 발동
+  if (w.spirit === 'berserkerblood' && Math.random() < ANCIENT_SPIRITS.berserkerblood.proc) {
+    fx.berserkerUntil = now + (ANCIENT_SPIRITS.berserkerblood.dur || 4) * 1000;
+    floatText('💢 광전사!');
+  }
+  // 누적 맹독(고대 에이션트 스피릿): 공격 시 낮은 확률로 독 1스택 적립(최대 3, 지속시간 갱신)
+  if (w.spirit === 'stackpoison' && Math.random() < ANCIENT_SPIRITS.stackpoison.proc) {
+    fx.poisonStacks = Math.min(ANCIENT_SPIRITS.stackpoison.stackMax || 3, (fx.poisonStacks || 0) + 1);
+    fx.poisonUntil = now + (ANCIENT_SPIRITS.stackpoison.dur || 4) * 1000;
+    floatText(`☠️ 맹독 x${fx.poisonStacks}`);
+  }
+  // 거석의 진동(고대 에이션트 스피릿): 공격 20회 누적마다 지진파. 보스가 아닐 때 지진파
+  // 피해가 몬스터 체력을 넘으면, 초과분(지진파피해÷몬스터체력, 내림)만큼 몬스터를 추가로
+  // 즉시 처치한다(1+초과처치 전부를 handleKill()로 직접 처리하고 원래 몬스터는 남기지 않음).
+  if (w.spirit === 'quake') {
+    fx.quakeCount = (fx.quakeCount || 0) + 1;
+    if (fx.quakeCount >= (ANCIENT_SPIRITS.quake.every || 20)) {
+      fx.quakeCount = 0;
+      const quakeDmg = weaponAtk(w) * (ANCIENT_SPIRITS.quake.mult || 3);
+      floatText('💥 지진파!');
+      if (!bossFight.active && quakeDmg >= mon.hp) {
+        const monHpFull = mon.maxHp || 1;
+        const overkill = quakeDmg - mon.hp;
+        // 무기가 극도로 강해지면 초과 처치 수가 천문학적으로 커질 수 있어 상한을 둔다
+        // (성능 보호 목적 — 200마리면 이미 충분히 극적인 연쇄 처치)
+        const totalKills = Math.min(200, 1 + Math.floor(overkill / monHpFull));
+        for (let i = 0; i < totalKills; i++) handleKill();
+      } else {
+        mon.hp -= quakeDmg;
+      }
     }
   }
   mon.hp -= dmg;
@@ -2299,7 +2540,9 @@ function endBossFight(win) {
       log(`💎 <b>신화 보스무기 드롭!</b> ${gradeTag(nw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
     }
     // 신화 보스장신구 드롭
-    if (Math.random() < BOSS.accDrop * (1 + accEff().luck)) {
+    // 용의 위엄(고대 에이션트 스피릿): 보스 장신구 드랍 확률 2배
+    const dragonMult = getEquipped() && getEquipped().spirit === 'dragonmajesty' ? (ANCIENT_SPIRITS.dragonmajesty.mult || 1) : 1;
+    if (Math.random() < BOSS.accDrop * dragonMult * (1 + accEff().luck)) {
       if (S.bossAccs.some(bf => bf === f)) {
         log(`보스 장신구는 이미 보유 중이라 골드로 대체 지급됩니다.`);
         S.gold += Math.floor(floorGold(f) * 10);
@@ -2351,7 +2594,9 @@ function tryEnhance() {
   const w = getEquipped();
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
   if (w.enhance >= ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
-  const cost = enhanceCost(w);
+  // 끝나지 않은 맹세(고대 에이션트 스피릿): 대기 중인 무료 강화가 있으면 비용 없이 진행
+  const freeThisTry = w.spirit === 'unbrokenoath' && fx.freeEnhance;
+  const cost = freeThisTry ? 0 : enhanceCost(w);
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
   // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름)
   const matNeed = highMatsNeeded(w.enhance);
@@ -2359,6 +2604,7 @@ function tryEnhance() {
     log(`고급 재료가 부족합니다! (필요 ${matNeed}개, 보유 ${countHighMats(w.grade)}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으세요`, 'lg-bad');
     return;
   }
+  if (freeThisTry) { fx.freeEnhance = false; log('🕯️ 끝나지 않은 맹세 발동! 이번 강화는 무료입니다.', 'lg-prim'); }
   S.gold -= cost;
   if (matNeed > 0) consumeHighMats(w.grade, matNeed);
 
@@ -2371,16 +2617,26 @@ function tryEnhance() {
     if (w.enhance >= 10) unlockCodexEntry(w);
   } else {
     const dChance = effectiveDestroyChance(w);
+    // 봉인 해제(고대): 파괴 판정 자체를 무시하고 무조건 유지로 대체
+    // 불멸의 뼈(고대): 파괴가 확정된 순간 30% 확률로 무효화(유지로 대체)
+    const sealbreakActive = w.spirit === 'sealbreak';
+    const undyingSave = w.spirit === 'undyingbone' && Math.random() < (ANCIENT_SPIRITS.undyingbone.proc || 0);
     // 맨손은 파괴되지 않고 +0으로 초기화
     if (isFist(w)) {
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
-    } else if (Math.random() * 100 < dChance) {
+    } else if (!sealbreakActive && !undyingSave && Math.random() * 100 < dChance) {
       playEnhanceFx('destroy', attemptLevel);
       log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}`, 'lg-bad');
       S.destroyedCount++;
       if (S.destroyedCount >= 50) unlockEgg('blacksmith');
+      // 타락의 유산(고대): 파괴 시 판매가의 절반만큼 골드로 환급
+      if (w.spirit === 'demonlegacy') {
+        const refund = Math.floor(sellPrice(w) * (ANCIENT_SPIRITS.demonlegacy.sellMult || 0));
+        S.gold += refund;
+        log(`💰 <b>타락의 유산</b> 발동! 파괴된 힘이 골드로 환원되어 +${fmt(refund)} 골드를 얻었습니다.`, 'lg-prim');
+      }
       // 고대 등급 무기는 파괴돼도 완전히 사라지지 않고 "흔적"이 남아 대장장이 탭에서 복구 가능
       if (w.grade === 6) addBlacksmithTrace(w);
       S.weapons = S.weapons.filter(x => x.id !== w.id);
@@ -2399,14 +2655,25 @@ function tryEnhance() {
       renderEnhance(); renderInventory(); renderTop();
       save();
       return;
-    } else if (Math.random() < 0.5) {
-      // 유지: 실패해도 단계가 그대로 유지됨 (파괴도, 하락도 아닌 세 번째 결과)
-      playEnhanceFx('fail', attemptLevel);
-      log(`😮‍💨 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
     } else {
-      w.enhance = Math.max(0, w.enhance - 1);
-      playEnhanceFx('fail', attemptLevel);
-      log(`❌ 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
+      if (sealbreakActive || undyingSave) {
+        playEnhanceFx('fail', attemptLevel);
+        const spiritName = sealbreakActive ? '봉인 해제' : '불멸의 뼈';
+        log(`🛡️ <b>${spiritName}</b> 발동! 파괴를 막아내고 단계를 유지했습니다. (파괴 확률이었음: ${dChance}%)`, 'lg-prim');
+      } else if (Math.random() < 0.5) {
+        // 유지: 실패해도 단계가 그대로 유지됨 (파괴도, 하락도 아닌 세 번째 결과)
+        playEnhanceFx('fail', attemptLevel);
+        log(`😮‍💨 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
+      } else {
+        w.enhance = Math.max(0, w.enhance - 1);
+        playEnhanceFx('fail', attemptLevel);
+        log(`❌ 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
+      }
+      // 끝나지 않은 맹세(고대): 파괴가 아닌 실패 시 낮은 확률로 다음 강화 무료 예약
+      if (w.spirit === 'unbrokenoath' && !fx.freeEnhance && Math.random() < (ANCIENT_SPIRITS.unbrokenoath.proc || 0)) {
+        fx.freeEnhance = true;
+        log('🕯️ <b>끝나지 않은 맹세</b>가 응답했습니다. 다음 강화는 무료입니다.', 'lg-prim');
+      }
     }
   }
   renderEnhance(); renderInventory(); renderTop();
@@ -2771,7 +3038,14 @@ function renderFloorBtns() {
     if (i < S.unlocked) {
       b.onclick = () => {
         if (bossFight.active) { endBossFight(false); log('사냥터 이동으로 보스전이 중단되었습니다.', 'lg-bad'); }
-        S.floor = i; spawnMonster(); renderFloorBtns(); renderFloorUI(); renderBossBtn(); save();
+        S.floor = i; spawnMonster(); renderFloorBtns(); renderFloorUI(); renderBossBtn();
+        // 활공(고대 에이션트 스피릿): 사냥터 이동 직후 한시적으로 공속 대폭 상승
+        const eqw = getEquipped();
+        if (eqw && eqw.spirit === 'glide') {
+          fx.glideUntil = Date.now() + (ANCIENT_SPIRITS.glide.dur || 10) * 1000;
+          log('🪽 활공! 잠시 공격속도가 크게 상승합니다.', 'lg-prim');
+        }
+        save();
       };
     } else {
       b.disabled = true;
@@ -3324,14 +3598,47 @@ function renderCraft() {
   }
 }
 
+// 늪의 진주(고대 에이션트 스피릿 전용 재료) 판매가 — 늪지대(10층) 보스 원킷·1시간 보상의 절반 수준
+function pearlSellPrice() { return Math.floor(floorGold(9) * 1800); }
+function sellPearl(n) {
+  const have = S.mats.pearl || 0;
+  n = Math.min(n, have);
+  if (n <= 0) return;
+  const price = pearlSellPrice() * n;
+  S.mats.pearl -= n;
+  if (S.mats.pearl <= 0) delete S.mats.pearl;
+  S.gold += price;
+  log(`판매: 늪지의 흑진주 ×${n} → +${fmt(price)} 골드`, 'lg-good');
+  renderTop(); renderCraft(); save();
+}
 // 재료 판매 목록
 function renderMatSell() {
   renderBossAccs();
   const list = $('matselllist');
   if (!list) return;
   list.innerHTML = '';
-  const keys = Object.keys(S.mats).filter(k => S.mats[k] > 0);
-  if (!keys.length) {
+  // 늪의 진주는 사냥터 슬롯 재료가 아닌 별도 고정가 재료라 먼저 따로 렌더링
+  if (S.mats.pearl > 0) {
+    const pdiv = document.createElement('div');
+    pdiv.className = 'invitem';
+    pdiv.innerHTML = `
+      <div><div class="wn"><span class="grade-고대">🦪 늪지의 흑진주 ×${S.mats.pearl}</span></div>
+      <div class="wi">개당 판매가 ${fmt(pearlSellPrice())} 골드</div></div>
+      <div class="btns"></div>`;
+    const pbtns = pdiv.querySelector('.btns');
+    const p1 = document.createElement('button');
+    p1.textContent = '1개 판매';
+    p1.onclick = () => sellPearl(1);
+    pbtns.appendChild(p1);
+    const pAll = document.createElement('button');
+    pAll.textContent = '전량 판매';
+    pAll.className = 'primary';
+    pAll.onclick = () => sellPearl(S.mats.pearl);
+    pbtns.appendChild(pAll);
+    list.appendChild(pdiv);
+  }
+  const keys = Object.keys(S.mats).filter(k => S.mats[k] > 0 && k !== 'pearl');
+  if (!keys.length && !(S.mats.pearl > 0)) {
     list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 재료가 없습니다. 사냥터에서 재료를 모으세요.</div>';
     return;
   }
@@ -3546,11 +3853,13 @@ function init() {
     }
     const e = w && w.effect ? EFFECTS[w.effect] : null;
     const goldMul = (1 + accEff().gold) * (1 + (e && e.gold ? e.gold : 0));
-    const gold = Math.floor(floorGold(S.floor) * goldMul * kills * 0.7); // 오프라인 효율 70%
+    // 몰락한 신의 가호(고대 에이션트 스피릿): 오프라인 효율 70% -> 90%
+    const offlineEff = (w && w.spirit === 'fallengod') ? (ANCIENT_SPIRITS.fallengod.offlineEff || 0.7) : 0.7;
+    const gold = Math.floor(floorGold(S.floor) * goldMul * kills * offlineEff);
     S.gold += gold;
     const h = Math.floor(capped / 3600), m = Math.floor((capped % 3600) / 60), s = capped % 60;
     const t = h > 0 ? `${h}시간 ${m}분` : m > 0 ? `${m}분 ${s}초` : `${s}초`;
-    log(`🌙 <b>오프라인 사냥 완료!</b> ${t} 동안 약 ${fmt(kills)}마리 사냥 → <b style="color:var(--gold)">+${fmt(gold)} 골드</b> (오프라인 효율 70%)`, 'lg-gold');
+    log(`🌙 <b>오프라인 사냥 완료!</b> ${t} 동안 약 ${fmt(kills)}마리 사냥 → <b style="color:var(--gold)">+${fmt(gold)} 골드</b> (오프라인 효율 ${Math.round(offlineEff*100)}%)`, 'lg-gold');
     renderTop();
     save();
   }

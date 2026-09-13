@@ -446,6 +446,13 @@
   <!-- 무기 도감 -->
   <div id="tab-codex" style="display:none">
     <div class="panel">
+      <h3>🏆 컬렉션 세트 효과</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        도감 등록 현황에 따라 자동으로 활성화되는 효과입니다. 별도 장착 없이 조건을 만족하는 즉시 항상 적용됩니다.
+      </div>
+      <div id="codexBonusList"></div>
+    </div>
+    <div class="panel">
       <h3>📖 무기 도감</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         아이콘은 아직 실루엣으로만 보입니다. 커서를 올리면 이름만 살짝 보이고, 해당 무기를
@@ -522,10 +529,11 @@ function typeTrait(w, key) {
 }
 // 지팡이는 "공격력" 대신 "마력"으로 표기(수치/계산은 동일, 표시만 다름)
 function atkLabel(w) { return (w && w.type === '지팡이') ? '마력' : '공격력'; }
-// 둔기 특성(파괴 확률 감소)까지 반영한 실제 파괴 확률
+// 둔기 특성 + 도감 컬렉션 보너스(파괴 확률 감소)까지 반영한 실제 파괴 확률
 function effectiveDestroyChance(w) {
   const base = ENH.destroy[w.enhance] || 0;
-  return Math.round(base * (1 - typeTrait(w, 'destroyReduce')) * 10) / 10;
+  const reduce = Math.min(0.95, typeTrait(w, 'destroyReduce') + accEff().destroyReduce);
+  return Math.round(base * (1 - reduce) * 10) / 10;
 }
 // DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷(+고유 특성으로 개성 부여)
 
@@ -707,6 +715,159 @@ function codexEntries() {
     }
   }
   return list;
+}
+
+// ---------- 도감 컬렉션 보너스 ----------
+// 쌍(일반~유니크), 타입 풀세트(레전더리/신화), 사냥터 풀세트(고대) — 도감 등록 현황에 따라
+// 자동으로 활성화되는 파밍 보조 효과. 장착/해제 개념 없이 조건 충족 시 항상 accEff()에 합산된다.
+const CODEX_PAIRS = [
+  { name: '쾌속 무기',     types: ['단검', '쌍검'], stat: 'extraAtk',      values: [0.005, 0.01, 0.015, 0.02] },
+  { name: '표준 무기',     types: ['검', '창'],     stat: 'atk',           values: [0.005, 0.01, 0.015, 0.02] },
+  { name: '중장 무기',     types: ['도끼', '둔기'], stat: 'destroyReduce', values: [0.005, 0.01, 0.015, 0.02] },
+  { name: '원거리/마력',   types: ['활', '지팡이'], stat: 'speed',         values: [0.005, 0.01, 0.015, 0.02] },
+];
+const CODEX_TYPE_SETS = {
+  단검:   { stat: 'extraAtk',      legend: 0.03, myth: 0.06 },
+  검:     { stat: 'atk',           legend: 0.04, myth: 0.08 },
+  쌍검:   { stat: 'critChance',    legend: 0.03, myth: 0.06 },
+  도끼:   { stat: 'bossDmg',       legend: 0.04, myth: 0.08 },
+  창:     { stat: 'critDamage',    legend: 0.03, myth: 0.06 },
+  활:     { stat: 'speed',         legend: 0.04, myth: 0.08 },
+  지팡이: { stat: 'gold',          legend: 0.04, myth: 0.08 },
+  둔기:   { stat: 'destroyReduce', legend: 0.03, myth: 0.06 },
+};
+// index = 사냥터(0~19). 'offline'은 accEff 합산 대상이 아니라 grantOffline()에서 별도로 처리.
+const CODEX_ANCIENT_SETS = [
+  { stat: 'luck', value: 0.30 },          // 0  초원·슬라임
+  { stat: 'gold', value: 0.30 },          // 1  동굴·박쥐
+  { stat: 'luck', value: 0.30 },          // 2  숲길·독버섯
+  { stat: 'speed', value: 0.20 },         // 3  숲깊은곳·들늑대
+  { stat: 'gold', value: 0.30 },          // 4  고블린마을·고블린
+  { stat: 'destroyReduce', value: 0.03 }, // 5  폐허·스켈레톤
+  { stat: 'atk', value: 0.15 },           // 6  오크진지·오크전사
+  { stat: 'critDamage', value: 0.20 },    // 7  거미둥지·독거미
+  { stat: 'bossDmg', value: 0.20 },       // 8  고대유적·골렘파수병
+  { stat: 'luck', value: 0.30 },          // 9  늪지대·리저드맨
+  { stat: 'enh', value: 5 },              // 10 저주받은성·해골기사
+  { stat: 'atk', value: 0.15 },           // 11 미궁·미노타우르스
+  { stat: 'critChance', value: 0.10 },    // 12 어둠의탑·암흑마법사
+  { stat: 'speed', value: 0.20 },         // 13 하늘섬·와이번
+  { stat: 'gold', value: 0.30 },          // 14 죽음의땅·리치로드
+  { stat: 'bossDmg', value: 0.20 },       // 15 마계입구·데몬워리어
+  { stat: 'atk', value: 0.15 },           // 16 마계심부·베히모스
+  { stat: 'extraAtk', value: 0.10 },      // 17 심연·심연의감시자
+  { stat: 'bossDmg', value: 0.20 },       // 18 용의둥지·고대드래곤
+  { stat: 'offline', value: 0.10 },       // 19 신들의영역·몰락한신
+];
+function codexHas(key) { return !!(S && S.codexSeen[key]); }
+function codexPairProgress(pair, grade) {
+  return pair.types.filter(t => codexHas(codexKey(grade, t))).length;
+}
+function codexTypeSetProgress(type, grade) {
+  const table = grade === 4 ? WEAPON_LEGEND_NAMES : WEAPON_MYTH_NAMES;
+  const variants = (table[type] || []).length;
+  if (!variants) return { have: 0, need: 0 };
+  let have = 0;
+  for (let vi = 0; vi < variants; vi++) if (codexHas(codexKey(grade, type, vi))) have++;
+  return { have, need: variants };
+}
+function codexAncientSetProgress(floorIdx) {
+  const variants = WEAPON_ANCIENT_NAMES[floorIdx];
+  if (!variants) return { have: 0, need: 0 };
+  let have = 0;
+  for (let vi = 0; vi < variants.length; vi++) if (codexHas(codexKey(6, null, vi, floorIdx))) have++;
+  return { have, need: variants.length };
+}
+// 현재 활성화된 모든 도감 컬렉션 보너스를 하나의 eff 객체로 합산 (accEff()에서 합산해 사용)
+function codexBonusEff() {
+  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, bossDmg: 0, destroyReduce: 0 };
+  for (const pair of CODEX_PAIRS) {
+    for (let grade = 0; grade <= 3; grade++) {
+      if (codexPairProgress(pair, grade) >= 2) eff[pair.stat] += pair.values[grade];
+    }
+  }
+  for (const t of WEAPON_TYPES) {
+    const cfg = CODEX_TYPE_SETS[t.name];
+    if (!cfg) continue;
+    const legendProg = codexTypeSetProgress(t.name, 4);
+    if (legendProg.need > 0 && legendProg.have >= legendProg.need) eff[cfg.stat] += cfg.legend;
+    const mythProg = codexTypeSetProgress(t.name, 5);
+    if (mythProg.need > 0 && mythProg.have >= mythProg.need) eff[cfg.stat] += cfg.myth;
+  }
+  for (let f = 0; f < CODEX_ANCIENT_SETS.length; f++) {
+    const set = CODEX_ANCIENT_SETS[f];
+    if (set.stat === 'offline') continue;
+    const prog = codexAncientSetProgress(f);
+    if (prog.need > 0 && prog.have >= prog.need) eff[set.stat] += set.value;
+  }
+  return eff;
+}
+function codexOfflineBonus() {
+  const prog = codexAncientSetProgress(19);
+  return (prog.need > 0 && prog.have >= prog.need) ? (CODEX_ANCIENT_SETS[19].value || 0) : 0;
+}
+// 도감 보너스 표시용 스탯 텍스트 포맷 (accEffText와 동일한 표기 규칙)
+function codexStatText(stat, value) {
+  const map = {
+    gold: v => `💰 골드 +${Math.round(v * 100)}%`,
+    atk: v => `⚔️ 공격력 +${Math.round(v * 100)}%`,
+    speed: v => `⚡ 공속 +${Math.round(v * 100)}%`,
+    luck: v => `🍀 드롭률 +${Math.round(v * 100)}%`,
+    enh: v => `🔨 강화 확률 +${v}%p`,
+    critChance: v => `💥 치명타 확률 +${(v * 100).toFixed(1)}%p`,
+    critDamage: v => `💢 치명타 피해 +${Math.round(v * 100)}%p`,
+    extraAtk: v => `⚡ 연타 확률 +${(v * 100).toFixed(1)}%p`,
+    bossDmg: v => `👹 보스 피해량 +${Math.round(v * 100)}%`,
+    destroyReduce: v => `🛡️ 강화 파괴 확률 -${Math.round(v * 100)}%p`,
+    offline: v => `🌙 오프라인 효율 +${Math.round(v * 100)}%p`,
+  };
+  return (map[stat] || (v => `+${v}`))(value);
+}
+// 도감 탭 상단: 현재 활성화된 세트 효과 + 진행 중인(미완성) 세트 표시
+function renderCodexBonuses() {
+  const box = $('codexBonusList');
+  if (!box) return;
+  const active = [];
+  const pending = [];
+  for (const pair of CODEX_PAIRS) {
+    for (let grade = 0; grade <= 3; grade++) {
+      const have = codexPairProgress(pair, grade);
+      const label = `[${GRADES[grade].name}] ${pair.name} 쌍`;
+      const effText = codexStatText(pair.stat, pair.values[grade]);
+      if (have >= 2) active.push({ grade, label, effText });
+      else pending.push({ grade, label, effText, have, need: 2 });
+    }
+  }
+  for (const t of WEAPON_TYPES) {
+    const cfg = CODEX_TYPE_SETS[t.name];
+    if (!cfg) continue;
+    for (const [grade, val] of [[4, cfg.legend], [5, cfg.myth]]) {
+      const prog = codexTypeSetProgress(t.name, grade);
+      if (!prog.need) continue;
+      const label = `[${GRADES[grade].name}] ${t.name} 전체 수집`;
+      const effText = codexStatText(cfg.stat, val);
+      if (prog.have >= prog.need) active.push({ grade, label, effText });
+      else pending.push({ grade, label, effText, have: prog.have, need: prog.need });
+    }
+  }
+  for (let f = 0; f < CODEX_ANCIENT_SETS.length; f++) {
+    const set = CODEX_ANCIENT_SETS[f];
+    const prog = codexAncientSetProgress(f);
+    if (!prog.need) continue;
+    const label = `[고대] ${FLOORS[f].name} 완전 수집`;
+    const effText = codexStatText(set.stat, set.value);
+    if (prog.have >= prog.need) active.push({ grade: 6, label, effText });
+    else pending.push({ grade: 6, label, effText, have: prog.have, need: prog.need });
+  }
+  const row = (x, dim) => `
+    <div class="invitem${dim ? '' : ' equipped'}"${dim ? ' style="opacity:0.55"' : ''}>
+      <div><div class="wn"><span class="grade-${GRADES[x.grade].name}">${x.label}</span>${dim ? ` <span style="color:var(--sub);font-size:12px">${x.have}/${x.need}</span>` : ''}</div>
+      <div class="wi">${x.effText}</div></div>
+    </div>`;
+  const activeHtml = active.length ? active.map(a => row(a, false)).join('') : '<div style="color:var(--sub);font-size:13px;">아직 활성화된 세트 효과가 없습니다.</div>';
+  const pendingSorted = pending.sort((a, b) => (b.have / b.need) - (a.have / a.need));
+  box.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">✅ 활성화된 세트 효과 (${active.length}개)</div>${activeHtml}
+    <div style="font-weight:bold;margin:12px 0 6px;">⏳ 미완성 세트</div>${pendingSorted.map(p => row(p, true)).join('')}`;
 }
 
 // ---------- 맨손 (무기가 전부 파괴되면 맨손으로 싸움) ----------
@@ -1725,7 +1886,7 @@ function playEnhanceFx(outcome, level) {
 }
 // 장신구 효과 합산 (일반 최대 ACC_SLOTS개 + 보스 장신구, 세트 효과 포함)
 function accEff() {
-  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, bossDmg: 0 };
+  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, bossDmg: 0, destroyReduce: 0 };
   if (S && Array.isArray(S.accEquipped)) {
     for (const eq of S.accEquipped) {
       const a = ACCESSORIES[eq.floor];
@@ -1749,6 +1910,9 @@ function accEff() {
   // 능력치 훈련 (장비와 무관하게 항상 적용)
   eff.atk += trainingValue('atk');
   eff.speed += trainingValue('atkSpeed');
+  // 도감 컬렉션 보너스(쌍/타입 풀세트/사냥터 풀세트) — 등록 현황에 따라 항상 자동 적용
+  const cbe = codexBonusEff();
+  for (const k of Object.keys(cbe)) eff[k] = (eff[k] || 0) + cbe[k];
   return eff;
 }
 // 세트 효과가 발동하는 사냥터 (장착한 보스무기와 같은 사냥터의 보스장신구를 보유 중이면)
@@ -2784,6 +2948,7 @@ function renderGambleTables() {
 // 변형 배지는 숫자만으로는 잘 안 보여서 변형마다 고정된 색(파랑/초록/주황)을 함께 사용
 const VARIANT_BADGES = ['1', '2', '3'];
 function renderCodex() {
+  renderCodexBonuses();
   const box = $('codexGrid');
   if (!box) return;
   box.innerHTML = '';
@@ -3588,6 +3753,7 @@ function accEffText(eff) {
   if (eff.critDamage) parts.push(`💢 치명타 피해 +${Math.round(eff.critDamage * 100)}%p`);
   if (eff.extraAtk) parts.push(`⚡ 연타 확률 +${(eff.extraAtk * 100).toFixed(1)}%p`);
   if (eff.bossDmg) parts.push(`👹 보스 피해량 +${Math.round(eff.bossDmg * 100)}%`);
+  if (eff.destroyReduce) parts.push(`🛡️ 강화 파괴 확률 -${Math.round(eff.destroyReduce * 100)}%p`);
   return parts.join(' · ');
 }
 
@@ -3911,7 +4077,9 @@ function init() {
     const e = w && w.effect ? EFFECTS[w.effect] : null;
     const goldMul = (1 + accEff().gold) * (1 + (e && e.gold ? e.gold : 0));
     // 몰락한 신의 가호(고대 에이션트 스피릿): 오프라인 효율 70% -> 90%
-    const offlineEff = (w && w.spirit === 'fallengod') ? (ANCIENT_SPIRITS.fallengod.offlineEff || 0.7) : 0.7;
+    // + 신들의 영역(20층) 고대 세트 보너스: 오프라인 효율 +10%p 추가
+    const baseOfflineEff = (w && w.spirit === 'fallengod') ? (ANCIENT_SPIRITS.fallengod.offlineEff || 0.7) : 0.7;
+    const offlineEff = Math.min(1, baseOfflineEff + codexOfflineBonus());
     const gold = Math.floor(floorGold(S.floor) * goldMul * kills * offlineEff);
     S.gold += gold;
     const h = Math.floor(capped / 3600), m = Math.floor((capped % 3600) / 60), s = capped % 60;

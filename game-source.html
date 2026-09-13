@@ -19,6 +19,7 @@
     --unique: #ff9e2c;
     --legend: #ff4a5e;
     --prim: #6cf0c2;
+    --ancient: #d4922a;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -203,6 +204,19 @@
   .grade-레전더리 { color: var(--legend); }
   .grade-신화 { color: #ff7cf0; text-shadow: 0 0 8px #ff7cf0; }
   .grade-태초 { color: var(--prim); text-shadow: 0 0 8px var(--prim); }
+  .grade-고대 { color: var(--ancient); text-shadow: 0 0 8px var(--ancient); }
+
+  /* ===== 무기 도감 ===== */
+  .codex-cell {
+    position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 20px; border-radius: 8px; cursor: pointer; background: var(--panel2);
+    border: 2px solid var(--border); user-select: none;
+  }
+  .codex-cell.locked .codex-icon { filter: brightness(0) opacity(0.55); }
+  .codex-cell .codex-badge {
+    position: absolute; right: -3px; bottom: -3px; font-size: 9px; line-height: 1;
+    background: var(--panel); border-radius: 50%; padding: 1px;
+  }
 
   .flash { animation: flash .4s; }
   @keyframes flash { 0%{filter:brightness(3)} 100%{filter:brightness(1)} }
@@ -247,6 +261,7 @@
     <div class="tab" data-tab="box">🎁 랜덤박스</div>
     <div class="tab" data-tab="rune">🔮 룬</div>
     <div class="tab" data-tab="gamble">🎲 도박장</div>
+    <div class="tab" data-tab="codex">📖 도감</div>
   </div>
 
   <!-- 사냥터 -->
@@ -294,7 +309,7 @@
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
         <b style="color:var(--unique)">+10 이후</b>부터 강화당 공격력 상승폭이 커집니다 · 등급이 높을수록 +15 이상 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다!
-        <br>+15부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다 (일반~레어: 1~6단계 / 에픽~유니크: 7~12단계 / 레전더리~신화: 13~19단계 / 태초: 20단계).
+        <br>+15부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다 (일반~레어: 1~6단계 / 에픽~유니크: 7~12단계 / 레전더리~신화: 13~19단계 / 고대: 20단계).
       </div>
     </div>
     <div class="panel">
@@ -376,7 +391,7 @@
     <div class="panel">
       <h3>🔮 룬 상점</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다. 슬롯 수는 무기 등급에 따라 늘어납니다(일반 1개 ~ 태초 7개).
+        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다. 슬롯 수는 무기 등급에 따라 늘어납니다(일반 1개 ~ 고대 7개).
         <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다.
       </div>
       <div id="runeboxlist"></div>
@@ -408,6 +423,21 @@
     </div>
   </div>
 
+  <!-- 무기 도감 -->
+  <div id="tab-codex" style="display:none">
+    <div class="panel">
+      <h3>📖 무기 도감</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        아이콘은 아직 실루엣으로만 보입니다. 커서를 올리면 이름만 살짝 보이고, 해당 무기를
+        <b style="color:var(--unique)">+10 이상</b> 강화하면 도감에 정식으로 등록되어 이름·설명·효과를 전부 볼 수 있습니다.
+      </div>
+      <div id="codexGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(44px, 1fr)); gap:6px; margin-bottom:10px;"></div>
+      <div id="codexDetail" style="font-size:13px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border); min-height:20px;">
+        도감 항목을 클릭하면 상세 정보가 여기 표시됩니다.
+      </div>
+    </div>
+  </div>
+
   <div id="logpanel"></div>
   <div id="savebar">
     <button id="saveBtn">💾 저장</button>
@@ -434,8 +464,11 @@ const GRADES = [
   { name: '유니크',    atk: 200,   enhanceCost: 37500,  sell: 3500,   color: '#ff9e2c' },
   { name: '레전더리',  atk: 550,   enhanceCost: 187500, sell: 18000,  color: '#ff4a5e' },
   { name: '신화',      atk: 950,   enhanceCost: 450000, sell: 45000,  color: '#ff7cf0' },
-  { name: '태초',      atk: 1600,  enhanceCost: 900000, sell: 90000,  color: '#6cf0c2' },
+  { name: '고대',      atk: 1600,  enhanceCost: 900000, sell: 90000,  color: '#d4922a' },
 ];
+// "태초"는 이제 무기 등급표에 속하지 않는다 — 사냥터별 초저확률 컬렉션 시스템
+// (GENESIS_ARTIFACTS, 태초의 유물)의 전용 명칭으로만 쓰인다. 색상(--prim, 민트)은
+// 혼동을 피하기 위해 등급표에서는 더 이상 쓰지 않고 유물 시스템 몫으로 남겨둔다.
 
 // ---------- 무기 종류 (공속 = 초당 공격 횟수, 데미지 배율) ----------
 // 종류마다 고유 특성(trait)을 부여해서 같은 등급/강화라도 플레이 체감이 다르게 만듦.
@@ -572,20 +605,76 @@ function weaponItemName(w) {
   if (w.grade === 1) return `${WEAPON_ADJ[type] || ''} ${type}`.trim();
   if (w.grade === 2) return WEAPON_EPIC_NAMES[type] || type;
   if (w.grade === 3) return WEAPON_UNIQUE_NAMES[type] || type;
-  if (w.grade === 4) return (WEAPON_LEGEND_NAMES[type] && WEAPON_LEGEND_NAMES[type][w.nameVariant || 0] || {}).name || type;
-  if (w.grade === 5) return (WEAPON_MYTH_NAMES[type] && WEAPON_MYTH_NAMES[type][w.nameVariant || 0] || {}).name || type;
-  return type; // 태초 등 미구현 등급
+  if (w.grade === 4 || w.grade === 5 || w.grade === 6) {
+    const v = weaponStatVariant(w);
+    return v ? v.name : type;
+  }
+  return type;
 }
-// 레전더리/신화 무기의 변형 데이터(설명 + 공격력/공속 배율) 조회
+// 레전더리/신화/고대 무기의 변형 데이터(설명 + 공격력/공속 배율) 조회.
+// 레전더리·신화는 "무기 타입"별로, 고대는 "사냥터"별로 변형 테이블이 다르다.
 function weaponStatVariant(w) {
   if (isFist(w)) return null;
   if (w.grade === 4) return (WEAPON_LEGEND_NAMES[w.type] && WEAPON_LEGEND_NAMES[w.type][w.nameVariant || 0]) || null;
   if (w.grade === 5) return (WEAPON_MYTH_NAMES[w.type] && WEAPON_MYTH_NAMES[w.type][w.nameVariant || 0]) || null;
+  if (w.grade === 6) return ancientVariant(w);
   return null;
 }
 function weaponFlavorText(w) {
   const v = weaponStatVariant(w);
   return v ? v.flavor : null;
+}
+// 고대 무기의 에이션트 스피릿 효과 조회 (사냥터 몬스터 테마의 추가 효과)
+function ancientSpirit(w) {
+  return (w && w.spirit && ANCIENT_SPIRITS[w.spirit]) || null;
+}
+
+// ---------- 무기 도감 ----------
+// 일반~고대 모든 "이름 있는 무기"를 나열한다. 일반~유니크는 타입당 1개, 레전더리/신화는
+// 타입당 3개 변형, 고대는 사냥터당(설계된 경우) 3개 변형 — 아직 설계되지 않은 사냥터는
+// "미발견" 자리로 표시한다. 특정 이름의 무기를 +10 이상 강화하면 그 항목이 등록된다.
+function codexKey(grade, type, variant, floorIdx) {
+  if (grade <= 3) return `g${grade}_${type}`;
+  if (grade === 6) return `g6_f${floorIdx}_${variant}`;
+  return `g${grade}_${type}_${variant}`;
+}
+function weaponCodexKey(w) {
+  if (isFist(w)) return null;
+  if (w.grade === 6) return codexKey(6, null, w.nameVariant || 0, w.ancientFloor);
+  if (w.grade >= 4) return codexKey(w.grade, w.type, w.nameVariant || 0);
+  return codexKey(w.grade, w.type);
+}
+function unlockCodexEntry(w) {
+  const key = weaponCodexKey(w);
+  if (!key || S.codexSeen[key]) return;
+  S.codexSeen[key] = { effect: w.effect || null };
+  log(`📖 <b>무기 도감</b>에 새 항목이 등록되었습니다: ${weaponItemName(w)}`, 'lg-prim');
+}
+function codexEntries() {
+  const list = [];
+  for (const t of WEAPON_TYPES) {
+    for (const grade of [0, 1, 2, 3]) {
+      list.push({ grade, type: t.name, icon: t.icon, name: weaponItemName({ grade, type: t.name }) });
+    }
+    for (const grade of [4, 5]) {
+      const table = grade === 4 ? WEAPON_LEGEND_NAMES : WEAPON_MYTH_NAMES;
+      (table[t.name] || []).forEach((v, vi) => {
+        list.push({ grade, type: t.name, icon: t.icon, variant: vi, name: v.name, flavor: v.flavor });
+      });
+    }
+  }
+  for (let f = 0; f < WEAPON_ANCIENT_NAMES.length; f++) {
+    const variants = WEAPON_ANCIENT_NAMES[f];
+    if (variants) {
+      variants.forEach((v, vi) => {
+        const t = WEAPON_TYPES.find(x => x.name === v.type);
+        list.push({ grade: 6, type: v.type, icon: t.icon, variant: vi, floor: f, name: v.name, flavor: v.flavor, spirit: v.spirit });
+      });
+    } else {
+      list.push({ grade: 6, undesigned: true, floor: f, icon: '❓', name: `미발견 (${FLOORS[f].name} 고대 무기)` });
+    }
+  }
+  return list;
 }
 
 // ---------- 맨손 (무기가 전부 파괴되면 맨손으로 싸움) ----------
@@ -597,9 +686,11 @@ function makeFist(enhance) {
 }
 
 // ---------- 특수 효과 (유니크 이상, 등급마다 5계열×1종 고유 패시브) ----------
-// 5계열(치명타/재화&드롭/연격/공격속도/보스피해) × 4등급 구성. 등급이 오를수록
-// 단순 수치 강화가 아니라 발동 매커니즘 자체가 달라지도록 설계 (출혈/스택/게이지/
-// 확정발동/복리 등). 스택·게이지·타이머 등 전투 중 임시 상태는 전역 fx 객체(비저장)에 보관.
+// 5계열(치명타/재화&드롭/연격/공격속도/보스피해) × 4등급(유니크/레전더리/신화/고대)
+// 구성. 등급이 오를수록 단순 수치 강화가 아니라 발동 매커니즘 자체가 달라지도록
+// 설계 (출혈/스택/게이지/고정발동/복리 등). grade:6은 "고대" 등급 몫이며, 신화(grade:5)
+// 효과를 한 단계 완화한 버전이다 — 태초(사냥터별 초저확률 유물)는 이 표와 무관하다.
+// 스택·게이지·타이머 등 전투 중 임시 상태는 전역 fx 객체(비저장)에 보관.
 const EFFECTS = {
   // ===== 치명타 계열 =====
   keen:     { name: '예리함',       desc: '공격 시 8% 확률로 치명타 (피해 1.8배)', grade: 3, crit: { chance: 0.08, mult: 1.8 } },
@@ -607,8 +698,8 @@ const EFFECTS = {
               grade: 4, crit: { chance: 0.12, mult: 2.0 }, bleedProc: 0.10, bleedDur: 5, bleedDmg: 0.2 },
   stigma:   { name: '처형자의 낙인', desc: '치명타 시 낙인 1스택 부여(스택당 무기 공격력 30%만큼 추가 피해), 5스택 도달 시 일반 몬스터 즉시 처형(보스 제외)',
               grade: 5, crit: { chance: 0.12, mult: 1.9 }, stackMax: 5, stackDmg: 0.3 },
-  judgment: { name: '심판의 시간',  desc: '공격 시 치명타가 확정 발동. 다른 원천의 치명타 확률 중 35%만큼이 치명타 피해로 전환되어 낭비되지 않음. 10% 확률로 5초간 치명타 피해 2배 추가 버프 획득',
-              grade: 6, guaranteedCrit: true, crit: { mult: 1.6 }, overflowRatio: 0.35, buffProc: 0.10, buffDur: 5, buffMult: 2 },
+  judgment: { name: '심판의 전조',  desc: '공격 시 70% 확률로 치명타 발동(다른 원천의 치명타 확률과 무관하게 고정). 다른 원천 치명타 확률의 20%만큼이 치명타 피해로 전환. 8% 확률로 5초간 치명타 피해 1.6배 추가 버프 획득',
+              grade: 6, fixedCrit: 0.70, crit: { mult: 1.4 }, overflowRatio: 0.20, buffProc: 0.08, buffDur: 5, buffMult: 1.6 },
 
   // ===== 재화 & 드롭 계열 =====
   fortune:   { name: '사냥의 감각', desc: '골드 획득 +20%, 아이템 드롭률 +15%', grade: 3, gold: 0.20, drop: 0.15 },
@@ -616,8 +707,8 @@ const EFFECTS = {
                grade: 4, gold: 0.35, drop: 0.30, jackpotProc: 0.01, jackpotMult: 100 },
   richman:   { name: '재물의 화신', desc: '골드 획득 +50%, 드롭률 +50%. 처치할 때마다 재물 게이지가 쌓여 20회마다 확정으로 골드 대박 + 랜덤박스 지급',
                grade: 5, gold: 0.5, drop: 0.5, gaugeMax: 20 },
-  midasWrath:{ name: '미다스의 진노', desc: '골드 획득 +80%, 드롭률 +60%. 온라인 상태(자동사냥 진행 중)일 때 보유 골드가 매초 아주 낮은 비율로 복리 증가',
-               grade: 6, gold: 0.80, drop: 0.60, interestRate: 0.000015 },
+  midasWrath:{ name: '미다스의 속삭임', desc: '골드 획득 +65%, 드롭률 +45%. 온라인 상태(자동사냥 진행 중)일 때 보유 골드가 매초 아주 낮은 비율로 복리 증가',
+               grade: 6, gold: 0.65, drop: 0.45, interestRate: 0.00001 },
 
   // ===== 연격 계열 =====
   swift:  { name: '쾌속',         desc: '공격 시 10% 확률로 즉시 재공격', grade: 3, extra: 0.10 },
@@ -625,8 +716,8 @@ const EFFECTS = {
             grade: 4, extra: 0.18, sprintBonus: 0.10, sprintDur: 3 },
   frenzy: { name: '광란',        desc: '공격 시 25% 확률로 즉시 재공격. 발동할 때마다 공격속도 버프가 최대 5스택까지 쌓이며, 잠시 멈추면 스택이 서서히 감소 (온라인 중에만 유지)',
             grade: 5, extra: 0.25, stackMax: 5, stackBonus: 0.05, decaySec: 5 },
-  moment: { name: '찰나',        desc: '공격 시 30% 확률로 즉시 재공격. 연타 발동 시 2% 확률로 3초간 공격속도가 크게 폭증하는 "찰나"가 함께 발동',
-            grade: 6, extra: 0.30, momentProc: 0.02, momentDur: 3, momentMult: 4 },
+  moment: { name: '여운',        desc: '공격 시 25% 확률로 즉시 재공격. 연타 발동 시 1.5% 확률로 2.5초간 공격속도가 크게 오르는 "여운"이 함께 발동',
+            grade: 6, extra: 0.25, momentProc: 0.015, momentDur: 2.5, momentMult: 2.5 },
 
   // ===== 공격속도 계열 (신규) =====
   haste:      { name: '신속',       desc: '공격속도 +10%', grade: 3, speed: 0.10 },
@@ -634,8 +725,8 @@ const EFFECTS = {
                 grade: 4, speed: 0.18, stackMax: 5, stackBonus: 0.03, decaySec: 5 },
   stormblade: { name: '폭풍의 검', desc: '공격속도 +15%. 공격속도가 빠를수록 치명타 확률도 함께 상승하는 시너지',
                 grade: 5, speed: 0.15, critFromSpeed: 0.05 },
-  infinite:   { name: '무한 속도', desc: '공격속도 +30%. 낮은 확률로 몇 초간 공격속도가 폭발적으로 치솟는 가속 폭주 발동',
-                grade: 6, speed: 0.30, burstProc: 0.03, burstDur: 4, burstMult: 3 },
+  infinite:   { name: '가속의 잔재', desc: '공격속도 +22%. 낮은 확률로 몇 초간 공격속도가 크게 오르는 가속 발동',
+                grade: 6, speed: 0.22, burstProc: 0.02, burstDur: 3, burstMult: 2 },
 
   // ===== 보스 피해 계열 (신규) =====
   slayermark:   { name: '사냥꾼의 표식', desc: '보스에게 피해 +15%', grade: 3, bossDmg: 0.15 },
@@ -643,8 +734,8 @@ const EFFECTS = {
                   grade: 4, bossDmg: 0.30, firstHitCrit: true },
   dragonslayer: { name: '용살자의 서약', desc: '보스에게 피해 +100%. 보스 최대 체력의 0.5%만큼 매초 추가 고정 피해',
                   grade: 5, bossDmg: 1.0, bossDotPct: 0.005 },
-  godslayer:    { name: '신살자',        desc: '보스에게 피해 +150%. 보스전 시작 시 보스 체력을 즉시 5% 삭감',
-                  grade: 6, bossDmg: 1.5, openBurstPct: 0.05 },
+  godslayer:    { name: '거인 사냥꾼',   desc: '보스에게 피해 +110%. 보스전 시작 시 보스 체력을 즉시 3% 삭감',
+                  grade: 6, bossDmg: 1.1, openBurstPct: 0.03 },
 };
 // 전투 중 임시 상태(스택/게이지/버프 타이머) — 저장하지 않는 휘발성 상태.
 // 몬스터가 즉시 리스폰되는 구조라 "대상"이 아니라 "전투 흐름" 기준으로 유지된다.
@@ -875,6 +966,65 @@ function rollGenesisArtifact(floorIdx, kindMult) {
   const artifact = GENESIS_ARTIFACTS[floorIdx];
   if (!artifact || hasGenesis(artifact.id)) return;
   if (Math.random() < GENESIS_BASE_CHANCE * kindMult) grantGenesisArtifact(artifact);
+}
+
+// ---------- 고대 무기 (grade 6) ----------
+// 태초의 유물과 같은 방식(사냥터별 초저확률 처치 판정)으로 얻는 초레어 "무기"이다.
+// 태초보다는 1만 배 흔하게 잡아서 신화-태초 사이의 간극을 메운다. 사냥터마다 최대
+// 3개의 이름 변형을 가지며, 그 사냥터 몬스터의 "고대 조상"이 지녔을 위엄을 담아
+// 짓는다. 아직 설계되지 않은 사냥터는 null로 비워두고(태초처럼) 필요한 만큼
+// 순차적으로 채워나간다. 등급 자체는 GRADES[6]("고대")를 그대로 쓴다.
+const ANCIENT_BASE_CHANCE = 1e-8; // 사냥터 몬스터 1마리당 기본 확률
+const ANCIENT_ELITE_MULT = 5;
+const ANCIENT_BOSS_MULT = 10;
+// 사냥터 몬스터의 특성을 반영한 "에이션트 스피릿" — 고대 무기 전용 추가 효과.
+// acid: 슬라임류(독/산성) 컨셉의 도트 피해. soul: 리치류(영혼) 컨셉의 영구 성장.
+const ANCIENT_SPIRITS = {
+  acid: { name: '부식의 정령', desc: '공격 시 20% 확률로 대상에게 4초간 산성 부식(도트, 무기 공격력의 12%/초)을 건다.',
+          proc: 0.20, dmgPerSec: 0.12, dur: 4 },
+  soul: { name: '영혼 포식자', desc: '이 무기로 몬스터를 20마리 처치할 때마다 흡수한 영혼으로 영구히 공격력이 0.4% 증가한다(이 무기에 귀속).',
+          killsPer: 20, bonusPerStack: 0.004 },
+};
+const WEAPON_ANCIENT_NAMES = [
+  [ // floor 0 — 초원 — 슬라임의 태고 조상: 모든 것을 녹이던 산성 괴물
+    { name: '태고의 산성퇴', type: '둔기', spirit: 'acid', atkMod: 1.1, speedMod: 0.93,
+      flavor: '지금의 슬라임과는 비교도 안 될 만큼 거대했던 태고의 산성 괴물 "용해체"의 뼈로 만든 철퇴. 스치기만 해도 무기가 녹아내렸다는 그 위엄이 아직 남아있다.' },
+    { name: '만고의 용해검', type: '검', spirit: 'acid', atkMod: 1.0, speedMod: 1.0,
+      flavor: '용해체의 체액을 담금질해 벼려낸 검. 벤 자리는 시간이 지날수록 오히려 더 짓무른다.' },
+    { name: '침식하는 이빨', type: '단검', spirit: 'acid', atkMod: 0.95, speedMod: 1.08,
+      flavor: '용해체의 이빨 한 조각을 그대로 자루에 박아 넣었다. 스치기만 해도 서서히 녹아 들어간다.' },
+  ],
+  null, null, null, null, null, null, null, null, null, null, null, null, null,
+  [ // floor 14 — 죽음의 땅 — 리치 로드의 태고 조상: 세상을 멸망 직전까지 몰아넣은 리치왕
+    { name: '리치왕의 봉인 지팡이', type: '지팡이', spirit: 'soul', atkMod: 1.0, speedMod: 1.0,
+      flavor: '오늘날의 리치로드들이 감히 흉내조차 낼 수 없는, 죽음 그 자체를 다스렸다는 태고의 리치왕이 쓰던 지팡이. 세계가 멸망 직전까지 갔던 그날의 마력이 아직 봉인되어 있다.' },
+    { name: '망자의 서약검', type: '검', spirit: 'soul', atkMod: 1.05, speedMod: 0.97,
+      flavor: '리치왕에게 충성을 맹세한 죽은 기사들의 영혼이 아직도 검신에 깃들어 있다. 벨 때마다 낮은 신음이 인다.' },
+    { name: '영혼포식자의 낫자루', type: '둔기', spirit: 'soul', atkMod: 0.97, speedMod: 1.05,
+      flavor: '리치왕이 거둬들인 무수한 영혼을 짓이겨 굳힌 자루. 휘두를수록 더 많은 영혼을 갈망한다.' },
+  ],
+  null, null, null, null, null,
+];
+function ancientVariant(w) {
+  const list = WEAPON_ANCIENT_NAMES[w.ancientFloor];
+  return (list && list[w.nameVariant || 0]) || null;
+}
+function rollAncientWeapon(floorIdx, kindMult) {
+  const variants = WEAPON_ANCIENT_NAMES[floorIdx];
+  if (!variants) return; // 아직 설계되지 않은 사냥터
+  if (Math.random() >= ANCIENT_BASE_CHANCE * kindMult) return;
+  const idx = Math.floor(Math.random() * variants.length);
+  const v = variants[idx];
+  const t = WEAPON_TYPES.find(x => x.name === v.type);
+  const pool = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === 6);
+  const nw = {
+    id: uid++, grade: 6, type: v.type, icon: t.icon, enhance: 0,
+    effect: pool[Math.floor(Math.random() * pool.length)], runes: [],
+    ancientFloor: floorIdx, nameVariant: idx, spirit: v.spirit, soulStacks: 0, soulKillCount: 0,
+  };
+  addWeapon(nw);
+  log(`🏺🏺🏺 <b class="grade-고대">[고대 무기] ${v.name}</b>을(를) 획득했습니다!!! 사냥터의 태고 몬스터가 남긴 유산입니다.`, 'lg-prim');
+  renderInventory(); renderTop(); save();
 }
 
 // ---------- 이스터에그 ----------
@@ -1134,6 +1284,7 @@ function newState() {
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
     eggs: {},          // 달성한 이스터에그: { eggId: true }
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
+    codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: { effect } }
   };
 }
 
@@ -1171,7 +1322,9 @@ function weaponAtk(w) {
   const g = GRADES[w.grade];
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
   const variant = weaponStatVariant(w);
-  const base = g.atk * t.dmgMult * (variant ? variant.atkMod : 1);
+  // 영혼 포식자(고대 에이션트 스피릿): 이 무기로 쌓은 처치 스택만큼 영구 공격력 증가
+  const soulBonus = (w.spirit === 'soul' && w.soulStacks) ? w.soulStacks * ANCIENT_SPIRITS.soul.bonusPerStack : 0;
+  const base = g.atk * t.dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus);
   return base * enhAtkMult(w.enhance, w.grade) * (1 + accEff().atk + typeTrait(w, 'atk'));
 }
 // 강화 단계별 누적 공격력 배율. +10까지는 강화 1회당 증가폭이 일정한 선형 구간(급등 없음),
@@ -1604,6 +1757,8 @@ function dropRoll() {
 
   // 태초의 유물: 극희박한 확률로 이 사냥터의 고유 유물 드랍 시도 (엘리트는 5배)
   rollGenesisArtifact(S.floor, isU ? GENESIS_ELITE_MULT : 1);
+  // 고대 무기: 태초보다는 흔하지만 여전히 극희박한 확률로 드랍 시도 (엘리트는 5배)
+  rollAncientWeapon(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
 
   // 연쇄 처치(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공 시 처치 보상을 한 번 더 획득
   // 발동 알림은 화면 텍스트로만 — 실제 보상은 재귀 호출된 dropRoll()의 일반 로그로 남음
@@ -1768,6 +1923,16 @@ function handleKill() {
     fx.accelStacks = Math.min(EFFECTS.accel.stackMax || 5, (fx.accelStacks || 0) + 1);
     fx.accelLast = Date.now();
   }
+  // 영혼 포식자(고대 에이션트 스피릿, 영혼): 이 무기로 일정 처치마다 영구 스택 적립
+  if (w && w.spirit === 'soul') {
+    w.soulKillCount = (w.soulKillCount || 0) + 1;
+    const need = ANCIENT_SPIRITS.soul.killsPer || 20;
+    if (w.soulKillCount >= need) {
+      w.soulKillCount -= need;
+      w.soulStacks = (w.soulStacks || 0) + 1;
+      floatText('👻 영혼 흡수!');
+    }
+  }
   spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
   return 'normal';
 }
@@ -1857,12 +2022,14 @@ function attack(w) {
   // 폭풍의 검(신화 공격속도): 공격속도가 빠를수록 치명타 확률도 함께 상승
   const stormBonus = (w.effect === 'stormblade') ? weaponSpeed(w) * (e.critFromSpeed || 0) : 0;
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus;
-  const guaranteedCrit = !!(e && e.guaranteedCrit);
-  const critChance = guaranteedCrit ? 1 : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
+  // fixedCrit: 다른 원천의 치명타 확률과 무관하게 고정된 확률로 치명타가 발동하는 효과
+  // (심판의 전조=70%, 심판의 시간류는 100%). 고정이라 못 쓰는 "다른 원천" 치명타 확률의
+  // 일부를 치명타 피해로 전환해준다(overflowRatio).
+  const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
+  const critChance = fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
   let critMult = Math.min(DMG_CAPS.critMult,
     (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage);
-  // 심판의 시간(태초 치명타): 확정 치명타라 못 쓰는 "다른 원천" 치명타 확률의 일부를 치명타 피해로 전환
-  if (guaranteedCrit) critMult += otherCritChance * (e.overflowRatio || 0);
+  if (fixedCrit !== null) critMult += otherCritChance * (e.overflowRatio || 0);
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
   if (forceCrit) fx.executionerReady = false;
@@ -1892,6 +2059,15 @@ function attack(w) {
     if (Math.random() < (e.buffProc || 0)) {
       fx.judgmentUntil = now + (e.buffDur || 5) * 1000;
       floatText('⚖️ 심판의 가호!');
+    }
+  }
+  // 부식의 정령(고대 에이션트 스피릿, 산성): 치명타 여부와 무관하게 공격마다 판정
+  if (w.spirit === 'acid') {
+    const spirit = ANCIENT_SPIRITS.acid;
+    if (Math.random() < spirit.proc) {
+      fx.bleeds = fx.bleeds || [];
+      fx.bleeds.push({ dmgPerSec: weaponAtk(w) * spirit.dmgPerSec, remain: spirit.dur });
+      floatText('🧪 부식!');
     }
   }
   mon.hp -= dmg;
@@ -2008,6 +2184,8 @@ function endBossFight(win) {
     log(`🏆 <b><span class="grade-신화">${F.boss.name}</span> 격파!</b> +${fmt(gold)} 골드 (1시간 후 재도전 가능)`, 'lg-prim');
     // 태초의 유물: 보스 처치는 10배 확률로 시도
     rollGenesisArtifact(f, GENESIS_BOSS_MULT);
+    // 고대 무기: 보스 처치는 10배 확률로 시도
+    rollAncientWeapon(f, ANCIENT_BOSS_MULT);
     // 승리 연출
     $('monemoji').classList.add('boss-appear');
     setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
@@ -2095,6 +2273,7 @@ function tryEnhance() {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
     log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
+    if (w.enhance >= 10) unlockCodexEntry(w);
   } else {
     const dChance = effectiveDestroyChance(w);
     // 맨손은 파괴되지 않고 +0으로 초기화
@@ -2220,6 +2399,39 @@ function renderGambleTables() {
   });
   const t = GAMBLE_TABLES[S.gambleTable] || GAMBLE_TABLES[0];
   $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b> · 최대 도박: <b style="color:var(--gold)">${gambleMaxLabel(S.gambleTable)}</b>)`;
+}
+
+// 무기 도감 렌더링
+const VARIANT_BADGES = ['①', '②', '③'];
+function renderCodex() {
+  const grid = $('codexGrid');
+  if (!grid) return;
+  grid.innerHTML = '';
+  for (const ent of codexEntries()) {
+    const key = ent.undesigned ? null : codexKey(ent.grade, ent.type, ent.variant, ent.floor);
+    const unlocked = !!(key && S.codexSeen[key]);
+    const gcolor = GRADES[ent.grade].color;
+    const cell = document.createElement('div');
+    cell.className = 'codex-cell' + (unlocked ? '' : ' locked');
+    cell.title = unlocked ? '' : ent.name; // 잠긴 항목도 이름은 항상 보임(호버)
+    cell.style.borderColor = unlocked ? gcolor : '';
+    if (unlocked && ent.grade >= 5) cell.style.boxShadow = `0 0 8px ${gcolor}`;
+    const badge = ent.variant !== undefined ? `<span class="codex-badge">${VARIANT_BADGES[ent.variant] || ''}</span>` : '';
+    cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolor}` : ''}">${ent.icon}</span>${badge}`;
+    if (unlocked) cell.onclick = () => renderCodexDetail(ent, key);
+    grid.appendChild(cell);
+  }
+}
+function renderCodexDetail(ent, key) {
+  const seen = S.codexSeen[key];
+  const effectInfo = seen && seen.effect && EFFECTS[seen.effect]
+    ? `<div class="lg-prim">✨ [${EFFECTS[seen.effect].name}] ${EFFECTS[seen.effect].desc}</div>` : '';
+  const spiritInfo = ent.spirit && ANCIENT_SPIRITS[ent.spirit]
+    ? `<div class="grade-고대">🏺 [${ANCIENT_SPIRITS[ent.spirit].name}] ${ANCIENT_SPIRITS[ent.spirit].desc}</div>` : '';
+  $('codexDetail').innerHTML = `
+    <div class="grade-${GRADES[ent.grade].name}" style="font-size:15px;font-weight:bold;margin-bottom:4px;">${ent.icon} [${GRADES[ent.grade].name}] ${ent.name}</div>
+    ${ent.flavor ? `<div style="font-style:italic;color:var(--sub);margin-bottom:6px;">${ent.flavor}</div>` : ''}
+    ${effectInfo}${spiritInfo}`;
 }
 
 /* ===================== 저장 / 불러오기 ===================== */
@@ -2446,11 +2658,13 @@ function renderEnhance() {
     : '';
   const typeInfo = isFist(w) ? null : WEAPON_TYPES.find(x => x.name === w.type);
   const flavor = weaponFlavorText(w);
+  const spirit = ancientSpirit(w);
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
     ${flavor ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px;font-style:italic">${flavor}</div>` : ''}
     <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
     ${typeInfo ? `<div style="font-size:12px;color:var(--sub)">🗡️ ${typeInfo.name} 특성: ${typeInfo.traitDesc}</div>` : ''}
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
+    ${spirit ? `<div class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</div>` : ''}
     ${(w.runes || []).map(r => `<div class="lg-prim">🔮 [${runeName(r)}] ${runeDesc(r)}</div>`).join('')}`;
   $('enhstat').innerHTML = `
     <div>${atkLabel(w)}<b>${fmt(atk)}</b></div>
@@ -2565,15 +2779,18 @@ function renderInventory() {
   for (const w of sorted) {
     const runes = w.runes || [];
     const flavor = weaponFlavorText(w);
-    const hasDetail = !!(w.effect || runes.length || flavor);
+    const spirit = ancientSpirit(w);
+    const hasDetail = !!(w.effect || runes.length || flavor || spirit);
     const expanded = hasDetail && expandedWeapons.has(w.id);
     const div = document.createElement('div');
     div.className = 'invitem' + (w.id === S.equipped ? ' equipped' : '');
     const detailHtml = expanded
       ? `<div class="wi" style="margin-top:4px;padding:6px 8px;background:var(--panel2);border-radius:6px">
-          ${flavor ? `<div style="font-style:italic;margin-bottom:${w.effect || runes.length ? '4px' : '0'}">${flavor}</div>` : ''}
+          ${flavor ? `<div style="font-style:italic;margin-bottom:${w.effect || runes.length || spirit ? '4px' : '0'}">${flavor}</div>` : ''}
           ${w.effect && EFFECTS[w.effect] ? `✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}` : ''}
-          ${w.effect && runes.length ? '<br>' : ''}
+          ${w.effect && (runes.length || spirit) ? '<br>' : ''}
+          ${spirit ? `<span class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</span>` : ''}
+          ${spirit && runes.length ? '<br>' : ''}
           ${runes.map(r => `🔮 [${runeName(r)}] ${runeDesc(r)}`).join('<br>')}
         </div>`
       : '';
@@ -2856,7 +3073,7 @@ function renderAll() {
 function switchTab(name) {
   currentTab = name;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'enhance') renderEnhance();
@@ -2866,6 +3083,7 @@ function switchTab(name) {
   if (name === 'box') renderBoxes();
   if (name === 'rune') renderRuneTab();
   if (name === 'gamble') renderGambleTables();
+  if (name === 'codex') renderCodex();
 }
 
 // 장신구 효과 설명 문자열

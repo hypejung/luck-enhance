@@ -464,6 +464,130 @@ function effectiveDestroyChance(w) {
 }
 // DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷(+고유 특성으로 개성 부여)
 
+// ---------- 무기 이름 (등급별로 작명 규칙 자체가 다름) ----------
+// 일반: [등급]타입 그대로. 레어: [등급]수식어+타입. 에픽/유니크: [등급]테마명 1개(타입당).
+// 레전더리/신화: 타입당 3개의 "변형"(이름+짧은 설정+공격력·공속 배율 차등)을 갖는다.
+// 태초는 아직 별도 설계 예정이라 이 테이블에 포함하지 않음(해당 등급은 그냥 타입명 표시).
+const WEAPON_ADJ = { // 레어 등급 수식어
+  단검: '예리한', 검: '강인한', 쌍검: '민첩한', 도끼: '묵직한',
+  창: '날카로운', 활: '정교한', 지팡이: '신비한', 둔기: '단단한',
+};
+const WEAPON_EPIC_NAMES = {
+  단검: '독사의 이빨', 검: '폭풍의 칼날', 쌍검: '쌍두사의 춤', 도끼: '거인의 손도끼',
+  창: '뇌전의 창', 활: '매의 시선', 지팡이: '심연의 지팡이', 둔기: '대지의 철퇴',
+};
+const WEAPON_UNIQUE_NAMES = { // 무기 타입 고유 특성이 드러나는 이름
+  단검: '잔영의 이빨', 검: '패왕의 검', 쌍검: '급소사냥꾼', 도끼: '거신참살자',
+  창: '관통의 예언자', 활: '질풍의 시위', 지팡이: '대현자의 유물', 둔기: '불멸의 철퇴',
+};
+const WEAPON_LEGEND_NAMES = {
+  단검: [
+    { name: '그림자를 삼킨 칼날', flavor: '어둠 속에서만 그 형체를 드러내는 칼날. 그림자와 하나가 된 자만이 이 검을 온전히 다룰 수 있다고 전해진다.', atkMod: 0.95, speedMod: 1.08 },
+    { name: '찰나의 이빨', flavor: '눈을 감았다 뜨는 그 짧은 순간에 이미 승부는 끝나 있다. 반응할 틈조차 주지 않는 속도의 화신.', atkMod: 1.0, speedMod: 1.03 },
+    { name: '바늘 끝의 유언', flavor: '가장 가느다란 것이 가장 깊이 박힌다. 급소만을 노리는 침묵의 살수들이 대대로 물려온 단검.', atkMod: 1.08, speedMod: 0.94 },
+  ],
+  검: [
+    { name: '초승달', flavor: '밤하늘에 걸린 초승달의 곡선을 그대로 벼려낸 검. 달이 차오르듯 벨수록 예리해진다는 전설이 있다.', atkMod: 1.0, speedMod: 1.0 },
+    { name: '폭풍을 벤 자', flavor: '한때 실제로 몰아치는 폭풍우를 두 동강 냈다는 전승이 남아있는 검. 휘두를 때마다 옅은 바람소리가 인다.', atkMod: 1.08, speedMod: 0.95 },
+    { name: '여명의 인도자', flavor: '가장 어두운 밤의 끝에서 뽑아 든 검. 칼날에 새벽빛이 스며 있어 절망 속에서도 길을 비춘다.', atkMod: 0.95, speedMod: 1.07 },
+  ],
+  쌍검: [
+    { name: '쌍둥이 그림자', flavor: '하나의 그림자에서 갈라져 나온 두 자루의 검. 따로 놓으면 온전한 힘을 내지 못한다.', atkMod: 0.97, speedMod: 1.05 },
+    { name: '엇갈린 운명', flavor: '서로 다른 두 개의 운명이 교차하는 순간, 상대는 이미 두 번 베인 뒤다.', atkMod: 1.03, speedMod: 1.0 },
+    { name: '회전하는 바람', flavor: '멈추지 않는 회오리처럼 끊임없이 돌고 도는 두 칼날. 그 안에 서면 방향을 잃는다.', atkMod: 0.94, speedMod: 1.1 },
+  ],
+  도끼: [
+    { name: '산을 가르는 자', flavor: '단 한 번의 내려찍음으로 산등성이를 갈랐다는 전설의 나무꾼이 남긴 도끼.', atkMod: 1.1, speedMod: 0.92 },
+    { name: '거인의 유산', flavor: '거인족 대장장이가 자신의 마지막 숨을 불어넣어 완성한 도끼. 인간의 손엔 버거울 만큼 묵직하다.', atkMod: 1.15, speedMod: 0.88 },
+    { name: '대지의 심판', flavor: '땅을 딛고 선 모든 것에게 내려지는 심판. 휘두를 때마다 지축이 흔들린다는 이야기가 전해진다.', atkMod: 1.05, speedMod: 0.97 },
+  ],
+  창: [
+    { name: '하늘을 꿰뚫는 창', flavor: '구름 위 신들의 영역까지 닿았다는 창끝. 그 끝은 하늘의 뜻조차 뚫는다.', atkMod: 1.05, speedMod: 0.98 },
+    { name: '천둥의 첫 소리', flavor: '번개가 치기 직전, 가장 먼저 울리는 소리를 담은 창. 찌르기보다 소리가 먼저 도착한다.', atkMod: 0.97, speedMod: 1.06 },
+    { name: '관통하는 유성', flavor: '떨어지는 별처럼 모든 것을 꿰뚫고 지나간다. 멈춰선 적은 없다고 전해진다.', atkMod: 1.1, speedMod: 0.94 },
+  ],
+  활: [
+    { name: '달빛 시위', flavor: '달빛이 시위에 걸리면 화살은 더 이상 빗나가지 않는다는 전설의 활.', atkMod: 0.96, speedMod: 1.07 },
+    { name: '별을 쏘는 자', flavor: '밤하늘의 별 하나를 직접 쏘아 떨어뜨렸다는 명궁이 사용하던 활.', atkMod: 1.05, speedMod: 0.97 },
+    { name: '고요한 살의', flavor: '시위를 당기는 소리조차 들리지 않는다. 화살이 박히고 나서야 존재를 깨닫게 된다.', atkMod: 1.0, speedMod: 1.02 },
+  ],
+  지팡이: [
+    { name: '별들의 속삭임', flavor: '밤하늘의 별들이 나누는 대화를 엿들은 마법사가 그 힘을 봉인한 지팡이.', atkMod: 1.0, speedMod: 1.0 },
+    { name: '마나의 우물', flavor: '마르지 않는 마력의 샘이 지팡이 끝에 봉인되어 있다. 퍼내도 퍼내도 채워진다.', atkMod: 1.08, speedMod: 0.93 },
+    { name: '시간을 굽히는 지팡이', flavor: '주문을 외는 순간만큼은 시간의 흐름조차 이 지팡이 앞에서 머뭇거린다고 전해진다.', atkMod: 0.94, speedMod: 1.08 },
+  ],
+  둔기: [
+    { name: '부서지지 않는 의지', flavor: '수백 번의 전투에도 이가 나가지 않았다는 철퇴. 부서진 것은 언제나 상대편이었다.', atkMod: 1.05, speedMod: 0.96 },
+    { name: '천근의 심판', flavor: '들어 올리는 것조차 힘겨운 무게. 그러나 내려치는 순간엔 깃털처럼 빠르다.', atkMod: 1.12, speedMod: 0.9 },
+    { name: '종말의 종소리', flavor: '이 철퇴가 울리면 그것이 전장의 마지막 종소리라고들 한다.', atkMod: 0.98, speedMod: 1.03 },
+  ],
+};
+const WEAPON_MYTH_NAMES = {
+  단검: [
+    { name: '헤르메스의 전령검', flavor: '[그리스 신화] 전령의 신 헤르메스가 신들의 소식을 전할 때 품고 다녔다는 단검. 소유자의 발걸음을 한없이 가볍게 만든다.', atkMod: 0.95, speedMod: 1.1 },
+    { name: '로키의 혓날', flavor: '[북유럽 신화] 장난과 기만의 신 로키가 벼려낸 칼날. 진실을 말하는 순간에만 진정한 위력을 발휘한다는 역설의 무기.', atkMod: 1.0, speedMod: 1.05 },
+    { name: '아누비스의 심판검', flavor: '[이집트 신화] 죽은 자의 심장을 저울에 달던 아누비스의 의식용 단검. 죄 지은 자의 앞에서만 날이 서늘해진다.', atkMod: 1.05, speedMod: 1.0 },
+  ],
+  검: [
+    { name: '아킬레우스의 최후검', flavor: '[그리스 신화] 불사의 몸을 지녔던 영웅 아킬레우스가 마지막 전투에서 손에 쥐었던 검. 그의 유일한 약점처럼, 완벽함 속 한 줄기 균열을 품고 있다.', atkMod: 1.1, speedMod: 0.97 },
+    { name: '그람의 파편', flavor: '[북유럽 신화] 영웅 시구르드가 용 파프니르를 처치했던 명검 그람의 파편으로 다시 벼려낸 검. 용의 피가 아직도 검신에 흐른다.', atkMod: 1.05, speedMod: 1.0 },
+    { name: '라의 불꽃검', flavor: '[이집트 신화] 태양신 라가 밤의 어둠을 가르며 나아갈 때 사용했다는 검. 칼날에서 옅은 태양빛이 새어 나온다.', atkMod: 0.98, speedMod: 1.06 },
+  ],
+  쌍검: [
+    { name: '디오스쿠로이의 쌍검', flavor: '[그리스 신화] 결코 떨어지지 않는 쌍둥이 형제 카스토르와 폴룩스가 나눠 가졌던 쌍검. 하나가 움직이면 다른 하나도 함께 움직인다.', atkMod: 1.0, speedMod: 1.05 },
+    { name: '케찰코아틀의 쌍이빨', flavor: '[아즈텍 신화] 깃털 달린 뱀의 신 케찰코아틀의 두 송곳니를 본떠 만든 쌍검. 하늘과 땅을 동시에 벤다고 전해진다.', atkMod: 1.06, speedMod: 0.98 },
+    { name: '수사노오의 팔지검', flavor: '[일본 신화] 폭풍의 신 수사노오가 여덟 갈래 뱀에게서 얻었다는 신검의 짝을 이루는 쌍검.', atkMod: 0.96, speedMod: 1.1 },
+  ],
+  도끼: [
+    { name: '브로크의 대장도끼', flavor: '[북유럽 신화] 묠니르를 벼려낸 난쟁이 대장장이 브로크가 시험 삼아 만들었다는 도끼. 완성작보다 투박하지만 더 묵직하다.', atkMod: 1.15, speedMod: 0.88 },
+    { name: '크로노스의 낫도끼', flavor: '[그리스 신화] 시간의 신 크로노스가 자신의 아버지를 거세할 때 썼다는 낫을 도끼날로 다시 벼린 무기. 벨 때마다 짧은 시간이 사라진다는 소문이 있다.', atkMod: 1.1, speedMod: 0.92 },
+    { name: '페룬의 벼락도끼', flavor: '[슬라브 신화] 천둥의 신 페룬이 대지에 내리꽂았다는 도끼. 휘두를 때마다 마른 하늘에 짧은 번개가 인다.', atkMod: 1.05, speedMod: 0.95 },
+  ],
+  창: [
+    { name: '궁니르의 파편창', flavor: '[북유럽 신화] 오딘의 신창 궁니르에서 떨어져 나온 파편으로 만든 창. 한 번 던지면 반드시 명중한다는 원본의 성질이 옅게 남아있다.', atkMod: 1.1, speedMod: 0.95 },
+    { name: '루의 광휘창', flavor: '[켈트 신화] 태양신 루가 지녔다는 창. 던지는 순간 태양처럼 눈부신 빛을 뿜어낸다.', atkMod: 1.0, speedMod: 1.03 },
+    { name: '펠레우스의 혼례창', flavor: '[그리스 신화] 영웅 아킬레우스의 아버지 펠레우스가 결혼식에서 신들에게 선물받았다는 창.', atkMod: 1.06, speedMod: 0.98 },
+  ],
+  활: [
+    { name: '아르테미스의 은빛활', flavor: '[그리스 신화] 사냥과 달의 여신 아르테미스가 지녔던 활. 달이 뜬 밤에는 절대 빗나가지 않는다.', atkMod: 1.0, speedMod: 1.05 },
+    { name: '울르의 스키활', flavor: '[북유럽 신화] 겨울과 사냥의 신 울르가 눈밭을 가르며 쏘았다는 활. 시위 소리가 얼음처럼 차갑다.', atkMod: 1.05, speedMod: 0.98 },
+    { name: '아르주나의 간디바', flavor: '[힌두 신화] 영웅 아르주나가 불의 신에게서 받았다는 활 간디바. 화살통이 결코 비지 않는다는 전설이 있다.', atkMod: 0.97, speedMod: 1.08 },
+  ],
+  지팡이: [
+    { name: '토트의 지혜지팡이', flavor: '[이집트 신화] 지혜와 기록의 신 토트가 세상의 모든 언어를 새겼다는 지팡이. 쥔 자에게 잊혀진 지식을 속삭인다.', atkMod: 1.0, speedMod: 1.0 },
+    { name: '이그드라실의 잔가지', flavor: '[북유럽 신화] 세계수 이그드라실에서 떨어진 잔가지로 만든 지팡이. 아홉 세계의 마력이 옅게 흐른다.', atkMod: 1.08, speedMod: 0.92 },
+    { name: '헤르메스의 케리케이온', flavor: '[그리스 신화] 두 마리 뱀이 감긴 전령의 지팡이. 산 자와 죽은 자의 경계를 자유로이 넘나든다.', atkMod: 0.95, speedMod: 1.08 },
+  ],
+  둔기: [
+    { name: '묠니르의 축소형', flavor: '[북유럽 신화] 천둥의 신 토르의 망치 묠니르를 본떠 축소 제작한 철퇴. 원본만큼은 아니지만 여전히 벼락 냄새가 난다.', atkMod: 1.12, speedMod: 0.9 },
+    { name: '다그다의 몽둥이', flavor: '[켈트 신화] 대지의 신 다그다가 지녔다는 몽둥이. 한쪽 끝은 죽이고 다른 쪽 끝은 되살린다는 전설의 반쪽만 남았다.', atkMod: 1.08, speedMod: 0.95 },
+    { name: '여의봉의 그림자', flavor: '[중국 신화] 자유자재로 크기가 변한다는 여의봉의 힘을 아주 조금 흉내 낸 철퇴. 손에 맞춰 무게가 달라진다.', atkMod: 1.0, speedMod: 1.02 },
+  ],
+};
+// 등급별 무기 이름(브라켓 태그 안에 들어갈 텍스트) 계산
+function weaponItemName(w) {
+  if (isFist(w)) return w.type;
+  const type = w.type;
+  if (w.grade === 0) return type;
+  if (w.grade === 1) return `${WEAPON_ADJ[type] || ''} ${type}`.trim();
+  if (w.grade === 2) return WEAPON_EPIC_NAMES[type] || type;
+  if (w.grade === 3) return WEAPON_UNIQUE_NAMES[type] || type;
+  if (w.grade === 4) return (WEAPON_LEGEND_NAMES[type] && WEAPON_LEGEND_NAMES[type][w.nameVariant || 0] || {}).name || type;
+  if (w.grade === 5) return (WEAPON_MYTH_NAMES[type] && WEAPON_MYTH_NAMES[type][w.nameVariant || 0] || {}).name || type;
+  return type; // 태초 등 미구현 등급
+}
+// 레전더리/신화 무기의 변형 데이터(설명 + 공격력/공속 배율) 조회
+function weaponStatVariant(w) {
+  if (isFist(w)) return null;
+  if (w.grade === 4) return (WEAPON_LEGEND_NAMES[w.type] && WEAPON_LEGEND_NAMES[w.type][w.nameVariant || 0]) || null;
+  if (w.grade === 5) return (WEAPON_MYTH_NAMES[w.type] && WEAPON_MYTH_NAMES[w.type][w.nameVariant || 0]) || null;
+  return null;
+}
+function weaponFlavorText(w) {
+  const v = weaponStatVariant(w);
+  return v ? v.flavor : null;
+}
+
 // ---------- 맨손 (무기가 전부 파괴되면 맨손으로 싸움) ----------
 // 맨손은 파괴되지 않고, 강화 실패 시 +0으로 초기화
 const FIST = { type: '맨손', icon: '✊', speed: 2.5, dmgMult: 0.5, grade: 0 };
@@ -1036,13 +1160,18 @@ function genWeapon(gradeIdx) {
     const keys = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === gradeIdx);
     w.effect = keys[Math.floor(Math.random() * keys.length)];
   }
+  if (gradeIdx === 4 || gradeIdx === 5) {
+    // 레전더리/신화: 타입당 3개의 이름 변형(공격력/공속이 살짝 다른) 중 하나를 무작위 배정
+    w.nameVariant = Math.floor(Math.random() * 3);
+  }
   return w;
 }
 
 function weaponAtk(w) {
   const g = GRADES[w.grade];
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
-  const base = g.atk * t.dmgMult;
+  const variant = weaponStatVariant(w);
+  const base = g.atk * t.dmgMult * (variant ? variant.atkMod : 1);
   return base * enhAtkMult(w.enhance, w.grade) * (1 + accEff().atk + typeTrait(w, 'atk'));
 }
 // 강화 단계별 누적 공격력 배율. +10까지는 강화 1회당 증가폭이 일정한 선형 구간(급등 없음),
@@ -1083,7 +1212,9 @@ function weaponSpeed(w) {
   let burstMult = 1;
   if (w && w.effect === 'moment' && now < fx.momentUntil) burstMult *= (e.momentMult || 1);
   if (w && w.effect === 'infinite' && now < fx.infiniteUntil) burstMult *= (e.burstMult || 1);
-  return t.speed * (1 + accEff().speed + typeTrait(w, 'speedBonus') + effSpeed + stackBonus) * (1 + weaponRuneStat(w, 'atkSpeed') / 100) * burstMult;
+  const variant = weaponStatVariant(w);
+  const variantMult = variant ? variant.speedMod : 1;
+  return t.speed * (1 + accEff().speed + typeTrait(w, 'speedBonus') + effSpeed + stackBonus) * (1 + weaponRuneStat(w, 'atkSpeed') / 100) * burstMult * variantMult;
 }
 
 /* ===================== 룬 ===================== */
@@ -1335,7 +1466,8 @@ function gradeTag(w) {
     : '';
   const boss = w.bossFloor !== undefined ? ' 👹' : '';
   const fist = isFist(w) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
-  return `<span class="grade-${g.name}">${g.name} ${w.icon}${w.type}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}${rune}`;
+  const itemName = weaponItemName(w);
+  return `<span class="grade-${g.name}">${w.icon}[${g.name}]${itemName}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}${rune}`;
 }
 function wrand(pairs) { // [[value, weight], ...]
   let total = pairs.reduce((s, p) => s + p[1], 0);
@@ -1887,6 +2019,7 @@ function endBossFight(win) {
         id: uid++, grade: 5, type: t.name, icon: t.icon, enhance: 0,
         effect: pool[Math.floor(Math.random() * pool.length)],
         runes: [],
+        nameVariant: Math.floor(Math.random() * 3),
         bossFloor: f,   // 보스무기 표식
       };
       addWeapon(nw);
@@ -2312,7 +2445,9 @@ function renderEnhance() {
     ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matHave}/${matNeed}</b></div>`
     : '';
   const typeInfo = isFist(w) ? null : WEAPON_TYPES.find(x => x.name === w.type);
+  const flavor = weaponFlavorText(w);
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
+    ${flavor ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px;font-style:italic">${flavor}</div>` : ''}
     <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
     ${typeInfo ? `<div style="font-size:12px;color:var(--sub)">🗡️ ${typeInfo.name} 특성: ${typeInfo.traitDesc}</div>` : ''}
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
@@ -2429,12 +2564,14 @@ function renderInventory() {
   list.innerHTML = '';
   for (const w of sorted) {
     const runes = w.runes || [];
-    const hasDetail = !!(w.effect || runes.length);
+    const flavor = weaponFlavorText(w);
+    const hasDetail = !!(w.effect || runes.length || flavor);
     const expanded = hasDetail && expandedWeapons.has(w.id);
     const div = document.createElement('div');
     div.className = 'invitem' + (w.id === S.equipped ? ' equipped' : '');
     const detailHtml = expanded
       ? `<div class="wi" style="margin-top:4px;padding:6px 8px;background:var(--panel2);border-radius:6px">
+          ${flavor ? `<div style="font-style:italic;margin-bottom:${w.effect || runes.length ? '4px' : '0'}">${flavor}</div>` : ''}
           ${w.effect && EFFECTS[w.effect] ? `✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}` : ''}
           ${w.effect && runes.length ? '<br>' : ''}
           ${runes.map(r => `🔮 [${runeName(r)}] ${runeDesc(r)}`).join('<br>')}

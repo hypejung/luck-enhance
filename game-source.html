@@ -349,6 +349,15 @@
       <div id="statsBox"></div>
     </div>
     <div class="panel">
+      <h3>🥊 펀치기계</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        무한 체력의 더미를 상대로 120초 동안 실제로 들어간 누적 데미지(치명타·연타·보스
+        피해량 보정·각종 특수효과 전부 포함)를 측정합니다. "보스" 취급이라 보스 피해량 보정이 반영되며,
+        보상은 없고 기록만 남습니다. 하루 1회, 이월되지 않습니다.
+      </div>
+      <div id="punchBox"></div>
+    </div>
+    <div class="panel">
       <h3>🏋️ 능력치 훈련</h3>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">
         골드를 소모해 장비와 무관하게 영구적으로 능력치를 올립니다. 레벨 제한 없음 — 비용은 레벨이 오를수록 계속 비싸지지만, 후반 층의 막대한 골드 수입을 투자할 곳이 됩니다.
@@ -1800,6 +1809,7 @@ function newState() {
     destroyProtect: false, // 파괴방지 on/off (+15 이상, 비용 = 강화비용×5)
     raidTokens: 0,     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
+    punch: { day: null, used: false, best: 0, last: 0 }, // 펀치기계: 일일 1회, 안 쓰면 소멸(뱅킹 없음)
   };
 }
 
@@ -2729,7 +2739,7 @@ function attack(w) {
 }
 
 /* ===================== 보스 전투 ===================== */
-const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0 };
+const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0, isPunch: false };
 
 // 보스 데미지 보너스: 세트 효과(+30%) + 용살자의 서약(+100%)
 function bossDmgBonus() {
@@ -2838,10 +2848,68 @@ function endRaidFight(win) {
   renderBossBtn(); renderTop(); renderRaidTab(); save();
 }
 
+// ---------- 펀치기계 (일일 딜 측정) ----------
+// 무한(사실상) 체력의 더미를 상대로 120초간 실제로 들어간 누적 데미지를 측정한다.
+// "보스" 취급이라 보스 데미지 보정이 그대로 반영되며, 체력이 절대 0이 되지 않으므로
+// handleKill()이 호출되지 않아 골드/재료/드롭 등 파밍 요소는 발생하지 않는다(순수 측정용).
+const PUNCH_TIME_LIMIT = 120;
+const PUNCH_DUMMY_HP = 1e18;
+function punchEnsureDay() {
+  const today = todayKey();
+  if (S.punch.day !== today) { S.punch.day = today; S.punch.used = false; }
+}
+function startPunchFight() {
+  if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
+  if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
+  punchEnsureDay();
+  if (S.punch.used) { log('오늘의 펀치기계 도전은 이미 사용했습니다. (매일 초기화)', 'lg-bad'); return; }
+  S.punch.used = true;
+  bossFight.active = true;
+  bossFight.isPunch = true;
+  bossFight.timeLeft = PUNCH_TIME_LIMIT + weaponBossTimeBonus(getEquipped());
+  mon.unique = false;
+  mon.maxHp = PUNCH_DUMMY_HP;
+  mon.hp = PUNCH_DUMMY_HP;
+  mon.dead = false;
+  mon.atkTimer = 0;
+  fx.executionerReady = true;
+  $('monemoji').textContent = '🥊';
+  $('monemoji').classList.add('boss-appear');
+  $('monname').innerHTML = `<span class="grade-고대" style="font-size:19px">🥊 펀치기계</span> <span style="font-size:12px;color:#ff7cf0;">★ 딜 측정 ★</span>`;
+  $('floortitle').innerHTML = `🥊 <span class="grade-고대">펀치기계 — 딜 측정 중</span>`;
+  log(`🥊 <b>펀치기계 가동!</b> ${PUNCH_TIME_LIMIT}초 동안 누적 데미지를 측정합니다.`, 'lg-prim');
+  setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
+  $('monemoji').classList.add('boss-glow');
+  switchTab('hunt');
+  renderBossBtn(); renderHP(); renderPunchBox(); save();
+}
+function endPunchFight() {
+  const dealt = Math.max(0, PUNCH_DUMMY_HP - mon.hp);
+  const isRecord = dealt > S.punch.best;
+  S.punch.last = dealt;
+  if (isRecord) S.punch.best = dealt;
+  log(`🥊 <b>펀치기계 측정 종료!</b> 누적 데미지: <b style="color:var(--gold)">${fmt(dealt)}</b>${isRecord ? ' <span class="lg-prim">🎉 최고 기록 경신!</span>' : ` (최고 기록: ${fmt(S.punch.best)})`}`, 'lg-prim');
+  spawnMonster();
+  renderBossBtn(); renderPunchBox(); save();
+}
+function renderPunchBox() {
+  const box = $('punchBox');
+  if (!box) return;
+  punchEnsureDay();
+  const available = !S.punch.used && !bossFight.active;
+  box.innerHTML = `
+    <div style="font-size:13px;margin-bottom:8px;">최근 기록: <b>${fmt(S.punch.last)}</b> · 최고 기록: <b style="color:var(--gold)">${fmt(S.punch.best)}</b></div>
+    <button class="primary" id="punchBtn" ${available ? '' : 'disabled'}>🥊 펀치기계 도전 (${PUNCH_TIME_LIMIT}초)</button>
+    <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : (S.punch.used ? '오늘 도전은 이미 사용했습니다. (매일 초기화, 이월 안 됨)' : '하루 1회, 보상은 없고 기록만 측정합니다.')}</div>`;
+  const btn = $('punchBtn');
+  if (btn) btn.onclick = startPunchFight;
+}
+
 function endBossFight(win) {
   bossFight.active = false;
   $('monemoji').classList.remove('boss-glow');
   if (bossFight.isRaid) { endRaidFight(win); return; }
+  if (bossFight.isPunch) { bossFight.isPunch = false; endPunchFight(); return; }
   const f = bossFight.floor;
   const F = FLOORS[f];
   if (win) {
@@ -2906,7 +2974,9 @@ function renderBossBtn() {
   if (bossFight.active) {
     el.textContent = bossFight.isRaid
       ? `⏱ 토벌전 진행중... ${Math.ceil(bossFight.timeLeft)}초`
-      : `⏱ 보스전 진행중... ${Math.ceil(bossFight.timeLeft)}초`;
+      : bossFight.isPunch
+        ? `⏱ 펀치기계 측정중... ${Math.ceil(bossFight.timeLeft)}초`
+        : `⏱ 보스전 진행중... ${Math.ceil(bossFight.timeLeft)}초`;
     el.disabled = true;
     if (flee) flee.style.display = '';
     return;
@@ -2929,9 +2999,11 @@ function fleeBoss() {
   if (!bossFight.active) return;
   const msg = bossFight.isRaid
     ? '토벌전을 포기하시겠습니까? (이미 소모된 오늘의 도전 횟수는 돌아오지 않습니다)'
-    : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
+    : bossFight.isPunch
+      ? '펀치기계 측정을 중단하시겠습니까? (지금까지의 누적 데미지로 기록됩니다)'
+      : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
   if (!confirm(msg)) return;
-  log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');
+  log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : bossFight.isPunch ? '🏳️ 펀치기계 측정을 중단했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');
   endBossFight(false);
 }
 
@@ -3433,6 +3505,7 @@ function migrate(d) {
   if (!d.raid || typeof d.raid !== 'object') d.raid = { day: null, count: 0, done: {} };
   if (typeof d.raid.done !== 'object' || d.raid.done === null) d.raid.done = {};
   if (typeof d.raidTokens !== 'number') d.raidTokens = 0;
+  if (!d.punch || typeof d.punch !== 'object') d.punch = { day: null, used: false, best: 0, last: 0 };
   if (!Array.isArray(d.accs)) d.accs = [];
   // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
@@ -3578,6 +3651,13 @@ function renderUniqueName() {
 }
 
 function renderHP() {
+  if (bossFight.active && bossFight.isPunch) {
+    const dealt = Math.max(0, PUNCH_DUMMY_HP - mon.hp);
+    const elapsed = Math.max(0, PUNCH_TIME_LIMIT - bossFight.timeLeft);
+    $('hpbar').style.width = Math.min(100, (elapsed / PUNCH_TIME_LIMIT) * 100) + '%';
+    $('hptext').textContent = `측정 중... 누적 데미지 ${fmt(dealt)}`;
+    return;
+  }
   mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
   $('hpbar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
   $('hptext').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
@@ -4108,6 +4188,7 @@ function computeStats() {
   };
 }
 function renderStats() {
+  renderPunchBox();
   const box = $('statsBox');
   if (!box) return;
   const w = getEquipped();

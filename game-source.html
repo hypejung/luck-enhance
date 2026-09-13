@@ -420,6 +420,14 @@
       </div>
       <div id="genesisList"></div>
     </div>
+    <div class="panel">
+      <h3>🌫️ 고대의 인장</h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">
+        <div style="font-style:italic;margin-bottom:6px;">토벌전에서 쓰러뜨린 존재는 완전히 사라지지 않는다. 아주 드물게, 그 기운의 파편이 하나의 인장으로 응축되어 남는다.</div>
+        <div>토벌전 20단계마다 하나씩 존재하며, 승리 시 극히 낮은 확률로 발견됩니다. 최대 <b style="color:var(--unique)">3개</b>까지 장착 가능.</div>
+      </div>
+      <div id="ancientSealList"></div>
+    </div>
   </div>
 
   <!-- 랜덤박스 -->
@@ -758,6 +766,10 @@ function unlockCodexEntry(w) {
   if (!key || S.codexSeen[key]) return;
   S.codexSeen[key] = true;
   log(`📖 <b>무기 도감</b>에 새 항목이 등록되었습니다: ${weaponItemName(w)}`, 'lg-prim');
+  if (sealEquippedHas('lichOverlord')) {
+    S.raidTokens = (S.raidTokens || 0) + 1;
+    log('👻 <b>리치대군주의 인장</b>이 영혼을 거두었다 — 🎫 토벌의 증표 +1', 'lg-prim');
+  }
 }
 function codexEntries() {
   const list = [];
@@ -869,6 +881,8 @@ function codexBonusEff() {
     const prog = codexAncientSetProgress(f);
     if (prog.need > 0 && prog.have >= prog.need) eff[set.stat] += set.value;
   }
+  // 금서파편의 인장: 도감 컬렉션 보너스 전체 20% 증폭
+  if (sealEquippedHas('bookFragment')) { for (const k of Object.keys(eff)) eff[k] *= 1.2; }
   return eff;
 }
 function codexOfflineBonus() {
@@ -1017,6 +1031,7 @@ const fx = {
   quakeCount: 0,           // 거석의 진동: 누적 공격 횟수
   freeEnhance: false,      // 끝나지 않은 맹세: 다음 강화 비용 무료 대기 중
   glideUntil: 0,           // 활공: 사냥터 이동 직후 공속 버프 만료 시각
+  enduranceStart: 0,       // 늑대왕의 인장: 현재 사냥터에서 쉬지 않고 사냥을 지속한 시작 시각
 };
 
 // ---------- 강화 설정 (최대 +30, "운빨강화"의 핵심 — 진짜 도박) ----------
@@ -1178,6 +1193,83 @@ const RAID_MONSTERS = [
   { name: '위엄을 삼킨 태초의 화룡', emoji: '🐲', flavor: '모든 용의 위엄을 집어삼켜 스스로 신화가 된 존재.' },
   { name: '몰락조차 초월한 태초의 잔영', emoji: '😇', flavor: '신이었던 것의, 신을 넘어선 마지막 잔영.' },
 ];
+// ---------- 고대의 인장 (토벌전 초희귀 장신구) ----------
+// 토벌전 승리 시 아주 낮은 확률(보스 장신구 0.9%보다도 낮게)로 그 단계의 인장을 시도한다.
+// 태초의 유물처럼 가방 탭에 별도 공간을 두지만, 항상 발동이 아니라 "장착"이 필요하고
+// 슬롯이 3개뿐이라 20개 중 무엇을 낄지 골라야 한다. 효과는 고대 무기 스피릿과 겹치지
+// 않도록 파밍/경제/보조 시스템 쪽 새로운 메커니즘 위주로 설계.
+const ANCIENT_SEAL_DROP_CHANCE = 0.003;
+const ANCIENT_SEAL_SLOTS = 3;
+const ANCIENT_SEALS = [
+  { id: 'slimeCore', floor: 0, name: '잠식하는 핵의 인장',
+    desc: '고급 재료를 사냥터 구간 제한 없이 어디서 얻은 것이든 강화에 사용할 수 있다.' },
+  { id: 'vampireLord', floor: 1, name: '흡혈군주의 인장',
+    desc: '오프라인 사냥에 적용되는 최대 시간이 8시간에서 12시간으로 늘어난다.' },
+  { id: 'sporeMother', floor: 2, name: '포자모의 인장',
+    desc: '무기가 드롭될 때 15% 확률로 같은 무기가 하나 더 함께 드롭된다.' },
+  { id: 'wolfKing', floor: 3, name: '늑대왕의 인장',
+    desc: '한 사냥터에서 쉬지 않고 사냥을 지속할수록 공격속도가 서서히 상승한다(5분마다 +5%p, 최대 +25%p). 사냥터 이동이나 자리 비움 시 초기화.' },
+  { id: 'thiefKing', floor: 4, name: '도적왕의 인장',
+    desc: '무기와 재료의 판매 가격이 20% 오른다.' },
+  { id: 'undyingFortress', floor: 5, name: '불멸성채의 인장',
+    desc: '대장장이에서 고대 무기를 복구할 때 필요한 재료가 40% 줄어든다.' },
+  { id: 'wrathAvatar', floor: 6, name: '분노화신의 인장',
+    desc: '능력치 훈련 비용이 15% 줄어든다.' },
+  { id: 'venomQueen', floor: 7, name: '만독여왕의 인장',
+    desc: '룬 합성 성공 확률이 10%p 오른다.' },
+  { id: 'quakeGuardian', floor: 8, name: '진동파수꾼의 인장',
+    desc: '사냥터 보스 재도전 쿨타임이 절반으로 줄어든다.' },
+  { id: 'swampHeart', floor: 9, name: '늪심장의 인장',
+    desc: '재료 획득 시 10% 확률로 한 단계 위 등급의 재료로 대체된다.' },
+  { id: 'oathKnight', floor: 10, name: '맹세기사의 인장',
+    desc: '고급 강화에 필요한 재료 배수가 50배에서 40배로 줄어든다.' },
+  { id: 'mazeHorn', floor: 11, name: '광포한뿔의 인장',
+    desc: '랜덤박스에서 상위 박스로 이어지는 연쇄 개봉 확률이 1.5배로 늘어난다.' },
+  { id: 'bookFragment', floor: 12, name: '금서파편의 인장',
+    desc: '무기 도감 컬렉션(쌍/세트) 보너스 효과가 20% 증폭된다.' },
+  { id: 'stormGlider', floor: 13, name: '활공자의 인장',
+    desc: '능력치 훈련 시 5% 확률로 레벨이 2씩 동시에 오른다.' },
+  { id: 'lichOverlord', floor: 14, name: '리치대군주의 인장',
+    desc: '무기 도감에 새 항목이 등록될 때마다 🎫 토벌의 증표를 1개 획득한다.' },
+  { id: 'fallenWarrior', floor: 15, name: '파계전사의 인장',
+    desc: '강화 실패로 단계가 하락할 상황이면, 30% 확률로 하락 대신 소량의 골드를 얻는다.' },
+  { id: 'endlessMarch', floor: 16, name: '무한진군의 인장',
+    desc: '사냥터 보스를 격파하면 재도전 쿨타임과 무관하게 즉시 재도전할 수 있는 기회가 1회 충전된다.' },
+  { id: 'abyssPredator', floor: 17, name: '심연포식자의 인장',
+    desc: '장신구 장착 슬롯이 1개 늘어난다(5→6).' },
+  { id: 'dragonKing', floor: 18, name: '화룡의 인장',
+    desc: '토벌전 하루 총 도전 횟수가 1회 늘어난다(3→4).' },
+  { id: 'transcendence', floor: 19, name: '초월잔영의 인장',
+    desc: '공격력·공격속도·치명타 확률·치명타 피해·연타 확률·보스 피해량·골드 획득·드롭률이 각각 12%씩 오른다.' },
+];
+const ANCIENT_SEAL_BY_ID = {};
+for (const s of ANCIENT_SEALS) ANCIENT_SEAL_BY_ID[s.id] = s;
+function hasSeal(id) { return !!(S && S.ancientSeals && S.ancientSeals.includes(id)); }
+function sealEquippedHas(id) { return !!(S && S.sealEquipped && S.sealEquipped.includes(id)); }
+function equipSeal(id) {
+  if (!hasSeal(id) || sealEquippedHas(id)) return;
+  if (S.sealEquipped.length >= ANCIENT_SEAL_SLOTS) { log(`고대의 인장은 최대 ${ANCIENT_SEAL_SLOTS}개까지 장착할 수 있습니다.`, 'lg-bad'); return; }
+  S.sealEquipped.push(id);
+  log(`🌫️ <b>[${ANCIENT_SEAL_BY_ID[id].name}]</b>을(를) 장착했습니다.`, 'lg-prim');
+  renderInventory(); renderTop(); save();
+}
+function unequipSeal(id) {
+  S.sealEquipped = S.sealEquipped.filter(x => x !== id);
+  renderInventory(); renderTop(); save();
+}
+// 토벌전 승리 시 그 단계의 인장을 낮은 확률로 시도. 이미 보유 중이면 골드로 대체 지급.
+function rollAncientSeal(stage) {
+  const seal = ANCIENT_SEALS[stage];
+  if (!seal || Math.random() >= ANCIENT_SEAL_DROP_CHANCE) return;
+  if (hasSeal(seal.id)) {
+    const gold = Math.floor(raidGoldReward(stage) * 0.5);
+    S.gold += gold;
+    log(`고대의 인장은 이미 보유 중이라 골드로 대체 지급됩니다. (+${fmt(gold)})`, 'lg-prim');
+  } else {
+    S.ancientSeals.push(seal.id);
+    log(`🌫️✨ <b style="color:#6cf0c2">[고대의 인장] ${seal.name}</b>을(를) 발견했습니다!!! 가방 탭에서 장착하세요.`, 'lg-prim');
+  }
+}
 function todayKey() {
   const d = new Date();
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
@@ -1187,6 +1279,8 @@ function raidEnsureDay() {
   if (S.raid.day !== today) { S.raid.day = today; S.raid.count = 0; S.raid.done = {}; }
 }
 function raidHp(stage) { return Math.round(RAID.baseHp * Math.pow(RAID.hpGrowth, stage)); }
+// 화룡의 인장: 하루 총 도전 횟수 +1
+function effectiveRaidDailyTotal() { return RAID.dailyTotal + (sealEquippedHas('dragonKing') ? 1 : 0); }
 function raidTokenReward(stage) { return 5 + stage * 2; }
 function raidGoldReward(stage) {
   const w = getEquipped();
@@ -1527,7 +1621,8 @@ function rollAncientWeapon(floorIdx, kindMult) {
 // 사냥터의 최고 등급 재료(슬롯2, +15 강화에도 쓰이는 그 재료)를 모으면 복구할 수 있다.
 // 필요 개수는 1층 2000개에서 시작해 20층으로 갈수록 줄어든다(고층 재료는 파밍이 어려우므로).
 function ancientRestoreCost(floorIdx) {
-  return Math.round(2000 * Math.pow(0.85, floorIdx));
+  const cost = Math.round(2000 * Math.pow(0.85, floorIdx));
+  return sealEquippedHas('undyingFortress') ? Math.round(cost * 0.6) : cost;
 }
 function addBlacksmithTrace(w) {
   if (w.grade !== 6 || w.ancientFloor == null) return;
@@ -1594,6 +1689,8 @@ const MAT_TIERS = [[0, 1, 2], [1, 2, 3], [2, 3, 4], [3, 4, 5]];
 const UNIQUE_CHANCE = 0.008;   // 유니크 몬스터 출현 확률 (0.8%)
 const CRAFT_COST = { n0: 12, n1: 4 };  // 일반 재료 12개 + 레어 재료 4개
 const ACC_SLOTS = 5;  // 동시 장착 가능한 일반 장신구 수 (보스 장신구는 별도 1슬롯)
+// 심연포식자의 인장: 장신구 장착 슬롯 +1
+function effectiveAccSlots() { return ACC_SLOTS + (sealEquippedHas('abyssPredator') ? 1 : 0); }
 // 무기 룬 슬롯 수 = 등급이 오를수록 늘어남 (일반=1 ... 태초=7), +15 강화해야 슬롯이 열림
 function runeSlotsForGrade(grade) { return Math.min(7, grade + 1); }
 
@@ -1621,14 +1718,21 @@ function trainingCost(key) {
   const t = TRAINING[key];
   const lvl = trainingLevel(key);
   const tier = Math.floor(lvl / TRAINING_TIER_STEP);
-  return Math.round(t.baseCost * Math.pow(lvl + 1, t.costExp) * trainingTierMult(tier));
+  let cost = Math.round(t.baseCost * Math.pow(lvl + 1, t.costExp) * trainingTierMult(tier));
+  if (sealEquippedHas('wrathAvatar')) cost = Math.round(cost * 0.85);
+  return cost;
 }
 function trainingValue(key) { return trainingLevel(key) * TRAINING[key].perLevel; }
 function trainStat(key) {
   const cost = trainingCost(key);
   if (S.gold < cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
   S.gold -= cost;
-  S.training[key] = trainingLevel(key) + 1;
+  let levels = 1;
+  if (sealEquippedHas('stormGlider') && Math.random() < 0.05) {
+    levels = 2;
+    log('🌩️ <b>활공자의 인장</b> 발동! 훈련 레벨이 2씩 동시에 올랐습니다.', 'lg-prim');
+  }
+  S.training[key] = trainingLevel(key) + levels;
   renderTop(); renderStats(); save();
 }
 
@@ -1836,6 +1940,9 @@ function newState() {
     raidTokens: 0,     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
     punch: { best: 0, last: 0 }, // 펀치기계: 연습용, 횟수 제한 없음
+    ancientSeals: [],  // 보유한 고대의 인장 id 목록
+    sealEquipped: [],  // 장착 중인 고대의 인장 id 목록 (최대 ANCIENT_SEAL_SLOTS개)
+    bossFreeRetryReady: false, // 무한진군의 인장: 충전된 무료 보스 재도전 여부
   };
 }
 
@@ -2057,7 +2164,18 @@ function accEff() {
       if (opt) eff[opt.stat] += line.value / 100;
     }
   }
+  // 고대의 인장: 장착 중인 것만 적용(최대 ANCIENT_SEAL_SLOTS개)
+  if (sealEquippedHas('transcendence')) {
+    for (const k of ['atk', 'speed', 'gold', 'luck', 'critChance', 'critDamage', 'extraAtk', 'bossDmg']) eff[k] += 0.12;
+  }
+  if (sealEquippedHas('wolfKing')) eff.speed += wolfKingEnduranceBonus();
   return eff;
+}
+// 늑대왕의 인장: 같은 사냥터에서 쉬지 않고 사냥한 시간에 비례한 공속 보너스(5분당 +5%p, 최대 +25%p)
+function wolfKingEnduranceBonus() {
+  if (!fx.enduranceStart) return 0;
+  const elapsedMin = (Date.now() - fx.enduranceStart) / 60000;
+  return Math.min(0.25, Math.floor(elapsedMin / 5) * 0.05);
 }
 // 세트 효과가 발동하는 사냥터 (장착한 보스무기와 같은 사냥터의 보스장신구를 보유 중이면)
 function bossSetFloor() {
@@ -2097,12 +2215,15 @@ function highMatFloorRange(grade) {
   return [19, 19];
 }
 function highMatFloorLabel(grade) {
+  if (sealEquippedHas('slimeCore')) return '전체 사냥터';
   const [lo, hi] = highMatFloorRange(grade);
   return lo === hi ? `${hi + 1}단계` : `${lo + 1}~${hi + 1}단계`;
 }
+// 잠식하는 핵의 인장: 등급별 사냥터 구간 제한을 무시하고 전체 사냥터의 고급 재료를 사용
+function highMatFloorRangeFor(grade) { return sealEquippedHas('slimeCore') ? [0, 19] : highMatFloorRange(grade); }
 // 보유 고급 재료 수 (등급별 허용 사냥터 구간의 3번째(에픽급) 재료 = matGrade 2)
 function countHighMats(grade) {
-  const [lo, hi] = highMatFloorRange(grade);
+  const [lo, hi] = highMatFloorRangeFor(grade);
   let n = 0;
   for (const key in S.mats) {
     const [f, g] = key.split('|').map(Number);
@@ -2112,7 +2233,7 @@ function countHighMats(grade) {
 }
 // 고급 재료 소모: 등급별 허용 구간 내에서 낮은 사냥터(저티어) 재료부터
 function consumeHighMats(grade, n) {
-  const [lo, hi] = highMatFloorRange(grade);
+  const [lo, hi] = highMatFloorRangeFor(grade);
   const keys = Object.keys(S.mats).filter(k => {
     const [f, g] = k.split('|').map(Number);
     return g >= 2 && f >= lo && f <= hi && S.mats[k] > 0;
@@ -2135,7 +2256,8 @@ function consumeHighMats(grade, n) {
 // 재료 판매가 (사냥터 골드 기준: 일반 1.5배 / 레어 4배 / 에픽 10배)
 function matSellPrice(f, g) {
   const mult = [1.5, 4, 10][g] || 1;
-  return Math.max(1, Math.floor(floorGold(f) * mult));
+  const price = Math.max(1, Math.floor(floorGold(f) * mult));
+  return sealEquippedHas('thiefKing') ? Math.floor(price * 1.2) : price;
 }
 // 강화를 많이 한 무기는 판매도 나름의 "돈벌이 수단"이 되도록 기대 판매가를 키운다.
 // +10까지는 기존처럼 공격력 배율에 비례해서 완만하게 오르고, +10부터는 강화비용의
@@ -2148,7 +2270,8 @@ function sellPrice(w) {
   const cap = Math.min(enh, 10);
   let mult = (1 + cap * 0.2) * enhAtkMult(cap, w.grade);
   if (enh > 10) mult *= Math.pow(SELL_HIGH_ENH_RATE, enh - 10);
-  return Math.max(1, Math.floor(g.sell * mult * (w.effect ? 5 : 1)));
+  const price = Math.max(1, Math.floor(g.sell * mult * (w.effect ? 5 : 1)));
+  return sealEquippedHas('thiefKing') ? Math.floor(price * 1.2) : price;
 }
 // 판매 운빨 테이블 — 대부분 무난하지만 드물게 대박(혹은 쪽박)이 남
 const SELL_LUCK = [
@@ -2319,6 +2442,12 @@ function dropRoll() {
     addWeapon(nw);
     log(`🎁 무기 드롭! ${gradeTag(nw)}`, grade >= 3 ? 'lg-epic' : 'lg-good');
     if (grade >= 4) { log(`✨ 레전더리 이상 무기가 나왔습니다!!`, 'lg-prim'); }
+    // 포자모의 인장: 낮은 확률로 같은 무기가 하나 더 드롭
+    if (sealEquippedHas('sporeMother') && Math.random() < 0.15) {
+      const nw2 = genWeapon(grade);
+      addWeapon(nw2);
+      log(`🍄 <b>포자모의 인장</b> 발동! 무기가 하나 더 드롭되었습니다: ${gradeTag(nw2)}`, 'lg-prim');
+    }
   }
 
   // 미다스의 손(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정 — 발동 알림은 화면 텍스트로만
@@ -2363,18 +2492,23 @@ function dropRoll() {
 // matSlot(0/1/2)은 사냥터 내 재료 슬롯(=FLOORS[f].mats의 인덱스)이고, 실제 아이템 등급은
 // MAT_TIERS[tierIdx][matSlot]로 별도 계산한다. 슬롯 인덱스와 등급 인덱스를 혼동하면
 // (구버전 버그) 사냥터 5구간 이상에서 조합에 필요한 '0|1' 키가 채워지지 않아 조합이 불가능해짐.
+// 늪심장의 인장: 재료 획득 시 10% 확률로 한 단계 위 등급의 재료로 대체
+function sealMatSlot(slot) {
+  if (slot < 2 && sealEquippedHas('swampHeart') && Math.random() < 0.10) return slot + 1;
+  return slot;
+}
 function dropMaterials(isU, luck) {
   const f = S.floor;
 
   // 일반 재료 (두 종류 중 하나)
   const commonChance = (0.5 + luck) * (isU ? 2 : 1);
   if (Math.random() < Math.min(0.95, commonChance)) {
-    addMat(f, 0);
+    addMat(f, sealMatSlot(0));
   }
   // 레어 재료
   const rareChance = (0.12 + luck * 0.5) * (isU ? 4 : 1);
   if (Math.random() < Math.min(0.9, rareChance)) {
-    addMat(f, 1);
+    addMat(f, sealMatSlot(1));
   }
   // 에픽(최고) 재료 — "운빨강화" 개편으로 골드/강화 시행 횟수가 크게 늘어난 만큼
   // 고급 재료 파밍이 병목이 되지 않도록 기본 확률을 상향(3%→15%)
@@ -2442,7 +2576,7 @@ function openBox(idx, src) {
   const roll = Math.random();
   let acc = 0;
   const wChance = b.weapon ? b.weapon.reduce((s, p) => s + p[1], 0) / 100 : 0;
-  const bChance = b.box ? b.box.reduce((s, p) => s + p[1], 0) / 100 : 0;
+  const bChance = (b.box ? b.box.reduce((s, p) => s + p[1], 0) / 100 : 0) * (sealEquippedHas('mazeHorn') ? 1.5 : 1);
   const gChance = b.gold;
 
   if (roll < wChance) {
@@ -2791,9 +2925,14 @@ function startBossFight() {
   const f = S.floor;
   const cdEnd = S.bossCooldowns[f] || 0;
   if (Date.now() < cdEnd) {
-    const left = Math.ceil((cdEnd - Date.now()) / 60000);
-    log(`⏳ 보스 재도전 쿨타임: ${left}분 남았습니다.`, 'lg-bad');
-    return;
+    if (S.bossFreeRetryReady) {
+      S.bossFreeRetryReady = false;
+      log('🔥 <b>무한진군의 인장</b> 발동! 쿨타임을 무시하고 즉시 재도전합니다.', 'lg-prim');
+    } else {
+      const left = Math.ceil((cdEnd - Date.now()) / 60000);
+      log(`⏳ 보스 재도전 쿨타임: ${left}분 남았습니다.`, 'lg-bad');
+      return;
+    }
   }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   bossFight.active = true;
@@ -2832,7 +2971,7 @@ function startRaidFight(stage) {
   raidEnsureDay();
   if (stage >= S.unlocked) { log('아직 해금되지 않은 사냥터의 토벌전입니다.', 'lg-bad'); return; }
   if (S.raid.done[stage]) { log('이 단계 토벌전은 오늘 이미 도전했습니다.', 'lg-bad'); return; }
-  if (S.raid.count >= RAID.dailyTotal) { log(`오늘 토벌전 도전 횟수를 모두 사용했습니다. (일일 ${RAID.dailyTotal}회)`, 'lg-bad'); return; }
+  if (S.raid.count >= effectiveRaidDailyTotal()) { log(`오늘 토벌전 도전 횟수를 모두 사용했습니다. (일일 ${effectiveRaidDailyTotal()}회)`, 'lg-bad'); return; }
   // 도전 시작 시점에 즉시 소모(승패 무관 — "도전"에 초점)
   S.raid.done[stage] = S.raid.day;
   S.raid.count++;
@@ -2871,6 +3010,7 @@ function endRaidFight(win) {
     log(`🏆 <b>토벌전 승리!</b> <span class="grade-고대">${rm.name}</span> 격파! +${fmt(gold)} 골드, 🎫 토벌의 증표 +${tokens}개`, 'lg-prim');
     $('raidMonEmoji').classList.add('boss-appear');
     setTimeout(() => $('raidMonEmoji').classList.remove('boss-appear'), 700);
+    rollAncientSeal(stage);
   } else {
     log(`⏰ 토벌전 실패... <span class="grade-고대">${rm.name}</span>에게 패배했습니다. (오늘 이 단계는 재도전 불가)`, 'lg-bad');
   }
@@ -2944,7 +3084,8 @@ function endBossFight(win) {
   const F = FLOORS[f];
   if (win) {
     S.bossWins++;
-    S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped());
+    S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped()) * (sealEquippedHas('quakeGuardian') ? 0.5 : 1);
+    if (sealEquippedHas('endlessMarch')) S.bossFreeRetryReady = true; // 무한진군의 인장: 다음 재도전 1회 무료 충전
     const w = getEquipped();
     const e = w && w.effect ? EFFECTS[w.effect] : null;
     const ae = accEff();
@@ -3046,7 +3187,9 @@ function fleeBoss() {
 const ADVANCED_ENH_MAT_MULT = 50;
 const ADVANCED_ENH_DESTROY_MULT = 0.5;
 function advancedEnhEligible(w) { return !isFist(w) && highMatsNeeded(w.enhance) > 0; }
-function advancedEnhMatCost(w) { return highMatsNeeded(w.enhance) * ADVANCED_ENH_MAT_MULT; }
+// 맹세기사의 인장: 고급 강화 재료 배수 50배 → 40배로 감소
+function advancedEnhMult() { return sealEquippedHas('oathKnight') ? 40 : ADVANCED_ENH_MAT_MULT; }
+function advancedEnhMatCost(w) { return highMatsNeeded(w.enhance) * advancedEnhMult(); }
 
 // ---------- 무기 각인 (메이플스토리 잠재능력 스타일) ----------
 // +15 이상 무기부터 대장장이에서 부여 가능. 항상 2줄(윗줄/아랫줄)이며, "레어" 등급에서
@@ -3166,7 +3309,8 @@ function renderRaidTab() {
   raidEnsureDay();
   const status = $('raidStatus');
   if (status) {
-    status.innerHTML = `오늘 남은 도전 횟수: <b style="color:var(--unique)">${RAID.dailyTotal - S.raid.count}/${RAID.dailyTotal}</b> · 보유 🎫 토벌의 증표: <b style="color:var(--gold)">${fmt(S.raidTokens || 0)}</b>`;
+    const dailyTotal = effectiveRaidDailyTotal();
+    status.innerHTML = `오늘 남은 도전 횟수: <b style="color:var(--unique)">${dailyTotal - S.raid.count}/${dailyTotal}</b> · 보유 🎫 토벌의 증표: <b style="color:var(--gold)">${fmt(S.raidTokens || 0)}</b>`;
   }
   const battlePanel = $('raidBattlePanel');
   const list = $('raidList');
@@ -3195,7 +3339,7 @@ function renderRaidTab() {
     const btn = document.createElement('button');
     if (locked) { btn.textContent = '🔒 미해금'; btn.disabled = true; }
     else if (usedToday) { btn.textContent = '오늘 도전 완료'; btn.disabled = true; }
-    else if (S.raid.count >= RAID.dailyTotal) { btn.textContent = '일일 횟수 소진'; btn.disabled = true; }
+    else if (S.raid.count >= effectiveRaidDailyTotal()) { btn.textContent = '일일 횟수 소진'; btn.disabled = true; }
     else if (bossFight.active) { btn.textContent = '전투 중'; btn.disabled = true; }
     else { btn.textContent = '도전'; btn.className = 'primary'; btn.onclick = () => startRaidFight(stage); }
     div.querySelector('.btns').appendChild(btn);
@@ -3212,8 +3356,8 @@ function tryEnhance(advanced) {
   const freeThisTry = w.spirit === 'unbrokenoath' && fx.freeEnhance;
   const cost = freeThisTry ? 0 : enhanceCost(w);
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
-  // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름). 고급 강화는 50배 소모.
-  const matNeed = highMatsNeeded(w.enhance) * (advanced ? ADVANCED_ENH_MAT_MULT : 1);
+  // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름). 고급 강화는 배수 소모.
+  const matNeed = highMatsNeeded(w.enhance) * (advanced ? advancedEnhMult() : 1);
   if (matNeed > 0 && countHighMats(w.grade) < matNeed) {
     log(`고급 재료가 부족합니다! (필요 ${matNeed}개, 보유 ${countHighMats(w.grade)}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으세요`, 'lg-bad');
     return;
@@ -3284,6 +3428,12 @@ function tryEnhance(advanced) {
         // 유지: 실패해도 단계가 그대로 유지됨 (파괴도, 하락도 아닌 세 번째 결과)
         playEnhanceFx('fail', attemptLevel);
         log(`😮‍💨 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
+      } else if (sealEquippedHas('fallenWarrior') && Math.random() < 0.3) {
+        // 파계전사의 인장: 단계 하락 상황을 30% 확률로 소량 골드 획득으로 대체
+        const refund = Math.floor(sellPrice(w) * 0.1);
+        S.gold += refund;
+        playEnhanceFx('fail', attemptLevel);
+        log(`😈 <b>파계전사의 인장</b> 발동! 단계 하락 대신 +${fmt(refund)} 골드를 얻었습니다. (파괴 확률이었음: ${dChance}%)${advTag}`, 'lg-prim');
       } else {
         w.enhance = Math.max(0, w.enhance - 1);
         playEnhanceFx('fail', attemptLevel);
@@ -3541,6 +3691,8 @@ function migrate(d) {
   if (typeof d.raid.done !== 'object' || d.raid.done === null) d.raid.done = {};
   if (typeof d.raidTokens !== 'number') d.raidTokens = 0;
   if (!d.punch || typeof d.punch !== 'object') d.punch = { best: 0, last: 0 };
+  if (!Array.isArray(d.ancientSeals)) d.ancientSeals = [];
+  if (!Array.isArray(d.sealEquipped)) d.sealEquipped = [];
   if (!Array.isArray(d.accs)) d.accs = [];
   // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
@@ -3733,6 +3885,7 @@ function renderFloorBtns() {
       b.onclick = () => {
         if (bossFight.active) { endBossFight(false); log('사냥터 이동으로 보스전이 중단되었습니다.', 'lg-bad'); }
         S.floor = i; spawnMonster(); renderFloorBtns(); renderFloorUI(); renderBossBtn();
+        fx.enduranceStart = Date.now(); // 늑대왕의 인장: 사냥터 이동 시 지구력 보너스 초기화
         // 활공(고대 에이션트 스피릿): 사냥터 이동 직후 한시적으로 공속 대폭 상승
         const eqw = getEquipped();
         if (eqw && eqw.spirit === 'glide') {
@@ -3925,11 +4078,46 @@ function renderGenesisList() {
     box.appendChild(div);
   }
 }
+function renderAncientSealList() {
+  const box = $('ancientSealList');
+  if (!box) return;
+  box.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:8px;">장착 슬롯 ${S.sealEquipped.length}/${ANCIENT_SEAL_SLOTS}</div>`;
+  for (const seal of ANCIENT_SEALS) {
+    const owned = hasSeal(seal.id);
+    const equipped = sealEquippedHas(seal.id);
+    const div = document.createElement('div');
+    div.className = 'invitem' + (equipped ? ' equipped' : '');
+    if (owned) {
+      div.innerHTML = `
+        <div><div class="wn">🌫️ <span class="grade-고대">${seal.name}</span>${equipped ? ' <span style="color:var(--unique);font-size:12px">(장착중)</span>' : ''}</div>
+        <div class="wi" style="color:var(--unique)">${seal.desc}</div></div>
+        <div class="btns"></div>`;
+      const btn = document.createElement('button');
+      if (equipped) {
+        btn.textContent = '해제';
+        btn.className = 'danger';
+        btn.onclick = () => unequipSeal(seal.id);
+      } else {
+        const full = S.sealEquipped.length >= ANCIENT_SEAL_SLOTS;
+        btn.textContent = full ? `장착 (${ANCIENT_SEAL_SLOTS}/${ANCIENT_SEAL_SLOTS} 꽉참)` : '장착';
+        btn.className = 'primary';
+        btn.disabled = full;
+        btn.onclick = () => equipSeal(seal.id);
+      }
+      div.querySelector('.btns').appendChild(btn);
+    } else {
+      div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(${FLOORS[seal.floor].name} 토벌전)</span></div>
+        <div class="wi" style="font-style:italic;">아직 발견하지 못한 고대의 인장입니다.</div></div>`;
+    }
+    box.appendChild(div);
+  }
+}
 function renderInventory() {
   const list = $('invlist');
   $('invcount').textContent = `(${S.weapons.length}/60)`;
   setupAutoSellControls();
   renderGenesisList();
+  renderAncientSealList();
   if (!S.weapons.length) {
     list.innerHTML = '<div style="color:var(--sub);font-size:13px;">가방이 비어 있습니다. 사냥이나 랜덤박스로 무기를 얻으세요.</div>';
     return;
@@ -4106,8 +4294,9 @@ function sellRune(runeId) {
 
 // 같은 등급 룬 3개를 소모해 한 단계 위 등급의 랜덤 룬 획득을 시도한다. 실패 시 재료는 전부 소멸.
 function fuseRunes(grade) {
-  const chance = RUNE_FUSION_CHANCE[grade];
-  if (chance == null) { log('이 등급은 합성할 수 없습니다.', 'lg-bad'); return; }
+  const baseChance = RUNE_FUSION_CHANCE[grade];
+  if (baseChance == null) { log('이 등급은 합성할 수 없습니다.', 'lg-bad'); return; }
+  const chance = Math.min(1, baseChance + (sealEquippedHas('venomQueen') ? 0.10 : 0));
   const pool = S.runes.filter(r => r.grade === grade);
   if (pool.length < 3) { log(`${GRADES[grade].name} 룬이 3개 이상 필요합니다. (보유 ${pool.length}개)`, 'lg-bad'); return; }
   for (let i = 0; i < 3; i++) {
@@ -4325,7 +4514,8 @@ function unequipAcc(floor) {
   renderCraft(); renderTop(); save();
 }
 function equipAcc(floor, grade) {
-  if (S.accEquipped.length >= ACC_SLOTS) { log(`장신구는 최대 ${ACC_SLOTS}개까지 장착할 수 있습니다.`, 'lg-bad'); return; }
+  const slots = effectiveAccSlots();
+  if (S.accEquipped.length >= slots) { log(`장신구는 최대 ${slots}개까지 장착할 수 있습니다.`, 'lg-bad'); return; }
   S.accEquipped.push({ floor, grade });
   renderCraft(); renderTop(); save();
 }
@@ -4333,7 +4523,8 @@ function renderCraft() {
   renderMatSell();
   // 장착 장신구 표시 (최대 ACC_SLOTS개)
   const eq = $('accEqBox');
-  eq.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">장착 슬롯 ${S.accEquipped.length}/${ACC_SLOTS}</div>`;
+  const accSlots = effectiveAccSlots();
+  eq.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">장착 슬롯 ${S.accEquipped.length}/${accSlots}</div>`;
   if (S.accEquipped.length) {
     for (const slot of S.accEquipped) {
       const a = ACCESSORIES[slot.floor];
@@ -4379,9 +4570,9 @@ function renderCraft() {
         b.textContent = '장착중';
         b.disabled = true;
       } else {
-        b.textContent = S.accEquipped.length >= ACC_SLOTS ? `장착 (${ACC_SLOTS}/${ACC_SLOTS} 꽉참)` : '장착';
+        b.textContent = S.accEquipped.length >= accSlots ? `장착 (${accSlots}/${accSlots} 꽉참)` : '장착';
         b.className = 'primary';
-        b.disabled = S.accEquipped.length >= ACC_SLOTS;
+        b.disabled = S.accEquipped.length >= accSlots;
         b.onclick = () => equipAcc(f, accGrade);
       }
       btns.appendChild(b);
@@ -4527,6 +4718,7 @@ function init() {
   } else {
     log('💾 저장된 진행 상황을 불러왔습니다.');
   }
+  fx.enduranceStart = Date.now(); // 늑대왕의 인장: 페이지 로드 시점부터 지구력 보너스 계산 시작
   // 이전 버전 호환: effect 검증
   for (const w of S.weapons) {
     if (w.effect && !EFFECTS[w.effect]) w.effect = null;
@@ -4623,9 +4815,11 @@ function init() {
     const awaySec = Math.floor((Date.now() - S.lastSeen) / 1000);
     if (awaySec < 10) return;  // 10초 미만이면 무시
     S.lastSeen = null;
+    fx.enduranceStart = Date.now(); // 늑대왕의 인장: 자리 비움 후 복귀 시 지구력 보너스 초기화
 
-    // 오프라인 사냥: 실제 장비 DPS 기반 (재료/드롭 제외, 최대 8시간, 효율 70%)
-    const capped = Math.min(awaySec, 8 * 3600);
+    // 오프라인 사냥: 실제 장비 DPS 기반 (재료/드롭 제외, 최대 8시간(흡혈군주의 인장 장착 시 12시간), 효율 70%)
+    const offlineCapSec = (sealEquippedHas('vampireLord') ? 12 : 8) * 3600;
+    const capped = Math.min(awaySec, offlineCapSec);
     const w = getEquipped();
     const dps = playerDPS();
     const speed = w ? weaponSpeed(w) : 0;

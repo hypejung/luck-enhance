@@ -1152,13 +1152,19 @@ const TRAINING = {
   bossDmg:    { name: '살육 훈련', desc: '보스 피해량 +1.2%/레벨',   perLevel: 0.012,  baseCost: 170, costExp: 1.32 },
 };
 const TRAINING_TIER_STEP = 10;     // 이 레벨 단위마다 비용이 큰 폭으로 튐
-const TRAINING_TIER_JUMP = 45;     // 티어 하나 오를 때마다 비용 배수 (10레벨마다 ×45 — 기존 ×150은 10대->20대 전환이 너무 가팔라서 완화)
+const TRAINING_TIER_JUMP = 45;     // 티어 하나 오를 때마다 비용 배수 (0->1, 1->2 티어. 10대->20대 전환용)
+const TRAINING_TIER_JUMP2 = 10;    // 3티어(30레벨)부터는 이 배수를 대신 사용 — 20대는 그대로, 30대부터만 완화
 function trainingLevel(key) { return (S && S.training && S.training[key]) || 0; }
+function trainingTierMult(tier) {
+  return tier <= 2
+    ? Math.pow(TRAINING_TIER_JUMP, tier)
+    : Math.pow(TRAINING_TIER_JUMP, 2) * Math.pow(TRAINING_TIER_JUMP2, tier - 2);
+}
 function trainingCost(key) {
   const t = TRAINING[key];
   const lvl = trainingLevel(key);
   const tier = Math.floor(lvl / TRAINING_TIER_STEP);
-  return Math.round(t.baseCost * Math.pow(lvl + 1, t.costExp) * Math.pow(TRAINING_TIER_JUMP, tier));
+  return Math.round(t.baseCost * Math.pow(lvl + 1, t.costExp) * trainingTierMult(tier));
 }
 function trainingValue(key) { return trainingLevel(key) * TRAINING[key].perLevel; }
 function trainStat(key) {

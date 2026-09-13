@@ -363,7 +363,7 @@
       <div id="matselllist"></div>
     </div>
     <div class="panel">
-      <h3>👹 보스 장신구 <span style="font-size:12px;color:var(--sub)">— 보스 격파 시 낮은 확률로 획득 (신화 등급)</span></h3>
+      <h3>👹 보스 장신구 <span style="font-size:12px;color:var(--sub)">— 보스 격파 시 낮은 확률로 획득 (신화 등급). 슬롯 제한 없이 보유한 전부가 항상 동시 적용됩니다.</span></h3>
       <div id="bossaccbox"></div>
     </div>
   </div>
@@ -1525,8 +1525,7 @@ function newState() {
     mats: {},          // 재료: { "사냥터|재료등급": count }
     accs: [],          // 보유 장신구: [{ floor, grade }]
     accEquipped: [],   // 장착 장신구(최대 ACC_SLOTS개): [{ floor, grade }, ...]
-    bossAccs: [],      // 보스 장신구: [{ floor }] (신화 등급)
-    bossAccEquipped: null, // 장착 보스 장신구: floor or null
+    bossAccs: [],      // 보스 장신구: [floor, ...] (신화 등급) — 슬롯 제한 없이 보유한 전부가 항상 장착 상태로 취급됨
     bossCooldowns: {}, // 사냥터별 보스 쿨타임 종료 시각 (timestamp)
     uniqueKills: 0,
     bossWins: 0,
@@ -1733,10 +1732,12 @@ function accEff() {
       if (a) for (const [k, v] of Object.entries(a.eff)) eff[k] += v;
     }
   }
-  // 보스 장신구
-  if (S && S.bossAccEquipped != null) {
-    const b = BOSS_ACCS[S.bossAccEquipped];
-    if (b) for (const [k, v] of Object.entries(b.eff)) eff[k] += v;
+  // 보스 장신구: 슬롯 제한 없이 보유한 전부가 항상 동시 적용됨
+  if (S && Array.isArray(S.bossAccs)) {
+    for (const f of S.bossAccs) {
+      const b = BOSS_ACCS[f];
+      if (b) for (const [k, v] of Object.entries(b.eff)) eff[k] += v;
+    }
   }
   // 세트 효과: 같은 사냥터의 보스무기 + 보스장신구 → 해당 사냥터에서 보너스
   const setFloor = bossSetFloor();
@@ -1750,12 +1751,12 @@ function accEff() {
   eff.speed += trainingValue('atkSpeed');
   return eff;
 }
-// 세트 효과가 발동하는 사냥터 (보스무기 floor와 보스장신구 floor가 같으면)
+// 세트 효과가 발동하는 사냥터 (장착한 보스무기와 같은 사냥터의 보스장신구를 보유 중이면)
 function bossSetFloor() {
-  if (!S || S.bossAccEquipped == null) return null;
+  if (!S || !Array.isArray(S.bossAccs) || !S.bossAccs.length) return null;
   const w = getEquipped();
   if (!w || w.bossFloor === undefined) return null;
-  return w.bossFloor === S.bossAccEquipped ? w.bossFloor : null;
+  return S.bossAccs.includes(w.bossFloor) ? w.bossFloor : null;
 }
 // 보스 무기/보스 장신구 여부
 function isBossWeapon(w) { return w && w.bossFloor !== undefined; }
@@ -2563,7 +2564,7 @@ function endBossFight(win) {
         S.gold += Math.floor(floorGold(f) * 10);
       } else {
         S.bossAccs.push(f);
-        log(`📿 <b>신화 보스장신구 드롭!</b> [${BOSS_ACCS[f].name}] — 조합 탭에서 장착하세요!`, 'lg-prim');
+        log(`📿 <b>신화 보스장신구 드롭!</b> [${BOSS_ACCS[f].name}] — 즉시 상시 적용됩니다! (조합 탭에서 확인)`, 'lg-prim');
       }
     }
   } else {
@@ -2881,7 +2882,7 @@ function migrate(d) {
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
   if (d.accEquipped.length > ACC_SLOTS) d.accEquipped = d.accEquipped.slice(0, ACC_SLOTS);
   if (!Array.isArray(d.bossAccs)) d.bossAccs = [];
-  if (d.bossAccEquipped === undefined) d.bossAccEquipped = null;
+  delete d.bossAccEquipped; // 보스 장신구 슬롯 제한 폐지 — 보유한 전부가 항상 장착됨
   if (typeof d.bossCooldowns !== 'object' || d.bossCooldowns === null) d.bossCooldowns = {};
   if (typeof d.bossWins !== 'number') d.bossWins = 0;
   if (!Array.isArray(d.weapons)) d.weapons = [];
@@ -3773,25 +3774,12 @@ function renderBossAccs() {
   for (const f of S.bossAccs) {
     const b = BOSS_ACCS[f];
     if (!b) continue;
-    const equipped = S.bossAccEquipped === f;
-    const setOn = equipped && bossSetFloor() === f;
+    const setOn = bossSetFloor() === f;
     const div = document.createElement('div');
-    div.className = 'invitem' + (equipped ? ' equipped' : '');
+    div.className = 'invitem equipped';
     div.innerHTML = `
-      <div><div class="wn"><span class="grade-신화">신화 👹 [${b.name}]</span>${setOn ? ' <span style="color:var(--unique);font-size:12px">✨ 세트 발동중!</span>' : ''}</div>
-      <div class="wi">${accEffText(b.eff)} · 세트 효과: ${f + 1}단계 사냥터에서 공격력/골드/드롭률 대폭 상승</div></div>
-      <div class="btns"></div>`;
-    const btns = div.querySelector('.btns');
-    const bt = document.createElement('button');
-    if (equipped) {
-      bt.textContent = '장착중';
-      bt.disabled = true;
-    } else {
-      bt.textContent = '장착';
-      bt.className = 'primary';
-      bt.onclick = () => { S.bossAccEquipped = f; renderCraft(); renderTop(); save(); };
-    }
-    btns.appendChild(bt);
+      <div><div class="wn"><span class="grade-신화">신화 👹 [${b.name}]</span> <span style="color:var(--unique);font-size:12px">✅ 상시 장착중</span>${setOn ? ' <span style="color:var(--unique);font-size:12px">✨ 세트 발동중!</span>' : ''}</div>
+      <div class="wi">${accEffText(b.eff)} · 세트 효과: ${f + 1}단계 사냥터에서 공격력/골드/드롭률 대폭 상승</div></div>`;
     box.appendChild(div);
   }
 }

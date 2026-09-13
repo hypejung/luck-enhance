@@ -472,24 +472,68 @@ function makeFist(enhance) {
   return { id: 0, grade: FIST.grade, type: FIST.type, icon: FIST.icon, enhance: enhance || 0, effect: null, runes: [], fist: true };
 }
 
-// ---------- 특수 효과 (유니크 이상, 등급마다 3종씩 고유 패시브) ----------
+// ---------- 특수 효과 (유니크 이상, 등급마다 5계열×1종 고유 패시브) ----------
+// 5계열(치명타/재화&드롭/연격/공격속도/보스피해) × 4등급 구성. 등급이 오를수록
+// 단순 수치 강화가 아니라 발동 매커니즘 자체가 달라지도록 설계 (출혈/스택/게이지/
+// 확정발동/복리 등). 스택·게이지·타이머 등 전투 중 임시 상태는 전역 fx 객체(비저장)에 보관.
 const EFFECTS = {
-  // 유니크
-  keen:    { name: '예리함',       desc: '공격 시 8% 확률로 치명타 (피해 1.8배)', grade: 3, crit: { chance: 0.08, mult: 1.8 } },
-  fortune: { name: '사냥의 감각',  desc: '골드 획득 +20%, 아이템 드롭률 +15%',    grade: 3, gold: 0.20, drop: 0.15 },
-  swift:   { name: '쾌속',         desc: '공격 시 10% 확률로 즉시 재공격',        grade: 3, extra: 0.10 },
-  // 레전더리
-  blood:    { name: '피의 갈망',     desc: '공격 시 12% 확률로 치명타 (피해 2배)', grade: 4, crit: { chance: 0.12, mult: 2 } },
-  hunter:   { name: '사냥꾼의 본능', desc: '골드 획득 +35%, 아이템 드롭률 +30%',    grade: 4, gold: 0.35, drop: 0.30 },
-  flurry:   { name: '연격',          desc: '공격 시 18% 확률로 즉시 재공격',        grade: 4, extra: 0.18 },
-  // 신화
-  dragonslayer: { name: '용살자의 서약', desc: '보스에게 피해 +100%', grade: 5, bossDmg: 1.0 },
-  monarch:      { name: '군주의 위엄',   desc: '골드 획득 +50%, 드롭률 +50%', grade: 5, gold: 0.5, drop: 0.5 },
-  timelord:     { name: '시간의 지배자', desc: '공격 시 35% 확률로 즉시 재공격', grade: 5, extra: 0.35 },
-  // 태초
-  downfall: { name: '몰락의 일격',   desc: '공격 시 25% 확률로 치명타 (피해 3배)', grade: 6, crit: { chance: 0.25, mult: 3 } },
-  midas:    { name: '황금의 손길',   desc: '골드 획득 +80%, 아이템 드롭률 +60%',    grade: 6, gold: 0.80, drop: 0.60 },
-  clone:    { name: '분신난무',      desc: '공격 시 30% 확률로 2연타',              grade: 6, extra: 0.30 },
+  // ===== 치명타 계열 =====
+  keen:     { name: '예리함',       desc: '공격 시 8% 확률로 치명타 (피해 1.8배)', grade: 3, crit: { chance: 0.08, mult: 1.8 } },
+  bloodrend:{ name: '유혈 참격',    desc: '공격 시 12% 확률로 치명타 (피해 2배). 치명타 발동 시 10% 확률로 5초간 지속되는 출혈 부여',
+              grade: 4, crit: { chance: 0.12, mult: 2.0 }, bleedProc: 0.10, bleedDur: 5, bleedDmg: 0.2 },
+  stigma:   { name: '처형자의 낙인', desc: '치명타 시 낙인 1스택 부여(스택당 무기 공격력 30%만큼 추가 피해), 5스택 도달 시 일반 몬스터 즉시 처형(보스 제외)',
+              grade: 5, crit: { chance: 0.12, mult: 1.9 }, stackMax: 5, stackDmg: 0.3 },
+  judgment: { name: '심판의 시간',  desc: '공격 시 치명타가 확정 발동. 다른 원천의 치명타 확률 중 35%만큼이 치명타 피해로 전환되어 낭비되지 않음. 10% 확률로 5초간 치명타 피해 2배 추가 버프 획득',
+              grade: 6, guaranteedCrit: true, crit: { mult: 1.6 }, overflowRatio: 0.35, buffProc: 0.10, buffDur: 5, buffMult: 2 },
+
+  // ===== 재화 & 드롭 계열 =====
+  fortune:   { name: '사냥의 감각', desc: '골드 획득 +20%, 아이템 드롭률 +15%', grade: 3, gold: 0.20, drop: 0.15 },
+  midtouch:  { name: '대박의 손',   desc: '골드 획득 +35%, 드롭률 +30%. 처치 시 1% 확률로 그 처치의 골드가 100배로 터지는 골드 잭팟',
+               grade: 4, gold: 0.35, drop: 0.30, jackpotProc: 0.01, jackpotMult: 100 },
+  richman:   { name: '재물의 화신', desc: '골드 획득 +50%, 드롭률 +50%. 처치할 때마다 재물 게이지가 쌓여 20회마다 확정으로 골드 대박 + 랜덤박스 지급',
+               grade: 5, gold: 0.5, drop: 0.5, gaugeMax: 20 },
+  midasWrath:{ name: '미다스의 진노', desc: '골드 획득 +80%, 드롭률 +60%. 온라인 상태(자동사냥 진행 중)일 때 보유 골드가 매초 아주 낮은 비율로 복리 증가',
+               grade: 6, gold: 0.80, drop: 0.60, interestRate: 0.000015 },
+
+  // ===== 연격 계열 =====
+  swift:  { name: '쾌속',         desc: '공격 시 10% 확률로 즉시 재공격', grade: 3, extra: 0.10 },
+  sprint: { name: '질주의 감각', desc: '공격 시 18% 확률로 즉시 재공격. 발동 시 3초간 공격속도 증가',
+            grade: 4, extra: 0.18, sprintBonus: 0.10, sprintDur: 3 },
+  frenzy: { name: '광란',        desc: '공격 시 25% 확률로 즉시 재공격. 발동할 때마다 공격속도 버프가 최대 5스택까지 쌓이며, 잠시 멈추면 스택이 서서히 감소 (온라인 중에만 유지)',
+            grade: 5, extra: 0.25, stackMax: 5, stackBonus: 0.05, decaySec: 5 },
+  moment: { name: '찰나',        desc: '공격 시 30% 확률로 즉시 재공격. 연타 발동 시 2% 확률로 3초간 공격속도가 크게 폭증하는 "찰나"가 함께 발동',
+            grade: 6, extra: 0.30, momentProc: 0.02, momentDur: 3, momentMult: 4 },
+
+  // ===== 공격속도 계열 (신규) =====
+  haste:      { name: '신속',       desc: '공격속도 +10%', grade: 3, speed: 0.10 },
+  accel:      { name: '가속 각인', desc: '공격속도 +18%. 몬스터를 처치할 때마다 공격속도 버프가 최대 5스택까지 쌓이며, 한동안 처치가 없으면 서서히 감소 (온라인 중에만 유지)',
+                grade: 4, speed: 0.18, stackMax: 5, stackBonus: 0.03, decaySec: 5 },
+  stormblade: { name: '폭풍의 검', desc: '공격속도 +15%. 공격속도가 빠를수록 치명타 확률도 함께 상승하는 시너지',
+                grade: 5, speed: 0.15, critFromSpeed: 0.05 },
+  infinite:   { name: '무한 속도', desc: '공격속도 +30%. 낮은 확률로 몇 초간 공격속도가 폭발적으로 치솟는 가속 폭주 발동',
+                grade: 6, speed: 0.30, burstProc: 0.03, burstDur: 4, burstMult: 3 },
+
+  // ===== 보스 피해 계열 (신규) =====
+  slayermark:   { name: '사냥꾼의 표식', desc: '보스에게 피해 +15%', grade: 3, bossDmg: 0.15 },
+  executioner:  { name: '처단자',        desc: '보스에게 피해 +30%. 보스전 시작 후 첫 타격은 무조건 치명타',
+                  grade: 4, bossDmg: 0.30, firstHitCrit: true },
+  dragonslayer: { name: '용살자의 서약', desc: '보스에게 피해 +100%. 보스 최대 체력의 0.5%만큼 매초 추가 고정 피해',
+                  grade: 5, bossDmg: 1.0, bossDotPct: 0.005 },
+  godslayer:    { name: '신살자',        desc: '보스에게 피해 +150%. 보스전 시작 시 보스 체력을 즉시 5% 삭감',
+                  grade: 6, bossDmg: 1.5, openBurstPct: 0.05 },
+};
+// 전투 중 임시 상태(스택/게이지/버프 타이머) — 저장하지 않는 휘발성 상태.
+// 몬스터가 즉시 리스폰되는 구조라 "대상"이 아니라 "전투 흐름" 기준으로 유지된다.
+const fx = {
+  stigma: 0,            // 처형자의 낙인 누적 스택
+  judgmentUntil: 0,      // 심판의 시간: 치명타 피해 2배 버프 만료 시각
+  gilt: 0,               // 재물의 화신 게이지
+  sprintUntil: 0,        // 질주의 감각 버프 만료 시각
+  frenzyStacks: 0, frenzyLast: 0,   // 광란 스택 + 마지막 발동 시각
+  accelStacks: 0, accelLast: 0,     // 가속 각인 스택 + 마지막 발동 시각
+  momentUntil: 0,        // 찰나 버프 만료 시각
+  infiniteUntil: 0,      // 가속 폭주 버프 만료 시각
+  executionerReady: false, // 처단자: 보스전 첫 타격 확정 치명타 대기 중
 };
 
 // ---------- 강화 설정 (최대 +30, "운빨강화"의 핵심 — 진짜 도박) ----------
@@ -1028,7 +1072,18 @@ function gradeAdjustedSuccess(grade, enhance) {
 }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
-  return t.speed * (1 + accEff().speed + typeTrait(w, 'speedBonus')) * (1 + weaponRuneStat(w, 'atkSpeed') / 100);
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const effSpeed = e && e.speed ? e.speed : 0;
+  // 공격속도 계열 효과의 임시 스택/버프 (해당 효과를 장착 중일 때만 적용)
+  const now = Date.now();
+  let stackBonus = 0;
+  if (w && w.effect === 'accel') stackBonus += fx.accelStacks * (e.stackBonus || 0);
+  if (w && w.effect === 'frenzy') stackBonus += fx.frenzyStacks * (e.stackBonus || 0);
+  if (w && w.effect === 'sprint' && now < fx.sprintUntil) stackBonus += e.sprintBonus || 0;
+  let burstMult = 1;
+  if (w && w.effect === 'moment' && now < fx.momentUntil) burstMult *= (e.momentMult || 1);
+  if (w && w.effect === 'infinite' && now < fx.infiniteUntil) burstMult *= (e.burstMult || 1);
+  return t.speed * (1 + accEff().speed + typeTrait(w, 'speedBonus') + effSpeed + stackBonus) * (1 + weaponRuneStat(w, 'atkSpeed') / 100) * burstMult;
 }
 
 /* ===================== 룬 ===================== */
@@ -1352,8 +1407,27 @@ function dropRoll() {
       floatText('💰 골드 러시!');
     }
   }
+  // 대박의 손(레전더리 재화): 처치마다 낮은 확률로 골드 잭팟
+  let jackpot = false;
+  if (w && w.effect === 'midtouch' && Math.random() < (e.jackpotProc || 0)) {
+    gold *= (e.jackpotMult || 1);
+    jackpot = true;
+    floatText('💰 골드 잭팟!');
+  }
+  // 재물의 화신(신화 재화): 처치 게이지가 가득 차면 확정 대박 + 랜덤박스
+  if (w && w.effect === 'richman') {
+    fx.gilt = (fx.gilt || 0) + 1;
+    if (fx.gilt >= (e.gaugeMax || 20)) {
+      fx.gilt = 0;
+      const bonusGold = Math.floor(floorGold(S.floor) * 20);
+      S.gold += bonusGold;
+      const tier = S.floor >= 12 ? 2 : S.floor >= 6 ? 1 : 0;
+      giveBox(tier, '재물의 화신 게이지');
+      log(`💰✨ <b>재물의 화신</b> 게이지가 가득 찼습니다! +${fmt(bonusGold)} 골드 + 랜덤박스 지급!`, 'lg-prim');
+    }
+  }
   S.gold += gold;
-  log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}`);
+  log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}${jackpot ? ' <span class="lg-prim">(골드 잭팟!)</span>' : ''}`);
 
   // 재료 드롭 (항상 1~2개)
   dropMaterials(isU, luck);
@@ -1546,6 +1620,26 @@ function addWeapon(w) {
   if (WEAPON_TYPES.every(t => S.weapons.some(x => x.type === t.name))) unlockEgg('collector');
 }
 
+// 몬스터가 죽었을 때 공통 처리(연출 + 보스/일반 분기). 'boss'를 반환하면 호출부는
+// 그 즉시 tick()을 종료해야 한다(보스전은 별도 흐름이라 남은 틱을 이어갈 수 없음).
+function handleKill() {
+  $('monemoji').classList.add('flash');
+  setTimeout(() => $('monemoji').classList.remove('flash'), 400);
+  if (bossFight.active) {
+    endBossFight(true);
+    return 'boss';
+  }
+  dropRoll();
+  // 가속 각인(레전더리 공격속도): 몬스터를 처치할 때마다 공속 버프 스택 적립
+  const w = getEquipped();
+  if (w && w.effect === 'accel') {
+    fx.accelStacks = Math.min(EFFECTS.accel.stackMax || 5, (fx.accelStacks || 0) + 1);
+    fx.accelLast = Date.now();
+  }
+  spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
+  return 'normal';
+}
+
 /* ===================== 게임 루프 ===================== */
 function tick(dt) {
   // 보스전 진행 중: 타이머 감소
@@ -1556,23 +1650,51 @@ function tick(dt) {
   }
   const w = getEquipped();
   if (!w) return;
-  mon.atkTimer += dt * weaponSpeed(w);
   let attacked = false;
   let killedAny = false;
+  const e0 = w.effect ? EFFECTS[w.effect] : null;
+  // 미다스의 진노(태초 재화): "온라인"(게임 루프가 도는 동안)에만 보유 골드가 매초 복리로 증가.
+  // 복리 폭주를 막기 위해 비율은 아주 낮게(초당 0.0015%) 잡혀 있음 — 튜닝 대상.
+  if (e0 && e0.interestRate) {
+    // 매 틱(0.1초)마다 소수점 단위의 아주 작은 골드가 붙기 때문에 여기서 floor하면
+    // 안 된다(반올림 손실로 사실상 이자가 거의 발동하지 않게 됨) — 표시는 fmt()가 처리.
+    S.gold *= (1 + e0.interestRate * dt);
+  }
+  // 광란/가속 각인: 일정 시간(decaySec) 발동이 없으면 스택이 서서히 감소 (온라인 중에만 진행)
+  const nowDecay = Date.now();
+  if (fx.frenzyStacks > 0 && nowDecay - fx.frenzyLast > (EFFECTS.frenzy.decaySec || 5) * 1000) {
+    fx.frenzyStacks--; fx.frenzyLast = nowDecay;
+  }
+  if (fx.accelStacks > 0 && nowDecay - fx.accelLast > (EFFECTS.accel.decaySec || 5) * 1000) {
+    fx.accelStacks--; fx.accelLast = nowDecay;
+  }
+  // 출혈(레전더리 치명타) 지속 피해 처리
+  if (fx.bleeds && fx.bleeds.length) {
+    for (const b of fx.bleeds) { mon.hp -= b.dmgPerSec * dt; b.remain -= dt; }
+    fx.bleeds = fx.bleeds.filter(b => b.remain > 0);
+    attacked = true;
+    if (mon.hp <= 0) {
+      if (handleKill() === 'boss') return;
+      killedAny = true;
+    }
+  }
+  // 용살자의 서약(신화 보스): 보스전 중 보스 최대체력 비례 고정 피해(도트)
+  if (bossFight.active && w.effect === 'dragonslayer') {
+    mon.hp -= mon.maxHp * (EFFECTS.dragonslayer.bossDotPct || 0) * dt;
+    attacked = true;
+    if (mon.hp <= 0) {
+      if (handleKill() === 'boss') return;
+      killedAny = true;
+    }
+  }
+  mon.atkTimer += dt * weaponSpeed(w);
   while (mon.atkTimer >= 1) {
     mon.atkTimer -= 1;
     attack(w);
     attacked = true;
     if (mon.hp <= 0) {
-      $('monemoji').classList.add('flash');
-      setTimeout(() => $('monemoji').classList.remove('flash'), 400);
-      if (bossFight.active) {
-        endBossFight(true);
-        return; // 보스전 종료 — 남은 공격 타이머는 다음 틱의 일반 사냥에서 사용됨
-      }
+      if (handleKill() === 'boss') return; // 보스전 종료 — 남은 공격 타이머는 다음 틱의 일반 사냥에서 사용됨
       killedAny = true;
-      dropRoll();
-      spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
     }
   }
   if (attacked) {
@@ -1599,13 +1721,46 @@ function attack(w) {
   // 치명타 확률/배율 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
   // (발동 알림은 화면 텍스트로만)
   const ae2 = accEff();
-  const critChance = Math.min(DMG_CAPS.critChance,
-    (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance);
-  const critMult = Math.min(DMG_CAPS.critMult,
+  const now = Date.now();
+  // 폭풍의 검(신화 공격속도): 공격속도가 빠를수록 치명타 확률도 함께 상승
+  const stormBonus = (w.effect === 'stormblade') ? weaponSpeed(w) * (e.critFromSpeed || 0) : 0;
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus;
+  const guaranteedCrit = !!(e && e.guaranteedCrit);
+  const critChance = guaranteedCrit ? 1 : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
+  let critMult = Math.min(DMG_CAPS.critMult,
     (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage);
-  if (critChance > 0 && Math.random() < critChance) {
+  // 심판의 시간(태초 치명타): 확정 치명타라 못 쓰는 "다른 원천" 치명타 확률의 일부를 치명타 피해로 전환
+  if (guaranteedCrit) critMult += otherCritChance * (e.overflowRatio || 0);
+  // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
+  const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
+  if (forceCrit) fx.executionerReady = false;
+  let didCrit = false;
+  if (forceCrit || (critChance > 0 && Math.random() < critChance)) {
     dmg *= critMult;
+    didCrit = true;
     floatText('💥 치명타!');
+  }
+  if (didCrit && w.effect === 'bloodrend' && Math.random() < (e.bleedProc || 0)) {
+    fx.bleeds = fx.bleeds || [];
+    fx.bleeds.push({ dmgPerSec: weaponAtk(w) * (e.bleedDmg || 0), remain: e.bleedDur || 5 });
+    floatText('🩸 출혈!');
+  }
+  if (didCrit && w.effect === 'stigma') {
+    fx.stigma = (fx.stigma || 0) + 1;
+    mon.hp -= weaponAtk(w) * (e.stackDmg || 0) * fx.stigma;
+    if (fx.stigma >= (e.stackMax || 5)) {
+      fx.stigma = 0;
+      if (!bossFight.active) { mon.hp = 0; floatText('☠️ 처형!'); }
+    } else {
+      floatText(`🩸 낙인 x${fx.stigma}`);
+    }
+  }
+  if (didCrit && w.effect === 'judgment') {
+    if (now < fx.judgmentUntil) dmg *= (e.buffMult || 2);
+    if (Math.random() < (e.buffProc || 0)) {
+      fx.judgmentUntil = now + (e.buffDur || 5) * 1000;
+      floatText('⚖️ 심판의 가호!');
+    }
   }
   mon.hp -= dmg;
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
@@ -1621,6 +1776,17 @@ function attack(w) {
   if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= dmg;
     floatText('⚡ 연타!');
+    if (w.effect === 'sprint') fx.sprintUntil = now + (e.sprintDur || 3) * 1000;
+    if (w.effect === 'frenzy') { fx.frenzyStacks = Math.min(e.stackMax || 5, (fx.frenzyStacks || 0) + 1); fx.frenzyLast = now; }
+    if (w.effect === 'moment' && Math.random() < (e.momentProc || 0)) {
+      fx.momentUntil = now + (e.momentDur || 3) * 1000;
+      floatText('⏳ 찰나!');
+    }
+  }
+  // 무한 속도(태초 공격속도): 낮은 확률로 짧은 시간 가속 폭주
+  if (w.effect === 'infinite' && Math.random() < (e.burstProc || 0)) {
+    fx.infiniteUntil = now + (e.burstDur || 4) * 1000;
+    floatText('💨 가속 폭주!');
   }
   // 더블 스트라이크(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공할 때마다 이번 타격 피해를 한 번 더 적용
   for (let i = 0; i < weaponSpecialCount(w, 'doublestrike'); i++) {
@@ -1666,8 +1832,18 @@ function startBossFight() {
   mon.hp = mon.maxHp;
   mon.dead = false;
   mon.atkTimer = 0;
+  // 처단자(레전더리 보스): 보스전 시작 후 첫 타격 확정 치명타 대기
+  fx.executionerReady = true;
   const F = FLOORS[f];
   const b = F.boss;
+  // 신살자(태초 보스): 보스전 시작 즉시 보스 체력 고정 비율 삭감
+  const eq = getEquipped();
+  const eqEffect = eq && eq.effect ? EFFECTS[eq.effect] : null;
+  if (eqEffect && eqEffect.openBurstPct) {
+    const cut = Math.floor(mon.maxHp * eqEffect.openBurstPct);
+    mon.hp = Math.max(1, mon.hp - cut);
+    log(`⚔️ <b>신살자</b>의 일격! 보스 체력 ${fmt(cut)} 즉시 삭감!`, 'lg-prim');
+  }
   $('monemoji').textContent = b.emoji;
   $('monemoji').classList.add('boss-appear');
   $('monname').innerHTML = `<span class="grade-신화" style="font-size:19px">👑 ${b.name}</span> <span style="font-size:12px;color:#ff7cf0;">★ BOSS ★</span>`;

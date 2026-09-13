@@ -931,7 +931,7 @@ const BOSS_ACCS = [
 // 않고 "보유하는 순간부터" 항상 발동하는 진짜 컬렉션형 보상. 평범한 킬로는 사실상
 // 평생 못 볼 확률(1/100억)이고 엘리트/보스는 그보다 훨씬 유리함.
 // 하나씩 천천히 채워나가는 컨텐츠라 아직 비어있는 슬롯은 null로 둔다.
-const GENESIS_BASE_CHANCE = 1e-10; // 사냥터 몬스터 1마리당 기본 확률
+const GENESIS_BASE_CHANCE = 2e-9; // 사냥터 몬스터 1마리당 기본 확률 (기존 1e-10의 20배)
 const GENESIS_ELITE_MULT = 5;      // 엘리트(유니크) 몬스터는 5배
 const GENESIS_BOSS_MULT = 10;      // 보스 몬스터는 10배
 const GENESIS_ARTIFACTS = [
@@ -1000,7 +1000,7 @@ function rollGenesisArtifact(floorIdx, kindMult) {
 // 3개의 이름 변형을 가지며, 그 사냥터 몬스터의 "고대 조상"이 지녔을 위엄을 담아
 // 짓는다. 아직 설계되지 않은 사냥터는 null로 비워두고(태초처럼) 필요한 만큼
 // 순차적으로 채워나간다. 등급 자체는 GRADES[6]("고대")를 그대로 쓴다.
-const ANCIENT_BASE_CHANCE = 1e-8; // 사냥터 몬스터 1마리당 기본 확률
+const ANCIENT_BASE_CHANCE = 2e-7; // 사냥터 몬스터 1마리당 기본 확률 (기존 1e-8의 20배)
 const ANCIENT_ELITE_MULT = 5;
 const ANCIENT_BOSS_MULT = 10;
 // 사냥터 몬스터의 특성을 반영한 "에이션트 스피릿" — 고대 무기 전용 추가 효과.

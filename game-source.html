@@ -1300,7 +1300,8 @@ function spawnMonster() {
   mon.maxHp = floorHp(S.floor);
   mon.hp = mon.maxHp;
   mon.dead = false;
-  mon.atkTimer = 0;
+  // atkTimer는 초기화하지 않는다 — 처치 시 남은 공격 타이머(0~1 미만의 여분)가
+  // 다음 몬스터에게 그대로 이어져야 공격속도가 빠를수록 정확히 그만큼 더 많이 잡는다.
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -1544,36 +1545,31 @@ function tick(dt) {
     renderBossBtn();
     if (bossFight.timeLeft <= 0) { endBossFight(false); return; }
   }
-  if (mon.dead) {
-    mon.spawnTimer -= dt;
-    if (mon.spawnTimer <= 0) spawnMonster();
-    return;
-  }
   const w = getEquipped();
   if (!w) return;
   mon.atkTimer += dt * weaponSpeed(w);
   let attacked = false;
+  let killedAny = false;
   while (mon.atkTimer >= 1) {
     mon.atkTimer -= 1;
     attack(w);
     attacked = true;
-    if (mon.hp <= 0) break;
-  }
-  if (attacked) {
-    mon.hp = Math.max(0, mon.hp);
-    renderHP();
     if (mon.hp <= 0) {
-      mon.dead = true;
-      mon.spawnTimer = 0.35;
       $('monemoji').classList.add('flash');
       setTimeout(() => $('monemoji').classList.remove('flash'), 400);
       if (bossFight.active) {
         endBossFight(true);
-      } else {
-        dropRoll();
-        renderFloorUI();
+        return; // 보스전 종료 — 남은 공격 타이머는 다음 틱의 일반 사냥에서 사용됨
       }
+      killedAny = true;
+      dropRoll();
+      spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
     }
+  }
+  if (attacked) {
+    mon.hp = Math.max(0, mon.hp);
+    renderHP();
+    if (killedAny) renderFloorUI();
   }
 }
 
@@ -2842,16 +2838,20 @@ function init() {
 
     // 오프라인 사냥: 실제 장비 DPS 기반 (재료/드롭 제외, 최대 8시간, 효율 70%)
     const capped = Math.min(awaySec, 8 * 3600);
+    const w = getEquipped();
     const dps = playerDPS();
+    const speed = w ? weaponSpeed(w) : 0;
     const monHp = floorHp(S.floor);
-    if (dps <= 0) return;
-    const killSec = monHp / dps;             // 한 마리 잡는 데 걸리는 시간
+    if (dps <= 0 || speed <= 0) return;
+    // 온라인과 동일하게 몬스터 처치 속도는 "공격속도"를 넘을 수 없다(한 방에 죽어도 공격
+    // 자체는 공속만큼만 나감). 그래서 킬당 최소 시간은 1/공속 — 슬라임처럼 체력이 낮은
+    // 몬스터를 DPS/HP만으로 계산하면 실제로는 불가능한 처치 속도가 나오던 문제를 방지.
+    const killSec = Math.max(1 / speed, monHp / dps);
     const kills = Math.floor(capped / killSec);
     if (kills <= 0) {
       log(`🌙 자리를 비운 동안 사냥터 몬스터를 잡지 못했습니다. (장비를 더 강화하세요!)`);
       return;
     }
-    const w = getEquipped();
     const e = w && w.effect ? EFFECTS[w.effect] : null;
     const goldMul = (1 + accEff().gold) * (1 + (e && e.gold ? e.gold : 0));
     const gold = Math.floor(floorGold(S.floor) * goldMul * kills * 0.7); // 오프라인 효율 70%

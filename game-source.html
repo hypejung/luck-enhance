@@ -411,6 +411,9 @@
   <div id="logpanel"></div>
   <div id="savebar">
     <button id="saveBtn">💾 저장</button>
+    <button id="exportFileBtn">📁 파일로 저장</button>
+    <button id="importFileBtn">📂 파일 불러오기</button>
+    <input type="file" id="importFileInput" accept=".txt,.json" style="display:none">
     <button id="exportBtn">📤 저장코드 내보내기</button>
     <button id="importBtn">📥 저장코드 불러오기</button>
     <button id="resetBtn" class="danger">🗑 초기화</button>
@@ -1972,20 +1975,51 @@ function load() {
     return data;
   } catch (e) { return null; }
 }
+function saveCode() {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(S))));
+}
+function loadCode(code) {
+  const data = migrate(JSON.parse(decodeURIComponent(escape(atob(code.trim())))));
+  if (typeof data.gold !== 'number' || !Array.isArray(data.weapons)) throw 0;
+  S = data;
+  if (!getEquipped() && S.weapons.length) S.equipped = S.weapons[0].id;
+  save(); location.reload();
+}
 function exportSave() {
-  const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
-  prompt('아래 저장코드를 복사해서 보관하세요:', code);
+  const code = saveCode();
+  let copied = false;
+  try {
+    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(code); copied = true; }
+  } catch (e) {}
+  prompt(copied ? '저장코드가 클립보드에 복사되었습니다! (아래에서 다시 확인 가능)' : '아래 저장코드를 복사해서 보관하세요:', code);
 }
 function importSave() {
   const code = prompt('저장코드를 붙여넣으세요:');
   if (!code) return;
-  try {
-    const data = migrate(JSON.parse(decodeURIComponent(escape(atob(code.trim())))));
-    if (typeof data.gold !== 'number' || !Array.isArray(data.weapons)) throw 0;
-    S = data;
-    if (!getEquipped() && S.weapons.length) S.equipped = S.weapons[0].id;
-    save(); location.reload();
-  } catch (e) { alert('잘못된 저장코드입니다.'); }
+  try { loadCode(code); } catch (e) { alert('잘못된 저장코드입니다.'); }
+}
+// 파일로 저장/불러오기 — 긴 저장코드를 직접 복사/붙여넣기 하지 않아도 되는 더 간편한 방식
+function exportSaveFile() {
+  const blob = new Blob([saveCode()], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `운빨강화하기_save_${stamp}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  log('📁 저장 파일을 다운로드했습니다.', 'lg-good');
+}
+function importSaveFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { loadCode(reader.result); } catch (e) { alert('잘못된 저장 파일입니다.'); }
+  };
+  reader.onerror = () => alert('파일을 읽는 중 오류가 발생했습니다.');
+  reader.readAsText(file);
 }
 
 /* ===================== 렌더 ===================== */
@@ -2724,6 +2758,13 @@ function init() {
   $('saveBtn').onclick = () => { save(); log('💾 저장 완료!', 'lg-good'); };
   $('exportBtn').onclick = exportSave;
   $('importBtn').onclick = importSave;
+  $('exportFileBtn').onclick = exportSaveFile;
+  $('importFileBtn').onclick = () => $('importFileInput').click();
+  $('importFileInput').onchange = (e) => {
+    const file = e.target.files[0];
+    if (file) importSaveFile(file);
+    e.target.value = '';
+  };
   $('resetBtn').onclick = () => {
     if (confirm('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?')) {
       resetting = true;  // 언로드 핸들러가 재저장하는 것을 차단

@@ -1152,7 +1152,7 @@ const TRAINING = {
   bossDmg:    { name: '살육 훈련', desc: '보스 피해량 +1.2%/레벨',   perLevel: 0.012,  baseCost: 170, costExp: 1.32 },
 };
 const TRAINING_TIER_STEP = 10;     // 이 레벨 단위마다 비용이 큰 폭으로 튐
-const TRAINING_TIER_JUMP = 150;    // 티어 하나 오를 때마다 비용 배수 (10레벨마다 ×150, 기존보다 강화)
+const TRAINING_TIER_JUMP = 45;     // 티어 하나 오를 때마다 비용 배수 (10레벨마다 ×45 — 기존 ×150은 10대->20대 전환이 너무 가팔라서 완화)
 function trainingLevel(key) { return (S && S.training && S.training[key]) || 0; }
 function trainingCost(key) {
   const t = TRAINING[key];

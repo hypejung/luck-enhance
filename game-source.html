@@ -282,6 +282,7 @@
     <div class="tab" data-tab="gamble">🎲 도박장</div>
     <div class="tab" data-tab="codex">📖 도감</div>
     <div class="tab" data-tab="blacksmith">🔨 대장장이</div>
+    <div class="tab" data-tab="raid">🚩 토벌전</div>
   </div>
 
   <!-- 사냥터 -->
@@ -484,6 +485,30 @@
         나온 사냥터의 최고 등급 재료를 모아오면 이곳에서 <b style="color:var(--ancient)">+0 상태로 복구</b>할 수 있습니다.
       </div>
       <div id="blacksmithList"></div>
+    </div>
+    <div class="panel">
+      <h3>⚒️ 무기 각인</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        <b style="color:var(--unique)">+15 이상</b> 강화한 무기에 각인을 부여하면 2줄의 옵션이 생깁니다.
+        "각인 재설정"은 🎫 <b>토벌의 증표</b>와 골드를 소모하며, 두 줄의 효과를 다시 뽑거나(대부분)
+        드물게 각인 등급 자체가 승급합니다. 같은 등급에서 "효과 변경"이 일정 횟수 쌓이면 다음 재설정은
+        무조건 등급이 승급합니다. 무기가 파괴되면 각인도 함께 사라집니다.
+      </div>
+      <div id="enchantBox"></div>
+    </div>
+  </div>
+
+  <!-- 토벌전 -->
+  <div id="tab-raid" style="display:none">
+    <div class="panel">
+      <h3>🚩 토벌전</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        고대의 존재가 사냥터마다 뒤틀린 몬스터를 소환했습니다. 2분 안에 처치하세요 — "보스" 취급이라
+        보스 피해량 보정과 보스 전용 효과가 그대로 적용됩니다. 사냥터별로 하루 1회, 전체 합산 하루
+        <b style="color:var(--unique)">3회</b>까지만 도전할 수 있고, <b style="color:#ff7a7a">도전을 시작하면 승패와 무관하게 그 횟수가 소모</b>됩니다.
+      </div>
+      <div id="raidStatus" style="margin-bottom:10px;"></div>
+      <div id="raidList"></div>
     </div>
   </div>
 
@@ -1082,6 +1107,62 @@ const BOSS = {
   // (장착 무기의 실질 공속 × 3600초 × 층 처치골드), 골드 보너스 배율도 동일하게 적용.
   // 자세한 산출 근거는 endBossFight()의 winGold 계산부 참고.
 };
+
+// ---------- 토벌전 (일일 콘텐츠) ----------
+// 각 사냥터에 "고대의 존재"가 나타나 그 사냥터의 몬스터를 뒤틀어 소환한 존재. 기존
+// 사냥터 보스와는 별개의 20단계 챌린지이며, "보스" 취급으로 bossFight 상태를 그대로
+// 재사용해서 보스 데미지 보정/보스 전용 스피릿 등이 자동으로 적용되게 한다.
+const RAID = {
+  timeLimit: 120,       // 2분 제한
+  baseHp: 1e9,          // 1단계 기준 체력(신화+17 기본형 무기 DPS×120초 근사치)
+  hpGrowth: 1.5,        // 단계당 체력 성장 배율
+  baseGoldMult: 4,      // 1단계 골드 보상 = 20단계 사냥터 보스 골드 계산식 × 4
+  goldGrowth: 1.5,      // 단계당 골드 보상 성장 배율
+  dailyTotal: 3,        // 하루 총 도전 가능 횟수(전체 단계 합산)
+};
+const RAID_MONSTERS = [
+  { name: '잠식하는 태고의 슬라임핵', emoji: '🟢', flavor: '순수했던 슬라임의 핵을 부식시켜 거대화시킨 고대의 화신.' },
+  { name: '천 마리를 삼킨 흡혈 군주', emoji: '🦇', flavor: '무수한 박쥐의 피를 흡수해 하나로 뭉친 고대의 존재.' },
+  { name: '포자의 어머니, 태고의 곰팡이', emoji: '🍄', flavor: '숲 전체를 뒤덮을 포자를 품은 거대 균사체.' },
+  { name: '천 걸음의 태초 늑대왕', emoji: '🐺', flavor: '지치지 않고 영원히 질주하는 고대의 짐승.' },
+  { name: '만 개의 손을 가진 도적왕', emoji: '👺', flavor: '훔친 모든 것을 삼켜 거대해진 고블린들의 집합체.' },
+  { name: '부서지지 않는 백골 성채', emoji: '💀', flavor: '아무리 부숴도 다시 일어서는, 무덤 전체가 하나가 된 존재.' },
+  { name: '멈추지 않는 분노의 화신', emoji: '👹', flavor: '끝나야 할 이유를 잊어버린, 영원히 끓어오르는 전투 본능.' },
+  { name: '만독의 여왕, 태고의 독', emoji: '🕷️', flavor: '한 방울씩 쌓여온 모든 독이 응축된 존재.' },
+  { name: '유적을 깨우는 진동의 파수꾼', emoji: '🗿', flavor: '땅 자체가 일어나 파수병이 된, 유적의 마지막 방어선.' },
+  { name: '심연의 진주를 품은 늪의 심장', emoji: '🦎', flavor: '늪 그 자체가 진주를 중심으로 응결되어 살아난 존재.' },
+  { name: '끝나지 않은 맹세의 기사단장', emoji: '☠️', flavor: '죽어서도 맹세를 저버리지 못한 기사들의 집념.' },
+  { name: '미로 그 자체가 된 광포한 뿔', emoji: '🐂', flavor: '길을 잃은 자를 삼키며 미로와 하나가 된 짐승.' },
+  { name: '봉인을 풀어버린 금서의 파편', emoji: '🧙', flavor: '탑의 모든 봉인을 스스로 해제해버린 걸어다니는 재앙.' },
+  { name: '폭풍을 가르는 태고의 활공자', emoji: '🐉', flavor: '하늘 그 자체를 찢으며 내려오는, 바람보다 빠른 재앙.' },
+  { name: '만 명의 영혼을 삼킨 리치 대군주', emoji: '🧟', flavor: '죽음의 땅에서 거둔 모든 영혼을 흡수해 다시 태어난 존재.' },
+  { name: '타락을 유산으로 남긴 파계 전사', emoji: '😈', flavor: '파괴될수록 오히려 강해지는 악마의 잔재.' },
+  { name: '대지를 짓밟는 무한 진군', emoji: '🦣', flavor: '멈춤을 모르는 압도적인 재앙, 걸음마다 사냥터가 흔들린다.' },
+  { name: '천 개의 눈을 뜬 심연의 포식자', emoji: '👁️', flavor: '눈을 감는 순간, 이미 그 앞에 와있는 존재.' },
+  { name: '위엄을 삼킨 태초의 화룡', emoji: '🐲', flavor: '모든 용의 위엄을 집어삼켜 스스로 신화가 된 존재.' },
+  { name: '몰락조차 초월한 태초의 잔영', emoji: '😇', flavor: '신이었던 것의, 신을 넘어선 마지막 잔영.' },
+];
+function todayKey() {
+  const d = new Date();
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+function raidEnsureDay() {
+  const today = todayKey();
+  if (S.raid.day !== today) { S.raid.day = today; S.raid.count = 0; S.raid.done = {}; }
+}
+function raidHp(stage) { return Math.round(RAID.baseHp * Math.pow(RAID.hpGrowth, stage)); }
+function raidTokenReward(stage) { return 5 + stage * 2; }
+function raidGoldReward(stage) {
+  const w = getEquipped();
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const ae = accEff();
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  goldMul *= Math.pow(1.2, weaponSpecialCount(w, 'omnirune'));
+  if (hasGenesis('gluttony')) goldMul *= 10;
+  const killsPerHour = weaponSpeed(w) * 3600;
+  const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
+  return Math.floor(base * Math.pow(RAID.goldGrowth, stage));
+}
 
 // 신화 등급 무기 특수 효과는 EFFECTS에 통합 (grade: 5)
 
@@ -1717,6 +1798,8 @@ function newState() {
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
     blacksmithTraces: [], // 파괴된 고대 무기의 흔적: [{ id, ancientFloor, nameVariant, type, icon, spirit, effect, name }]
     destroyProtect: false, // 파괴방지 on/off (+15 이상, 비용 = 강화비용×5)
+    raidTokens: 0,     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
+    raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
   };
 }
 
@@ -1929,6 +2012,14 @@ function accEff() {
   // 도감 컬렉션 보너스(쌍/타입 풀세트/사냥터 풀세트) — 등록 현황에 따라 항상 자동 적용
   const cbe = codexBonusEff();
   for (const k of Object.keys(cbe)) eff[k] = (eff[k] || 0) + cbe[k];
+  // 무기 각인: 장착 무기에 새겨진 각인 2줄의 효과 합산 (파괴되면 함께 사라짐)
+  const enchantW = S && getEquipped();
+  if (enchantW && enchantW.enchant) {
+    for (const line of enchantW.enchant.lines) {
+      const opt = ENCHANT_OPTIONS[line.key];
+      if (opt) eff[opt.stat] += line.value / 100;
+    }
+  }
   return eff;
 }
 // 세트 효과가 발동하는 사냥터 (장착한 보스무기와 같은 사냥터의 보스장신구를 보유 중이면)
@@ -2638,7 +2729,7 @@ function attack(w) {
 }
 
 /* ===================== 보스 전투 ===================== */
-const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0 };
+const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0 };
 
 // 보스 데미지 보너스: 세트 효과(+30%) + 용살자의 서약(+100%)
 function bossDmgBonus() {
@@ -2694,9 +2785,63 @@ function startBossFight() {
   renderBossBtn(); renderHP();
 }
 
+function startRaidFight(stage) {
+  if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
+  if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
+  raidEnsureDay();
+  if (stage >= S.unlocked) { log('아직 해금되지 않은 사냥터의 토벌전입니다.', 'lg-bad'); return; }
+  if (S.raid.done[stage]) { log('이 단계 토벌전은 오늘 이미 도전했습니다.', 'lg-bad'); return; }
+  if (S.raid.count >= RAID.dailyTotal) { log(`오늘 토벌전 도전 횟수를 모두 사용했습니다. (일일 ${RAID.dailyTotal}회)`, 'lg-bad'); return; }
+  // 도전 시작 시점에 즉시 소모(승패 무관 — "도전"에 초점)
+  S.raid.done[stage] = S.raid.day;
+  S.raid.count++;
+  bossFight.active = true;
+  bossFight.isRaid = true;
+  bossFight.raidStage = stage;
+  bossFight.floor = stage;
+  bossFight.timeLeft = RAID.timeLimit + weaponBossTimeBonus(getEquipped());
+  mon.unique = false;
+  mon.maxHp = raidHp(stage);
+  mon.hp = mon.maxHp;
+  mon.dead = false;
+  mon.atkTimer = 0;
+  // 처단자(레전더리 보스 효과): 토벌전도 보스 취급이므로 동일하게 첫 타격 확정 치명타 대기
+  fx.executionerReady = true;
+  const rm = RAID_MONSTERS[stage];
+  $('monemoji').textContent = rm.emoji;
+  $('monemoji').classList.add('boss-appear');
+  $('monname').innerHTML = `<span class="grade-고대" style="font-size:19px">${rm.emoji} ${rm.name}</span> <span style="font-size:12px;color:#ff7cf0;">★ 토벌전 ★</span>`;
+  $('floortitle').innerHTML = `🚩 <span class="grade-고대">토벌전 — ${rm.name}</span>`;
+  log(`🚩 <b>토벌전 시작!</b> <span class="grade-고대">${rm.name}</span> — 2분 안에 처치하세요! (HP: ${fmt(mon.maxHp)})`, 'lg-prim');
+  setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
+  $('monemoji').classList.add('boss-glow');
+  switchTab('hunt');
+  renderBossBtn(); renderHP(); renderRaidTab(); save();
+}
+
+function endRaidFight(win) {
+  const stage = bossFight.raidStage;
+  const rm = RAID_MONSTERS[stage];
+  bossFight.isRaid = false;
+  if (win) {
+    const tokens = raidTokenReward(stage);
+    const gold = raidGoldReward(stage);
+    S.gold += gold;
+    S.raidTokens += tokens;
+    log(`🏆 <b>토벌전 승리!</b> <span class="grade-고대">${rm.name}</span> 격파! +${fmt(gold)} 골드, 🎫 토벌의 증표 +${tokens}개`, 'lg-prim');
+    $('monemoji').classList.add('boss-appear');
+    setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
+  } else {
+    log(`⏰ 토벌전 실패... <span class="grade-고대">${rm.name}</span>에게 패배했습니다. (오늘 이 단계는 재도전 불가)`, 'lg-bad');
+  }
+  spawnMonster();
+  renderBossBtn(); renderTop(); renderRaidTab(); save();
+}
+
 function endBossFight(win) {
   bossFight.active = false;
   $('monemoji').classList.remove('boss-glow');
+  if (bossFight.isRaid) { endRaidFight(win); return; }
   const f = bossFight.floor;
   const F = FLOORS[f];
   if (win) {
@@ -2759,7 +2904,9 @@ function renderBossBtn() {
   const flee = $('bossFleeBtn');
   if (!el) return;
   if (bossFight.active) {
-    el.textContent = `⏱ 보스전 진행중... ${Math.ceil(bossFight.timeLeft)}초`;
+    el.textContent = bossFight.isRaid
+      ? `⏱ 토벌전 진행중... ${Math.ceil(bossFight.timeLeft)}초`
+      : `⏱ 보스전 진행중... ${Math.ceil(bossFight.timeLeft)}초`;
     el.disabled = true;
     if (flee) flee.style.display = '';
     return;
@@ -2777,11 +2924,14 @@ function renderBossBtn() {
   }
 }
 
-// 보스 포기: 패배 처리와 동일 (쿨타임 없음)
+// 보스 포기: 패배 처리와 동일 (쿨타임 없음). 토벌전은 이미 도전 횟수가 소모된 상태라 경고만 다르게.
 function fleeBoss() {
   if (!bossFight.active) return;
-  if (!confirm('보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)')) return;
-  log('🏳️ 보스전을 포기했습니다.', 'lg-bad');
+  const msg = bossFight.isRaid
+    ? '토벌전을 포기하시겠습니까? (이미 소모된 오늘의 도전 횟수는 돌아오지 않습니다)'
+    : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
+  if (!confirm(msg)) return;
+  log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');
   endBossFight(false);
 }
 
@@ -2796,6 +2946,151 @@ function toggleDestroyProtect() {
   S.destroyProtect = !S.destroyProtect;
   log(`🛡️ 파괴방지 ${S.destroyProtect ? 'ON' : 'OFF'}`, 'lg-prim');
   renderEnhance(); save();
+}
+
+// ---------- 무기 각인 (메이플스토리 잠재능력 스타일) ----------
+// +15 이상 무기부터 대장장이에서 부여 가능. 항상 2줄(윗줄/아랫줄)이며, "레어" 등급에서
+// 시작해서 "각인 재설정"으로 효과를 다시 뽑거나(대부분) 드물게 등급이 승급한다.
+// 에픽 이상부터는 윗줄=현재 등급, 아랫줄=한 단계 낮은 등급(드물게 "이탈"로 윗줄과 동급)이 된다.
+const ENCHANT_MIN_ENHANCE = 15;
+const ENCHANT_MAX_GRADE = 5; // 신화가 최대
+const ENCHANT_DEVIATION_CHANCE = 0.05; // 이탈 확률
+// 등급(현재) -> 다음 등급 승급까지 필요한 "효과 변경" 누적 횟수(천장)
+const ENCHANT_CEILING = { 1: 10, 2: 30, 3: 40, 4: 60 };
+const ENCHANT_TOKEN_COST = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 12 };
+function enchantGoldCost(grade) { return Math.round(runeBoxCost(grade) * 2); }
+// 옵션 종류(8종) — ranges[grade-1] = [최소, 최대] (모두 accEff()의 eff 필드에 %(fraction)로 합산됨)
+const ENCHANT_OPTIONS = {
+  atk:        { name: '공격력',      stat: 'atk',        unit: '%',  ranges: [[1, 3], [3, 6], [6, 10], [10, 16], [16, 24]] },
+  speed:      { name: '공격속도',    stat: 'speed',      unit: '%',  ranges: [[1, 3], [3, 6], [6, 10], [10, 16], [16, 24]] },
+  gold:       { name: '골드 획득',   stat: 'gold',       unit: '%',  ranges: [[2, 5], [5, 10], [10, 17], [17, 26], [26, 38]] },
+  luck:       { name: '드롭률',      stat: 'luck',       unit: '%',  ranges: [[2, 5], [5, 10], [10, 17], [17, 26], [26, 38]] },
+  bossDmg:    { name: '보스 피해량', stat: 'bossDmg',     unit: '%',  ranges: [[2, 5], [5, 10], [10, 17], [17, 26], [26, 38]] },
+  critChance: { name: '치명타 확률', stat: 'critChance',  unit: '%p', ranges: [[0.5, 1.5], [1.5, 3], [3, 5], [5, 8], [8, 12]] },
+  critDamage: { name: '치명타 피해', stat: 'critDamage',  unit: '%p', ranges: [[2, 5], [5, 10], [10, 17], [17, 26], [26, 38]] },
+  extraAtk:   { name: '연타 확률',   stat: 'extraAtk',    unit: '%p', ranges: [[0.5, 1.5], [1.5, 3], [3, 5], [5, 8], [8, 12]] },
+};
+const ENCHANT_OPTION_KEYS = Object.keys(ENCHANT_OPTIONS);
+// 등급 내에서 최댓값에 가까울수록 확률이 낮아지도록 저치 편향 분포로 값을 뽑는다.
+function rollEnchantLine(grade) {
+  const key = ENCHANT_OPTION_KEYS[Math.floor(Math.random() * ENCHANT_OPTION_KEYS.length)];
+  const [min, max] = ENCHANT_OPTIONS[key].ranges[grade - 1];
+  const t = Math.pow(Math.random(), 2);
+  const value = Math.round((min + (max - min) * t) * 10) / 10;
+  return { key, grade, value };
+}
+function rollEnchantLines(grade) {
+  if (grade <= 1) return [rollEnchantLine(grade), rollEnchantLine(grade)];
+  const top = rollEnchantLine(grade);
+  const isDeviation = Math.random() < ENCHANT_DEVIATION_CHANCE;
+  const bottom = rollEnchantLine(isDeviation ? grade : grade - 1);
+  return [top, bottom];
+}
+function enchantLineText(line) {
+  const opt = ENCHANT_OPTIONS[line.key];
+  return `<span class="grade-${GRADES[line.grade].name}">[${GRADES[line.grade].name}]</span> ${opt.name} +${line.value}${opt.unit}`;
+}
+function grantEnchant(w) {
+  if (!w || isFist(w)) { log('맨손에는 각인을 부여할 수 없습니다.', 'lg-bad'); return; }
+  if (w.enhance < ENCHANT_MIN_ENHANCE) { log(`각인은 +${ENCHANT_MIN_ENHANCE} 이상 무기부터 부여할 수 있습니다.`, 'lg-bad'); return; }
+  if (w.enchant) { log('이미 각인이 부여된 무기입니다.', 'lg-bad'); return; }
+  const tokenCost = ENCHANT_TOKEN_COST[1];
+  const goldCost = enchantGoldCost(1);
+  if ((S.raidTokens || 0) < tokenCost) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
+  if (S.gold < goldCost) { log(`골드가 부족합니다 (${fmt(goldCost)} 필요)`, 'lg-bad'); return; }
+  S.raidTokens -= tokenCost;
+  S.gold -= goldCost;
+  w.enchant = { grade: 1, lines: rollEnchantLines(1), pity: 0 };
+  log(`⚒️ <b>각인 부여!</b> ${gradeTag(w)}에 <span class="grade-레어">레어</span> 각인이 새겨졌습니다.`, 'lg-prim');
+  renderBlacksmith(); renderTop(); save();
+}
+function resetEnchant(w) {
+  if (!w || !w.enchant) return;
+  const grade = w.enchant.grade;
+  const tokenCost = ENCHANT_TOKEN_COST[grade];
+  const goldCost = enchantGoldCost(grade);
+  if ((S.raidTokens || 0) < tokenCost) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
+  if (S.gold < goldCost) { log(`골드가 부족합니다 (${fmt(goldCost)} 필요)`, 'lg-bad'); return; }
+  S.raidTokens -= tokenCost;
+  S.gold -= goldCost;
+  const ceiling = ENCHANT_CEILING[grade];
+  if (grade < ENCHANT_MAX_GRADE && ceiling != null && w.enchant.pity + 1 >= ceiling) {
+    w.enchant.grade = grade + 1;
+    w.enchant.pity = 0;
+    w.enchant.lines = rollEnchantLines(w.enchant.grade);
+    log(`✨ <b>각인 등급 승급!</b> ${gradeTag(w)}의 각인이 <span class="grade-${GRADES[w.enchant.grade].name}">${GRADES[w.enchant.grade].name}</span> 등급이 되었습니다!`, 'lg-prim');
+  } else {
+    w.enchant.pity++;
+    w.enchant.lines = rollEnchantLines(grade);
+    const need = grade < ENCHANT_MAX_GRADE ? ceiling : null;
+    log(`⚒️ 각인 재설정: 효과가 변경되었습니다.${need ? ` (${w.enchant.pity}/${need})` : ''}`, 'lg-good');
+  }
+  renderBlacksmith(); renderTop(); save();
+}
+function renderEnchantBox() {
+  const box = $('enchantBox');
+  if (!box) return;
+  const w = getEquipped();
+  if (!w || isFist(w)) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">장착된 무기가 없습니다.</div>'; return; }
+  if (w.enhance < ENCHANT_MIN_ENHANCE) {
+    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">각인은 <b style="color:var(--unique)">+${ENCHANT_MIN_ENHANCE}</b> 이상 강화한 무기부터 부여할 수 있습니다. (현재 ${gradeTag(w)})</div>`;
+    return;
+  }
+  if (!w.enchant) {
+    const tokenCost = ENCHANT_TOKEN_COST[1];
+    const goldCost = enchantGoldCost(1);
+    box.innerHTML = `
+      <div style="font-size:13px;margin-bottom:8px;">${gradeTag(w)}에는 아직 각인이 없습니다.</div>
+      <button class="primary" id="grantEnchantBtn">각인부여 (🎫${tokenCost} + 💰${fmt(goldCost)})</button>`;
+    $('grantEnchantBtn').onclick = () => grantEnchant(w);
+    return;
+  }
+  const en = w.enchant;
+  const grade = en.grade;
+  const maxed = grade >= ENCHANT_MAX_GRADE;
+  const ceiling = ENCHANT_CEILING[grade];
+  const tokenCost = ENCHANT_TOKEN_COST[grade];
+  const goldCost = enchantGoldCost(grade);
+  const canAfford = (S.raidTokens || 0) >= tokenCost && S.gold >= goldCost;
+  box.innerHTML = `
+    <div style="font-size:13px;margin-bottom:6px;">${gradeTag(w)} — 각인 등급 <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span></div>
+    <div class="lg-prim" style="margin-bottom:2px;">윗줄: ${enchantLineText(en.lines[0])}</div>
+    <div class="lg-prim" style="margin-bottom:8px;">아랫줄: ${enchantLineText(en.lines[1])}</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">${maxed ? '최대 등급(신화)입니다.' : `다음 등급까지 효과 변경 ${en.pity}/${ceiling}회`} · 보유 🎫 ${fmt(S.raidTokens || 0)}</div>
+    <button class="primary" id="resetEnchantBtn" ${canAfford ? '' : 'disabled'}>각인 재설정 (🎫${tokenCost} + 💰${fmt(goldCost)})</button>`;
+  $('resetEnchantBtn').onclick = () => resetEnchant(w);
+}
+
+// ---------- 토벌전 UI ----------
+function renderRaidTab() {
+  raidEnsureDay();
+  const status = $('raidStatus');
+  if (status) {
+    status.innerHTML = `오늘 남은 도전 횟수: <b style="color:var(--unique)">${RAID.dailyTotal - S.raid.count}/${RAID.dailyTotal}</b> · 보유 🎫 토벌의 증표: <b style="color:var(--gold)">${fmt(S.raidTokens || 0)}</b>`;
+  }
+  const list = $('raidList');
+  if (!list) return;
+  list.innerHTML = '';
+  for (let stage = 0; stage < RAID_MONSTERS.length; stage++) {
+    const rm = RAID_MONSTERS[stage];
+    const locked = stage >= S.unlocked;
+    const usedToday = !!S.raid.done[stage];
+    const div = document.createElement('div');
+    div.className = 'invitem';
+    div.innerHTML = `
+      <div><div class="wn">${rm.emoji} <span class="grade-고대">${stage + 1}단계 — ${rm.name}</span></div>
+      <div class="wi" style="font-style:italic;">${rm.flavor}</div>
+      <div class="wi">HP ${fmt(raidHp(stage))} · 보상: 💰 ${fmt(raidGoldReward(stage))} + 🎫 ${raidTokenReward(stage)}개</div></div>
+      <div class="btns"></div>`;
+    const btn = document.createElement('button');
+    if (locked) { btn.textContent = '🔒 미해금'; btn.disabled = true; }
+    else if (usedToday) { btn.textContent = '오늘 도전 완료'; btn.disabled = true; }
+    else if (S.raid.count >= RAID.dailyTotal) { btn.textContent = '일일 횟수 소진'; btn.disabled = true; }
+    else if (bossFight.active) { btn.textContent = '전투 중'; btn.disabled = true; }
+    else { btn.textContent = '도전'; btn.className = 'primary'; btn.onclick = () => startRaidFight(stage); }
+    div.querySelector('.btns').appendChild(btn);
+    list.appendChild(div);
+  }
 }
 
 function tryEnhance() {
@@ -3090,6 +3385,7 @@ function renderCodexDetail(ent, key) {
 
 // 대장장이 탭 렌더링 — 파괴된 고대 무기의 흔적 목록 + 복구
 function renderBlacksmith() {
+  renderEnchantBox();
   const box = $('blacksmithList');
   if (!box) return;
   if (!S.blacksmithTraces.length) {
@@ -3134,6 +3430,9 @@ function migrate(d) {
     if (d[k] === undefined) d[k] = base[k];
   }
   if (typeof d.mats !== 'object' || d.mats === null || Array.isArray(d.mats)) d.mats = {};
+  if (!d.raid || typeof d.raid !== 'object') d.raid = { day: null, count: 0, done: {} };
+  if (typeof d.raid.done !== 'object' || d.raid.done === null) d.raid.done = {};
+  if (typeof d.raidTokens !== 'number') d.raidTokens = 0;
   if (!Array.isArray(d.accs)) d.accs = [];
   // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
@@ -3865,7 +4164,7 @@ function renderAll() {
 function switchTab(name) {
   currentTab = name;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'enhance') renderEnhance();
@@ -3877,6 +4176,7 @@ function switchTab(name) {
   if (name === 'gamble') renderGambleTables();
   if (name === 'codex') renderCodex();
   if (name === 'blacksmith') renderBlacksmith();
+  if (name === 'raid') renderRaidTab();
 }
 
 // 장신구 효과 설명 문자열

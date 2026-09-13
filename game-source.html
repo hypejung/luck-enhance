@@ -87,9 +87,9 @@
   .fbtn.on { border-color: var(--gold); color: var(--gold); background: #3d3d1f; }
   .fbtn.locked { opacity: .3; }
 
-  #monbox { text-align: center; padding: 10px 0; position: relative; }
-  #monemoji { font-size: 64px; line-height: 1.2; }
-  #monname { font-size: 18px; margin: 4px 0; }
+  #monbox, #raidMonBox, #punchMonBox { text-align: center; padding: 10px 0; position: relative; }
+  #monemoji, #raidMonEmoji, #punchMonEmoji { font-size: 64px; line-height: 1.2; }
+  #monname, #raidMonName, #punchMonName { font-size: 18px; margin: 4px 0; }
   .floatmsg {
     position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
     font-weight: bold; font-size: 15px; color: var(--unique);
@@ -101,16 +101,16 @@
     15%  { opacity: 1; transform: translate(-50%, -55%) scale(1.05); }
     100% { opacity: 0; transform: translate(-50%, -95%) scale(1); }
   }
-  #hpbarWrap {
+  #hpbarWrap, #raidHpBarWrap, #punchHpBarWrap {
     width: 100%; height: 22px; background: #333; border-radius: 11px;
     overflow: hidden; border: 1px solid var(--border); margin: 8px 0;
   }
-  #hpbar {
+  #hpbar, #raidHpBar, #punchHpBar {
     height: 100%; width: 100%;
     background: linear-gradient(90deg, #e04545, #ff7a5c);
     transition: width .1s;
   }
-  #hptext { font-size: 13px; color: var(--sub); }
+  #hptext, #raidHpText, #punchHpText { font-size: 13px; color: var(--sub); }
 
   #huntinfo { display: flex; justify-content: space-between; font-size: 13px; color: var(--sub); margin-top: 8px; flex-wrap: wrap; gap: 4px; }
   #dropinfo { font-size: 12px; color: var(--sub); margin-top: 6px; text-align: center; }
@@ -355,6 +355,16 @@
         피해량 보정·각종 특수효과 전부 포함)를 측정합니다. "보스" 취급이라 보스 피해량 보정이 반영되며,
         보상은 없고 기록만 남습니다. 하루 1회, 이월되지 않습니다.
       </div>
+      <div id="punchBattlePanel" style="display:none">
+        <div id="punchMonBox">
+          <div id="punchMonEmoji">🥊</div>
+          <div id="punchMonName"></div>
+          <div id="punchHpBarWrap"><div id="punchHpBar"></div></div>
+          <div id="punchHpText"></div>
+        </div>
+        <div id="punchTimer" style="text-align:center;font-weight:bold;margin:6px 0;"></div>
+        <button class="big danger" id="punchFleeBtn" style="width:100%;">🏳️ 측정 중단</button>
+      </div>
       <div id="punchBox"></div>
     </div>
     <div class="panel">
@@ -517,6 +527,16 @@
         <b style="color:var(--unique)">3회</b>까지만 도전할 수 있고, <b style="color:#ff7a7a">도전을 시작하면 승패와 무관하게 그 횟수가 소모</b>됩니다.
       </div>
       <div id="raidStatus" style="margin-bottom:10px;"></div>
+      <div id="raidBattlePanel" style="display:none">
+        <div id="raidMonBox">
+          <div id="raidMonEmoji">❓</div>
+          <div id="raidMonName"></div>
+          <div id="raidHpBarWrap"><div id="raidHpBar"></div></div>
+          <div id="raidHpText"></div>
+        </div>
+        <div id="raidTimer" style="text-align:center;font-weight:bold;margin:6px 0;"></div>
+        <button class="big danger" id="raidFleeBtn" style="width:100%;">🏳️ 토벌전 포기</button>
+      </div>
       <div id="raidList"></div>
     </div>
   </div>
@@ -1940,7 +1960,8 @@ function weaponBossTimeBonus(w) { return weaponSpecialCount(w, 'timedilation') *
 function weaponCooldownMult(w) { return Math.pow(RUNE_SPECIALS.bossrush.mult, weaponSpecialCount(w, 'bossrush')); }
 // 전투 화면에 잠깐 떠오르는 효과 발동 텍스트
 function floatText(msg) {
-  const host = $('monbox');
+  const hostId = bossFight.isRaid ? 'raidMonBox' : bossFight.isPunch ? 'punchMonBox' : 'monbox';
+  const host = $(hostId);
   if (!host) return;
   const el = document.createElement('div');
   el.className = 'floatmsg';
@@ -2473,8 +2494,9 @@ function addWeapon(w) {
 // 몬스터가 죽었을 때 공통 처리(연출 + 보스/일반 분기). 'boss'를 반환하면 호출부는
 // 그 즉시 tick()을 종료해야 한다(보스전은 별도 흐름이라 남은 틱을 이어갈 수 없음).
 function handleKill() {
-  $('monemoji').classList.add('flash');
-  setTimeout(() => $('monemoji').classList.remove('flash'), 400);
+  const flashId = bossFight.isRaid ? 'raidMonEmoji' : bossFight.isPunch ? 'punchMonEmoji' : 'monemoji';
+  const flashEl = $(flashId);
+  if (flashEl) { flashEl.classList.add('flash'); setTimeout(() => flashEl.classList.remove('flash'), 400); }
   if (bossFight.active) {
     endBossFight(true);
     return 'boss';
@@ -2514,6 +2536,8 @@ function tick(dt) {
   if (bossFight.active) {
     bossFight.timeLeft -= dt;
     renderBossBtn();
+    if (bossFight.isRaid) renderRaidBattleHP();
+    else if (bossFight.isPunch) renderPunchBattleHP();
     if (bossFight.timeLeft <= 0) { endBossFight(false); return; }
   }
   const w = getEquipped();
@@ -2757,6 +2781,7 @@ function bossDmgBonus() {
 }
 
 function startBossFight() {
+  if (bossFight.active) { log('이미 다른 전투가 진행 중입니다.', 'lg-bad'); return; }
   const f = S.floor;
   const cdEnd = S.bossCooldowns[f] || 0;
   if (Date.now() < cdEnd) {
@@ -2818,14 +2843,12 @@ function startRaidFight(stage) {
   // 처단자(레전더리 보스 효과): 토벌전도 보스 취급이므로 동일하게 첫 타격 확정 치명타 대기
   fx.executionerReady = true;
   const rm = RAID_MONSTERS[stage];
-  $('monemoji').textContent = rm.emoji;
-  $('monemoji').classList.add('boss-appear');
-  $('monname').innerHTML = `<span class="grade-고대" style="font-size:19px">${rm.emoji} ${rm.name}</span> <span style="font-size:12px;color:#ff7cf0;">★ 토벌전 ★</span>`;
-  $('floortitle').innerHTML = `🚩 <span class="grade-고대">토벌전 — ${rm.name}</span>`;
+  $('raidMonEmoji').textContent = rm.emoji;
+  $('raidMonEmoji').classList.add('boss-appear');
+  $('raidMonName').innerHTML = `<span class="grade-고대" style="font-size:19px">${rm.emoji} ${rm.name}</span> <span style="font-size:12px;color:#ff7cf0;">★ 토벌전 ★</span>`;
   log(`🚩 <b>토벌전 시작!</b> <span class="grade-고대">${rm.name}</span> — 2분 안에 처치하세요! (HP: ${fmt(mon.maxHp)})`, 'lg-prim');
-  setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
-  $('monemoji').classList.add('boss-glow');
-  switchTab('hunt');
+  setTimeout(() => $('raidMonEmoji').classList.remove('boss-appear'), 700);
+  $('raidMonEmoji').classList.add('boss-glow');
   renderBossBtn(); renderHP(); renderRaidTab(); save();
 }
 
@@ -2833,14 +2856,15 @@ function endRaidFight(win) {
   const stage = bossFight.raidStage;
   const rm = RAID_MONSTERS[stage];
   bossFight.isRaid = false;
+  $('raidMonEmoji').classList.remove('boss-glow');
   if (win) {
     const tokens = raidTokenReward(stage);
     const gold = raidGoldReward(stage);
     S.gold += gold;
     S.raidTokens += tokens;
     log(`🏆 <b>토벌전 승리!</b> <span class="grade-고대">${rm.name}</span> 격파! +${fmt(gold)} 골드, 🎫 토벌의 증표 +${tokens}개`, 'lg-prim');
-    $('monemoji').classList.add('boss-appear');
-    setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
+    $('raidMonEmoji').classList.add('boss-appear');
+    setTimeout(() => $('raidMonEmoji').classList.remove('boss-appear'), 700);
   } else {
     log(`⏰ 토벌전 실패... <span class="grade-고대">${rm.name}</span>에게 패배했습니다. (오늘 이 단계는 재도전 불가)`, 'lg-bad');
   }
@@ -2873,14 +2897,12 @@ function startPunchFight() {
   mon.dead = false;
   mon.atkTimer = 0;
   fx.executionerReady = true;
-  $('monemoji').textContent = '🥊';
-  $('monemoji').classList.add('boss-appear');
-  $('monname').innerHTML = `<span class="grade-고대" style="font-size:19px">🥊 펀치기계</span> <span style="font-size:12px;color:#ff7cf0;">★ 딜 측정 ★</span>`;
-  $('floortitle').innerHTML = `🥊 <span class="grade-고대">펀치기계 — 딜 측정 중</span>`;
+  $('punchMonEmoji').textContent = '🥊';
+  $('punchMonEmoji').classList.add('boss-appear');
+  $('punchMonName').innerHTML = `<span class="grade-고대" style="font-size:19px">🥊 펀치기계</span> <span style="font-size:12px;color:#ff7cf0;">★ 딜 측정 ★</span>`;
   log(`🥊 <b>펀치기계 가동!</b> ${PUNCH_TIME_LIMIT}초 동안 누적 데미지를 측정합니다.`, 'lg-prim');
-  setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
-  $('monemoji').classList.add('boss-glow');
-  switchTab('hunt');
+  setTimeout(() => $('punchMonEmoji').classList.remove('boss-appear'), 700);
+  $('punchMonEmoji').classList.add('boss-glow');
   renderBossBtn(); renderHP(); renderPunchBox(); save();
 }
 function endPunchFight() {
@@ -2888,14 +2910,23 @@ function endPunchFight() {
   const isRecord = dealt > S.punch.best;
   S.punch.last = dealt;
   if (isRecord) S.punch.best = dealt;
+  $('punchMonEmoji').classList.remove('boss-glow');
   log(`🥊 <b>펀치기계 측정 종료!</b> 누적 데미지: <b style="color:var(--gold)">${fmt(dealt)}</b>${isRecord ? ' <span class="lg-prim">🎉 최고 기록 경신!</span>' : ` (최고 기록: ${fmt(S.punch.best)})`}`, 'lg-prim');
   spawnMonster();
   renderBossBtn(); renderPunchBox(); save();
 }
 function renderPunchBox() {
+  const battlePanel = $('punchBattlePanel');
   const box = $('punchBox');
-  if (!box) return;
+  if (!box || !battlePanel) return;
   punchEnsureDay();
+  if (bossFight.active && bossFight.isPunch) {
+    battlePanel.style.display = '';
+    box.style.display = 'none';
+    return;
+  }
+  battlePanel.style.display = 'none';
+  box.style.display = '';
   const available = !S.punch.used && !bossFight.active;
   box.innerHTML = `
     <div style="font-size:13px;margin-bottom:8px;">최근 기록: <b>${fmt(S.punch.last)}</b> · 최고 기록: <b style="color:var(--gold)">${fmt(S.punch.best)}</b></div>
@@ -2972,11 +3003,14 @@ function renderBossBtn() {
   const flee = $('bossFleeBtn');
   if (!el) return;
   if (bossFight.active) {
-    el.textContent = bossFight.isRaid
-      ? `⏱ 토벌전 진행중... ${Math.ceil(bossFight.timeLeft)}초`
-      : bossFight.isPunch
-        ? `⏱ 펀치기계 측정중... ${Math.ceil(bossFight.timeLeft)}초`
-        : `⏱ 보스전 진행중... ${Math.ceil(bossFight.timeLeft)}초`;
+    if (bossFight.isRaid || bossFight.isPunch) {
+      // 토벌전/펀치기계는 각자 전용 탭에서 진행되므로, 사냥터 탭의 보스 버튼은 잠금만 표시
+      el.textContent = bossFight.isRaid ? '⏱ 토벌전이 진행 중입니다 (토벌전 탭 참고)' : '⏱ 펀치기계 측정 중입니다 (능력치 탭 참고)';
+      el.disabled = true;
+      if (flee) flee.style.display = 'none';
+      return;
+    }
+    el.textContent = `⏱ 보스전 진행중... ${Math.ceil(bossFight.timeLeft)}초`;
     el.disabled = true;
     if (flee) flee.style.display = '';
     return;
@@ -3140,8 +3174,18 @@ function renderRaidTab() {
   if (status) {
     status.innerHTML = `오늘 남은 도전 횟수: <b style="color:var(--unique)">${RAID.dailyTotal - S.raid.count}/${RAID.dailyTotal}</b> · 보유 🎫 토벌의 증표: <b style="color:var(--gold)">${fmt(S.raidTokens || 0)}</b>`;
   }
+  const battlePanel = $('raidBattlePanel');
   const list = $('raidList');
   if (!list) return;
+  if (battlePanel) {
+    if (bossFight.active && bossFight.isRaid) {
+      battlePanel.style.display = '';
+      list.style.display = 'none';
+      return;
+    }
+    battlePanel.style.display = 'none';
+    list.style.display = '';
+  }
   list.innerHTML = '';
   for (let stage = 0; stage < RAID_MONSTERS.length; stage++) {
     const rm = RAID_MONSTERS[stage];
@@ -3650,14 +3694,22 @@ function renderUniqueName() {
   }
 }
 
+function renderRaidBattleHP() {
+  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
+  $('raidHpBar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  $('raidHpText').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
+  $('raidTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
+}
+function renderPunchBattleHP() {
+  const dealt = Math.max(0, PUNCH_DUMMY_HP - mon.hp);
+  const elapsed = Math.max(0, PUNCH_TIME_LIMIT - bossFight.timeLeft);
+  $('punchHpBar').style.width = Math.min(100, (elapsed / PUNCH_TIME_LIMIT) * 100) + '%';
+  $('punchHpText').textContent = `누적 데미지 ${fmt(dealt)}`;
+  $('punchTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
+}
 function renderHP() {
-  if (bossFight.active && bossFight.isPunch) {
-    const dealt = Math.max(0, PUNCH_DUMMY_HP - mon.hp);
-    const elapsed = Math.max(0, PUNCH_TIME_LIMIT - bossFight.timeLeft);
-    $('hpbar').style.width = Math.min(100, (elapsed / PUNCH_TIME_LIMIT) * 100) + '%';
-    $('hptext').textContent = `측정 중... 누적 데미지 ${fmt(dealt)}`;
-    return;
-  }
+  if (bossFight.active && bossFight.isRaid) { renderRaidBattleHP(); return; }
+  if (bossFight.active && bossFight.isPunch) { renderPunchBattleHP(); return; }
   mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
   $('hpbar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
   $('hptext').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
@@ -4536,6 +4588,9 @@ function init() {
   $('bossBtn').onclick = startBossFight;
   // 보스 포기
   $('bossFleeBtn').onclick = fleeBoss;
+  // 토벌전 / 펀치기계 포기(전용 UI에서도 동일한 fleeBoss 로직 재사용)
+  $('raidFleeBtn').onclick = fleeBoss;
+  $('punchFleeBtn').onclick = fleeBoss;
 
   spawnMonster();
   renderAll();

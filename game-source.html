@@ -2820,6 +2820,12 @@ function tryEnhance() {
       }
       // 고대 등급 무기는 파괴돼도 완전히 사라지지 않고 "흔적"이 남아 대장장이 탭에서 복구 가능
       if (w.grade === 6) addBlacksmithTrace(w);
+      // 무기는 파괴돼도 장착 중이던 룬은 함께 사라지지 않고 가방(보유 룬)으로 돌아온다
+      if (Array.isArray(w.runes) && w.runes.length) {
+        S.runes.push(...w.runes);
+        log(`🔮 장착 중이던 룬 ${w.runes.length}개는 무기와 함께 사라지지 않고 보유 룬으로 돌아왔습니다.`, 'lg-prim');
+        w.runes = [];
+      }
       S.weapons = S.weapons.filter(x => x.id !== w.id);
       S.equipped = null;
       const best = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a))[0];

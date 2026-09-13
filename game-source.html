@@ -608,33 +608,37 @@ const BOSS = {
   hpMult: 100,            // 체력 = 사냥터 몬스터 × 100
   weaponDrop: 0.007,      // 신화 보스무기 드롭 (0.7%)
   accDrop: 0.009,         // 신화 보스장신구 드롭 (0.9%)
-  goldMult: 50,           // 승리 보상 골드 (처치당 골드 × 50)
+  // 승리 보상 골드 = 해당 층 몬스터를 "원킷" 기준으로 1시간 사냥했을 때 벌 수 있는 골드
+  // (장착 무기의 실질 공속 × 3600초 × 층 처치골드), 골드 보너스 배율도 동일하게 적용.
+  // 자세한 산출 근거는 endBossFight()의 winGold 계산부 참고.
 };
 
 // 신화 등급 무기 특수 효과는 EFFECTS에 통합 (grade: 5)
 
 // 보스 장신구 (세트 효과 포함, index = 사냥터 번호)
+// 층이 오를수록 효과 수치가 완만하게 시작해 후반으로 갈수록 가파르게 커지도록
+// 지수 곡선(약 1.13배/층)으로 재설계 (기존엔 4개 층마다 거의 동일한 값이었음).
 const BOSS_ACCS = [
   { name: '킹 슬라임의 왕관',   eff: { gold: 0.08 } },
-  { name: '흡혈박쥐의 속곗니',  eff: { speed: 0.08 } },
-  { name: '버섯왕의 포자왕관',  eff: { atk: 0.08 } },
-  { name: '월광 늑대의 영혼석', eff: { luck: 0.08 } },
-  { name: '족장의 정복자 반지', eff: { gold: 0.12 } },
-  { name: '대군주의 사슬',      eff: { atk: 0.12 } },
-  { name: '대족장의 투혼 팔찌', eff: { speed: 0.12 } },
-  { name: '여왕의 밀실 열쇠',   eff: { luck: 0.12 } },
-  { name: '수호자의 심장 코어', eff: { atk: 0.16 } },
-  { name: '리저드 제왕의 진주', eff: { gold: 0.16 } },
-  { name: '기수의 파멸 장갑',   eff: { speed: 0.16 } },
-  { name: '제왕의 황금 나침반', eff: { atk: 0.20 } },
+  { name: '흡혈박쥐의 속곗니',  eff: { speed: 0.09 } },
+  { name: '버섯왕의 포자왕관',  eff: { atk: 0.10 } },
+  { name: '월광 늑대의 영혼석', eff: { luck: 0.12 } },
+  { name: '족장의 정복자 반지', eff: { gold: 0.13 } },
+  { name: '대군주의 사슬',      eff: { atk: 0.15 } },
+  { name: '대족장의 투혼 팔찌', eff: { speed: 0.17 } },
+  { name: '여왕의 밀실 열쇠',   eff: { luck: 0.19 } },
+  { name: '수호자의 심장 코어', eff: { atk: 0.21 } },
+  { name: '리저드 제왕의 진주', eff: { gold: 0.24 } },
+  { name: '기수의 파멸 장갑',   eff: { speed: 0.27 } },
+  { name: '제왕의 황금 나침반', eff: { atk: 0.31 } },
   { name: '대현자의 금서',      eff: { enh: 4 } },
-  { name: '여왕의 폭풍 깃털',   eff: { luck: 0.20 } },
-  { name: '리치킹의 영혼 반지', eff: { gold: 0.20 } },
-  { name: '데몬로드의 계약서',  eff: { atk: 0.24 } },
-  { name: '베히모스의 대퇴골',  eff: { speed: 0.24 } },
-  { name: '심연의 밀봉 인장',   eff: { luck: 0.28 } },
-  { name: '용왕의 심장',        eff: { atk: 0.30 } },
-  { name: '신왕의 태초 인장',   eff: { gold: 0.25, luck: 0.25, enh: 4 } },
+  { name: '여왕의 폭풍 깃털',   eff: { luck: 0.39 } },
+  { name: '리치킹의 영혼 반지', eff: { gold: 0.44 } },
+  { name: '데몬로드의 계약서',  eff: { atk: 0.50 } },
+  { name: '베히모스의 대퇴골',  eff: { speed: 0.57 } },
+  { name: '심연의 밀봉 인장',   eff: { luck: 0.64 } },
+  { name: '용왕의 심장',        eff: { atk: 0.72 } },
+  { name: '신왕의 태초 인장',   eff: { gold: 0.55, luck: 0.55, enh: 9 } },
 ];
 
 // ---------- 태초의 유물 (Genesis Artifacts) ----------
@@ -1677,8 +1681,16 @@ function endBossFight(win) {
   if (win) {
     S.bossWins++;
     S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped());
-    const goldMul = 1 + accEff().gold;
-    const gold = Math.floor(floorGold(f) * BOSS.goldMult * goldMul);
+    const w = getEquipped();
+    const e = w && w.effect ? EFFECTS[w.effect] : null;
+    const ae = accEff();
+    // 해당 층 몬스터를 "원킷" 기준으로 1시간(3600초) 동안 사냥했을 때 벌 수 있는 골드와 동일하게 산출
+    // (평시 사냥 골드 배율 스택과 동일하게: 무기 효과 골드% + 장신구 골드% + 전능의 룬 + 글러트니 유물)
+    let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+    goldMul *= Math.pow(1.2, weaponSpecialCount(w, 'omnirune'));
+    if (hasGenesis('gluttony')) goldMul *= 10;
+    const killsPerHour = weaponSpeed(w) * 3600;
+    const gold = Math.floor(floorGold(f) * killsPerHour * goldMul);
     S.gold += gold;
     log(`🏆 <b><span class="grade-신화">${F.boss.name}</span> 격파!</b> +${fmt(gold)} 골드 (1시간 후 재도전 가능)`, 'lg-prim');
     // 태초의 유물: 보스 처치는 10배 확률로 시도

@@ -413,8 +413,10 @@
     <div class="panel">
       <h3>🌌 태초의 유물</h3>
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">
-        사냥터마다 숨겨진 단 하나뿐인 유물. 평범한 몬스터로는 평균 6,000만 마리에 한 번,
-        엘리트는 5배, 보스는 10배 확률로 발견됩니다. 장착 슬롯 없이 보유만 해도 항상 발동합니다.
+        <div style="font-style:italic;margin-bottom:6px;">태초, 사냥터에 아직 이름조차 없던 시절 — 그 자리에는 이미 무언가가 있었다.
+        시대가 몇 번을 바뀌어도 그 존재들은 완전히 사라지지 않았다. 다만 옅어지고 흩어져, 사냥터 깊숙한 곳에 잔영으로 남았을 뿐.
+        그 잔영을 온전히 담아낸 유물은 장착할 곳조차 필요로 하지 않는다 — 지니고 있는 것만으로, 그 존재의 힘이 당신의 것이 된다.</div>
+        <div>사냥터마다 단 하나, 평범한 몬스터 기준 평균 6,000만 마리에 한 번꼴로만 흔적이 드러납니다 (엘리트 5배 · 보스 10배).</div>
       </div>
       <div id="genesisList"></div>
     </div>
@@ -3933,7 +3935,7 @@ function renderGenesisList() {
         </div>`;
     } else {
       div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(${FLOORS[a.floor].name} — ${FLOORS[a.floor].monster})</span></div>
-        <div class="wi">아직 발견하지 못한 태초의 유물입니다.</div></div>`;
+        <div class="wi" style="font-style:italic;">이 사냥터 어딘가에도 태초의 잔영이 잠들어 있다고 전해진다 — 아직, 그 흔적조차 찾아내지 못했다.</div></div>`;
     }
     box.appendChild(div);
   }

@@ -149,6 +149,13 @@
   #enhBtn.fx-destroy { animation: enhDoom 1s ease-in-out, enhShakeBig .6s ease-in-out; }
   #enhBtn.fx-destroy-2 { animation: enhDoom 1.3s ease-in-out, enhShakeBig .8s ease-in-out 2; }
   #enhBtn.fx-destroy-3 { animation: enhDoom 1.8s ease-in-out, enhShakeBig 1s ease-in-out 3; }
+  @keyframes enhShieldFlash { 0%{box-shadow:0 0 0 0 rgba(79,195,247,0); filter:brightness(1);} 15%{box-shadow:0 0 45px 16px rgba(79,195,247,.9); filter:brightness(1.3);} 100%{box-shadow:0 0 0 0 rgba(79,195,247,0); filter:brightness(1);} }
+  #enhBtn.fx-protect { animation: enhShieldFlash 1s ease-out; }
+  #enhBtn.fx-protect-2 { animation: enhShieldFlash 1.3s ease-out; }
+  #enhBtn.fx-protect-3 { animation: enhShieldFlash 1.6s ease-out; }
+  .enh-particle.protect-text { font-size: 15px; font-weight: bold; color: #4fc3f7; letter-spacing: 1px; }
+  .enh-particle.protect-text.big { font-size: 19px; }
+  .enh-particle.protect-text.huge { font-size: 23px; }
 
   /* ===== 능력치 ===== */
   .statgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; }
@@ -1849,11 +1856,13 @@ function floatText(msg) {
   setTimeout(() => el.remove(), 950);
 }
 
-// 강화 연출 (+15부터, +20/+25에서 더 극적으로). outcome: 'success' | 'fail' | 'destroy'
+// 강화 연출 (+15부터, +20/+25에서 더 극적으로). outcome: 'success' | 'fail' | 'destroy' | 'protect'
 const ENH_FX_PARTICLES = {
   success: ['✨', '💫', '⭐', '🌟'],
   fail: ['💧', '😔', '☁️'],
   destroy: ['💥', '☠️', '🔥', '💔'],
+  // 파괴방지/봉인 해제/불멸의 뼈 등으로 파괴가 무효화됐을 때 전용 연출
+  protect: ['🛡️', '🛡️', 'PROTECTED', '✨'],
 };
 function enhFxTier(level) {
   if (level >= 25) return 3;
@@ -1868,7 +1877,7 @@ function playEnhanceFx(outcome, level) {
   const overlay = $('enhFxOverlay');
   if (!btn || !overlay) return;
   const cls = tier >= 3 ? `fx-${outcome}-3` : tier >= 2 ? `fx-${outcome}-2` : `fx-${outcome}`;
-  ['fx-success', 'fx-success-2', 'fx-success-3', 'fx-fail', 'fx-fail-2', 'fx-fail-3', 'fx-destroy', 'fx-destroy-2', 'fx-destroy-3']
+  ['fx-success', 'fx-success-2', 'fx-success-3', 'fx-fail', 'fx-fail-2', 'fx-fail-3', 'fx-destroy', 'fx-destroy-2', 'fx-destroy-3', 'fx-protect', 'fx-protect-2', 'fx-protect-3']
     .forEach(c => btn.classList.remove(c));
   // 리플로우를 강제해서 같은 클래스를 연달아 줘도 애니메이션이 다시 재생되게 함
   void btn.offsetWidth;
@@ -1879,9 +1888,10 @@ function playEnhanceFx(outcome, level) {
   const pool = ENH_FX_PARTICLES[outcome];
   const count = 4 + tier * 4;
   for (let i = 0; i < count; i++) {
+    const text = pool[Math.floor(Math.random() * pool.length)];
     const el = document.createElement('span');
-    el.className = 'enh-particle fly' + (tier >= 3 ? ' huge' : tier >= 2 ? ' big' : '');
-    el.textContent = pool[Math.floor(Math.random() * pool.length)];
+    el.className = 'enh-particle fly' + (text === 'PROTECTED' ? ' protect-text' : '') + (tier >= 3 ? ' huge' : tier >= 2 ? ' big' : '');
+    el.textContent = text;
     const spread = 40 + tier * 25;
     const dx = (Math.random() - 0.5) * spread;
     el.style.marginLeft = dx + 'px';
@@ -2864,7 +2874,7 @@ function tryEnhance() {
       return;
     } else {
       if (sealbreakActive || undyingSave || protectActive) {
-        playEnhanceFx('fail', attemptLevel);
+        playEnhanceFx('protect', attemptLevel);
         const spiritName = sealbreakActive ? '봉인 해제' : undyingSave ? '불멸의 뼈' : '파괴방지';
         log(`🛡️ <b>${spiritName}</b> 발동! 파괴를 막아내고 단계를 유지했습니다. (파괴 확률이었음: ${dChance}%)`, 'lg-prim');
       } else if (Math.random() < 0.5) {

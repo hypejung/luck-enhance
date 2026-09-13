@@ -961,7 +961,7 @@ function newState() {
 }
 
 function defaultWeapon() {
-  return genWeapon(0);
+  return makeFist(0);
 }
 
 /* ===================== 무기 생성 ===================== */
@@ -2738,7 +2738,7 @@ function init() {
     S.equipped = w.id;
     log('🍀 <b>운빨강화하기</b>에 오신 것을 환영합니다!', 'lg-gold');
     log('사냥터에서 골드를 모아 무기를 강화하세요!');
-    log('시작 무기를 지급했습니다. 사냥으로 골드를 모아보세요!');
+    log('✊ <b>맨손</b>으로 시작합니다. (맨손도 강화 가능! 사냥으로 무기를 구해보세요)');
   } else {
     log('💾 저장된 진행 상황을 불러왔습니다.');
   }

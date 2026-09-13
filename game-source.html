@@ -922,6 +922,15 @@ const GAMBLE_TABLES = [
   { name: '💎 고급 테이블', min: 10000,  icon: '💎', desc: '승부사들의 자리. 한 판이 크게 흔들린다.' },
   { name: '🎩 타짜 테이블', min: 100000, icon: '🎩', desc: '운빨을 증명하는 곳. 올인하는 자만이 남는다.' },
 ];
+// 베팅 상한선 = 다음 등급 테이블의 최소 금액 (타짜 테이블은 최고 등급이라 상한 없음)
+function gambleMax(i) {
+  const next = GAMBLE_TABLES[i + 1];
+  return next ? next.min : Infinity;
+}
+function gambleMaxLabel(i) {
+  const m = gambleMax(i);
+  return m === Infinity ? '무제한' : `${fmt(m)} 골드`;
+}
 
 /* ===================== 게임 상태 ===================== */
 let S = null;   // state
@@ -1823,7 +1832,9 @@ function tryEnhance() {
 
 /* ===================== 도박 ===================== */
 function gamble(ratio) {
-  const tbl = GAMBLE_TABLES[S.gambleTable] || GAMBLE_TABLES[0];
+  const ti = S.gambleTable;
+  const tbl = GAMBLE_TABLES[ti] || GAMBLE_TABLES[0];
+  const max = gambleMax(ti);
   let bet = Math.floor(S.gold * ratio);
   if (bet <= 0) { log('도박할 골드가 없습니다!', 'lg-bad'); return; }
   if (S.gold < tbl.min) {
@@ -1831,6 +1842,10 @@ function gamble(ratio) {
     return;
   }
   if (bet < tbl.min) bet = tbl.min;  // 최소 금액 보장
+  if (bet > max) {
+    bet = max;
+    log(`💰 ${tbl.name}의 베팅 상한은 ${fmt(max)} 골드입니다. 상한까지만 베팅합니다.`, 'lg-bad');
+  }
   S.gold -= bet;
   S.gambleCount++;
   let gm = wrand(GAMBLE.map(g => [g.mult, g.weight]));
@@ -1880,7 +1895,7 @@ function renderGambleTables() {
   GAMBLE_TABLES.forEach((t, i) => {
     const b = document.createElement('button');
     const afford = S.gold >= t.min;
-    b.innerHTML = `${t.name}<br><span style="font-size:11px; color:${afford ? 'var(--gold)' : '#ff7a7a'}">최소 ${fmt(t.min)}</span>`;
+    b.innerHTML = `${t.name}<br><span style="font-size:11px; color:${afford ? 'var(--gold)' : '#ff7a7a'}">최소 ${fmt(t.min)} · 최대 ${gambleMaxLabel(i)}</span>`;
     b.style.flex = '1';
     b.style.minWidth = '140px';
     b.style.fontWeight = i === S.gambleTable ? 'bold' : 'normal';
@@ -1888,14 +1903,14 @@ function renderGambleTables() {
     b.style.color = i === S.gambleTable ? 'var(--gold)' : (afford ? '' : 'var(--sub)');
     b.onclick = () => {
       S.gambleTable = i;
-      $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b>)`;
+      $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b> · 최대 도박: <b style="color:var(--gold)">${gambleMaxLabel(i)}</b>)`;
       renderGambleTables();
       save();
     };
     tb.appendChild(b);
   });
   const t = GAMBLE_TABLES[S.gambleTable] || GAMBLE_TABLES[0];
-  $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b>)`;
+  $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b> · 최대 도박: <b style="color:var(--gold)">${gambleMaxLabel(S.gambleTable)}</b>)`;
 }
 
 /* ===================== 저장 / 불러오기 ===================== */

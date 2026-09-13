@@ -411,6 +411,13 @@
       <div id="runegachaslot"></div>
     </div>
     <div class="panel">
+      <h3>🛠️ 룬 합성</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        같은 등급 룬 3개를 소모해 한 단계 위 등급의 랜덤한 룬 1개 획득을 시도합니다. 등급이 높을수록 성공 확률이 낮고, <b style="color:#ff7a7a">실패하면 재료 3개는 그대로 소멸</b>합니다.
+      </div>
+      <div id="runefusionlist"></div>
+    </div>
+    <div class="panel">
       <h3>🎒 보유 룬</h3>
       <div id="runeinvlist"></div>
     </div>
@@ -1467,6 +1474,11 @@ const RUNE_BOXES = [0, 1, 2, 3, 4, 5, 6].map(t => ({
   cost: runeBoxCost(t),
   dropTable: buildRuneDropTable(t),
 }));
+// 룬 판매가 = 해당 등급을 "자기 등급"으로 하는 룬박스 가격의 3% (등급이 오를수록 자연히 함께 상승)
+function runeSellPrice(grade) { return Math.max(1, Math.round(RUNE_BOXES[grade].cost * 0.03)); }
+// 룬 합성: 같은 등급 3개를 소모해 한 단계 위 등급 랜덤 룬 1개 획득 시도.
+// 등급이 높을수록 성공 확률이 낮아지며(고대는 합성 대상에서 제외), 실패 시 재료는 전부 소멸한다.
+const RUNE_FUSION_CHANCE = { 0: 0.50, 1: 0.45, 2: 0.38, 3: 0.30, 4: 0.20, 5: 0.08 };
 
 // ---------- 도박 ----------
 const GAMBLE = [
@@ -3354,6 +3366,37 @@ function unequipRuneFromCurrentWeapon(runeId) {
   renderRuneTab(); renderEnhance(); save();
 }
 
+function sellRune(runeId) {
+  const idx = S.runes.findIndex(r => r.id === runeId);
+  if (idx < 0) return;
+  const rune = S.runes[idx];
+  const price = runeSellPrice(rune.grade);
+  S.runes.splice(idx, 1);
+  S.gold += price;
+  log(`판매: <span class="grade-${GRADES[rune.grade].name}">${runeName(rune)}</span> → +${fmt(price)} 골드`, 'lg-good');
+  renderTop(); renderRuneTab(); save();
+}
+
+// 같은 등급 룬 3개를 소모해 한 단계 위 등급의 랜덤 룬 획득을 시도한다. 실패 시 재료는 전부 소멸.
+function fuseRunes(grade) {
+  const chance = RUNE_FUSION_CHANCE[grade];
+  if (chance == null) { log('이 등급은 합성할 수 없습니다.', 'lg-bad'); return; }
+  const pool = S.runes.filter(r => r.grade === grade);
+  if (pool.length < 3) { log(`${GRADES[grade].name} 룬이 3개 이상 필요합니다. (보유 ${pool.length}개)`, 'lg-bad'); return; }
+  for (let i = 0; i < 3; i++) {
+    const idx = S.runes.findIndex(r => r.grade === grade);
+    S.runes.splice(idx, 1);
+  }
+  if (Math.random() < chance) {
+    const newRune = genRune(grade + 1);
+    S.runes.push(newRune);
+    log(`🔮✨ 룬 합성 성공! <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> 룬 3개 → <span class="grade-${GRADES[grade + 1].name}">${runeName(newRune)}</span> 획득!`, 'lg-prim');
+  } else {
+    log(`💨 룬 합성 실패... ${GRADES[grade].name} 룬 3개가 소멸했습니다. (성공 확률 ${(chance * 100).toFixed(0)}%)`, 'lg-bad');
+  }
+  renderRuneTab(); save();
+}
+
 function renderRuneTab() {
   const list = $('runeboxlist');
   if (!list) return;
@@ -3374,6 +3417,7 @@ function renderRuneTab() {
     list.appendChild(div);
   });
   renderRuneInventory();
+  renderRuneFusion();
 }
 // 룬박스 묶음 구매(최대 count개, 감당 가능한 만큼만 실제 구매)
 function buyRuneBoxesBulk(i, count) {
@@ -3413,7 +3457,30 @@ function renderRuneInventory() {
     bt.className = 'primary';
     bt.onclick = () => equipRuneToCurrentWeapon(r.id);
     btns.appendChild(bt);
+    const sellBt = document.createElement('button');
+    sellBt.textContent = `판매 (+${fmt(runeSellPrice(r.grade))})`;
+    sellBt.onclick = () => sellRune(r.id);
+    btns.appendChild(sellBt);
     list.appendChild(div);
+  }
+}
+
+// 룬 합성 UI: 등급별 보유 개수/필요 개수/성공 확률을 보여주고 합성 버튼을 제공
+function renderRuneFusion() {
+  const box = $('runefusionlist');
+  if (!box) return;
+  box.innerHTML = '';
+  for (let grade = 0; grade <= 5; grade++) {
+    const have = S.runes.filter(r => r.grade === grade).length;
+    const chance = RUNE_FUSION_CHANCE[grade];
+    const div = document.createElement('div');
+    div.className = 'boxrow';
+    div.innerHTML = `
+      <div><div style="font-weight:bold"><span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> 룬 3개 → <span class="grade-${GRADES[grade + 1].name}">${GRADES[grade + 1].name}</span> 룬 1개</div>
+      <div class="bi">보유 ${have}/3 · 성공 확률 ${(chance * 100).toFixed(0)}% (실패 시 재료 소멸)</div></div>
+      <div class="btns"><button class="primary" data-g="${grade}" ${have < 3 ? 'disabled' : ''}>합성 시도</button></div>`;
+    div.querySelector('button[data-g]').onclick = () => fuseRunes(grade);
+    box.appendChild(div);
   }
 }
 

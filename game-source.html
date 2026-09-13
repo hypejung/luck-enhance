@@ -442,7 +442,7 @@
       <h3>📖 무기 도감</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         아이콘은 아직 실루엣으로만 보입니다. 커서를 올리면 이름만 살짝 보이고, 해당 무기를
-        <b style="color:var(--unique)">+10 이상</b> 강화하면 도감에 정식으로 등록되어 이름·설명·효과를 전부 볼 수 있습니다.
+        <b style="color:var(--unique)">한 번이라도 획득</b>하면 도감에 정식으로 등록되어 이름·설명·효과를 전부 볼 수 있습니다.
       </div>
       <div id="codexGrid"></div>
       <div id="codexDetail" style="font-size:13px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border); min-height:20px;">
@@ -657,7 +657,7 @@ function ancientSpirit(w) {
 // ---------- 무기 도감 ----------
 // 일반~고대 모든 "이름 있는 무기"를 나열한다. 일반~유니크는 타입당 1개, 레전더리/신화는
 // 타입당 3개 변형, 고대는 사냥터당(설계된 경우) 3개 변형 — 아직 설계되지 않은 사냥터는
-// "미발견" 자리로 표시한다. 특정 이름의 무기를 +10 이상 강화하면 그 항목이 등록된다.
+// "미발견" 자리로 표시한다. 해당 이름의 무기를 획득하는 즉시(강화 단계 무관) 항목이 등록된다.
 function codexKey(grade, type, variant, floorIdx) {
   if (grade <= 3) return `g${grade}_${type}`;
   if (grade === 6) return `g6_f${floorIdx}_${variant}`;
@@ -1414,8 +1414,10 @@ const RUNE_SPECIALS = {
 const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
 for (const [k, v] of Object.entries(RUNE_SPECIALS)) RUNE_SPECIALS_BY_GRADE[v.grade].push(k);
 
-// 룬박스 등급별 "자기 등급" 룬이 나올 확률(%) — 박스 등급이 올라갈수록 헤드라인 확률은 계속 낮아짐 (태초=0.01%)
-const RUNE_HEADLINE = [90, 20, 5, 1, 0.2, 0.04, 0.01];
+// 룬박스 등급별 "자기 등급" 룬이 나올 확률(%) — 고대(6)는 하위 박스의 "상위 등급 보너스" 확률(레전 0.0146%,
+// 신화 0.041%)보다도 낮으면 고대 룬박스를 직접 사는 의미가 없어지므로, 모든 박스를 통틀어 가장 높은
+// 고대 획득 확률이 되도록 1%로 고정한다.
+const RUNE_HEADLINE = [90, 20, 5, 1, 0.2, 0.04, 1];
 // 일반 룬박스는 레어/에픽 확률도 직접 지정(요청 스펙 그대로), 나머지 등급/박스는 자동 분배
 const RUNE_PINNED = { 0: { 1: 5, 2: 1 } };
 function buildRuneDropTable(boxTier) {
@@ -2145,6 +2147,7 @@ function openBox(idx, src) {
 }
 
 function addWeapon(w) {
+  unlockCodexEntry(w); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록
   // 자동판매 필터: 지정 등급 이하 + 강화수치 0인 새 무기는 획득 즉시 자동 판매
   if (S.autoSellGrade != null && w.grade <= S.autoSellGrade && w.enhance === 0) {
     const price = sellPrice(w);
@@ -2614,7 +2617,6 @@ function tryEnhance() {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
     log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
-    if (w.enhance >= 10) unlockCodexEntry(w);
   } else {
     const dChance = effectiveDestroyChance(w);
     // 봉인 해제(고대): 파괴 판정 자체를 무시하고 무조건 유지로 대체

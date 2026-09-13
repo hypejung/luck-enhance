@@ -274,6 +274,7 @@
     <div class="tab" data-tab="rune">🔮 룬</div>
     <div class="tab" data-tab="gamble">🎲 도박장</div>
     <div class="tab" data-tab="codex">📖 도감</div>
+    <div class="tab" data-tab="blacksmith">🔨 대장장이</div>
   </div>
 
   <!-- 사냥터 -->
@@ -447,6 +448,18 @@
       <div id="codexDetail" style="font-size:13px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border); min-height:20px;">
         도감 항목을 클릭하면 상세 정보가 여기 표시됩니다.
       </div>
+    </div>
+  </div>
+
+  <!-- 대장장이 -->
+  <div id="tab-blacksmith" style="display:none">
+    <div class="panel">
+      <h3>🔨 대장장이</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        고대 등급 무기가 강화 파괴로 사라지면 완전히 잃지 않고 "흔적"이 남습니다. 그 무기가
+        나온 사냥터의 최고 등급 재료를 모아오면 이곳에서 <b style="color:var(--ancient)">+0 상태로 복구</b>할 수 있습니다.
+      </div>
+      <div id="blacksmithList"></div>
     </div>
   </div>
 
@@ -761,6 +774,7 @@ const fx = {
   momentUntil: 0,        // 찰나 버프 만료 시각
   infiniteUntil: 0,      // 가속 폭주 버프 만료 시각
   executionerReady: false, // 처단자: 보스전 첫 타격 확정 치명타 대기 중
+  ambushReady: false,      // 심연의 기습: 몬스터 스폰 후 첫 타격 확정 치명타 대기 중
 };
 
 // ---------- 강화 설정 (최대 +30, "운빨강화"의 핵심 — 진짜 도박) ----------
@@ -991,11 +1005,14 @@ const ANCIENT_ELITE_MULT = 5;
 const ANCIENT_BOSS_MULT = 10;
 // 사냥터 몬스터의 특성을 반영한 "에이션트 스피릿" — 고대 무기 전용 추가 효과.
 // acid: 슬라임류(독/산성) 컨셉의 도트 피해. soul: 리치류(영혼) 컨셉의 영구 성장.
+// ambush: 심연의 감시자 컨셉의 기습 — 몬스터 스폰 직후 첫 공격 확정 치명타 + 피해 2배.
 const ANCIENT_SPIRITS = {
   acid: { name: '부식의 정령', desc: '공격 시 20% 확률로 대상에게 4초간 산성 부식(도트, 무기 공격력의 12%/초)을 건다.',
           proc: 0.20, dmgPerSec: 0.12, dur: 4 },
   soul: { name: '영혼 포식자', desc: '이 무기로 몬스터를 20마리 처치할 때마다 흡수한 영혼으로 영구히 공격력이 0.4% 증가한다(이 무기에 귀속).',
           killsPer: 20, bonusPerStack: 0.004 },
+  ambush: { name: '심연의 기습', desc: '몬스터가 스폰되면 그 몬스터에 대한 첫 공격은 무조건 치명타로 적중하며, 치명타 피해가 추가로 2배 적용된다.',
+            extraMult: 2 },
 };
 const WEAPON_ANCIENT_NAMES = [
   [ // floor 0 — 초원 — 슬라임의 태고 조상: 모든 것을 녹이던 산성 괴물
@@ -1015,7 +1032,16 @@ const WEAPON_ANCIENT_NAMES = [
     { name: '영혼포식자의 낫자루', type: '둔기', spirit: 'soul', atkMod: 0.97, speedMod: 1.05,
       flavor: '리치왕이 거둬들인 무수한 영혼을 짓이겨 굳힌 자루. 휘두를수록 더 많은 영혼을 갈망한다.' },
   ],
-  null, null, null, null, null,
+  null, null,
+  [ // floor 17 — 심연 — 심연의 감시자의 태고 조상: 만물을 지켜보다 기습하는 태고의 눈
+    { name: '감시자의 단검', type: '단검', spirit: 'ambush', atkMod: 1.0, speedMod: 1.05,
+      flavor: '천 개의 눈이 지켜보다가, 눈치채지 못한 순간 단 한 번 깊숙이 박힌다. 그 한 번이면 충분했다.' },
+    { name: '심연의 지팡이', type: '지팡이', spirit: 'ambush', atkMod: 1.05, speedMod: 0.97,
+      flavor: '어둠 속에서 대상을 가늠하던 시선이 지팡이 끝에 응축되어 있다. 첫 주문은 언제나 빗나가지 않았다.' },
+    { name: '천안의 활', type: '활', spirit: 'ambush', atkMod: 0.97, speedMod: 1.08,
+      flavor: '수많은 눈으로 동시에 겨눈 화살은 대상이 알아채기도 전에 급소에 박힌다.' },
+  ],
+  null, null,
 ];
 function ancientVariant(w) {
   const list = WEAPON_ANCIENT_NAMES[w.ancientFloor];
@@ -1037,6 +1063,46 @@ function rollAncientWeapon(floorIdx, kindMult) {
   addWeapon(nw);
   log(`🏺🏺🏺 <b class="grade-고대">[고대 무기] ${v.name}</b>을(를) 획득했습니다!!! 사냥터의 태고 몬스터가 남긴 유산입니다.`, 'lg-prim');
   renderInventory(); renderTop(); save();
+}
+
+// ---------- 대장장이 (파괴된 고대 무기 복구) ----------
+// 고대 등급 무기가 강화 파괴로 사라지면 완전히 잃는 대신 "흔적"이 남는다. 같은
+// 사냥터의 최고 등급 재료(슬롯2, +15 강화에도 쓰이는 그 재료)를 모으면 복구할 수 있다.
+// 필요 개수는 1층 2000개에서 시작해 20층으로 갈수록 줄어든다(고층 재료는 파밍이 어려우므로).
+function ancientRestoreCost(floorIdx) {
+  return Math.round(2000 * Math.pow(0.85, floorIdx));
+}
+function addBlacksmithTrace(w) {
+  if (w.grade !== 6 || w.ancientFloor == null) return;
+  S.blacksmithTraces.push({
+    id: uid++, ancientFloor: w.ancientFloor, nameVariant: w.nameVariant || 0,
+    type: w.type, icon: w.icon, spirit: w.spirit, effect: w.effect,
+    name: weaponItemName(w),
+  });
+  log(`🔨 <b>${weaponItemName(w)}의 흔적</b>이 남았습니다. 대장장이 탭에서 복구할 수 있습니다.`, 'lg-prim');
+}
+function restoreBlacksmithTrace(traceId) {
+  const trace = S.blacksmithTraces.find(t => t.id === traceId);
+  if (!trace) return;
+  const cost = ancientRestoreCost(trace.ancientFloor);
+  const matKey = trace.ancientFloor + '|2';
+  const have = S.mats[matKey] || 0;
+  if (have < cost) {
+    log(`재료가 부족합니다! (${FLOORS[trace.ancientFloor].mats[2]} ${fmt(have)}/${fmt(cost)})`, 'lg-bad');
+    return;
+  }
+  S.mats[matKey] -= cost;
+  if (S.mats[matKey] <= 0) delete S.mats[matKey];
+  const nw = {
+    id: uid++, grade: 6, type: trace.type, icon: trace.icon, enhance: 0,
+    effect: trace.effect, runes: [],
+    ancientFloor: trace.ancientFloor, nameVariant: trace.nameVariant, spirit: trace.spirit,
+    soulStacks: 0, soulKillCount: 0,
+  };
+  addWeapon(nw);
+  S.blacksmithTraces = S.blacksmithTraces.filter(t => t.id !== traceId);
+  log(`🔨✨ <b class="grade-고대">${trace.name}</b>을(를) 복구했습니다!`, 'lg-prim');
+  renderInventory(); renderBlacksmith(); renderTop(); save();
 }
 
 // ---------- 이스터에그 ----------
@@ -1297,6 +1363,7 @@ function newState() {
     eggs: {},          // 달성한 이스터에그: { eggId: true }
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: { effect } }
+    blacksmithTraces: [], // 파괴된 고대 무기의 흔적: [{ id, ancientFloor, nameVariant, type, icon, spirit, effect, name }]
   };
 }
 
@@ -1663,6 +1730,9 @@ function spawnMonster() {
   mon.dead = false;
   // atkTimer는 초기화하지 않는다 — 처치 시 남은 공격 타이머(0~1 미만의 여분)가
   // 다음 몬스터에게 그대로 이어져야 공격속도가 빠를수록 정확히 그만큼 더 많이 잡는다.
+  // 심연의 기습(고대 에이션트 스피릿): 새 몬스터가 스폰되면 첫 공격 확정 치명타 대기
+  const eqw = getEquipped();
+  if (eqw && eqw.spirit === 'ambush') fx.ambushReady = true;
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -2045,11 +2115,18 @@ function attack(w) {
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
   if (forceCrit) fx.executionerReady = false;
+  // 심연의 기습(고대 에이션트 스피릿): 몬스터 스폰 후 첫 공격은 확정 치명타 + 피해 2배 추가
+  const ambushCrit = w.spirit === 'ambush' && fx.ambushReady;
+  if (ambushCrit) fx.ambushReady = false;
   let didCrit = false;
-  if (forceCrit || (critChance > 0 && Math.random() < critChance)) {
+  if (forceCrit || ambushCrit || (critChance > 0 && Math.random() < critChance)) {
     dmg *= critMult;
     didCrit = true;
     floatText('💥 치명타!');
+  }
+  if (ambushCrit) {
+    dmg *= ANCIENT_SPIRITS.ambush.extraMult || 1;
+    floatText('👁️ 기습!');
   }
   if (didCrit && w.effect === 'bloodrend' && Math.random() < (e.bleedProc || 0)) {
     fx.bleeds = fx.bleeds || [];
@@ -2298,6 +2375,8 @@ function tryEnhance() {
       log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}`, 'lg-bad');
       S.destroyedCount++;
       if (S.destroyedCount >= 50) unlockEgg('blacksmith');
+      // 고대 등급 무기는 파괴돼도 완전히 사라지지 않고 "흔적"이 남아 대장장이 탭에서 복구 가능
+      if (w.grade === 6) addBlacksmithTrace(w);
       S.weapons = S.weapons.filter(x => x.id !== w.id);
       S.equipped = null;
       const best = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a))[0];
@@ -2462,6 +2541,36 @@ function renderCodexDetail(ent, key) {
     <div class="grade-${GRADES[ent.grade].name}" style="font-size:15px;font-weight:bold;margin-bottom:4px;">${ent.icon} [${GRADES[ent.grade].name}] ${ent.name}</div>
     ${ent.flavor ? `<div style="font-style:italic;color:var(--sub);margin-bottom:6px;">${ent.flavor}</div>` : ''}
     ${effectInfo}${spiritInfo}`;
+}
+
+// 대장장이 탭 렌더링 — 파괴된 고대 무기의 흔적 목록 + 복구
+function renderBlacksmith() {
+  const box = $('blacksmithList');
+  if (!box) return;
+  if (!S.blacksmithTraces.length) {
+    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">아직 남은 흔적이 없습니다. 고대 등급 무기가 강화 파괴되면 여기에 흔적이 남습니다.</div>';
+    return;
+  }
+  box.innerHTML = '';
+  for (const trace of S.blacksmithTraces) {
+    const cost = ancientRestoreCost(trace.ancientFloor);
+    const have = S.mats[trace.ancientFloor + '|2'] || 0;
+    const matName = FLOORS[trace.ancientFloor].mats[2];
+    const ok = have >= cost;
+    const div = document.createElement('div');
+    div.className = 'invitem';
+    div.innerHTML = `
+      <div><div class="wn">${trace.icon} <span class="grade-고대">${trace.name}의 흔적</span></div>
+      <div class="wi">${FLOORS[trace.ancientFloor].name} 최고급 재료 필요: <b style="color:${ok ? '#7de08a' : '#ff7a7a'}">${matName} ${fmt(have)}/${fmt(cost)}</b></div></div>
+      <div class="btns"></div>`;
+    const btn = document.createElement('button');
+    btn.textContent = '복구';
+    btn.className = ok ? 'primary' : '';
+    btn.disabled = !ok;
+    btn.onclick = () => restoreBlacksmithTrace(trace.id);
+    div.querySelector('.btns').appendChild(btn);
+    box.appendChild(div);
+  }
 }
 
 /* ===================== 저장 / 불러오기 ===================== */
@@ -3103,7 +3212,7 @@ function renderAll() {
 function switchTab(name) {
   currentTab = name;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'enhance') renderEnhance();
@@ -3114,6 +3223,7 @@ function switchTab(name) {
   if (name === 'rune') renderRuneTab();
   if (name === 'gamble') renderGambleTables();
   if (name === 'codex') renderCodex();
+  if (name === 'blacksmith') renderBlacksmith();
 }
 
 // 장신구 효과 설명 문자열

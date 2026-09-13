@@ -1917,15 +1917,19 @@ function migrate(d) {
   if (!Array.isArray(d.weapons)) d.weapons = [];
   if (!Array.isArray(d.runes)) d.runes = [];
   if (d.gold !== d.gold || typeof d.gold !== 'number') d.gold = 0; // NaN 방지
-  // 신화 등급 신설(5)에 따른 구버전 태초(5) 무기 → 태초(6) 이동
-  if (d.migratedGradeShift !== true) {
+  // 버그 수정: 예전의 "구버전 태초(5)→태초(6)" 일회성 마이그레이션이 실제로는
+  // 이미 정상적으로 신화(5)였던 무기/장신구까지 전부 태초(6)로 잘못 승급시키던 버그였다
+  // (보스 신화무기가 갑자기 태초 등급으로 바뀌는 현상의 원인). 태초 등급 무기/장신구는
+  // 아직 어떤 드랍 테이블에도 존재하지 않으므로 grade===6인 항목은 전부 이 버그로
+  // 오염된 것 — 신화(5)로 되돌린다.
+  if (d.repairedGrade6Bug !== true) {
     for (const w of d.weapons) {
-      if (w.grade === 5) w.grade = 6;
+      if (w.grade === 6) w.grade = 5;
     }
     for (const a of d.accs) {
-      if (a.grade === 5) a.grade = 6;
+      if (a.grade === 6) a.grade = 5;
     }
-    d.migratedGradeShift = true;
+    d.repairedGrade6Bug = true;
   }
   // 재료 키 버그 수정: dropMaterials가 슬롯(0/1/2) 대신 실제 등급 index를 키로 써서
   // 사냥터 5구간 이상(스켈레톤/오크전사 등)에서 조합 재료('f|0','f|1')가 전혀 쌓이지 않던 문제.

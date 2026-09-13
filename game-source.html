@@ -684,10 +684,12 @@ function weaponCodexKey(w) {
   if (w.grade >= 4) return codexKey(w.grade, w.type, w.nameVariant || 0);
   return codexKey(w.grade, w.type);
 }
+// 무기 특수효과(w.effect)는 같은 이름의 무기라도 개체마다 랜덤으로 다르게 붙으므로
+// 도감에는 기록하지 않는다(도감은 "이름 있는 무기" 자체의 고정 정보만 다룸).
 function unlockCodexEntry(w) {
   const key = weaponCodexKey(w);
   if (!key || S.codexSeen[key]) return;
-  S.codexSeen[key] = { effect: w.effect || null };
+  S.codexSeen[key] = true;
   log(`📖 <b>무기 도감</b>에 새 항목이 등록되었습니다: ${weaponItemName(w)}`, 'lg-prim');
 }
 function codexEntries() {
@@ -1702,7 +1704,7 @@ function newState() {
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
     eggs: {},          // 달성한 이스터에그: { eggId: true }
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
-    codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: { effect } }
+    codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
     blacksmithTraces: [], // 파괴된 고대 무기의 흔적: [{ id, ancientFloor, nameVariant, type, icon, spirit, effect, name }]
   };
 }
@@ -2985,15 +2987,13 @@ function renderCodex() {
   }
 }
 function renderCodexDetail(ent, key) {
-  const seen = S.codexSeen[key];
-  const effectInfo = seen && seen.effect && EFFECTS[seen.effect]
-    ? `<div class="lg-prim">✨ [${EFFECTS[seen.effect].name}] ${EFFECTS[seen.effect].desc}</div>` : '';
+  // 무기 특수효과(w.effect)는 개체마다 랜덤으로 달라붙는 값이라 도감(무기 자체의 고정 정보)에는 표시하지 않는다.
   const spiritInfo = ent.spirit && ANCIENT_SPIRITS[ent.spirit]
     ? `<div class="grade-고대">🏺 [${ANCIENT_SPIRITS[ent.spirit].name}] ${ANCIENT_SPIRITS[ent.spirit].desc}</div>` : '';
   $('codexDetail').innerHTML = `
     <div class="grade-${GRADES[ent.grade].name}" style="font-size:15px;font-weight:bold;margin-bottom:4px;">${ent.icon} [${GRADES[ent.grade].name}] ${ent.name}</div>
     ${ent.flavor ? `<div style="font-style:italic;color:var(--sub);margin-bottom:6px;">${ent.flavor}</div>` : ''}
-    ${effectInfo}${spiritInfo}`;
+    ${spiritInfo}`;
 }
 
 // 대장장이 탭 렌더링 — 파괴된 고대 무기의 흔적 목록 + 복구

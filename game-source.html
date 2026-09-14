@@ -688,13 +688,7 @@
 
   <div id="logpanel"></div>
   <div id="savebar">
-    <button id="saveBtn">💾 저장</button>
     <button id="syncBtn">🔗 동기화</button>
-    <button id="exportFileBtn">📁 파일로 저장</button>
-    <button id="importFileBtn">📂 파일 불러오기</button>
-    <input type="file" id="importFileInput" accept=".txt,.json" style="display:none">
-    <button id="exportBtn">📤 저장코드 내보내기</button>
-    <button id="importBtn">📥 저장코드 불러오기</button>
     <button id="resetBtn" class="danger">🗑 초기화</button>
   </div>
 </div>
@@ -1370,6 +1364,7 @@ const PATCH_NOTES = [
       '♾️ 전능의 룬을 "모든 스탯 +8%p"에서 "훈련 비용 -30%, 골드 획득 +50%"로 재설계',
       '🍀 도박의 신 발동 시 결과창에 시각 효과 추가',
       '💥 치명타 계열 무기 효과(예리함/유혈 참격/처형자의 낙인)가 자체 고정 치명타 배율을 덮어쓰던 것을 없애고 치명타 "확률"만 올려주도록 변경 — 치명타 피해는 온전히 유저가 쌓은 스탯을 따름 (심판의 전조는 특수 매커니즘이라 변경 없음)',
+      '🗑️ 클라우드 동기화 도입으로 필요 없어진 수동 저장/저장코드 내보내기·불러오기/파일로 저장·불러오기 버튼 정리',
     ],
   },
 ];
@@ -4051,53 +4046,6 @@ function load() {
     return data;
   } catch (e) { return null; }
 }
-function saveCode() {
-  return btoa(unescape(encodeURIComponent(JSON.stringify(S))));
-}
-function loadCode(code) {
-  const data = migrate(JSON.parse(decodeURIComponent(escape(atob(code.trim())))));
-  if (typeof data.gold !== 'number' || !Array.isArray(data.weapons)) throw 0;
-  S = data;
-  if (!getEquipped() && S.weapons.length) S.equipped = S.weapons[0].id;
-  save(); location.reload();
-}
-function exportSave() {
-  const code = saveCode();
-  let copied = false;
-  try {
-    if (navigator.clipboard && window.isSecureContext) { navigator.clipboard.writeText(code); copied = true; }
-  } catch (e) {}
-  prompt(copied ? '저장코드가 클립보드에 복사되었습니다! (아래에서 다시 확인 가능)' : '아래 저장코드를 복사해서 보관하세요:', code);
-}
-function importSave() {
-  const code = prompt('저장코드를 붙여넣으세요:');
-  if (!code) return;
-  try { loadCode(code); } catch (e) { alert('잘못된 저장코드입니다.'); }
-}
-// 파일로 저장/불러오기 — 긴 저장코드를 직접 복사/붙여넣기 하지 않아도 되는 더 간편한 방식
-function exportSaveFile() {
-  const blob = new Blob([saveCode()], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const d = new Date();
-  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `운빨강화하기_save_${stamp}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-  log('📁 저장 파일을 다운로드했습니다.', 'lg-good');
-}
-function importSaveFile(file) {
-  const reader = new FileReader();
-  reader.onload = () => {
-    try { loadCode(reader.result); } catch (e) { alert('잘못된 저장 파일입니다.'); }
-  };
-  reader.onerror = () => alert('파일을 읽는 중 오류가 발생했습니다.');
-  reader.readAsText(file);
-}
-
 /* ===================== 클라우드 동기화 ===================== */
 // Firebase Realtime Database REST API를 그대로 fetch로 호출 (SDK 불필요).
 // 아래 URL을 실제 프로젝트의 Realtime Database URL로 채워야 동기화가 활성화됩니다.
@@ -5392,18 +5340,7 @@ function init() {
   $('enhBtn').onclick = () => tryEnhance(false);
   // 도박
   document.querySelectorAll('#betbtns button').forEach(b => b.onclick = () => gamble(parseFloat(b.dataset.bet)));
-  // 저장 버튼
-  $('saveBtn').onclick = () => { save(); log('💾 저장 완료!', 'lg-good'); };
   $('syncBtn').onclick = syncModalHome;
-  $('exportBtn').onclick = exportSave;
-  $('importBtn').onclick = importSave;
-  $('exportFileBtn').onclick = exportSaveFile;
-  $('importFileBtn').onclick = () => $('importFileInput').click();
-  $('importFileInput').onchange = (e) => {
-    const file = e.target.files[0];
-    if (file) importSaveFile(file);
-    e.target.value = '';
-  };
   $('resetBtn').onclick = () => {
     if (confirm('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?')) {
       resetting = true;  // 언로드 핸들러가 재저장하는 것을 차단

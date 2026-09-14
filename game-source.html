@@ -175,6 +175,16 @@
   .invitem .btns { display: flex; gap: 6px; }
   .invitem button { padding: 5px 10px; font-size: 12px; }
 
+  .matfilterrow {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; margin-bottom: 6px; font-size: 13px;
+  }
+  .matfilter-main { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .matfilter-main label { flex: 1; min-width: 140px; }
+  .matfilter-main button { padding: 4px 8px; font-size: 11px; }
+  .matfilter-sub { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+  .matfilter-check { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+
   /* ===== 랜덤박스 ===== */
   .boxrow {
     display: flex; justify-content: space-between; align-items: center;
@@ -431,6 +441,10 @@
     </div>
     <div class="panel">
       <h3>🌿 보유 재료 & 판매</h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">
+        사냥터별로 자동판매를 켜두면 그 재료는 드롭되는 즉시 골드로 자동 판매됩니다. "펼치기"로 재료 종류별 개별 설정도 가능합니다.
+      </div>
+      <div id="matFilterList" style="margin-bottom:10px;"></div>
       <div id="matselllist"></div>
     </div>
     <div class="panel">
@@ -1026,8 +1040,8 @@ const EFFECTS = {
   keen:     { name: '예리함',       desc: '공격 시 8% 확률로 치명타 (피해 1.8배)', grade: 3, crit: { chance: 0.08, mult: 1.8 } },
   bloodrend:{ name: '유혈 참격',    desc: '공격 시 12% 확률로 치명타 (피해 2배). 치명타 발동 시 10% 확률로 5초간 지속되는 출혈 부여',
               grade: 4, crit: { chance: 0.12, mult: 2.0 }, bleedProc: 0.10, bleedDur: 5, bleedDmg: 0.2 },
-  stigma:   { name: '처형자의 낙인', desc: '치명타 시 낙인 1스택 부여(스택당 무기 공격력 30%만큼 추가 피해), 5스택 도달 시 일반 몬스터 즉시 처형(보스 제외)',
-              grade: 5, crit: { chance: 0.12, mult: 1.9 }, stackMax: 5, stackDmg: 0.3 },
+  stigma:   { name: '처형자의 낙인', desc: '치명타 시 낙인 1스택 부여(스택당 무기 공격력 30%만큼 추가 피해). 5스택 도달 시 일반 몬스터는 즉시 처형, 보스는 대신 무기 공격력의 800%만큼 큰 고정 피해를 추가로 입는다',
+              grade: 5, crit: { chance: 0.12, mult: 1.9 }, stackMax: 5, stackDmg: 0.3, bossBurstMult: 8 },
   judgment: { name: '심판의 전조',  desc: '공격 시 70% 확률로 치명타 발동(다른 원천의 치명타 확률과 무관하게 고정). 다른 원천 치명타 확률의 20%만큼이 치명타 피해로 전환. 8% 확률로 5초간 치명타 피해 1.6배 추가 버프 획득',
               grade: 6, fixedCrit: 0.70, crit: { mult: 1.4 }, overflowRatio: 0.20, buffProc: 0.08, buffDur: 5, buffMult: 1.6 },
 
@@ -1062,10 +1076,10 @@ const EFFECTS = {
   slayermark:   { name: '사냥꾼의 표식', desc: '보스에게 피해 +15%', grade: 3, bossDmg: 0.15 },
   executioner:  { name: '처단자',        desc: '보스에게 피해 +30%. 보스전 시작 후 첫 타격은 무조건 치명타',
                   grade: 4, bossDmg: 0.30, firstHitCrit: true },
-  dragonslayer: { name: '용살자의 서약', desc: '보스에게 피해 +100%. 보스 최대 체력의 0.5%만큼 매초 추가 고정 피해',
-                  grade: 5, bossDmg: 1.0, bossDotPct: 0.005 },
-  godslayer:    { name: '거인 사냥꾼',   desc: '보스에게 피해 +110%. 보스전 시작 시 보스 체력을 즉시 3% 삭감',
-                  grade: 6, bossDmg: 1.1, openBurstPct: 0.03 },
+  dragonslayer: { name: '용살자의 서약', desc: '보스에게 피해 +100%. 매초 무기 공격력의 100%만큼 추가 고정 피해',
+                  grade: 5, bossDmg: 1.0, bossDotAtkMult: 1.0 },
+  godslayer:    { name: '거인 사냥꾼',   desc: '보스에게 피해 +110%. 보스전 시작 시 무기 공격력의 1500%만큼 즉시 고정 피해',
+                  grade: 6, bossDmg: 1.1, openBurstAtkMult: 15 },
 };
 // 전투 중 임시 상태(스택/게이지/버프 타이머) — 저장하지 않는 휘발성 상태.
 // 몬스터가 즉시 리스폰되는 구조라 "대상"이 아니라 "전투 흐름" 기준으로 유지된다.
@@ -1276,7 +1290,7 @@ const ANCIENT_SEALS = [
   { id: 'swampHeart', floor: 9, name: '늪심장의 인장',
     desc: '재료 획득 시 10% 확률로 한 단계 위 등급의 재료로 대체된다.' },
   { id: 'oathKnight', floor: 10, name: '맹세기사의 인장',
-    desc: '고급 강화에 필요한 재료 배수가 50배에서 40배로 줄어든다.' },
+    desc: '고급 강화에 필요한 재료 배수가 30배에서 24배로 줄어든다.' },
   { id: 'mazeHorn', floor: 11, name: '광포한뿔의 인장',
     desc: '랜덤박스에서 상위 박스로 이어지는 연쇄 개봉 확률이 1.5배로 늘어난다.' },
   { id: 'bookFragment', floor: 12, name: '금서파편의 인장',
@@ -1839,6 +1853,10 @@ const BOXES = [
     weapon: [[1,20],[2,28],[3,3],[4,0.05]], gold: 0.4795, box: [[3,1]] },
   { name: '전설 랜덤박스', icon: '🏆', cost: 180000,
     weapon: [[2,25],[3,28],[4,0.1],[5,0.01]], gold: 0.4499, box: [[3,2]] },
+  // 신화 확률을 대폭 끌어올린 최상위 박스. 신화 확률의 정확히 2배를 레전더리에 배정.
+  // 가격 = 전설 랜덤박스 350개 상당(0.01% 신화를 노리고 그만큼 살 경우) × 1.3배 프리미엄.
+  { name: '신화 랜덤박스', icon: '💫', cost: 82000000,
+    weapon: [[2,25],[3,55],[4,7],[5,3.5]], gold: 0.095 },
 ];
 // 레전더리(4)/신화(5) 등급 무기 드롭 확률을 추가로 10배 이상 낮춤 (희귀 0.5%→0.05%, 전설 1%/0.1%→0.1%/0.01%)
 
@@ -1985,6 +2003,7 @@ function newState() {
     ancientSeals: [],  // 보유한 고대의 인장 id 목록
     sealEquipped: [],  // 장착 중인 고대의 인장 id 목록 (최대 ANCIENT_SEAL_SLOTS개)
     bossFreeRetryReady: false, // 무한진군의 인장: 충전된 무료 보스 재도전 여부
+    matAutoSell: {},   // 재료 자동판매 필터: 'f|g' 키가 true면 그 재료는 획득 즉시 자동 판매됨
   };
 }
 
@@ -2051,6 +2070,23 @@ function gradeAdjustedSuccess(grade, enhance) {
   if (enhance < 15) return base;
   const exponent = 1 + (grade || 0) * ENH.gradeSuccessExp;
   return Math.max(0.0000001, Math.pow(base / 100, exponent) * 100);
+}
+// 강화 확률 보정: 출처별로 "이 단계 이하에서만 적용"되는 상한을 둬서, 확률이 이미 0에 가까운
+// 고단계 구간에서 고정 %p 보정이 상대적으로 터무니없이 커지는 현상(예: 실제확률 5~6%가 보정만으로
+// 12~13%가 되는 등)을 막는다. 늦게 얻는 장비/도감일수록 상한도 더 높은 단계까지 적용된다.
+const ENH_BONUS_SOURCES = [
+  { cap: 14, value: 5, has: () => { const p = codexAncientSetProgress(10); return p.need > 0 && p.have >= p.need; } }, // 도감: 저주받은성 세트
+  { cap: 16, value: 3, has: () => S.accEquipped.some(a => a.floor === 12) },   // 13층 장신구
+  { cap: 18, value: 4, has: () => S.bossAccs.includes(12) },                  // 대현자의 금서 (13층 보스장신구)
+  { cap: 20, value: 4, has: () => S.accEquipped.some(a => a.floor === 19) },  // 20층 장신구
+  { cap: 22, value: 9, has: () => S.bossAccs.includes(19) },                  // 신왕의 태초 인장 (20층 보스장신구)
+];
+function enhTierBonus(enhance) {
+  let bonus = 0;
+  for (const src of ENH_BONUS_SOURCES) {
+    if (enhance <= src.cap && src.has()) bonus += src.value;
+  }
+  return bonus;
 }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
@@ -2293,6 +2329,27 @@ function consumeHighMats(grade, n) {
     if (S.mats[k] <= 0) delete S.mats[k];
   }
   return n <= 0;
+}
+// 고급 재료 부족분을 토벌의 증표로 대신 지불 가능 (토벌의 증표가 훨씬 구하기 어려우므로
+// 1개로 고급 재료 100개 상당을 대체 — 순수 재료 파밍보다 훨씬 유리한 환율).
+const RAID_TOKEN_TO_MAT = 100;
+function tokensForShortfall(shortfall) { return Math.ceil(shortfall / RAID_TOKEN_TO_MAT); }
+// 고급 재료 필요량에 대한 현재 상태(보유 재료 + 부족분을 토큰으로 대체 가능한지) 요약
+function highMatStatus(grade, need) {
+  const have = countHighMats(grade);
+  if (need <= 0) return { ok: true, have, need: 0, shortfall: 0, tokensNeed: 0, tokensHave: S.raidTokens || 0 };
+  const shortfall = Math.max(0, need - have);
+  const tokensNeed = tokensForShortfall(shortfall);
+  const tokensHave = S.raidTokens || 0;
+  return { ok: shortfall === 0 || tokensHave >= tokensNeed, have, need, shortfall, tokensNeed, tokensHave };
+}
+// 고급 재료를 최대한 소모하고, 부족분은 토벌의 증표로 대체 소모
+function consumeHighMatsWithTokens(grade, need) {
+  const have = countHighMats(grade);
+  const useMats = Math.min(have, need);
+  if (useMats > 0) consumeHighMats(grade, useMats);
+  const shortfall = need - useMats;
+  if (shortfall > 0) S.raidTokens -= tokensForShortfall(shortfall);
 }
 
 // 재료 판매가 (사냥터 골드 기준: 일반 1.5배 / 레어 4배 / 에픽 10배)
@@ -2564,6 +2621,12 @@ function addMat(f, matSlot) {
   const key = f + '|' + matSlot;
   // 끝없는 탐욕(글러트니의 목걸이): 아이템 획득 시 10% 확률로 10배 획득
   const bonus = (hasGenesis('gluttony') && Math.random() < 0.1) ? 10 : 1;
+  // 재료 자동판매 필터: 체크된 재료는 획득 즉시 골드로 자동 판매
+  if (S.matAutoSell && S.matAutoSell[key]) {
+    const price = matSellPrice(f, matSlot) * bonus;
+    S.gold += price;
+    return;
+  }
   S.mats[key] = (S.mats[key] || 0) + bonus;
   const name = FLOORS[f].mats[matSlot];
   const tierIdx = Math.min(3, Math.floor(f / 5));
@@ -2752,9 +2815,9 @@ function tick(dt) {
       killedAny = true;
     }
   }
-  // 용살자의 서약(신화 보스): 보스전 중 보스 최대체력 비례 고정 피해(도트)
+  // 용살자의 서약(신화 보스): 보스전 중 무기 공격력 비례 고정 피해(도트)
   if (bossFight.active && w.effect === 'dragonslayer') {
-    mon.hp -= mon.maxHp * (EFFECTS.dragonslayer.bossDotPct || 0) * dt;
+    mon.hp -= weaponAtk(w) * (EFFECTS.dragonslayer.bossDotAtkMult || 0) * dt;
     attacked = true;
     if (mon.hp <= 0) {
       if (handleKill() === 'boss') return;
@@ -2850,7 +2913,12 @@ function attack(w) {
     mon.hp -= weaponAtk(w) * (e.stackDmg || 0) * fx.stigma;
     if (fx.stigma >= (e.stackMax || 5)) {
       fx.stigma = 0;
-      if (!bossFight.active) { mon.hp = 0; floatText('☠️ 처형!'); }
+      if (bossFight.active) {
+        mon.hp -= weaponAtk(w) * (e.bossBurstMult || 0);
+        floatText('🩸 낙인 폭발!');
+      } else {
+        mon.hp = 0; floatText('☠️ 처형!');
+      }
     } else {
       floatText(`🩸 낙인 x${fx.stigma}`);
     }
@@ -2992,8 +3060,8 @@ function startBossFight() {
   // 신살자(태초 보스): 보스전 시작 즉시 보스 체력 고정 비율 삭감
   const eq = getEquipped();
   const eqEffect = eq && eq.effect ? EFFECTS[eq.effect] : null;
-  if (eqEffect && eqEffect.openBurstPct) {
-    const cut = Math.floor(mon.maxHp * eqEffect.openBurstPct);
+  if (eqEffect && eqEffect.openBurstAtkMult) {
+    const cut = Math.floor(weaponAtk(eq) * eqEffect.openBurstAtkMult);
     mon.hp = Math.max(1, mon.hp - cut);
     log(`⚔️ <b>신살자</b>의 일격! 보스 체력 ${fmt(cut)} 즉시 삭감!`, 'lg-prim');
   }
@@ -3140,6 +3208,12 @@ function endBossFight(win) {
     const gold = Math.floor(floorGold(f) * killsPerHour * goldMul);
     S.gold += gold;
     log(`🏆 <b><span class="grade-신화">${F.boss.name}</span> 격파!</b> +${fmt(gold)} 골드 (1시간 후 재도전 가능)`, 'lg-prim');
+    // 고급 재료 보너스: 해당 사냥터의 최고 등급 재료(고급 강화 재료)를 대량 지급 — 보스 쿨타임이
+    // 1시간이라 꾸준히 도전하면 고급 강화 재료 조달의 주요 경로가 되도록 층이 높을수록 더 많이 지급.
+    const matBonus = 15 + f * 3;
+    S.mats[f + '|2'] = (S.mats[f + '|2'] || 0) + matBonus;
+    const matGradeName = GRADES[MAT_TIERS[Math.min(3, Math.floor(f / 5))][2]].name;
+    log(`🌿 보스 처치 보상: <span class="grade-${matGradeName}">${F.mats[2]}</span> ×${matBonus} 획득!`, 'lg-good');
     // 태초의 유물: 보스 처치는 10배 확률로 시도
     rollGenesisArtifact(f, GENESIS_BOSS_MULT);
     // 고대 무기: 보스 처치는 10배 확률로 시도
@@ -3224,14 +3298,14 @@ function fleeBoss() {
 }
 
 /* ===================== 강화 ===================== */
-// 고급 강화(+15 이상): 일반 강화와 동일하게 시도하되, 고급 재료를 50배 소모하는 대신
+// 고급 강화(+15 이상): 일반 강화와 동일하게 시도하되, 고급 재료를 30배 소모하는 대신
 // 이번 시도의 파괴 확률이 절반으로 줄어든다(확정 방지는 아님 — 순수 확률 경감).
-const ADVANCED_ENH_MAT_MULT = 50;
-const ADVANCED_ENH_GOLD_MULT = 5;
+const ADVANCED_ENH_MAT_MULT = 30;
+const ADVANCED_ENH_GOLD_MULT = 3;
 const ADVANCED_ENH_DESTROY_MULT = 0.5;
 function advancedEnhEligible(w) { return !isFist(w) && highMatsNeeded(w.enhance) > 0; }
-// 맹세기사의 인장: 고급 강화 재료 배수 50배 → 40배로 감소
-function advancedEnhMult() { return sealEquippedHas('oathKnight') ? 40 : ADVANCED_ENH_MAT_MULT; }
+// 맹세기사의 인장: 고급 강화 재료 배수 30배 → 24배로 감소
+function advancedEnhMult() { return sealEquippedHas('oathKnight') ? 24 : ADVANCED_ENH_MAT_MULT; }
 function advancedEnhMatCost(w) { return highMatsNeeded(w.enhance) * advancedEnhMult(); }
 function advancedEnhGoldCost(w) { return enhanceCost(w) * ADVANCED_ENH_GOLD_MULT; }
 
@@ -3398,22 +3472,27 @@ function tryEnhance(advanced) {
   if (advanced && !advancedEnhEligible(w)) { log('고급 강화는 고급 재료가 필요한 +15 이상부터 사용할 수 있습니다.', 'lg-bad'); return; }
   // 끝나지 않은 맹세(고대 에이션트 스피릿): 대기 중인 무료 강화가 있으면 비용 없이 진행
   const freeThisTry = w.spirit === 'unbrokenoath' && fx.freeEnhance;
-  // 고급 강화는 골드 소모량도 일반 강화의 5배
+  // 고급 강화는 골드 소모량도 일반 강화의 3배
   const cost = freeThisTry ? 0 : (advanced ? advancedEnhGoldCost(w) : enhanceCost(w));
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
   // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름). 고급 강화는 배수 소모.
+  // 재료가 부족하면 그 부족분만큼 토벌의 증표로 대신 낼 수 있다(highMatStatus 참고).
   const matNeed = highMatsNeeded(w.enhance) * (advanced ? advancedEnhMult() : 1);
-  if (matNeed > 0 && countHighMats(w.grade) < matNeed) {
-    log(`고급 재료가 부족합니다! (필요 ${matNeed}개, 보유 ${countHighMats(w.grade)}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으세요`, 'lg-bad');
+  const matSt = highMatStatus(w.grade, matNeed);
+  if (!matSt.ok) {
+    log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${matSt.tokensHave}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
     return;
   }
   if (freeThisTry) { fx.freeEnhance = false; log('🕯️ 끝나지 않은 맹세 발동! 이번 강화는 무료입니다.', 'lg-prim'); }
   S.gold -= cost;
-  if (matNeed > 0) consumeHighMats(w.grade, matNeed);
+  if (matNeed > 0) {
+    consumeHighMatsWithTokens(w.grade, matNeed);
+    if (matSt.shortfall > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
+  }
   const advTag = advanced ? ' <span style="color:var(--unique)">[고급 강화]</span>' : '';
 
   const attemptLevel = w.enhance; // FX 연출 강도 판단용 (변경 전 단계)
-  const chance = Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + accEff().enh);
+  const chance = Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + enhTierBonus(w.enhance));
   if (Math.random() * 100 < chance) {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
@@ -3755,6 +3834,7 @@ function migrate(d) {
   if (!d.punch || typeof d.punch !== 'object') d.punch = { best: 0, last: 0 };
   if (!Array.isArray(d.ancientSeals)) d.ancientSeals = [];
   if (!Array.isArray(d.sealEquipped)) d.sealEquipped = [];
+  if (typeof d.matAutoSell !== 'object' || d.matAutoSell === null || Array.isArray(d.matAutoSell)) d.matAutoSell = {};
   if (!Array.isArray(d.accs)) d.accs = [];
   // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
@@ -4200,13 +4280,13 @@ function renderEnhance() {
   const maxed = w.enhance >= ENH.maxLevel;
   const nextAtk = maxed ? 0 : weaponAtk({ ...w, enhance: w.enhance + 1 });
   const cost = maxed ? 0 : enhanceCost(w);
-  const chance = maxed ? 0 : Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + accEff().enh);
+  const chance = maxed ? 0 : Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + enhTierBonus(w.enhance));
   const dChance = maxed ? 0 : effectiveDestroyChance(w);
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
-  const matHave = countHighMats(w.grade);
-  const matOk = matNeed === 0 || matHave >= matNeed;
+  const matSt = highMatStatus(w.grade, matNeed);
+  const matOk = matSt.ok;
   const matText = matNeed > 0
-    ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matHave}/${matNeed}</b></div>`
+    ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matSt.have}/${matSt.need}</b>${matSt.shortfall > 0 ? ` <span style="font-size:11px;color:${matSt.ok ? '#7de08a' : '#ff7a7a'}">(부족분 🎫${matSt.tokensNeed}개로 대체, 보유 🎫${matSt.tokensHave})</span>` : ''}</div>`
     : '';
   const typeInfo = isFist(w) ? null : WEAPON_TYPES.find(x => x.name === w.type);
   const flavor = weaponFlavorText(w);
@@ -4224,7 +4304,7 @@ function renderEnhance() {
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}`;
   const matNote = matNeed > 0 && !matOk
-    ? ` · <span class="warn">고급 재료 부족 (${highMatFloorLabel(w.grade)} 재료 ${matNeed}개 필요)</span>` : '';
+    ? ` · <span class="warn">고급 재료 부족 (${highMatFloorLabel(w.grade)} 재료 ${matNeed}개 필요, 🎫${matSt.tokensNeed}개 더 있으면 대체 가능)</span>` : '';
   $('enhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
     : isFist(w)
@@ -4243,12 +4323,13 @@ function renderAdvancedEnhance(w, maxed) {
     return;
   }
   const matNeed = advancedEnhMatCost(w);
-  const matHave = countHighMats(w.grade);
+  const matSt = highMatStatus(w.grade, matNeed);
   const goldNeed = advancedEnhGoldCost(w);
-  const affordable = matHave >= matNeed && S.gold >= goldNeed;
+  const affordable = matSt.ok && S.gold >= goldNeed;
+  const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🎫${matSt.tokensNeed}개로 대체` : '';
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="advancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
-      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matHave)}/${fmt(matNeed)} 소모)</span>
+      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
     </button>`;
   const btn = $('advancedEnhBtn');
   if (btn) btn.onclick = () => tryEnhance(true);
@@ -4876,6 +4957,77 @@ function renderCraft() {
   }
 }
 
+// 재료 자동판매 필터 (사냥터별 전체 적용 / 종류별 개별 적용)
+let matFilterExpanded = {}; // UI 전용 — 펼침 상태는 저장하지 않음
+function matAutoSellAllOn(f) { return [0, 1, 2].every(g => S.matAutoSell[f + '|' + g]); }
+function setMatAutoSell(f, g, on) {
+  const key = f + '|' + g;
+  if (on) S.matAutoSell[key] = true; else delete S.matAutoSell[key];
+}
+// 해당 사냥터 재료 3종의 현재 보유분을 한 번에 판매 (자동판매 설정 여부와 무관)
+function bulkSellFloorMats(f) {
+  let total = 0, count = 0;
+  for (let g = 0; g < 3; g++) {
+    const key = f + '|' + g;
+    const have = S.mats[key] || 0;
+    if (have > 0) {
+      total += matSellPrice(f, g) * have;
+      count += have;
+      delete S.mats[key];
+    }
+  }
+  if (count === 0) { log('일괄판매할 재료가 없습니다.', 'lg-bad'); return; }
+  S.gold += total;
+  log(`🌿 일괄판매: ${FLOORS[f].name} 재료 ${count}개 → +${fmt(total)} 골드`, 'lg-good');
+  renderTop(); renderCraft(); save();
+}
+function renderMatFilter() {
+  const box = $('matFilterList');
+  if (!box) return;
+  box.innerHTML = '';
+  for (let f = 0; f < S.unlocked && f < FLOORS.length; f++) {
+    const F = FLOORS[f];
+    const allOn = matAutoSellAllOn(f);
+    const expanded = !!matFilterExpanded[f];
+    const div = document.createElement('div');
+    div.className = 'matfilterrow';
+    div.innerHTML = `
+      <div class="matfilter-main">
+        <label class="matfilter-check"><input type="checkbox" ${allOn ? 'checked' : ''} data-mf-all="${f}"> ${f + 1}단계 ${F.name} 전체 자동판매</label>
+        <button data-mf-sell="${f}">일괄판매</button>
+        <button data-mf-toggle="${f}">${expanded ? '접기 ▴' : '펼치기 ▾'}</button>
+      </div>
+      ${expanded ? `<div class="matfilter-sub">
+        ${[0, 1, 2].map(g => `<label class="matfilter-check"><input type="checkbox" ${S.matAutoSell[f + '|' + g] ? 'checked' : ''} data-mf-one="${f}|${g}"> ${F.mats[g] || '???'}</label>`).join('')}
+      </div>` : ''}`;
+    box.appendChild(div);
+  }
+  box.querySelectorAll('[data-mf-all]').forEach(el => {
+    el.onchange = () => {
+      const f = Number(el.dataset.mfAll);
+      for (let g = 0; g < 3; g++) setMatAutoSell(f, g, el.checked);
+      save(); renderMatFilter();
+    };
+  });
+  box.querySelectorAll('[data-mf-one]').forEach(el => {
+    el.onchange = () => {
+      const [f, g] = el.dataset.mfOne.split('|').map(Number);
+      setMatAutoSell(f, g, el.checked);
+      save(); renderMatFilter();
+    };
+  });
+  box.querySelectorAll('[data-mf-sell]').forEach(el => {
+    el.onclick = () => bulkSellFloorMats(Number(el.dataset.mfSell));
+  });
+  box.querySelectorAll('[data-mf-toggle]').forEach(el => {
+    el.onclick = () => {
+      const f = Number(el.dataset.mfToggle);
+      matFilterExpanded[f] = !matFilterExpanded[f];
+      renderMatFilter();
+    };
+  });
+}
+
 // 늪의 진주(고대 에이션트 스피릿 전용 재료) 판매가 — 늪지대(10층) 보스 원킷·1시간 보상의 절반 수준
 function pearlSellPrice() { return Math.floor(floorGold(9) * 1800); }
 function sellPearl(n) {
@@ -4892,6 +5044,7 @@ function sellPearl(n) {
 // 재료 판매 목록
 function renderMatSell() {
   renderBossAccs();
+  renderMatFilter();
   const list = $('matselllist');
   if (!list) return;
   list.innerHTML = '';

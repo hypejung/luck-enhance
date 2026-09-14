@@ -51,6 +51,7 @@
   /* ===== 탭 ===== */
   #tabs { display: flex; gap: 6px; margin-bottom: 10px; }
   .tab {
+    position: relative;
     flex: 1; text-align: center; padding: 10px 4px;
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: bold;
@@ -58,6 +59,25 @@
   }
   .tab:hover { color: var(--text); }
   .tab.on { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
+
+  .tab-badge {
+    position: absolute; top: -3px; right: -3px;
+    width: 9px; height: 9px; border-radius: 50%;
+    background: #ff4d4d; border: 1px solid var(--panel);
+  }
+  .tab-badge[hidden] { display: none; }
+
+  .patchnote-card {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .patchnote-card.unread { border-color: #ff4d4d; }
+  .patchnote-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+  .patchnote-ver { font-weight: bold; color: var(--gold); }
+  .patchnote-date { font-size: 12px; color: var(--sub); }
+  .patchnote-new { font-size: 11px; font-weight: bold; color: #fff; background: #ff4d4d; border-radius: 4px; padding: 1px 6px; }
+  .patchnote-title { font-weight: bold; margin-bottom: 6px; }
+  .patchnote-changes { font-size: 13px; line-height: 1.6; margin: 0; padding-left: 18px; }
 
   .panel {
     background: var(--panel); border: 1px solid var(--border);
@@ -334,6 +354,7 @@
     <div class="tab" data-tab="codex">📖 도감</div>
     <div class="tab" data-tab="blacksmith">🔨 대장장이</div>
     <div class="tab" data-tab="raid">🚩 토벌전</div>
+    <div class="tab" data-tab="patchnotes">📜 패치노트<span id="patchNotesBadge" class="tab-badge" hidden></span></div>
   </div>
 
   <!-- 사냥터 -->
@@ -611,6 +632,16 @@
         <button class="big danger" id="raidFleeBtn" style="width:100%;">🏳️ 토벌전 포기</button>
       </div>
       <div id="raidList"></div>
+    </div>
+  </div>
+
+  <div id="tab-patchnotes" style="display:none">
+    <div class="panel">
+      <h3>📜 패치노트</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        업데이트 내역입니다. 최신 버전이 맨 위에 표시됩니다.
+      </div>
+      <div id="patchNotesList"></div>
     </div>
   </div>
 
@@ -1261,6 +1292,31 @@ const RAID_MONSTERS = [
   { name: '위엄을 삼킨 태초의 화룡', emoji: '🐲', flavor: '모든 용의 위엄을 집어삼켜 스스로 신화가 된 존재.' },
   { name: '몰락조차 초월한 태초의 잔영', emoji: '😇', flavor: '신이었던 것의, 신을 넘어선 마지막 잔영.' },
 ];
+// ---------- 패치노트 ----------
+// 최신이 배열 맨 앞(index 0)에 오도록 추가한다. 버전은 1부터 순증가하는 단순 정수.
+const PATCH_NOTES = [
+  {
+    version: 1,
+    date: '2026-09-15',
+    title: '밸런스 대규모 조정 + 클라우드 동기화',
+    changes: [
+      '☁️ 클라우드 동기화 저장 추가 — 동기화 ID/비밀번호로 다른 기기에서도 이어서 플레이 가능 (저장바의 🔗 동기화 버튼)',
+      '🔮 룬박스 등급별 드롭 확률 전면 재설계 — 일반 룬박스에서 고대 룬이 나오던 문제 등 등급별 확률 전체를 다시 잡음',
+      '⚔️ 용살자의 서약 / 거인 사냥꾼: 보스 최대체력 비례 피해를 무기 공격력 비례 피해로 전환',
+      '🩸 처형자의 낙인: 보스전에서 5스택에 도달하면 무기 공격력 800%에 해당하는 큰 고정 피해를 추가로 입힘 (기존엔 스택만 초기화되고 아무 효과 없었음)',
+      '🛠️ 고급 강화 비용 40% 절감 (골드 소모 5배→3배, 재료 소모 50배→30배). 보스 처치 시 그 사냥터의 최고 등급 재료를 대량 지급. 고급 재료가 부족하면 토벌의 증표로 부족분을 대신 낼 수 있음(증표 1개 = 재료 100개)',
+      '🎲 강화 확률 보정(장신구/도감 등 보너스)에 "몇 단계 이하에서만 적용" 상한을 도입 — 고단계로 갈수록 고정 보정이 상대적으로 과도하게 커지던 문제 해결',
+      '💫 신화 확률을 대폭 높인 "신화 랜덤박스" 신규 추가 (신화 3.5%, 레전더리 7%)',
+      '🌿 가방(재료) 탭에 사냥터별 자동판매 필터 + 일괄판매 버튼 추가',
+      '🚩 토벌전 도전 횟수 초기화 시각을 자정이 아닌 매일 오전 9시로 고정',
+      '📦 랜덤박스 100개 단위 일괄 구매 버튼 추가',
+      '📖 무기 도감: 레전더리 이상은 미보유 상태에서도 이름/설명 미리보기 가능 + 모바일 터치 팝업 지원',
+      '📜 지금 보고 있는 이 패치노트 탭 신규 추가',
+    ],
+  },
+];
+function latestPatchVersion() { return PATCH_NOTES.length ? PATCH_NOTES[0].version : 0; }
+
 // ---------- 고대의 인장 (토벌전 초희귀 장신구) ----------
 // 토벌전 승리 시 아주 낮은 확률(보스 장신구 0.9%보다도 낮게)로 그 단계의 인장을 시도한다.
 // 태초의 유물처럼 가방 탭에 별도 공간을 두지만, 항상 발동이 아니라 "장착"이 필요하고
@@ -2004,6 +2060,7 @@ function newState() {
     sealEquipped: [],  // 장착 중인 고대의 인장 id 목록 (최대 ANCIENT_SEAL_SLOTS개)
     bossFreeRetryReady: false, // 무한진군의 인장: 충전된 무료 보스 재도전 여부
     matAutoSell: {},   // 재료 자동판매 필터: 'f|g' 키가 true면 그 재료는 획득 즉시 자동 판매됨
+    lastSeenPatchVersion: latestPatchVersion(), // 신규 플레이어는 처음부터 전부 "읽은" 상태로 시작
   };
 }
 
@@ -3823,6 +3880,10 @@ function save() {
 }
 // 이전 버전 저장 데이터에 빠진 필드를 채워주는 마이그레이션
 function migrate(d) {
+  // 패치노트 기능 도입 이전 세이브(기존 플레이어)는 0으로 시작해서 v1을 "안읽음"으로 보게 한다.
+  // (신규 세이브는 newState()에서 곧바로 latestPatchVersion()으로 시작 — 아래 generic 채움 루프가
+  // 이 필드를 건드리지 않도록 그 루프보다 먼저 명시적으로 채워둔다.)
+  if (typeof d.lastSeenPatchVersion !== 'number') d.lastSeenPatchVersion = 0;
   const base = newState();
   for (const k of Object.keys(base)) {
     if (d[k] === undefined) d[k] = base[k];
@@ -4847,7 +4908,7 @@ function renderAll() {
 function switchTab(name) {
   currentTab = name;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'patchnotes']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'enhance') renderEnhance();
@@ -4860,6 +4921,34 @@ function switchTab(name) {
   if (name === 'codex') renderCodex();
   if (name === 'blacksmith') renderBlacksmith();
   if (name === 'raid') renderRaidTab();
+  if (name === 'patchnotes') renderPatchNotes();
+}
+// 패치노트: 안읽음 여부는 렌더링 시점의 "이전에 확인한 버전" 기준으로 표시한 뒤,
+// 탭을 열람하는 즉시 최신 버전까지 전부 확인한 것으로 갱신한다.
+function renderPatchNotes() {
+  const list = $('patchNotesList');
+  if (!list) return;
+  const lastSeen = S.lastSeenPatchVersion || 0;
+  list.innerHTML = PATCH_NOTES.map(p => `
+    <div class="patchnote-card ${p.version > lastSeen ? 'unread' : ''}">
+      <div class="patchnote-head">
+        <span class="patchnote-ver">v${p.version}</span>
+        <span class="patchnote-date">${p.date}</span>
+        ${p.version > lastSeen ? '<span class="patchnote-new">NEW</span>' : ''}
+      </div>
+      <div class="patchnote-title">${p.title}</div>
+      <ul class="patchnote-changes">${p.changes.map(c => `<li>${c}</li>`).join('')}</ul>
+    </div>`).join('');
+  if (latestPatchVersion() > lastSeen) {
+    S.lastSeenPatchVersion = latestPatchVersion();
+    updatePatchNotesBadge();
+    save();
+  }
+}
+function updatePatchNotesBadge() {
+  const badge = $('patchNotesBadge');
+  if (!badge) return;
+  badge.hidden = !(S && latestPatchVersion() > (S.lastSeenPatchVersion || 0));
 }
 
 // 장신구 효과 설명 문자열
@@ -5225,6 +5314,7 @@ function init() {
   renderAll();
   renderBoxes();
   renderBossBtn();
+  updatePatchNotesBadge();
 
   // 루프 (10 tick/sec) — 에러가 나도 루프가 죽지 않도록 방어
   let last = performance.now();

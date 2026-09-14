@@ -365,7 +365,7 @@
 
   <div id="tabs">
     <div class="tabgroup" data-group="combat">
-      <div class="tabgroup-header">⚔️ 전투 <span class="tabgroup-arrow">▾</span></div>
+      <div class="tabgroup-header active">⚔️ 전투 <span class="tabgroup-arrow">▾</span></div>
       <div class="tabgroup-body">
         <div class="tab on" data-tab="hunt">⚔️ 사냥터</div>
         <div class="tab" data-tab="raid">🚩 토벌전</div>
@@ -373,7 +373,7 @@
     </div>
     <div class="tabgroup" data-group="growth">
       <div class="tabgroup-header">🔨 강화/성장 <span class="tabgroup-arrow">▾</span></div>
-      <div class="tabgroup-body">
+      <div class="tabgroup-body" hidden>
         <div class="tab" data-tab="enhance">🔨 강화기</div>
         <div class="tab" data-tab="stats">📊 능력치</div>
         <div class="tab" data-tab="rune">🔮 룬</div>
@@ -382,7 +382,7 @@
     </div>
     <div class="tabgroup" data-group="items">
       <div class="tabgroup-header">🎒 아이템 <span class="tabgroup-arrow">▾</span></div>
-      <div class="tabgroup-body">
+      <div class="tabgroup-body" hidden>
         <div class="tab" data-tab="inventory">🎒 가방</div>
         <div class="tab" data-tab="craft">🧪 조합</div>
         <div class="tab" data-tab="box">🎁 랜덤박스</div>
@@ -390,7 +390,7 @@
     </div>
     <div class="tabgroup" data-group="etc">
       <div class="tabgroup-header">🎲 기타 <span id="tabgroupBadgeEtc" class="tabgroup-dot" hidden></span> <span class="tabgroup-arrow">▾</span></div>
-      <div class="tabgroup-body">
+      <div class="tabgroup-body" hidden>
         <div class="tab" data-tab="gamble">🎲 도박장</div>
         <div class="tab" data-tab="codex">📖 도감</div>
         <div class="tab" data-tab="patchnotes">📜 패치노트<span id="patchNotesBadge" class="tab-badge" hidden></span></div>
@@ -1355,7 +1355,7 @@ const PATCH_NOTES = [
       '📦 랜덤박스 100개 단위 일괄 구매 버튼 추가',
       '📖 무기 도감: 레전더리 이상은 미보유 상태에서도 이름/설명 미리보기 가능 + 모바일 터치 팝업 지원',
       '📜 지금 보고 있는 이 패치노트 탭 신규 추가',
-      '📂 상단 탭이 많아져 가시성이 떨어지던 문제 — 전투/강화·성장/아이템/기타 4개 카테고리로 묶어 접고 펼칠 수 있게 정리',
+      '📂 상단 탭이 많아져 가시성이 떨어지던 문제 — 전투/강화·성장/아이템/기타 4개 카테고리로 묶어 각각 따로 접고 펼칠 수 있게 정리 (여러 카테고리를 동시에 펼쳐둘 수도 있음)',
     ],
   },
 ];
@@ -4956,16 +4956,14 @@ const TAB_GROUPS = [
   { id: 'items', tabs: ['inventory', 'craft', 'box'] },
   { id: 'etc', tabs: ['gamble', 'codex', 'patchnotes'] },
 ];
-// 주어진 탭이 속한 카테고리만 펼치고 나머지는 접는다 (아코디언 — 한 번에 하나만 펼쳐짐)
+// 활성 탭이 속한 카테고리는 펼치되, 다른 카테고리가 펼쳐져 있어도 그대로 둔다(여러 개 동시 펼침 가능)
 function setActiveTabGroup(name) {
   const group = TAB_GROUPS.find(g => g.tabs.includes(name));
-  document.querySelectorAll('.tabgroup').forEach(el => {
-    const isActive = !!group && el.dataset.group === group.id;
-    const header = el.querySelector('.tabgroup-header');
-    const body = el.querySelector('.tabgroup-body');
-    header.classList.toggle('active', isActive);
-    body.hidden = !isActive;
-  });
+  if (!group) return;
+  const el = document.querySelector(`.tabgroup[data-group="${group.id}"]`);
+  if (!el) return;
+  el.querySelector('.tabgroup-header').classList.add('active');
+  el.querySelector('.tabgroup-body').hidden = false;
 }
 function switchTab(name) {
   currentTab = name;
@@ -5335,14 +5333,13 @@ function init() {
 
   // 탭
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
-  // 탭 카테고리 헤더 클릭: 같은 걸 다시 누르면 접히고, 다른 걸 누르면 그것만 펼쳐짐(아코디언)
+  // 탭 카테고리 헤더 클릭: 그 카테고리만 접거나 펼침 (다른 카테고리는 건드리지 않음 — 여러 개 동시 펼침 가능)
   document.querySelectorAll('.tabgroup-header').forEach(h => {
     h.onclick = () => {
       const body = h.parentElement.querySelector('.tabgroup-body');
       const willOpen = body.hidden;
-      document.querySelectorAll('.tabgroup-header').forEach(hh => hh.classList.remove('active'));
-      document.querySelectorAll('.tabgroup-body').forEach(b => b.hidden = true);
-      if (willOpen) { h.classList.add('active'); body.hidden = false; }
+      body.hidden = !willOpen;
+      h.classList.toggle('active', willOpen);
     };
   });
   setActiveTabGroup(currentTab);

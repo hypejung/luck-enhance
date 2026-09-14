@@ -1869,35 +1869,21 @@ const RUNE_SPECIALS = {
 const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
 for (const [k, v] of Object.entries(RUNE_SPECIALS)) RUNE_SPECIALS_BY_GRADE[v.grade].push(k);
 
-// 룬박스 등급별 "자기 등급" 룬이 나올 확률(%) — 고대(6)는 하위 박스의 "상위 등급 보너스" 확률(레전 0.0146%,
-// 신화 0.041%)보다도 낮으면 고대 룬박스를 직접 사는 의미가 없어지므로, 모든 박스를 통틀어 가장 높은
-// 고대 획득 확률이 되도록 1%로 고정한다.
-const RUNE_HEADLINE = [90, 20, 5, 1, 0.2, 0.04, 1];
-// 일반 룬박스는 레어/에픽 확률도 직접 지정(요청 스펙 그대로), 나머지 등급/박스는 자동 분배
-const RUNE_PINNED = { 0: { 1: 5, 2: 1 } };
+// 룬박스 등급별 드롭 확률(%) — 등급별로 직접 지정한 고정 테이블.
+// 인덱스 0~6 = 일반/레어/에픽/유니크/레전더리/신화/고대. 각 행의 합은 100.
+const RUNE_DROP_TABLES = [
+  /* 0 일반   */ [68.6, 29.4, 0,    2.0,  0,    0,   0],   // 일반:레어 = 7:3, 유니크만 드물게. 유니크 이상(에픽/레전더리+)은 등장 안 함
+  /* 1 레어   */ [10,   50,   0,    40,   0,    0,   0],   // 일반 소량, 레어·유니크가 높게. 레전더리 이상 없음
+  /* 2 에픽   */ [12,   45,   35,   7,    1,    0,   0],   // 레어>에픽>일반>유니크≫레전더리
+  /* 3 유니크 */ [2.7,  8.5,  50,   38,   0.6,  0.2, 0],   // 에픽>유니크>레어>일반>레전더리≫신화
+  /* 4 레전더리*/ [0,    2.5,  4,    45,   47.5, 1,   0],   // 유니크·레전더리 위주, 신화 소량, 고대 없음
+  /* 5 신화   */ [0,    0,    0,    2.5,  86,   10,  1.5], // 레전더리 위주, 신화 10%, 고대 1.5%
+  /* 6 고대   */ [0,    0,    0,    0,    55,   40,  5],   // 레전더리:신화:고대 = 55:40:5
+];
 function buildRuneDropTable(boxTier) {
-  const pinned = { [boxTier]: RUNE_HEADLINE[boxTier], ...(RUNE_PINNED[boxTier] || {}) };
-  const pinnedSum = Object.values(pinned).reduce((a, b) => a + b, 0);
-  const remain = 100 - pinnedSum;
-  const belowGrades = [0, 1, 2, 3, 4, 5, 6].filter(g => g < boxTier && !(g in pinned));
-  const aboveGrades = [0, 1, 2, 3, 4, 5, 6].filter(g => g > boxTier && !(g in pinned));
-  // 박스 등급보다 "높은" 룬 전체 확률은 박스 등급이 오를수록 빠르게 줄어든다(상위 룬은 항상 희귀해야 함).
-  // 나머지(대부분)는 박스 등급 이하(주로 바로 아래 등급)로 흘러간다 — below/above 총량을 먼저 분리한 뒤
-  // 각 그룹 안에서 헤드라인과 가까운 등급일수록 더 많이 받도록 지수적으로 분배.
-  const aboveTotal = aboveGrades.length ? Math.min(remain, 4 * Math.pow(0.4, boxTier)) : 0;
-  const belowTotal = remain - aboveTotal;
-  const table = [];
-  const distribute = (grades, total, base, distFn) => {
-    if (!grades.length || total <= 0) return;
-    let wsum = 0;
-    const ws = grades.map(g => { const w = Math.pow(base, distFn(g)); wsum += w; return [g, w]; });
-    for (const [g, w] of ws) table.push([g, +(total * w / wsum).toFixed(4)]);
-  };
-  distribute(belowGrades, belowTotal, 3, g => g - boxTier);       // dist<0 → 헤드라인에 가까울수록 큰 비중
-  distribute(aboveGrades, aboveTotal, 6, g => boxTier - g);       // dist<0 → 헤드라인에 가까울수록 큰 비중, 훨씬 가파르게 감소
-  for (const [g, p] of Object.entries(pinned)) table.push([+g, p]);
-  table.sort((a, b) => a[0] - b[0]);
-  return table;
+  return RUNE_DROP_TABLES[boxTier]
+    .map((p, g) => [g, p])
+    .filter(([, p]) => p > 0);
 }
 // 룬박스 가격 = 박스 등급보다 2단계 높은 등급의 무기를 +15까지 강화하는 데 드는 평균 골드
 // (예: 일반 룬박스 → 에픽 무기 +15 평균 골드)

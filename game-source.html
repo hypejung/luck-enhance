@@ -1185,9 +1185,13 @@ const fx = {
 // 무기 등급/강화 자체의 배율은 여기 포함되지 않음 — 순수 확률/배율형 스탯만 제한.
 const DMG_CAPS = {
   critChance: 0.5,   // 치명타 확률 최대 50%
-  critMult: 2.5,      // 치명타 피해 최대 2.5배
+  critMult: 5.0,      // 치명타 피해 최대 5.0배 — 풀 장비(룬 중복 2개 제한 포함)만으로는 약 4.51배까지만
+                       // 닿고, 나머지는 무제한 투자 가능한 치명 훈련으로 채워야 진짜 상한에 도달
   extraChance: 0.25,  // 연타(추가공격) 확률 최대 25%
 };
+// 연타(추가공격)는 치명타 배율을 적용하기 전 기본 데미지의 이 비율만큼만 별도로 적용된다
+// (원래는 치명타가 터진 타격이면 연타도 그 배율을 그대로 물려받아 사실상 "치명타 2연타"가 되던 문제 수정)
+const EXTRA_ATK_DMG_MULT = 0.75;
 const ENH = {
   maxLevel: 30,
   linearPhase: 10,          // +0 ~ +10: 강화당 공격력이 일정량씩 선형으로만 증가(급등 없음)
@@ -1356,6 +1360,13 @@ const PATCH_NOTES = [
       '📖 무기 도감: 레전더리 이상은 미보유 상태에서도 이름/설명 미리보기 가능 + 모바일 터치 팝업 지원',
       '📜 지금 보고 있는 이 패치노트 탭 신규 추가',
       '📂 상단 탭이 많아져 가시성이 떨어지던 문제 — 전투/강화·성장/아이템/기타 4개 카테고리로 묶어 각각 따로 접고 펼칠 수 있게 정리 (여러 카테고리를 동시에 펼쳐둘 수도 있음)',
+      '💥 치명타 피해 상한 2.5배 → 5.0배로 상향, 동일 룬 중복 장착 제한 신설(일반~레전더리 2개, 신화·고대 1개)',
+      '⚡ 연타(추가공격)가 원래 타격의 치명타 배율을 그대로 물려받던 문제 수정 — 이제 치명타 미적용 기본 데미지의 75%로 별도 계산',
+      '💰 골드 러시 중복 장착 시 확률이 독립 판정되어 과하게 중첩되던 것을 합연산으로 변경',
+      '🌟 미다스의 손 재설계 — 처치 시 보너스 박스가 신화 랜덤박스까지 포함하도록 확장, 장착 중엔 랜덤박스·룬박스의 최고 등급 확률이 2배로 상승',
+      '⚡ 신벌이 보스에게는 아무 효과 없던 것을 보스 최대 체력 1% 고정 피해로 변경',
+      '♾️ 전능의 룬을 "모든 스탯 +8%p"에서 "훈련 비용 -30%, 골드 획득 +50%"로 재설계',
+      '🍀 도박의 신 발동 시 결과창에 시각 효과 추가',
     ],
   },
 ];
@@ -1457,7 +1468,7 @@ function raidGoldReward(stage) {
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const ae = accEff();
   let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
-  goldMul *= Math.pow(1.2, weaponSpecialCount(w, 'omnirune'));
+  goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
   if (hasGenesis('gluttony')) goldMul *= 10;
   const killsPerHour = weaponSpeed(w) * 3600;
   const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
@@ -1890,6 +1901,8 @@ function trainingCost(key) {
   const tier = Math.floor(lvl / TRAINING_TIER_STEP);
   let cost = Math.round(t.baseCost * Math.pow(lvl + 1, t.costExp) * trainingTierMult(tier));
   if (sealEquippedHas('wrathAvatar')) cost = Math.round(cost * 0.85);
+  // 전능의 룬(태초): 능력치 훈련 비용 -30%
+  if (weaponSpecialCount(getEquipped(), 'omnirune') > 0) cost = Math.round(cost * RUNE_SPECIALS.omnirune.trainCostMult);
   return cost;
 }
 function trainingValue(key) { return trainingLevel(key) * TRAINING[key].perLevel; }
@@ -1980,9 +1993,9 @@ const RUNE_SPECIALS = {
   chainslayer:  { name: '연쇄 처치',       grade: 5, proc: 0.15, desc: '몬스터 처치 시 15% 확률로 처치 보상(골드/재료/드롭)을 한 번 더 획득' },
   timedilation: { name: '시간 왜곡',       grade: 5, bonus: 20,  desc: '보스전 제한시간 +20초' },
   bossrush:     { name: '보스 러시',       grade: 5, mult: 0.5,  desc: '보스 재도전 쿨타임 50% 감소' },
-  midastouch:   { name: '미다스의 손',     grade: 6, proc: 0.08, desc: '몬스터 처치 시 8% 확률로 랜덤박스(일반~에픽) 즉시 획득' },
-  divinestrike: { name: '신벌',            grade: 6, proc: 0.02, desc: '공격 시 2% 확률로 몬스터 즉시 처치 (보스 제외)' },
-  omnirune:     { name: '전능의 룬',       grade: 6, value: 8,   desc: '모든 일반 스탯(공속/치확/치피/연타/보스피해) +8%p, 골드 획득 +20%' },
+  midastouch:   { name: '미다스의 손',     grade: 6, proc: 0.08, desc: '몬스터 처치 시 8% 확률로 랜덤박스(전체 등급, 신화 포함) 즉시 획득. 장착 중에는 랜덤박스·룬박스를 열 때 가장 좋은 등급이 나올 확률이 2배로 오른다(늘어난 만큼 낮은 등급에서 비율대로 차감)' },
+  divinestrike: { name: '신벌',            grade: 6, proc: 0.02, bossDmgPct: 0.01, desc: '공격 시 2% 확률로 몬스터 즉시 처치 (보스는 대신 최대 체력의 1% 고정 피해)' },
+  omnirune:     { name: '전능의 룬',       grade: 6, trainCostMult: 0.7, goldMult: 1.5, desc: '능력치 훈련 비용 -30%, 골드 획득 +50%' },
   elitehunter:  { name: '정예 사냥꾼',     grade: 5, bonus: 0.02, desc: '엘리트(유니크) 몬스터 출현 확률 +2%p' },
   luckygambler: { name: '도박의 신',       grade: 6, proc: 0.25, desc: '도박장에서 손해가 나오면 25% 확률로 즉시 재도전(더 나은 결과가 나올 때까지는 아니고 한 번 더 굴림)' },
 };
@@ -2237,8 +2250,7 @@ function weaponRuneStat(w, statKey) {
   if (!w || !Array.isArray(w.runes)) return 0;
   let total = 0;
   for (const r of w.runes) {
-    if (r.grade <= 3) { if (r.key === statKey) total += RUNE_STATS[statKey].values[r.grade]; }
-    else if (r.key === 'omnirune' && RUNE_STAT_KEYS.includes(statKey)) total += RUNE_SPECIALS.omnirune.value; // 전능의 룬: 5개 스탯에 균일 보너스
+    if (r.grade <= 3 && r.key === statKey) total += RUNE_STATS[statKey].values[r.grade];
   }
   return total;
 }
@@ -2523,6 +2535,18 @@ function wrand(pairs) { // [[value, weight], ...]
   for (const [v, w] of pairs) { r -= w; if (r <= 0) return v; }
   return pairs[pairs.length - 1][0];
 }
+// 미다스의 손(룬 특수효과): 장착 중이면 박스/룬박스 드롭 테이블에서 가장 좋은(값이 가장 큰) 등급의
+// 확률을 2배로 올리고, 늘어난 만큼을 나머지 등급들에서 비율대로 깎아 합계를 그대로 유지한다.
+function applyMidasBoost(pairs) {
+  if (pairs.length < 2 || !weaponSpecialCount(getEquipped(), 'midastouch')) return pairs;
+  const sorted = [...pairs].sort((a, b) => a[0] - b[0]);
+  const bestIdx = sorted.length - 1;
+  const bestWeight = sorted[bestIdx][1];
+  const othersTotal = sorted.reduce((s, p, i) => i === bestIdx ? s : s + p[1], 0);
+  if (othersTotal <= 0) return pairs;
+  const shrinkRatio = Math.max(0, (othersTotal - bestWeight) / othersTotal);
+  return sorted.map((p, i) => i === bestIdx ? [p[0], p[1] * 2] : [p[0], p[1] * shrinkRatio]);
+}
 function log(msg, cls) {
   const el = document.createElement('div');
   if (cls) el.className = cls;
@@ -2576,19 +2600,19 @@ function dropRoll() {
   const isU = mon.unique;
 
   if (isU) goldMul *= 10;
-  // 전능의 룬(태초): 골드 획득 +20% (여러 개 장착하면 곱연산 중첩)
-  goldMul *= Math.pow(1.2, weaponSpecialCount(w, 'omnirune'));
+  // 전능의 룬(태초): 골드 획득 +50% (여러 개 장착하면 곱연산 중첩)
+  goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
   // 끝없는 허기(글러트니의 목걸이): 태초를 제외한 모든 아이템 드랍률 ×10, 골드 획득 ×10
   if (hasGenesis('gluttony')) { dropMul *= 10; goldMul *= 10; }
 
   // 골드
   let gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
-  // 골드 러시(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공할 때마다 골드 2배 — 발동 알림은 화면 텍스트로만
-  for (let i = 0; i < weaponSpecialCount(w, 'goldrush'); i++) {
-    if (Math.random() < RUNE_SPECIALS.goldrush.proc) {
-      gold *= 2;
-      floatText('💰 골드 러시!');
-    }
+  // 골드 러시(룬 특수효과): 장착 개수 × 확률을 단순 합산(최대 100%)해서 딱 한 번만 판정 —
+  // 개수만큼 독립 판정하면 중첩 발동(2배가 여러 번 겹침)까지 가능해져서 합연산으로 변경.
+  const goldrushCount = weaponSpecialCount(w, 'goldrush');
+  if (goldrushCount > 0 && Math.random() < Math.min(1, RUNE_SPECIALS.goldrush.proc * goldrushCount)) {
+    gold *= 2;
+    floatText('💰 골드 러시!');
   }
   // 대박의 손(레전더리 재화): 처치마다 낮은 확률로 골드 잭팟
   let jackpot = false;
@@ -2650,10 +2674,10 @@ function dropRoll() {
     }
   }
 
-  // 미다스의 손(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정 — 발동 알림은 화면 텍스트로만
+  // 미다스의 손(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정 — 전체 박스 등급(신화 포함) 대상
   for (let i = 0; i < weaponSpecialCount(w, 'midastouch'); i++) {
     if (Math.random() < RUNE_SPECIALS.midastouch.proc) {
-      const idx = wrand([[0, 60], [1, 30], [2, 10]]);
+      const idx = wrand([[0, 50], [1, 30], [2, 12], [3, 6], [4, 2]]);
       floatText('🌟 미다스의 손!');
       giveBox(idx, '미다스의 손');
     }
@@ -2786,7 +2810,7 @@ function openBox(idx, src) {
   const gChance = b.gold;
 
   if (roll < wChance) {
-    const grade = wrand(b.weapon);
+    const grade = wrand(applyMidasBoost(b.weapon));
     const nw = genWeapon(grade);
     addWeapon(nw);
     log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 무기! ${gradeTag(nw)}`, grade >= 3 ? 'lg-epic' : 'lg-good');
@@ -2967,12 +2991,18 @@ function attack(w) {
   if (bossFight.active) {
     dmg *= 1 + bossDmgBonus();
   }
-  // 신벌(룬 특수효과): 보스 제외 즉사 — 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
+  // 신벌(룬 특수효과): 일반 몬스터는 즉시 처치, 보스는 최대 체력의 1% 고정 피해로 대체.
+  // 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
   const divineCount = weaponSpecialCount(w, 'divinestrike');
-  if (!bossFight.active && divineCount > 0 && Math.random() < 1 - Math.pow(1 - RUNE_SPECIALS.divinestrike.proc, divineCount)) {
-    mon.hp = 0;
-    floatText('⚡ 신벌!');
-    return;
+  if (divineCount > 0 && Math.random() < 1 - Math.pow(1 - RUNE_SPECIALS.divinestrike.proc, divineCount)) {
+    if (bossFight.active) {
+      mon.hp -= mon.maxHp * (RUNE_SPECIALS.divinestrike.bossDmgPct || 0);
+      floatText('⚡ 신벌!');
+    } else {
+      mon.hp = 0;
+      floatText('⚡ 신벌!');
+      return;
+    }
   }
   // 치명타 확률/배율 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
   // (발동 알림은 화면 텍스트로만)
@@ -2988,6 +3018,7 @@ function attack(w) {
   let critMult = Math.min(DMG_CAPS.critMult,
     (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage);
   if (fixedCrit !== null) critMult += otherCritChance * (e.overflowRatio || 0);
+  const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
   if (forceCrit) fx.executionerReady = false;
@@ -3090,7 +3121,7 @@ function attack(w) {
   const extraChance = Math.min(DMG_CAPS.extraChance,
     (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk);
   if (extraChance > 0 && Math.random() < extraChance) {
-    mon.hp -= dmg;
+    mon.hp -= preCritDmg * EXTRA_ATK_DMG_MULT;
     floatText('⚡ 연타!');
     if (w.effect === 'sprint') fx.sprintUntil = now + (e.sprintDur || 3) * 1000;
     if (w.effect === 'frenzy') { fx.frenzyStacks = Math.min(e.stackMax || 5, (fx.frenzyStacks || 0) + 1); fx.frenzyLast = now; }
@@ -3303,7 +3334,7 @@ function endBossFight(win) {
     // 해당 층 몬스터를 "원킷" 기준으로 1시간(3600초) 동안 사냥했을 때 벌 수 있는 골드와 동일하게 산출
     // (평시 사냥 골드 배율 스택과 동일하게: 무기 효과 골드% + 장신구 골드% + 전능의 룬 + 글러트니 유물)
     let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
-    goldMul *= Math.pow(1.2, weaponSpecialCount(w, 'omnirune'));
+    goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
     if (hasGenesis('gluttony')) goldMul *= 10;
     const killsPerHour = weaponSpeed(w) * 3600;
     const gold = Math.floor(floorGold(f) * killsPerHour * goldMul);
@@ -3759,7 +3790,11 @@ function gamble(ratio) {
   }
   const result = Math.floor(bet * gm);
   S.gold += bet + result;
-  if (luckyReroll) log('🍀 <b>도박의 신</b> 발동! 손해가 나오자 즉시 재도전했습니다.', 'lg-prim');
+  if (luckyReroll) {
+    log('🍀 <b>도박의 신</b> 발동! 손해가 나오자 즉시 재도전했습니다.', 'lg-prim');
+    const rerollEl = $('betresult');
+    if (rerollEl) { rerollEl.classList.add('flash'); setTimeout(() => rerollEl.classList.remove('flash'), 400); }
+  }
   const br = $('betresult');
   if (gm >= 2) {
     br.innerHTML = `<span style="color:var(--gold)">🎉 잭팟!! +${gm * 100}% (+${fmt(result)})</span>`;
@@ -4716,7 +4751,7 @@ function openRuneBox(tier) {
   const b = RUNE_BOXES[tier];
   if (S.gold < b.cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
   S.gold -= b.cost;
-  const grade = wrand(b.dropTable);
+  const grade = wrand(applyMidasBoost(b.dropTable));
   const rune = genRune(grade);
   S.runes.push(rune);
   const gname = GRADES[grade].name;
@@ -4738,6 +4773,13 @@ function equipRuneToCurrentWeapon(runeId) {
   const idx = S.runes.findIndex(r => r.id === runeId);
   if (idx < 0) return;
   const rune = S.runes[idx];
+  // 동일 룬(같은 이름+등급) 중복 장착 제한: 일반~레전더리(0~4등급)는 최대 2개, 신화·고대(5~6등급)는 최대 1개
+  const dupLimit = rune.grade >= 5 ? 1 : 2;
+  const dupCount = w.runes.filter(r => r.key === rune.key && r.grade === rune.grade).length;
+  if (dupCount >= dupLimit) {
+    log(`같은 룬(${runeName(rune)})은 이 무기에 최대 ${dupLimit}개까지만 장착할 수 있습니다.`, 'lg-bad');
+    return;
+  }
   S.runes.splice(idx, 1);
   w.runes.push(rune);
   log(`🔮 ${gradeTag(w)}에 <span class="grade-${GRADES[rune.grade].name}">${runeName(rune)}</span> 장착! (${w.runes.length}/${maxSlots})`, 'lg-good');
@@ -4816,7 +4858,7 @@ function buyRuneBoxesBulk(i, count) {
   for (let n = 0; n < count; n++) {
     if (S.gold < b.cost) break;
     S.gold -= b.cost;
-    const grade = wrand(b.dropTable);
+    const grade = wrand(applyMidasBoost(b.dropTable));
     S.runes.push(genRune(grade));
     bought++;
   }

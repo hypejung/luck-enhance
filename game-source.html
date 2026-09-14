@@ -248,6 +248,36 @@
     font-size: 13px;
   }
 
+  #syncModal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.72);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 150;
+  }
+  #syncModal[hidden] { display: none; }
+  #syncModalBox {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 18px; max-width: 380px; width: 100%; max-height: 85vh; overflow-y: auto;
+    font-size: 13px;
+  }
+  #syncModalBox h3 { margin: 0 0 10px; font-size: 16px; }
+  #syncModalBox .syncIdBig {
+    font-size: 24px; font-weight: bold; letter-spacing: 3px; text-align: center;
+    padding: 10px; background: var(--panel); border-radius: 8px; margin: 8px 0; color: var(--gold);
+  }
+  #syncModalBox .syncPwBig {
+    font-size: 16px; font-weight: bold; letter-spacing: 1px; text-align: center;
+    padding: 6px; background: var(--panel); border-radius: 8px; margin: 4px 0 10px;
+  }
+  #syncModalBox input[type=text], #syncModalBox input[type=password] {
+    width: 100%; box-sizing: border-box; padding: 8px; margin: 6px 0;
+    border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: inherit;
+  }
+  #syncModalBox .syncErr { color: #ff7a7a; font-size: 12px; margin: 4px 0; }
+  #syncModalBox .syncNote { color: var(--sub); font-size: 12px; margin: 6px 0; }
+  #syncModalBox .syncRow { display: flex; gap: 8px; margin-top: 10px; }
+  #syncModalBox .syncRow button { flex: 1; }
+  #syncModalBox label.syncCheck { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 8px; }
+
   .flash { animation: flash .4s; }
   @keyframes flash { 0%{filter:brightness(3)} 100%{filter:brightness(1)} }
   .shake { animation: shake .35s; }
@@ -573,12 +603,18 @@
   <div id="logpanel"></div>
   <div id="savebar">
     <button id="saveBtn">💾 저장</button>
+    <button id="syncBtn">🔗 동기화</button>
     <button id="exportFileBtn">📁 파일로 저장</button>
     <button id="importFileBtn">📂 파일 불러오기</button>
     <input type="file" id="importFileInput" accept=".txt,.json" style="display:none">
     <button id="exportBtn">📤 저장코드 내보내기</button>
     <button id="importBtn">📥 저장코드 불러오기</button>
     <button id="resetBtn" class="danger">🗑 초기화</button>
+  </div>
+</div>
+<div id="syncModal" hidden>
+  <div id="syncModalBox">
+    <div id="syncModalContent"></div>
   </div>
 </div>
 
@@ -3716,6 +3752,7 @@ function save() {
   const hr = new Date().getHours();
   if (hr === 0 && S.eggs && !S.eggs.midnight) unlockEgg('midnight');
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
+  syncUpload();
 }
 // 이전 버전 저장 데이터에 빠진 필드를 채워주는 마이그레이션
 function migrate(d) {
@@ -3848,6 +3885,229 @@ function importSaveFile(file) {
   };
   reader.onerror = () => alert('파일을 읽는 중 오류가 발생했습니다.');
   reader.readAsText(file);
+}
+
+/* ===================== 클라우드 동기화 ===================== */
+// Firebase Realtime Database REST API를 그대로 fetch로 호출 (SDK 불필요).
+// 아래 URL을 실제 프로젝트의 Realtime Database URL로 채워야 동기화가 활성화됩니다.
+// (Firebase 콘솔 > Realtime Database > 데이터 탭 상단에 표시되는 https://xxxx-default-rtdb.xxxx.firebasedatabase.app 형태)
+const SYNC_DB_URL = ''; // TODO: 여기에 Realtime Database URL 입력
+const SYNC_ID_KEY = 'luckEnhance_syncId';
+const SYNC_PW_KEY = 'luckEnhance_syncPw';
+const SYNC_ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0/O, 1/I 제외
+const SYNC_PW_CHARS = 'abcdefghijkmnpqrstuvwxyz23456789';
+
+function syncConfigured() { return !!SYNC_DB_URL; }
+function getSyncId() { try { return localStorage.getItem(SYNC_ID_KEY) || ''; } catch (e) { return ''; } }
+function getSyncPw() { try { return localStorage.getItem(SYNC_PW_KEY) || ''; } catch (e) { return ''; } }
+function setSyncCreds(id, pw) { try { localStorage.setItem(SYNC_ID_KEY, id); localStorage.setItem(SYNC_PW_KEY, pw); } catch (e) {} }
+function clearSyncCreds() { try { localStorage.removeItem(SYNC_ID_KEY); localStorage.removeItem(SYNC_PW_KEY); } catch (e) {} }
+function randStr(chars, len) {
+  let s = '';
+  for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+let syncUploadBusy = false;
+let syncUploadPending = false;
+// 저장이 일어날 때마다 같은 데이터를 서버에도 올림 (실패 시 조용히 무시 - 다음 저장 때 다시 시도됨)
+function syncUpload() {
+  if (!syncConfigured()) return;
+  const id = getSyncId();
+  if (!id) return;
+  if (syncUploadBusy) { syncUploadPending = true; return; }
+  syncUploadBusy = true;
+  const pw = getSyncPw();
+  fetch(`${SYNC_DB_URL}/saves/${id}.json`, {
+    method: 'PUT',
+    body: JSON.stringify({ pw, data: JSON.stringify(S), updatedAt: Date.now() }),
+  }).catch(() => { /* 오프라인 - 다음 저장 주기에 재시도 */ }).finally(() => {
+    syncUploadBusy = false;
+    if (syncUploadPending) { syncUploadPending = false; syncUpload(); }
+  });
+}
+
+async function syncFetchRecord(id, timeoutMs) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs || 6000);
+  try {
+    const res = await fetch(`${SYNC_DB_URL}/saves/${id}.json`, { signal: ctrl.signal });
+    if (!res.ok) throw new Error('http ' + res.status);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// 페이지 로드 시, 동기화 ID가 이미 있으면 게임을 시작하기 전에 서버 최신 데이터로 로컬을 덮어씀
+async function syncApplyOnLoad() {
+  if (!syncConfigured()) return;
+  const id = getSyncId();
+  if (!id) return;
+  try {
+    const rec = await syncFetchRecord(id, 6000);
+    if (rec && rec.data) { try { localStorage.setItem(SAVE_KEY, rec.data); } catch (e2) {} }
+  } catch (e) { /* 오프라인/타임아웃 - 로컬 저장 데이터로 계속 진행 */ }
+}
+
+function hideSyncModal() { $('syncModal').hidden = true; }
+function showSyncModal(html) {
+  $('syncModalContent').innerHTML = html;
+  $('syncModal').hidden = false;
+}
+
+function syncModalHome() {
+  if (!syncConfigured()) {
+    showSyncModal(`
+      <h3>🔗 클라우드 동기화</h3>
+      <div class="syncNote">아직 동기화 서버가 준비되지 않았습니다. 곧 지원될 예정이니 잠시만 기다려주세요.</div>
+      <div class="syncRow"><button id="syncCloseBtn" class="primary">닫기</button></div>
+    `);
+    $('syncCloseBtn').onclick = hideSyncModal;
+    return;
+  }
+  const id = getSyncId();
+  if (id) {
+    showSyncModal(`
+      <h3>🔗 동기화 연결됨</h3>
+      <div class="syncNote">현재 이 기기는 아래 ID와 연결되어 저장할 때마다 자동으로 클라우드에 백업됩니다.</div>
+      <div class="syncIdBig">${id}</div>
+      <div class="syncRow">
+        <button id="syncCopyIdBtn">📋 ID 복사</button>
+        <button id="syncReconnectBtn">🔄 다른 ID로 연결</button>
+      </div>
+      <div class="syncRow">
+        <button id="syncDisconnectBtn" class="danger">연결 해제</button>
+        <button id="syncCloseBtn" class="primary">닫기</button>
+      </div>
+    `);
+    $('syncCopyIdBtn').onclick = () => syncCopyText(id, 'ID가 복사되었습니다.');
+    $('syncReconnectBtn').onclick = () => syncModalChoice(false);
+    $('syncDisconnectBtn').onclick = () => {
+      if (confirm('이 기기의 동기화 연결을 해제할까요? (저장된 진행 상황은 그대로 남고, 더 이상 클라우드에 자동 백업되지 않습니다)')) {
+        clearSyncCreds();
+        log('🔗 동기화 연결이 해제되었습니다.');
+        hideSyncModal();
+      }
+    };
+    $('syncCloseBtn').onclick = hideSyncModal;
+  } else {
+    syncModalChoice(true);
+  }
+}
+
+// forceChoice: 최초 진입(로컬에 ID 없음) 시 true → 닫기 버튼 대신 "나중에" 버튼만 제공
+function syncModalChoice(forceChoice) {
+  showSyncModal(`
+    <h3>🔗 클라우드 동기화</h3>
+    <div class="syncNote">동기화 ID로 다른 기기(집 PC, 모바일, 회사 PC 등)에서도 같은 진행 상황을 이어서 플레이할 수 있습니다.</div>
+    <div class="syncRow">
+      <button id="syncNewBtn" class="primary">🆕 새 ID 발급받기</button>
+    </div>
+    <div class="syncRow">
+      <button id="syncEnterBtn">🔑 기존 ID로 불러오기</button>
+    </div>
+    ${forceChoice ? `<div class="syncRow"><button id="syncLaterBtn">나중에 하기</button></div>` : `<div class="syncRow"><button id="syncBackBtn">닫기</button></div>`}
+    <div id="syncModalErr" class="syncErr"></div>
+  `);
+  $('syncNewBtn').onclick = syncModalIssueNew;
+  $('syncEnterBtn').onclick = syncModalEnterExisting;
+  if (forceChoice) $('syncLaterBtn').onclick = hideSyncModal;
+  else $('syncBackBtn').onclick = hideSyncModal;
+}
+
+function syncModalIssueNew() {
+  const id = randStr(SYNC_ID_CHARS, 7);
+  const pw = randStr(SYNC_PW_CHARS, 8);
+  showSyncModal(`
+    <h3>🆕 새 동기화 ID 발급</h3>
+    <div class="syncNote">이 ID와 비밀번호로 다른 기기에서 지금 진행 상황을 불러올 수 있습니다. <b style="color:var(--gold)">꼭 적어두거나 복사해두세요!</b></div>
+    <div class="syncIdBig">${id}</div>
+    <div class="syncPwBig">${pw}</div>
+    <div class="syncRow">
+      <button id="syncCopyBothBtn">📋 ID+비밀번호 복사</button>
+    </div>
+    <label class="syncCheck"><input type="checkbox" id="syncCopyCheck"> 적어두었거나 복사했습니다</label>
+    <div class="syncRow">
+      <button id="syncIssueConfirmBtn" class="primary" disabled>이 ID로 시작하기</button>
+    </div>
+    <div id="syncModalErr" class="syncErr"></div>
+  `);
+  $('syncCopyBothBtn').onclick = () => syncCopyText(`ID: ${id}\n비밀번호: ${pw}`, 'ID와 비밀번호가 복사되었습니다.');
+  const checkbox = $('syncCopyCheck');
+  const confirmBtn = $('syncIssueConfirmBtn');
+  checkbox.onchange = () => { confirmBtn.disabled = !checkbox.checked; };
+  confirmBtn.onclick = async () => {
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '업로드 중...';
+    try {
+      await fetch(`${SYNC_DB_URL}/saves/${id}.json`, {
+        method: 'PUT',
+        body: JSON.stringify({ pw, data: JSON.stringify(S), updatedAt: Date.now() }),
+      });
+      setSyncCreds(id, pw);
+      log(`🔗 새 동기화 ID(${id})가 발급되어 현재 진행 상황이 클라우드에 저장되었습니다.`, 'lg-good');
+      hideSyncModal();
+    } catch (e) {
+      $('syncModalErr').textContent = '업로드에 실패했습니다. 인터넷 연결을 확인하고 다시 시도해주세요.';
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = '이 ID로 시작하기';
+    }
+  };
+}
+
+function syncModalEnterExisting() {
+  showSyncModal(`
+    <h3>🔑 기존 ID로 불러오기</h3>
+    <div class="syncNote">다른 기기에서 발급받은 ID와 비밀번호를 입력하세요. <b style="color:#ff7a7a">현재 기기의 진행 상황은 불러온 데이터로 덮어써집니다.</b></div>
+    <input type="text" id="syncEnterId" placeholder="동기화 ID" autocomplete="off">
+    <input type="text" id="syncEnterPw" placeholder="비밀번호" autocomplete="off">
+    <div class="syncRow">
+      <button id="syncEnterConfirmBtn" class="primary">불러오기</button>
+    </div>
+    <div id="syncModalErr" class="syncErr"></div>
+  `);
+  const confirmBtn = $('syncEnterConfirmBtn');
+  confirmBtn.onclick = async () => {
+    const id = $('syncEnterId').value.trim();
+    const pw = $('syncEnterPw').value.trim();
+    if (!id) { $('syncModalErr').textContent = 'ID를 입력해주세요.'; return; }
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = '확인 중...';
+    try {
+      const rec = await syncFetchRecord(id, 8000);
+      if (!rec || !rec.data) {
+        $('syncModalErr').textContent = '해당 ID의 저장 데이터를 찾을 수 없습니다.';
+      } else if (rec.pw && rec.pw !== pw) {
+        $('syncModalErr').textContent = '비밀번호가 일치하지 않습니다.';
+      } else {
+        if (!confirm('현재 기기의 진행 상황을 덮어쓰고 불러온 데이터로 시작할까요?')) {
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = '불러오기';
+          return;
+        }
+        try { localStorage.setItem(SAVE_KEY, rec.data); } catch (e2) {}
+        setSyncCreds(id, pw);
+        location.reload();
+        return;
+      }
+    } catch (e) {
+      $('syncModalErr').textContent = '조회에 실패했습니다. ID를 확인하거나 인터넷 연결을 확인해주세요.';
+    }
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = '불러오기';
+  };
+}
+
+function syncCopyText(text, okMsg) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text);
+      log(`📋 ${okMsg}`, 'lg-good');
+      return;
+    }
+  } catch (e) {}
+  prompt('아래 내용을 복사해서 보관하세요:', text);
 }
 
 /* ===================== 렌더 ===================== */
@@ -4783,6 +5043,7 @@ function init() {
   document.querySelectorAll('#betbtns button').forEach(b => b.onclick = () => gamble(parseFloat(b.dataset.bet)));
   // 저장 버튼
   $('saveBtn').onclick = () => { save(); log('💾 저장 완료!', 'lg-good'); };
+  $('syncBtn').onclick = syncModalHome;
   $('exportBtn').onclick = exportSave;
   $('importBtn').onclick = importSave;
   $('exportFileBtn').onclick = exportSaveFile;
@@ -4890,6 +5151,18 @@ function init() {
     save();
   }
   grantOffline();  // 페이지 로드 시에도 확인 (브라우저 재시작 케이스)
+
+  // 동기화 ID가 아직 없으면 안내 모달 표시 (동기화 서버 미설정 시에는 표시하지 않음)
+  let syncModalSkipped = false;
+  try { syncModalSkipped = !!sessionStorage.getItem('syncModalSkipped'); } catch (e) {}
+  if (syncConfigured() && !getSyncId() && !syncModalSkipped) {
+    syncModalChoice(true);
+    const laterBtn = $('syncModal').querySelector('#syncLaterBtn');
+    if (laterBtn) laterBtn.onclick = () => {
+      try { sessionStorage.setItem('syncModalSkipped', '1'); } catch (e) {}
+      hideSyncModal();
+    };
+  }
 }
 
 function updateAutoBtn() {
@@ -4898,7 +5171,7 @@ function updateAutoBtn() {
   b.classList.toggle('primary', !S.auto);
 }
 
-init();
+syncApplyOnLoad().finally(init);
 </script>
 </body>
 </html>

@@ -1325,7 +1325,9 @@ function rollAncientSeal(stage) {
   }
 }
 function todayKey() {
-  const d = new Date();
+  // 토벌전 초기화 시각을 자정이 아닌 오전 9시로 고정 — 9시간을 당겨서 날짜를 계산하면
+  // 09:00 이전은 "전날"로, 09:00 이후는 "오늘"로 자연스럽게 떨어진다.
+  const d = new Date(Date.now() - 9 * 3600 * 1000);
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
 function raidEnsureDay() {
@@ -4495,6 +4497,7 @@ function renderBoxes() {
       <div class="btns">
         <button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost)}</span></button>
         <button class="primary" data-idx10="${i}">×10 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost * 10)}</span></button>
+        <button class="primary" data-idx100="${i}">×100 개봉<br><span style="font-size:11px">💰 ${fmt(b.cost * 100)}</span></button>
       </div>`;
     div.querySelector('button[data-idx]').onclick = () => {
       if (S.gold < b.cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
@@ -4503,6 +4506,7 @@ function renderBoxes() {
       openBox(i, '');
     };
     div.querySelector('button[data-idx10]').onclick = () => buyBoxesBulk(i, 10);
+    div.querySelector('button[data-idx100]').onclick = () => buyBoxesBulk(i, 100);
     list.appendChild(div);
   }
 }

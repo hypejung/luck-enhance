@@ -1148,6 +1148,27 @@ const EFFECTS = {
                   grade: 5, bossDmg: 1.0, bossDotAtkMult: 1.0 },
   godslayer:    { name: '거인 사냥꾼',   desc: '보스에게 피해 +110%. 보스전 시작 시 무기 공격력의 1500%만큼 즉시 고정 피해',
                   grade: 6, bossDmg: 1.1, openBurstAtkMult: 15 },
+
+  // ===== 재료 계열 (신규) =====
+  // 사냥터마다 나오는 재료 3종을 등급명이 아닌 상대적 위치(하급/중급/고급)로 지칭한다 —
+  // 사냥터가 높아질수록 실제 등급명이 달라지므로(예: 20층은 최하급조차 레전더리) 등급명으로
+  // 표현하면 혼동됨. slot 0/1/2 = 하급/중급/고급(=기존 "고급 재료" 시스템과 동일한 slot 2).
+  // 고대 등급 무기는 이 계열의 효과가 없음(요청에 따라 3등급만 존재).
+  harvest1: { name: '풍요의 손길', grade: 3, matBonus: [
+      { slot: 'low', chance: 0.05, amount: 3 },
+      { slot: 'mid', chance: 0.05, amount: 3 },
+    ], desc: '하급·중급 재료 획득 시 각각 5% 확률로 +3개 추가' },
+  harvest2: { name: '대지의 축복', grade: 4, matBonus: [
+      { slot: 'low', chance: 0.06, amount: 5 },
+      { slot: 'mid', chance: 0.06, amount: 5 },
+      { slot: 'high', chance: 0.03, amount: 3 },
+    ], desc: '하급·중급 재료 획득 시 각각 6% 확률로 +5개, 고급 재료 획득 시 3% 확률로 +3개 추가' },
+  harvest3: { name: '황금 수확', grade: 5, matBonus: [
+      { slot: 'low', chance: 0.08, amount: 10 },
+      { slot: 'mid', chance: 0.08, amount: 10 },
+      { slot: 'high', chance: 0.05, amount: 8 },
+    ], jackpot: { slot: 'high', chance: 0.10, amount: 20 },
+    desc: '하급·중급 재료 획득 시 각각 8% 확률로 +10개, 고급 재료 획득 시 5% 확률로 +8개 추가. 고급 재료 획득 시 추가로 10% 확률로 대풍작(+20개) 발동' },
 };
 // 전투 중 임시 상태(스택/게이지/버프 타이머) — 저장하지 않는 휘발성 상태.
 // 몬스터가 즉시 리스폰되는 구조라 "대상"이 아니라 "전투 흐름" 기준으로 유지된다.
@@ -1365,6 +1386,8 @@ const PATCH_NOTES = [
       '🍀 도박의 신 발동 시 결과창에 시각 효과 추가',
       '💥 치명타 계열 무기 효과(예리함/유혈 참격/처형자의 낙인)가 자체 고정 치명타 배율을 덮어쓰던 것을 없애고 치명타 "확률"만 올려주도록 변경 — 치명타 피해는 온전히 유저가 쌓은 스탯을 따름 (심판의 전조는 특수 매커니즘이라 변경 없음)',
       '🗑️ 클라우드 동기화 도입으로 필요 없어진 수동 저장/저장코드 내보내기·불러오기/파일로 저장·불러오기 버튼 정리',
+      '🌾 무기 특수효과 "재료 계열" 신규 추가(유니크~신화 3종) — 재료 획득 시 확률적으로 추가 개수 획득. 신화 등급은 고급 재료 한정 "대풍작" 잭팟 보너스도 있음',
+      '🌾 룬에도 수확의 룬(일반~유니크), 풍작의 룬(레전더리), 풍요의 룬(신화), 대풍요의 룬(고대) 신규 추가 — 같은 재료를 노리는 소스는 확률·개수가 합산되어 판정됨',
     ],
   },
 ];
@@ -1980,6 +2003,8 @@ const RUNE_STATS = {
   critDamage: { name: '파괴의 룬', values: [10, 25, 50, 90], desc: v => `치명타 피해 +${v}%p` },
   extraAtk:   { name: '연격의 룬', values: [2, 5, 10, 18],   desc: v => `연타(추가공격) 확률 +${v}%` },
   bossDmg:    { name: '살육의 룬', values: [4, 10, 20, 35],  desc: v => `보스 피해량 +${v}%` },
+  // 수확의 룬: 개수는 유니크까지 항상 +1 고정, 확률만 등급에 따라 커짐. 하급/중급 재료에 각각 독립 적용.
+  matBonus:   { name: '수확의 룬', values: [3, 6, 10, 15],   desc: v => `하급·중급 재료 획득 시 각각 ${v}% 확률로 +1개 추가` },
 };
 const RUNE_STAT_KEYS = Object.keys(RUNE_STATS);
 
@@ -1996,6 +2021,12 @@ const RUNE_SPECIALS = {
   omnirune:     { name: '전능의 룬',       grade: 6, trainCostMult: 0.7, goldMult: 1.5, desc: '능력치 훈련 비용 -30%, 골드 획득 +50%' },
   elitehunter:  { name: '정예 사냥꾼',     grade: 5, bonus: 0.02, desc: '엘리트(유니크) 몬스터 출현 확률 +2%p' },
   luckygambler: { name: '도박의 신',       grade: 6, proc: 0.25, desc: '도박장에서 손해가 나오면 25% 확률로 즉시 재도전(더 나은 결과가 나올 때까지는 아니고 한 번 더 굴림)' },
+  harvestLegend:{ name: '풍작의 룬',       grade: 4, proc: 0.03, amount: 3, desc: '고급 재료 획득 시 3% 확률로 +3개 추가' },
+  harvestMyth:  { name: '풍요의 룬',       grade: 5, proc: 0.05, amount: 3, desc: '고급 재료 획득 시 5% 확률로 +3개 추가' },
+  // 대풍요의 룬: 세 종류 재료(하급/중급/고급) 각각에 독립적으로 적용되는 단계별 확률표(한 번에 하나만 적용).
+  grandHarvest: { name: '대풍요의 룬',     grade: 6,
+                  ladder: [{ chance: 0.001, amount: 30 }, { chance: 0.01, amount: 10 }, { chance: 0.05, amount: 5 }, { chance: 0.10, amount: 3 }],
+                  desc: '모든 재료 획득 시 10% 확률로 +3개, 5% 확률로 +5개, 1% 확률로 +10개, 0.1% 확률로 +30개 추가 (한 번에 하나만 적용)' },
 };
 const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
 for (const [k, v] of Object.entries(RUNE_SPECIALS)) RUNE_SPECIALS_BY_GRADE[v.grade].push(k);
@@ -2740,10 +2771,62 @@ function dropMaterials(isU, luck) {
   }
 }
 
+// 재료 계열 보너스: 사냥터별 재료 3종을 등급명 대신 상대 위치(low=하급/mid=중급/high=고급)로 다룬다.
+const MAT_SLOT_NAMES = ['low', 'mid', 'high'];
+// 무기 효과의 matBonus + 룬(수확의 룬/풍작의 룬/풍요의 룬)을 슬롯별로 모은다.
+// 같은 슬롯을 대상으로 하는 소스는 여기서 배열에 함께 쌓이고, rollMatBonus()에서 확률/개수를 합산해 1번만 판정한다.
+function matBonusPools(w) {
+  const pools = { low: [], mid: [], high: [] };
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  if (e && Array.isArray(e.matBonus)) {
+    for (const b of e.matBonus) pools[b.slot].push({ chance: b.chance, amount: b.amount });
+  }
+  if (w && Array.isArray(w.runes)) {
+    for (const r of w.runes) {
+      if (r.grade <= 3 && r.key === 'matBonus') {
+        const chance = RUNE_STATS.matBonus.values[r.grade] / 100;
+        pools.low.push({ chance, amount: 1 });
+        pools.mid.push({ chance, amount: 1 });
+      } else if (r.key === 'harvestLegend' || r.key === 'harvestMyth') {
+        const spec = RUNE_SPECIALS[r.key];
+        pools.high.push({ chance: spec.proc, amount: spec.amount });
+      }
+    }
+  }
+  return pools;
+}
+// 같은 슬롯을 대상으로 하는 소스들의 확률/개수를 합산해서 1번만 판정 (요청하신 "같은 등급끼리만 합연산" 규칙)
+function rollMatBonus(w, slot) {
+  const list = matBonusPools(w)[slot];
+  if (!list.length) return 0;
+  const chance = Math.min(1, list.reduce((s, x) => s + x.chance, 0));
+  const amount = list.reduce((s, x) => s + x.amount, 0);
+  return Math.random() < chance ? amount : 0;
+}
+// 신화 무기효과의 "대풍작"과 고대 룬 "대풍요의 룬"은 위 합연산 풀과 무관하게 별도로 추가 판정한다.
+function rollMatJackpot(w, slot) {
+  let bonus = 0;
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  if (e && e.jackpot && e.jackpot.slot === slot && Math.random() < e.jackpot.chance) {
+    bonus += e.jackpot.amount;
+    floatText('🌾 대풍작!');
+  }
+  if (w && weaponSpecialCount(w, 'grandHarvest') > 0) {
+    const roll = Math.random();
+    for (const step of RUNE_SPECIALS.grandHarvest.ladder) {
+      if (roll < step.chance) { bonus += step.amount; floatText('🌾 대풍요!'); break; }
+    }
+  }
+  return bonus;
+}
 function addMat(f, matSlot) {
   const key = f + '|' + matSlot;
   // 끝없는 탐욕(글러트니의 목걸이): 아이템 획득 시 10% 확률로 10배 획득
-  const bonus = (hasGenesis('gluttony') && Math.random() < 0.1) ? 10 : 1;
+  const gluttonyBonus = (hasGenesis('gluttony') && Math.random() < 0.1) ? 10 : 1;
+  const w = getEquipped();
+  const slotName = MAT_SLOT_NAMES[matSlot];
+  const harvestBonus = rollMatBonus(w, slotName) + rollMatJackpot(w, slotName);
+  const bonus = gluttonyBonus + harvestBonus;
   // 재료 자동판매 필터: 체크된 재료는 획득 즉시 골드로 자동 판매
   if (S.matAutoSell && S.matAutoSell[key]) {
     const price = matSellPrice(f, matSlot) * bonus;
@@ -2755,8 +2838,9 @@ function addMat(f, matSlot) {
   const tierIdx = Math.min(3, Math.floor(f / 5));
   const actualGrade = MAT_TIERS[tierIdx][matSlot];
   const gname = GRADES[actualGrade].name;
-  const bonusTag = bonus > 1 ? ` <span class="lg-prim">(끝없는 탐욕! ×10)</span>` : '';
-  log(`🌿 재료 획득: <span class="grade-${gname}">${name}</span>${bonusTag} (보유 ${S.mats[key]})`);
+  const bonusTag = gluttonyBonus > 1 ? ` <span class="lg-prim">(끝없는 탐욕! ×10)</span>` : '';
+  const harvestTag = harvestBonus > 0 ? ` <span class="lg-prim">(수확 보너스 +${harvestBonus})</span>` : '';
+  log(`🌿 재료 획득: <span class="grade-${gname}">${name}</span>${bonusTag}${harvestTag} (보유 ${S.mats[key]})`);
 }
 
 // 조합 가능 여부 확인

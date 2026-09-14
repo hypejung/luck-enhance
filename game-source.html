@@ -1109,11 +1109,13 @@ function makeFist(enhance) {
 // 스택·게이지·타이머 등 전투 중 임시 상태는 전역 fx 객체(비저장)에 보관.
 const EFFECTS = {
   // ===== 치명타 계열 =====
-  keen:     { name: '예리함',       desc: '공격 시 8% 확률로 치명타 (피해 1.8배)', grade: 3, crit: { chance: 0.08, mult: 1.8 } },
-  bloodrend:{ name: '유혈 참격',    desc: '공격 시 12% 확률로 치명타 (피해 2배). 치명타 발동 시 10% 확률로 5초간 지속되는 출혈 부여',
-              grade: 4, crit: { chance: 0.12, mult: 2.0 }, bleedProc: 0.10, bleedDur: 5, bleedDmg: 0.2 },
-  stigma:   { name: '처형자의 낙인', desc: '치명타 시 낙인 1스택 부여(스택당 무기 공격력 30%만큼 추가 피해). 5스택 도달 시 일반 몬스터는 즉시 처형, 보스는 대신 무기 공격력의 800%만큼 큰 고정 피해를 추가로 입는다',
-              grade: 5, crit: { chance: 0.12, mult: 1.9 }, stackMax: 5, stackDmg: 0.3, bossBurstMult: 8 },
+  // keen/bloodrend/stigma는 치명타 "확률"만 올려준다 — 치명타 피해량은 룬/훈련/장비로 쌓은
+  // 유저 본인의 치명타 피해 스탯을 그대로 따른다(효과 자체의 고정 배율로 덮어쓰지 않음).
+  keen:     { name: '예리함',       desc: '치명타 확률 +8%p (치명타 피해는 보유한 치명타 피해 스탯을 따름)', grade: 3, crit: { chance: 0.08 } },
+  bloodrend:{ name: '유혈 참격',    desc: '치명타 확률 +12%p. 치명타 발동 시 10% 확률로 5초간 지속되는 출혈 부여',
+              grade: 4, crit: { chance: 0.12 }, bleedProc: 0.10, bleedDur: 5, bleedDmg: 0.2 },
+  stigma:   { name: '처형자의 낙인', desc: '치명타 확률 +12%p. 치명타 시 낙인 1스택 부여(스택당 무기 공격력 30%만큼 추가 피해). 5스택 도달 시 일반 몬스터는 즉시 처형, 보스는 대신 무기 공격력의 800%만큼 큰 고정 피해를 추가로 입는다',
+              grade: 5, crit: { chance: 0.12 }, stackMax: 5, stackDmg: 0.3, bossBurstMult: 8 },
   judgment: { name: '심판의 전조',  desc: '공격 시 70% 확률로 치명타 발동(다른 원천의 치명타 확률과 무관하게 고정). 다른 원천 치명타 확률의 20%만큼이 치명타 피해로 전환. 8% 확률로 5초간 치명타 피해 1.6배 추가 버프 획득',
               grade: 6, fixedCrit: 0.70, crit: { mult: 1.4 }, overflowRatio: 0.20, buffProc: 0.08, buffDur: 5, buffMult: 1.6 },
 
@@ -1367,6 +1369,7 @@ const PATCH_NOTES = [
       '⚡ 신벌이 보스에게는 아무 효과 없던 것을 보스 최대 체력 1% 고정 피해로 변경',
       '♾️ 전능의 룬을 "모든 스탯 +8%p"에서 "훈련 비용 -30%, 골드 획득 +50%"로 재설계',
       '🍀 도박의 신 발동 시 결과창에 시각 효과 추가',
+      '💥 치명타 계열 무기 효과(예리함/유혈 참격/처형자의 낙인)가 자체 고정 치명타 배율을 덮어쓰던 것을 없애고 치명타 "확률"만 올려주도록 변경 — 치명타 피해는 온전히 유저가 쌓은 스탯을 따름 (심판의 전조는 특수 매커니즘이라 변경 없음)',
     ],
   },
 ];
@@ -3016,7 +3019,7 @@ function attack(w) {
   const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
   const critChance = fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage);
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage);
   if (fixedCrit !== null) critMult += otherCritChance * (e.overflowRatio || 0);
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
@@ -4924,7 +4927,7 @@ function computeStats() {
   const atk = w ? weaponAtk(w) : 0;
   const spd = w ? weaponSpeed(w) : 0;
   const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance) * 100;
-  const critMultPct = Math.min(DMG_CAPS.critMult, (e && e.crit ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage) * 100;
+  const critMultPct = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage) * 100;
   const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk) * 100;
   return {
     atk, spd, dps: atk * spd,

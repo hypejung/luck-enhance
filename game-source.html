@@ -568,6 +568,13 @@
       <div id="runegachaslot"></div>
     </div>
     <div class="panel">
+      <h3>⚔️ 장착 중인 룬</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        지금 장착한 무기에 낀 룬입니다. 여기서 바로 해제하면 아래 "보유 룬"으로 돌아와서 다른 룬으로 바꿔 낄 수 있습니다.
+      </div>
+      <div id="runeEquippedList"></div>
+    </div>
+    <div class="panel">
       <h3>🛠️ 룬 합성</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         같은 등급 룬 3개를 소모해 한 단계 위 등급의 랜덤한 룬 1개 획득을 시도합니다. 등급이 높을수록 성공 확률이 낮고, <b style="color:#ff7a7a">실패하면 재료 3개는 그대로 소멸</b>합니다.
@@ -1418,6 +1425,9 @@ const PATCH_NOTES = [
       '🛡️ 강화 파괴 확률 감소가 실제로는 비율로만 깎이던 버그 수정 — 이제 다른 %p 스탯들과 동일하게 정확히 %p만큼 차감됨. 대신 저강화 구간이 통째로 무효화되지 않도록 소스 수치도 재설계(둔기 도감 세트: 신화까지 다 모아도 +16강까지만 파괴 확률 0%, 그 이상은 위험 그대로)',
       '📖 중장무기 도감쌍(일반~유니크 각 1%p) + 둔기 타입셋(레전 2.5%p, 신화 3%p) 값 재조정 — 등급이 오를수록 항목별 값도 매끄럽게 증가하도록',
       '🐛 재료 자동판매 버그 수정 — 보스 처치 보상으로 받는 고급 재료가 자동판매 필터를 무시하고 무조건 재료로 쌓이던 문제 해결',
+      '🖱️ 장착/판매 버튼을 색상과 위치로 명확히 구분(장착=골드, 판매=빨강, 판매 버튼은 오른쪽 끝으로) + 강화된 무기(+1 이상) 판매 시 확인창 추가',
+      '✊ 무기를 갖고 있어도 맨손을 다시 장착할 수 있도록 변경',
+      '🔁 무기/장신구/룬 장착·해제를 그 자리에서 바로 — 가방 무기 목록에서 "장착해제" 버튼으로 즉시 해제, 장신구 목록도 "장착중" 대신 "장착해제" 버튼으로 바로 해제, 룬 탭에 "장착 중인 룬" 패널 신설(강화기 탭까지 가지 않고 바로 빼고 다시 낄 수 있음)',
     ],
   },
 ];
@@ -4880,31 +4890,45 @@ function renderInventory() {
       };
     }
     const btns = div.querySelector('.btns');
+    // 장착/장착해제: 이제 무기를 갖고 있어도 맨손으로 되돌아갈 수 있다(단, 맨손 자체를
+    // 장착 중일 땐 되돌아갈 곳이 없으므로 비활성 '장착중'으로 표시).
     if (w.id === S.equipped) {
-      const eq = document.createElement('button');
-      eq.textContent = '장착중';
-      eq.disabled = true;
-      btns.appendChild(eq);
-    } else if (!isFist(w)) {
+      if (isFist(w)) {
+        const eq = document.createElement('button');
+        eq.textContent = '장착중';
+        eq.disabled = true;
+        btns.appendChild(eq);
+      } else {
+        const eq = document.createElement('button');
+        eq.textContent = '장착해제';
+        eq.className = 'danger';
+        eq.onclick = () => { S.equipped = 0; renderAll(); save(); };
+        btns.appendChild(eq);
+      }
+    } else {
       const eq = document.createElement('button');
       eq.textContent = '장착';
+      eq.className = 'primary';
       eq.onclick = () => { S.equipped = w.id; renderAll(); save(); };
       btns.appendChild(eq);
     }
-    // 맨손 / 태초 무기는 판매 불가
+    // 맨손 / 태초 무기는 판매 불가 (판매 버튼과 확실히 구분되게 오른쪽으로 밀어둠)
     if (isFist(w) || isGenesisWeapon(w)) {
       const note = document.createElement('button');
-      note.textContent = isGenesisWeapon(w) ? '판매 불가' : '소유 무기 없음';
+      note.textContent = '판매 불가';
       note.disabled = true;
+      note.style.marginLeft = 'auto';
       btns.appendChild(note);
     } else {
     const sel = document.createElement('button');
     sel.textContent = '판매';
     sel.className = 'danger';
+    sel.style.marginLeft = 'auto';
     sel.onclick = () => {
       // 이미 판매된(목록에 없는) 무기면 무시 — 중복 클릭 방지
       if (!S.weapons.some(x => x.id === w.id)) { renderInventory(); return; }
       if (w.id === S.equipped) { log('장착 중인 무기는 판매할 수 없습니다.', 'lg-bad'); return; }
+      if (w.enhance > 0 && !confirm(`강화한 무기입니다(+${w.enhance}). 정말 판매하시겠습니까?`)) return;
       const roll = rollSellPrice(sellPrice(w));
       // 끝없는 탐욕(글러트니의 목걸이): 판매 시 10% 확률로 추가 10배
       const jackpot = hasGenesisEquipped('gluttony') && Math.random() < 0.1;
@@ -5067,8 +5091,28 @@ function renderRuneTab() {
     div.querySelector('button[data-idx10]').onclick = () => buyRuneBoxesBulk(i, 10);
     list.appendChild(div);
   });
+  renderRuneEquippedList();
   renderRuneInventory();
   renderRuneFusion();
+}
+// 지금 장착한 무기에 낀 룬 — 강화기 탭까지 가지 않고 여기서 바로 해제할 수 있게
+function renderRuneEquippedList() {
+  const box = $('runeEquippedList');
+  if (!box) return;
+  const w = getEquipped();
+  const runes = (w && Array.isArray(w.runes)) ? w.runes : [];
+  if (!w || isFist(w)) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">맨손에는 룬을 장착할 수 없습니다.</div>'; return; }
+  if (!runes.length) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">${gradeTag(w)}에 장착된 룬이 없습니다.</div>`; return; }
+  box.innerHTML = '';
+  for (const r of runes) {
+    const gname = GRADES[r.grade].name;
+    const div = document.createElement('div');
+    div.className = 'invitem equipped';
+    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
+      <div class="wi">${runeDesc(r)}</div></div><div class="btns"><button class="danger">장착해제</button></div>`;
+    div.querySelector('button').onclick = () => unequipRuneFromCurrentWeapon(r.id);
+    box.appendChild(div);
+  }
 }
 // 룬박스 묶음 구매(최대 count개, 감당 가능한 만큼만 실제 구매)
 function buyRuneBoxesBulk(i, count) {
@@ -5350,8 +5394,9 @@ function renderCraft() {
     if (owned) {
       const b = document.createElement('button');
       if (equipped) {
-        b.textContent = '장착중';
-        b.disabled = true;
+        b.textContent = '장착해제';
+        b.className = 'danger';
+        b.onclick = () => unequipAcc(f);
       } else {
         b.textContent = S.accEquipped.length >= accSlots ? `장착 (${accSlots}/${accSlots} 꽉참)` : '장착';
         b.className = 'primary';

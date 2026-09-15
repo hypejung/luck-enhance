@@ -719,6 +719,7 @@ const GRADES = [
 // 얻을 수 있는 하드코딩 "고유" 무기 등급이다. 판매 불가(sell:0은 표시용, 실제 차단은 UI에서 강제).
 const GENESIS_GRADE = 7;
 function isGenesisWeapon(w) { return !!w && w.grade === GENESIS_GRADE; }
+function isAncientWeapon(w) { return !!w && w.grade === 6; }
 
 // ---------- 무기 종류 (공속 = 초당 공격 횟수, 데미지 배율) ----------
 // 종류마다 고유 특성(trait)을 부여해서 같은 등급/강화라도 플레이 체감이 다르게 만듦.
@@ -1401,6 +1402,7 @@ const PATCH_NOTES = [
       '🌾 룬에도 수확의 룬(일반~유니크), 풍작의 룬(레전더리), 풍요의 룬(신화), 대풍요의 룬(고대) 신규 추가 — 같은 재료를 노리는 소스는 확률·개수가 합산되어 판정됨',
       '🌌 태초의 유물 시스템 전면 재설계 — "보유만 해도 발동"하던 장신구에서 "장착해야 발동"하는 진짜 무기(전용 등급)로 전환. 판매·파괴 불가, 강화 실패는 유지/하락만(파괴 없음), 강화에 골드 외 "무기의 정수" 별도 필요. 글러트니의 목걸이는 처치 시 골드·드랍률이 스택형으로 쌓이는 "끝없는 허기"와, 다른 모든 보너스를 총합 10배로 뻥튀기하는 "끝없는 탐욕"을 지닌 무기로 재탄생',
       '🏺🌌 고대 무기 / 태초의 유물 드랍률 조정 — 이제 장신구·도감·각인 등 모든 드롭률 보너스가 적용됨. 그 사냥터의 보스 장신구를 보유하고 보스 무기를 장착 중이면 드랍률이 3배로 상승(보스 세트효과). 기본 확률 자체도 재조정',
+      '🏺 고대 무기 강화 규칙 변경 — 이제 파괴되지 않는 대신, 파괴가 확정됐을 순간 +0으로 초기화됨. 강화에 골드 외 "무기의 정수"도 소모(태초보다 적게)',
     ],
   },
 ];
@@ -2504,6 +2506,11 @@ function enhanceCost(w) {
 const GENESIS_ESSENCE_BASE = 1;
 const GENESIS_ESSENCE_GROWTH = 1.35;
 function genesisEssenceCost(w) { return Math.ceil(GENESIS_ESSENCE_BASE * Math.pow(GENESIS_ESSENCE_GROWTH, w.enhance)); }
+// 고대 무기도 같은 "무기의 정수"를 소모하지만, 태초보다 성장 배율이 완만해 더 적게 든다.
+const ANCIENT_ESSENCE_BASE = 1;
+const ANCIENT_ESSENCE_GROWTH = 1.2;
+function ancientEssenceCost(w) { return Math.ceil(ANCIENT_ESSENCE_BASE * Math.pow(ANCIENT_ESSENCE_GROWTH, w.enhance)); }
+function essenceCostFor(w) { return isGenesisWeapon(w) ? genesisEssenceCost(w) : isAncientWeapon(w) ? ancientEssenceCost(w) : 0; }
 
 // 고레벨 강화에 필요한 고급 재료 수 (에픽 등급 이상 재료)
 // +15 강화부터 필요: +15→5개 ... +29→75개 (스팸성 강화 시도를 억제하기 위해 대폭 상향)
@@ -2640,7 +2647,7 @@ function gradeTag(w) {
         : ` <span style="font-size:12px">🔮×${runeList.length}</span>`)
     : '';
   const boss = w.bossFloor !== undefined ? ' 👹' : '';
-  const fist = (isFist(w) || isGenesisWeapon(w)) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
+  const fist = (isFist(w) || isGenesisWeapon(w) || isAncientWeapon(w)) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
   const itemName = weaponItemName(w);
   return `<span class="grade-${g.name}">${w.icon}[${g.name}]${itemName}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}${rune}`;
 }
@@ -3783,8 +3790,8 @@ function tryEnhance(advanced) {
   // 고급 강화는 골드 소모량도 일반 강화의 3배
   const cost = freeThisTry ? 0 : (advanced ? advancedEnhGoldCost(w) : enhanceCost(w));
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
-  // 태초 무기: 골드 외에 "무기의 정수"도 함께 필요
-  const essenceNeed = isGenesisWeapon(w) ? genesisEssenceCost(w) : 0;
+  // 태초/고대 무기: 골드 외에 "무기의 정수"도 함께 필요 (고대는 태초보다 적게)
+  const essenceNeed = essenceCostFor(w);
   if (essenceNeed > 0 && (S.weaponEssence || 0) < essenceNeed) {
     log(`무기의 정수가 부족합니다! (필요 ${essenceNeed}, 보유 ${S.weaponEssence || 0}) — 고대의 도서관에서 획득하세요`, 'lg-bad');
     return;
@@ -3819,12 +3826,21 @@ function tryEnhance(advanced) {
     // 불멸의 뼈(고대): 파괴가 확정된 순간 30% 확률로 무효화(유지로 대체)
     const sealbreakActive = w.spirit === 'sealbreak';
     const undyingSave = w.spirit === 'undyingbone' && Math.random() < (ANCIENT_SPIRITS.undyingbone.proc || 0);
+    // 파괴/초기화 여부는 단 한 번만 굴려서(destroyRoll) 재사용한다 — 분기마다 새로 굴리면
+    // "파괴 대신 초기화" 분기가 빗나가도 바로 아래 일반 파괴 분기가 또 한 번 굴려 파괴로
+    // 새어나가는 이중 판정 버그가 생긴다.
+    const destroyRoll = Math.random() * 100;
     // 맨손은 파괴되지 않고 +0으로 초기화
     if (isFist(w)) {
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
-    } else if (!sealbreakActive && !undyingSave && Math.random() * 100 < dChance) {
+    } else if (isAncientWeapon(w) && !sealbreakActive && !undyingSave && destroyRoll < dChance) {
+      // 고대 무기는 파괴되지 않는 대신, 파괴가 확정됐을 순간 통째로 +0 초기화된다.
+      w.enhance = 0;
+      playEnhanceFx('fail', attemptLevel);
+      log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
+    } else if (!isAncientWeapon(w) && !sealbreakActive && !undyingSave && destroyRoll < dChance) {
       playEnhanceFx('destroy', attemptLevel);
       log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}${advTag}`, 'lg-bad');
       S.destroyedCount++;
@@ -4582,7 +4598,7 @@ function renderEnhance() {
   const matText = matNeed > 0
     ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matSt.have}/${matSt.need}</b>${matSt.shortfall > 0 ? ` <span style="font-size:11px;color:${matSt.ok ? '#7de08a' : '#ff7a7a'}">(부족분 🎫${matSt.tokensNeed}개로 대체, 보유 🎫${matSt.tokensHave})</span>` : ''}</div>`
     : '';
-  const essenceNeed = maxed || !isGenesisWeapon(w) ? 0 : genesisEssenceCost(w);
+  const essenceNeed = maxed ? 0 : essenceCostFor(w);
   const essenceOk = (S.weaponEssence || 0) >= essenceNeed;
   const essenceText = essenceNeed > 0
     ? `<div>무기의 정수<b style="color:${essenceOk ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence || 0)}/${fmt(essenceNeed)}</b></div>`
@@ -4610,7 +4626,9 @@ function renderEnhance() {
     ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
     : isFist(w)
       ? `✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
-      : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
+      : isAncientWeapon(w)
+        ? `🏺 고대 무기는 파괴되지 않습니다. 실패 시: 유지 / 단계 -1 / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''}${matNote} · 현재 <b>+${w.enhance}</b>`
+        : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderAdvancedEnhance(w, maxed);
   renderAutoEnhance(w, maxed);
   renderEnhRune();

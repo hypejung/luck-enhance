@@ -449,10 +449,6 @@
         <br>+15 이상에서는 골드를 <b style="color:var(--unique)">5배</b>, 고급 재료를 <b style="color:var(--unique)">50배</b> 사용하는 <b style="color:var(--unique)">고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
       </div>
     </div>
-    <div class="panel">
-      <h3>🔮 장착 무기의 룬</h3>
-      <div id="enhruneBox"></div>
-    </div>
   </div>
 
   <!-- 능력치 -->
@@ -566,6 +562,13 @@
       </div>
       <div id="runeboxlist"></div>
       <div id="runegachaslot"></div>
+    </div>
+    <div class="panel">
+      <h3>⚔️ 장착 중인 룬</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        지금 장착한 무기에 낀 룬입니다. 여기서 바로 해제하면 아래 "보유 룬"으로 돌아와서 다른 룬으로 바꿔 낄 수 있습니다.
+      </div>
+      <div id="runeEquippedList"></div>
     </div>
     <div class="panel">
       <h3>🛠️ 룬 합성</h3>
@@ -4670,7 +4673,6 @@ function renderEnhance() {
         : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderAdvancedEnhance(w, maxed);
   renderAutoEnhance(w, maxed);
-  renderEnhRune();
 }
 
 function renderAdvancedEnhance(w, maxed) {
@@ -4717,36 +4719,6 @@ function renderAutoEnhance(w, maxed) {
       <button class="primary" id="autoEnhanceStartBtn">자동 강화 시작</button>
     </div>`;
   $('autoEnhanceStartBtn').onclick = () => startAutoEnhance($('autoEnhanceInput').value);
-}
-
-function renderEnhRune() {
-  const box = $('enhruneBox');
-  if (!box) return;
-  const w = getEquipped();
-  if (!w || isFist(w)) {
-    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">맨손에는 룬을 장착할 수 없습니다.</div>';
-    return;
-  }
-  if (w.enhance < 15) {
-    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">룬은 <b style="color:var(--unique)">+15</b> 이상 강화한 무기에만 장착할 수 있습니다. (현재 +${w.enhance})</div>`;
-    return;
-  }
-  const maxSlots = runeSlotsForGrade(w.grade);
-  const runes = w.runes || [];
-  box.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">룬 슬롯 ${runes.length}/${maxSlots} (무기 등급이 오를수록 슬롯 증가, 최대 7개)</div>`;
-  if (runes.length) {
-    for (const r of runes) {
-      const gname = GRADES[r.grade].name;
-      const div = document.createElement('div');
-      div.className = 'invitem equipped';
-      div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
-        <div class="wi">${runeDesc(r)}</div></div><div class="btns"><button class="danger">해제</button></div>`;
-      div.querySelector('button').onclick = () => unequipRuneFromCurrentWeapon(r.id);
-      box.appendChild(div);
-    }
-  } else {
-    box.insertAdjacentHTML('beforeend', `<div style="color:var(--sub);font-size:13px;">장착된 룬이 없습니다. 🔮 룬 탭에서 보유한 룬을 장착하세요.</div>`);
-  }
 }
 
 function setupAutoSellControls() {
@@ -5084,6 +5056,7 @@ function renderRuneTab() {
     div.querySelector('button[data-idx10]').onclick = () => buyRuneBoxesBulk(i, 10);
     list.appendChild(div);
   });
+  renderRuneEquippedList();
   renderRuneInventory();
   renderRuneFusion();
 }
@@ -5104,8 +5077,27 @@ function buyRuneBoxesBulk(i, count) {
   renderTop(); renderRuneTab(); save();
 }
 
-// 보유 룬 목록 — 지금 장착한 무기에 낀 룬도 함께 보여주고 "장착해제"로 바로 뺄 수 있게 한다
-// (강화기 탭까지 갈 필요 없이 여기서 바로 빼고 다른 룬을 낄 수 있음).
+// 지금 장착한 무기에 낀 룬 — 강화기 탭까지 가지 않고 여기서 바로 해제할 수 있게
+function renderRuneEquippedList() {
+  const box = $('runeEquippedList');
+  if (!box) return;
+  const w = getEquipped();
+  const runes = (w && Array.isArray(w.runes)) ? w.runes : [];
+  if (!w || isFist(w)) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">맨손에는 룬을 장착할 수 없습니다.</div>'; return; }
+  if (!runes.length) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">${gradeTag(w)}에 장착된 룬이 없습니다.</div>`; return; }
+  box.innerHTML = '';
+  for (const r of runes) {
+    const gname = GRADES[r.grade].name;
+    const div = document.createElement('div');
+    div.className = 'invitem equipped';
+    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
+      <div class="wi">${runeDesc(r)}</div></div><div class="btns"><button class="danger">장착해제</button></div>`;
+    div.querySelector('button').onclick = () => unequipRuneFromCurrentWeapon(r.id);
+    box.appendChild(div);
+  }
+}
+// 보유 룬 목록 — 장착 중인 룬도 장신구처럼 같은 목록에 자연스러운 위치(등급순) 그대로 섞어서
+// 보여주고, "장착"/"장착해제" 버튼만 상태에 따라 바뀐다(장신구 목록과 동일한 방식).
 function renderRuneInventory() {
   const list = $('runeinvlist');
   if (!list) return;
@@ -5117,8 +5109,7 @@ function renderRuneInventory() {
     list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 룬이 없습니다. 룬박스를 개봉해 획득하세요.</div>';
     return;
   }
-  // 장착 중인 룬을 먼저, 그 다음 등급 내림차순
-  const sorted = all.sort((a, b) => (b.equipped - a.equipped) || (b.grade - a.grade));
+  const sorted = all.sort((a, b) => b.grade - a.grade);
   list.innerHTML = '';
   for (const r of sorted) {
     const gname = GRADES[r.grade].name;

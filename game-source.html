@@ -1417,6 +1417,7 @@ const PATCH_NOTES = [
       '📖 무기 도감 5층(폐허·스켈레톤) 세트효과 상향 — 강화 파괴 확률 감소 +3%p → +10%p (다른 사냥터들의 고대/신화 세트효과 비율에 맞춤, 신화 타입셋보다 낮았던 역전 현상 수정)',
       '🛡️ 강화 파괴 확률 감소가 실제로는 비율로만 깎이던 버그 수정 — 이제 다른 %p 스탯들과 동일하게 정확히 %p만큼 차감됨. 대신 저강화 구간이 통째로 무효화되지 않도록 소스 수치도 재설계(둔기 도감 세트: 신화까지 다 모아도 +16강까지만 파괴 확률 0%, 그 이상은 위험 그대로)',
       '📖 중장무기 도감쌍(일반~유니크 각 1%p) + 둔기 타입셋(레전 2.5%p, 신화 3%p) 값 재조정 — 등급이 오를수록 항목별 값도 매끄럽게 증가하도록',
+      '🐛 재료 자동판매 버그 수정 — 보스 처치 보상으로 받는 고급 재료가 자동판매 필터를 무시하고 무조건 재료로 쌓이던 문제 해결',
     ],
   },
 ];
@@ -3552,10 +3553,18 @@ function endBossFight(win) {
     log(`🏆 <b><span class="grade-신화">${F.boss.name}</span> 격파!</b> +${fmt(gold)} 골드 (1시간 후 재도전 가능)`, 'lg-prim');
     // 고급 재료 보너스: 해당 사냥터의 최고 등급 재료(고급 강화 재료)를 대량 지급 — 보스 쿨타임이
     // 1시간이라 꾸준히 도전하면 고급 강화 재료 조달의 주요 경로가 되도록 층이 높을수록 더 많이 지급.
+    // (버그 수정: 예전엔 S.mats를 직접 건드려서 재료 자동판매 필터가 전혀 먹지 않았음)
     const matBonus = 15 + f * 3;
-    S.mats[f + '|2'] = (S.mats[f + '|2'] || 0) + matBonus;
+    const matKey2 = f + '|2';
     const matGradeName = GRADES[MAT_TIERS[Math.min(3, Math.floor(f / 5))][2]].name;
-    log(`🌿 보스 처치 보상: <span class="grade-${matGradeName}">${F.mats[2]}</span> ×${matBonus} 획득!`, 'lg-good');
+    if (S.matAutoSell && S.matAutoSell[matKey2]) {
+      const price = matSellPrice(f, 2) * matBonus;
+      S.gold += price;
+      log(`🌿 보스 처치 보상(자동판매): <span class="grade-${matGradeName}">${F.mats[2]}</span> ×${matBonus} → +${fmt(price)} 골드`, 'lg-good');
+    } else {
+      S.mats[matKey2] = (S.mats[matKey2] || 0) + matBonus;
+      log(`🌿 보스 처치 보상: <span class="grade-${matGradeName}">${F.mats[2]}</span> ×${matBonus} 획득!`, 'lg-good');
+    }
     // 태초의 유물: 보스 처치는 10배 확률로 시도
     rollGenesisArtifact(f, GENESIS_BOSS_MULT);
     // 고대 무기: 보스 처치는 10배 확률로 시도

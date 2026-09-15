@@ -568,13 +568,6 @@
       <div id="runegachaslot"></div>
     </div>
     <div class="panel">
-      <h3>⚔️ 장착 중인 룬</h3>
-      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        지금 장착한 무기에 낀 룬입니다. 여기서 바로 해제하면 아래 "보유 룬"으로 돌아와서 다른 룬으로 바꿔 낄 수 있습니다.
-      </div>
-      <div id="runeEquippedList"></div>
-    </div>
-    <div class="panel">
       <h3>🛠️ 룬 합성</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         같은 등급 룬 3개를 소모해 한 단계 위 등급의 랜덤한 룬 1개 획득을 시도합니다. 등급이 높을수록 성공 확률이 낮고, <b style="color:#ff7a7a">실패하면 재료 3개는 그대로 소멸</b>합니다.
@@ -5091,28 +5084,8 @@ function renderRuneTab() {
     div.querySelector('button[data-idx10]').onclick = () => buyRuneBoxesBulk(i, 10);
     list.appendChild(div);
   });
-  renderRuneEquippedList();
   renderRuneInventory();
   renderRuneFusion();
-}
-// 지금 장착한 무기에 낀 룬 — 강화기 탭까지 가지 않고 여기서 바로 해제할 수 있게
-function renderRuneEquippedList() {
-  const box = $('runeEquippedList');
-  if (!box) return;
-  const w = getEquipped();
-  const runes = (w && Array.isArray(w.runes)) ? w.runes : [];
-  if (!w || isFist(w)) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">맨손에는 룬을 장착할 수 없습니다.</div>'; return; }
-  if (!runes.length) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">${gradeTag(w)}에 장착된 룬이 없습니다.</div>`; return; }
-  box.innerHTML = '';
-  for (const r of runes) {
-    const gname = GRADES[r.grade].name;
-    const div = document.createElement('div');
-    div.className = 'invitem equipped';
-    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
-      <div class="wi">${runeDesc(r)}</div></div><div class="btns"><button class="danger">장착해제</button></div>`;
-    div.querySelector('button').onclick = () => unequipRuneFromCurrentWeapon(r.id);
-    box.appendChild(div);
-  }
 }
 // 룬박스 묶음 구매(최대 count개, 감당 가능한 만큼만 실제 구매)
 function buyRuneBoxesBulk(i, count) {
@@ -5131,31 +5104,47 @@ function buyRuneBoxesBulk(i, count) {
   renderTop(); renderRuneTab(); save();
 }
 
+// 보유 룬 목록 — 지금 장착한 무기에 낀 룬도 함께 보여주고 "장착해제"로 바로 뺄 수 있게 한다
+// (강화기 탭까지 갈 필요 없이 여기서 바로 빼고 다른 룬을 낄 수 있음).
 function renderRuneInventory() {
   const list = $('runeinvlist');
   if (!list) return;
-  if (!S.runes.length) {
+  const w = getEquipped();
+  const equippedRunes = (w && Array.isArray(w.runes)) ? w.runes.map(r => ({ ...r, equipped: true })) : [];
+  const bagRunes = S.runes.map(r => ({ ...r, equipped: false }));
+  const all = [...equippedRunes, ...bagRunes];
+  if (!all.length) {
     list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 룬이 없습니다. 룬박스를 개봉해 획득하세요.</div>';
     return;
   }
-  const sorted = [...S.runes].sort((a, b) => b.grade - a.grade);
+  // 장착 중인 룬을 먼저, 그 다음 등급 내림차순
+  const sorted = all.sort((a, b) => (b.equipped - a.equipped) || (b.grade - a.grade));
   list.innerHTML = '';
   for (const r of sorted) {
     const gname = GRADES[r.grade].name;
     const div = document.createElement('div');
-    div.className = 'invitem';
-    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
+    div.className = 'invitem' + (r.equipped ? ' equipped' : '');
+    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span>${r.equipped ? ' <span style="color:var(--unique);font-size:12px">(장착중)</span>' : ''}</div>
       <div class="wi">${runeDesc(r)}</div></div><div class="btns"></div>`;
     const btns = div.querySelector('.btns');
-    const bt = document.createElement('button');
-    bt.textContent = '장착 무기에 장착';
-    bt.className = 'primary';
-    bt.onclick = () => equipRuneToCurrentWeapon(r.id);
-    btns.appendChild(bt);
-    const sellBt = document.createElement('button');
-    sellBt.textContent = `판매 (+${fmt(runeSellPrice(r.grade))})`;
-    sellBt.onclick = () => sellRune(r.id);
-    btns.appendChild(sellBt);
+    if (r.equipped) {
+      const bt = document.createElement('button');
+      bt.textContent = '장착해제';
+      bt.className = 'danger';
+      bt.onclick = () => unequipRuneFromCurrentWeapon(r.id);
+      btns.appendChild(bt);
+    } else {
+      const bt = document.createElement('button');
+      bt.textContent = '장착 무기에 장착';
+      bt.className = 'primary';
+      bt.onclick = () => equipRuneToCurrentWeapon(r.id);
+      btns.appendChild(bt);
+      const sellBt = document.createElement('button');
+      sellBt.textContent = `판매 (+${fmt(runeSellPrice(r.grade))})`;
+      sellBt.style.marginLeft = 'auto';
+      sellBt.onclick = () => sellRune(r.id);
+      btns.appendChild(sellBt);
+    }
     list.appendChild(div);
   }
 }

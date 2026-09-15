@@ -369,6 +369,7 @@
       <div class="tabgroup-body">
         <div class="tab on" data-tab="hunt">⚔️ 사냥터</div>
         <div class="tab" data-tab="raid">🚩 토벌전</div>
+        <div class="tab" data-tab="preset">💾 프리셋</div>
       </div>
     </div>
     <div class="tabgroup" data-group="growth">
@@ -676,6 +677,17 @@
         <button class="big danger" id="raidFleeBtn" style="width:100%;">🏳️ 토벌전 포기</button>
       </div>
       <div id="raidList"></div>
+    </div>
+  </div>
+
+  <div id="tab-preset" style="display:none">
+    <div class="panel">
+      <h3>💾 전투 프리셋</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        지금 장착한 무기(룬 포함)와 장신구 구성을 저장해뒀다가 한 번에 불러올 수 있습니다.
+        저장은 그 시점의 무기를 "기억"해두는 것이라, 이후 그 무기를 계속 강화하거나 룬을 바꿔도 불러올 때는 항상 최신 상태로 적용됩니다.
+      </div>
+      <div id="presetList"></div>
     </div>
   </div>
 
@@ -1424,6 +1436,7 @@ const PATCH_NOTES = [
       '🖱️ 장착/판매 버튼을 색상과 위치로 명확히 구분(장착=골드, 판매=빨강, 판매 버튼은 오른쪽 끝으로) + 강화된 무기(+1 이상) 판매 시 확인창 추가',
       '✊ 무기를 갖고 있어도 맨손을 다시 장착할 수 있도록 변경',
       '🔁 무기/장신구/룬 장착·해제를 그 자리에서 바로 — 가방 무기 목록에서 "장착해제" 버튼으로 즉시 해제, 장신구 목록도 "장착중" 대신 "장착해제" 버튼으로 바로 해제, 룬 탭에 "장착 중인 룬" 패널 신설(강화기 탭까지 가지 않고 바로 빼고 다시 낄 수 있음)',
+      '💾 전투 프리셋 신규 추가 — 전투 탭에 프리셋 메뉴 신설(기본 3개). 지금 장착한 무기(룬 포함)와 장신구 구성을 저장해뒀다가 한 번에 불러올 수 있고, 이름도 자유롭게 바꿀 수 있음',
     ],
   },
 ];
@@ -2239,6 +2252,11 @@ function newState() {
     bossFreeRetryReady: false, // 무한진군의 인장: 충전된 무료 보스 재도전 여부
     matAutoSell: {},   // 재료 자동판매 필터: 'f|g' 키가 true면 그 재료는 획득 즉시 자동 판매됨
     lastSeenPatchVersion: latestPatchVersion(), // 신규 플레이어는 처음부터 전부 "읽은" 상태로 시작
+    presets: [ // 전투 프리셋(기본 3개): 무기는 id로 참조(룬은 무기에 귀속되므로 자동 포함), 장신구는 스냅샷
+      { name: '프리셋 1번', weaponId: null, accEquipped: null },
+      { name: '프리셋 2번', weaponId: null, accEquipped: null },
+      { name: '프리셋 3번', weaponId: null, accEquipped: null },
+    ],
   };
 }
 
@@ -4215,6 +4233,13 @@ function migrate(d) {
   if (typeof d.raidTokens !== 'number') d.raidTokens = 0;
   if (!d.punch || typeof d.punch !== 'object') d.punch = { best: 0, last: 0 };
   if (!Array.isArray(d.ancientSeals)) d.ancientSeals = [];
+  if (!Array.isArray(d.presets) || !d.presets.length) {
+    d.presets = [
+      { name: '프리셋 1번', weaponId: null, accEquipped: null },
+      { name: '프리셋 2번', weaponId: null, accEquipped: null },
+      { name: '프리셋 3번', weaponId: null, accEquipped: null },
+    ];
+  }
   if (!Array.isArray(d.sealEquipped)) d.sealEquipped = [];
   if (typeof d.matAutoSell !== 'object' || d.matAutoSell === null || Array.isArray(d.matAutoSell)) d.matAutoSell = {};
   if (!Array.isArray(d.accs)) d.accs = [];
@@ -5254,9 +5279,10 @@ function switchTab(name) {
   currentTab = name;
   setActiveTabGroup(name);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'patchnotes']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'patchnotes', 'preset']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
+  if (name === 'preset') renderPresetTab();
   if (name === 'enhance') renderEnhance();
   if (name === 'stats') renderStats();
   if (name === 'craft') renderCraft();
@@ -5394,6 +5420,72 @@ function renderCraft() {
     }
     list.appendChild(div);
   }
+}
+
+/* ===================== 전투 프리셋 ===================== */
+// 무기는 id로 참조한다(룬은 무기 자체에 귀속된 배열이라 따로 저장할 필요 없이 자동으로 함께
+// 적용됨). 장신구는 accEquipped 스냅샷을 통째로 복사해둔다.
+function savePreset(idx) {
+  const p = S.presets[idx];
+  if (!p) return;
+  const w = getEquipped();
+  if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
+  p.weaponId = w.id;
+  p.accEquipped = JSON.parse(JSON.stringify(S.accEquipped));
+  log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)})와 장신구 ${p.accEquipped.length}개를 저장했습니다.`, 'lg-good');
+  renderPresetTab(); save();
+}
+function loadPreset(idx) {
+  const p = S.presets[idx];
+  if (!p || p.weaponId == null) { log('저장된 프리셋이 없습니다.', 'lg-bad'); return; }
+  const w = S.weapons.find(x => x.id === p.weaponId);
+  if (!w) {
+    log(`⚠️ <b>${p.name}</b>의 무기를 찾을 수 없습니다(판매되었거나 파괴됨). 장신구만 적용합니다.`, 'lg-bad');
+  } else {
+    S.equipped = w.id;
+  }
+  if (Array.isArray(p.accEquipped)) S.accEquipped = JSON.parse(JSON.stringify(p.accEquipped));
+  log(`📥 <b>${p.name}</b>을(를) 불러왔습니다.${w ? ` ${gradeTag(w)} 장착.` : ''}`, 'lg-prim');
+  renderAll(); save();
+}
+function renamePreset(idx, newName) {
+  const p = S.presets[idx];
+  if (!p) return;
+  const name = (newName || '').trim().slice(0, 20);
+  if (!name || name === p.name) { renderPresetTab(); return; }
+  p.name = name;
+  save();
+}
+function renderPresetTab() {
+  const box = $('presetList');
+  if (!box) return;
+  box.innerHTML = '';
+  S.presets.forEach((p, idx) => {
+    const w = p.weaponId != null ? S.weapons.find(x => x.id === p.weaponId) : null;
+    const accNames = Array.isArray(p.accEquipped) ? p.accEquipped.map(eq => ACCESSORIES[eq.floor]?.name).filter(Boolean) : [];
+    let summary;
+    if (p.weaponId == null) summary = '<span style="color:var(--sub)">저장된 내용 없음</span>';
+    else if (!w) summary = '<span style="color:#ff7a7a">저장된 무기를 찾을 수 없음(판매·파괴됨)</span>';
+    else summary = `${gradeTag(w)}${accNames.length ? ` · 📿 ${accNames.join(', ')}` : ' · 장신구 없음'}`;
+    const div = document.createElement('div');
+    div.className = 'invitem';
+    div.innerHTML = `
+      <div style="flex:1;min-width:0;">
+        <input type="text" value="${p.name}" maxlength="20" data-preset-name="${idx}"
+          style="background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:14px;font-weight:bold;max-width:180px;">
+        <div class="wi" style="margin-top:4px;">${summary}</div>
+      </div>
+      <div class="btns">
+        <button data-preset-save="${idx}">저장</button>
+        <button class="primary" data-preset-load="${idx}" ${p.weaponId == null ? 'disabled' : ''}>불러오기</button>
+      </div>`;
+    box.appendChild(div);
+  });
+  box.querySelectorAll('[data-preset-save]').forEach(el => { el.onclick = () => savePreset(+el.dataset.presetSave); });
+  box.querySelectorAll('[data-preset-load]').forEach(el => { el.onclick = () => loadPreset(+el.dataset.presetLoad); });
+  box.querySelectorAll('[data-preset-name]').forEach(el => {
+    el.onchange = () => renamePreset(+el.dataset.presetName, el.value);
+  });
 }
 
 // 재료 자동판매 필터 (사냥터별 전체 적용 / 종류별 개별 적용)

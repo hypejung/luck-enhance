@@ -957,7 +957,7 @@ function codexEntries() {
 const CODEX_PAIRS = [
   { name: '쾌속 무기',     types: ['단검', '쌍검'], stat: 'extraAtk',      values: [0.005, 0.01, 0.015, 0.02] },
   { name: '표준 무기',     types: ['검', '창'],     stat: 'atk',           values: [0.005, 0.01, 0.015, 0.02] },
-  { name: '중장 무기',     types: ['도끼', '둔기'], stat: 'destroyReduce', values: [0.005, 0.01, 0.015, 0.02] },
+  { name: '중장 무기',     types: ['도끼', '둔기'], stat: 'destroyReduce', values: [0.01, 0.01, 0.01, 0.01] },
   { name: '원거리/마력',   types: ['활', '지팡이'], stat: 'speed',         values: [0.005, 0.01, 0.015, 0.02] },
 ];
 const CODEX_TYPE_SETS = {
@@ -968,7 +968,7 @@ const CODEX_TYPE_SETS = {
   창:     { stat: 'critDamage',    legend: 0.03, myth: 0.06 },
   활:     { stat: 'speed',         legend: 0.04, myth: 0.08 },
   지팡이: { stat: 'gold',          legend: 0.04, myth: 0.08 },
-  둔기:   { stat: 'destroyReduce', legend: 0.01, myth: 0.02 }, // %p 차감 방식으로 바뀌면서 값도 하향(중장무기 쌍 5%p + 여기 3%p = 신화까지 합계 8%p)
+  둔기:   { stat: 'destroyReduce', legend: 0.025, myth: 0.03 }, // 일반~유니크 각 1%p(중장무기 쌍) + 레전 2.5%p + 신화 3%p = 신화까지 합계 9.5%p
 };
 // index = 사냥터(0~19). 'offline'은 accEff 합산 대상이 아니라 grantOffline()에서 별도로 처리.
 const CODEX_ANCIENT_SETS = [
@@ -1416,6 +1416,7 @@ const PATCH_NOTES = [
       '🔨 둔기 무기특성 재설계 — "강화 파괴 확률 -30%"(다른 %p 스탯과 달리 실제로는 비율로만 깎이던 버그가 있었음) 대신, 매 5번째 공격이 강타로 적중해 무기 공격력 250% 고정 피해를 추가하는 "파쇄의 리듬"으로 변경',
       '📖 무기 도감 5층(폐허·스켈레톤) 세트효과 상향 — 강화 파괴 확률 감소 +3%p → +10%p (다른 사냥터들의 고대/신화 세트효과 비율에 맞춤, 신화 타입셋보다 낮았던 역전 현상 수정)',
       '🛡️ 강화 파괴 확률 감소가 실제로는 비율로만 깎이던 버그 수정 — 이제 다른 %p 스탯들과 동일하게 정확히 %p만큼 차감됨. 대신 저강화 구간이 통째로 무효화되지 않도록 소스 수치도 재설계(둔기 도감 세트: 신화까지 다 모아도 +16강까지만 파괴 확률 0%, 그 이상은 위험 그대로)',
+      '📖 중장무기 도감쌍(일반~유니크 각 1%p) + 둔기 타입셋(레전 2.5%p, 신화 3%p) 값 재조정 — 등급이 오를수록 항목별 값도 매끄럽게 증가하도록',
     ],
   },
 ];

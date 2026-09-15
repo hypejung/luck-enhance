@@ -1400,6 +1400,7 @@ const PATCH_NOTES = [
       '🌾 무기 특수효과 "재료 계열" 신규 추가(유니크~신화 3종) — 재료 획득 시 확률적으로 추가 개수 획득. 신화 등급은 고급 재료 한정 "대풍작" 잭팟 보너스도 있음',
       '🌾 룬에도 수확의 룬(일반~유니크), 풍작의 룬(레전더리), 풍요의 룬(신화), 대풍요의 룬(고대) 신규 추가 — 같은 재료를 노리는 소스는 확률·개수가 합산되어 판정됨',
       '🌌 태초의 유물 시스템 전면 재설계 — "보유만 해도 발동"하던 장신구에서 "장착해야 발동"하는 진짜 무기(전용 등급)로 전환. 판매·파괴 불가, 강화 실패는 유지/하락만(파괴 없음), 강화에 골드 외 "무기의 정수" 별도 필요. 글러트니의 목걸이는 처치 시 골드·드랍률이 스택형으로 쌓이는 "끝없는 허기"와, 다른 모든 보너스를 총합 10배로 뻥튀기하는 "끝없는 탐욕"을 지닌 무기로 재탄생',
+      '🏺🌌 고대 무기 / 태초의 유물 드랍률 조정 — 이제 장신구·도감·각인 등 모든 드롭률 보너스가 적용됨. 그 사냥터의 보스 장신구를 보유하고 보스 무기를 장착 중이면 드랍률이 3배로 상승(보스 세트효과). 기본 확률 자체도 재조정',
     ],
   },
 ];
@@ -1541,7 +1542,7 @@ const BOSS_ACCS = [
 // 않고 "보유하는 순간부터" 항상 발동하는 진짜 컬렉션형 보상. 평범한 킬로는 평균
 // 6천만 마리에 한 번(극한 최적화 캐릭터 기준 약 1년, 하루 8시간)이고 엘리트/보스는
 // 그보다 훨씬 유리함. 하나씩 천천히 채워나가는 컨텐츠라 아직 비어있는 슬롯은 null로 둔다.
-const GENESIS_BASE_CHANCE = 1 / 6e7; // 사냥터 몬스터 1마리당 기본 확률 = 평균 6천만 마리에 한 번
+const GENESIS_BASE_CHANCE = 1 / 46900000; // 사냥터 몬스터 1마리당 기본 확률. 드롭률 효과 + 보스 세트효과(x3)를 모두 반영한 "풀 세팅" 기준 평균 12시간 방치 30일 목표로 역산한 값
 const GENESIS_ELITE_MULT = 5;      // 엘리트(유니크) 몬스터는 5배
 const GENESIS_BOSS_MULT = 10;      // 보스 몬스터는 10배
 const GENESIS_ARTIFACTS = [
@@ -1622,10 +1623,15 @@ function grantGenesisArtifact(artifact) {
   renderInventory(); renderTop(); save();
 }
 // 사냥터별 유물이 아직 없다면 극희박한 확률로 드랍 시도. kindMult: 1=일반, 5=엘리트, 10=보스
+// 태초/고대 공통: 드롭률 보너스(장신구/도감/각인 등 accEff().luck에 합산되는 전부)를 반영하고,
+// 그 사냥터의 보스 세트(보스 장신구 보유 + 그 층 보스무기 장착, bossSetFloor())를 갖췄으면 3배.
+function genesisAncientDropMult(floorIdx) {
+  return (1 + accEff().luck) * (bossSetFloor() === floorIdx ? 3 : 1);
+}
 function rollGenesisArtifact(floorIdx, kindMult) {
   const artifact = GENESIS_ARTIFACTS[floorIdx];
   if (!artifact || hasGenesis(artifact.id)) return;
-  if (Math.random() < GENESIS_BASE_CHANCE * kindMult) grantGenesisArtifact(artifact);
+  if (Math.random() < GENESIS_BASE_CHANCE * kindMult * genesisAncientDropMult(floorIdx)) grantGenesisArtifact(artifact);
 }
 
 // ---------- 글러트니(태초 무기) 전용 전투 효과 ----------
@@ -1659,7 +1665,7 @@ function goldAtkBonusPct() {
 // 3개의 이름 변형을 가지며, 그 사냥터 몬스터의 "고대 조상"이 지녔을 위엄을 담아
 // 짓는다. 아직 설계되지 않은 사냥터는 null로 비워두고(태초처럼) 필요한 만큼
 // 순차적으로 채워나간다. 등급 자체는 GRADES[6]("고대")를 그대로 쓴다.
-const ANCIENT_BASE_CHANCE = 2e-7; // 사냥터 몬스터 1마리당 기본 확률 (기존 1e-8의 20배)
+const ANCIENT_BASE_CHANCE = 1 / 10800000; // 사냥터 몬스터 1마리당 기본 확률. 드롭률 효과 + 보스 세트효과(x3)를 모두 반영한 "풀 세팅" 기준 평균 12시간 방치 7일 목표로 역산한 값
 const ANCIENT_ELITE_MULT = 5;
 const ANCIENT_BOSS_MULT = 10;
 // 사냥터 몬스터의 특성을 반영한 "에이션트 스피릿" — 고대 무기 전용 추가 효과.
@@ -1864,7 +1870,7 @@ function ancientVariant(w) {
 function rollAncientWeapon(floorIdx, kindMult) {
   const variants = WEAPON_ANCIENT_NAMES[floorIdx];
   if (!variants) return; // 아직 설계되지 않은 사냥터
-  if (Math.random() >= ANCIENT_BASE_CHANCE * kindMult) return;
+  if (Math.random() >= ANCIENT_BASE_CHANCE * kindMult * genesisAncientDropMult(floorIdx)) return;
   const idx = Math.floor(Math.random() * variants.length);
   const v = variants[idx];
   const t = WEAPON_TYPES.find(x => x.name === v.type);

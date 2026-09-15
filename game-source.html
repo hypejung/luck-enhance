@@ -532,8 +532,8 @@
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">
         <div style="font-style:italic;margin-bottom:6px;">태초, 그곳엔 이름조차 없었다 — 다만 존재할 뿐인 무언가가 세계의 전부였다.
         시대가 몇 번을 바뀌어도 그 존재들은 완전히 사라지지 않았다. 다만 옅어지고 흩어져, 사냥터 깊숙한 곳에 잔영으로 남았을 뿐.
-        그 잔영을 온전히 담아낸 유물은 장착할 곳조차 필요로 하지 않는다 — 지니고 있는 것만으로, 그 존재의 힘이 당신의 것이 된다.</div>
-        <div>사냥터마다 단 하나뿐인 유물입니다.</div>
+        그 잔영을 온전히 담아낸 유물은 이제 하나의 진짜 "무기"다 — 가방에서 장착해야 비로소 그 존재의 힘이 당신의 것이 된다.</div>
+        <div>사냥터마다 단 하나뿐인 유물입니다. 판매·파괴가 불가능하며, 강화하려면 골드와 함께 "무기의 정수"가 필요합니다.</div>
       </div>
       <div id="genesisList"></div>
     </div>
@@ -713,10 +713,12 @@ const GRADES = [
   { name: '레전더리',  atk: 550,   enhanceCost: 187500, sell: 18000,  color: '#ff4a5e' },
   { name: '신화',      atk: 950,   enhanceCost: 450000, sell: 45000,  color: '#ff7cf0' },
   { name: '고대',      atk: 1600,  enhanceCost: 900000, sell: 90000,  color: '#d4922a' },
+  { name: '태초',      atk: 6000,  enhanceCost: 200000000, sell: 0,   color: 'var(--prim)' },
 ];
-// "태초"는 이제 무기 등급표에 속하지 않는다 — 사냥터별 초저확률 컬렉션 시스템
-// (GENESIS_ARTIFACTS, 태초의 유물)의 전용 명칭으로만 쓰인다. 색상(--prim, 민트)은
-// 혼동을 피하기 위해 등급표에서는 더 이상 쓰지 않고 유물 시스템 몫으로 남겨둔다.
+// "태초"(index 7)는 사냥터별 초저확률 컬렉션 시스템(GENESIS_ARTIFACTS, 태초의 유물)으로만
+// 얻을 수 있는 하드코딩 "고유" 무기 등급이다. 판매 불가(sell:0은 표시용, 실제 차단은 UI에서 강제).
+const GENESIS_GRADE = 7;
+function isGenesisWeapon(w) { return !!w && w.grade === GENESIS_GRADE; }
 
 // ---------- 무기 종류 (공속 = 초당 공격 횟수, 데미지 배율) ----------
 // 종류마다 고유 특성(trait)을 부여해서 같은 등급/강화라도 플레이 체감이 다르게 만듦.
@@ -731,15 +733,22 @@ const WEAPON_TYPES = [
   { name: '지팡이', icon: '🪄', speed: 0.9,  dmgMult: 1.25, trait: { spellProc: 0.25, spellMult: 3 },   traitDesc: '공격력은 "마력"으로 작용, 25% 확률로 주문 작렬(피해 3배)' },
   { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65, trait: { destroyReduce: 0.3 },              traitDesc: '강화 파괴 확률 -30%' },
 ];
+// 태초 무기 전용 "종류". WEAPON_TYPES 배열에는 넣지 않는다 — genWeapon() 등이 이 배열을
+// 무작위 뽑기 풀로도 쓰기 때문에, 여기 섞이면 일반 등급 무기가 "고유" 타입을 뽑는 사고가 난다.
+const GENESIS_WEAPON_TYPE = {
+  name: '고유', icon: '🌌', speed: 3.5, dmgMult: 1.0,
+  traitDesc: '무기마다 고유한 "고유스킬" 보유',
+};
 function typeTrait(w, key) {
   if (!w) return 0;
-  const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
+  const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   return (t && t.trait && t.trait[key]) || 0;
 }
 // 지팡이는 "공격력" 대신 "마력"으로 표기(수치/계산은 동일, 표시만 다름)
 function atkLabel(w) { return (w && w.type === '지팡이') ? '마력' : '공격력'; }
 // 둔기 특성 + 도감 컬렉션 보너스(파괴 확률 감소)까지 반영한 실제 파괴 확률
 function effectiveDestroyChance(w) {
+  if (isGenesisWeapon(w)) return 0; // 태초 무기는 파괴되지 않는다 (실패 시 유지 또는 하락뿐)
   const base = ENH.destroy[w.enhance] || 0;
   const reduce = Math.min(0.95, typeTrait(w, 'destroyReduce') + accEff().destroyReduce);
   return Math.round(base * (1 - reduce) * 10) / 10;
@@ -849,6 +858,7 @@ const WEAPON_MYTH_NAMES = {
 // 등급별 무기 이름(브라켓 태그 안에 들어갈 텍스트) 계산
 function weaponItemName(w) {
   if (isFist(w)) return w.type;
+  if (isGenesisWeapon(w)) return w.name;
   const type = w.type;
   if (w.grade === 0) return type;
   if (w.grade === 1) return `${WEAPON_ADJ[type] || ''} ${type}`.trim();
@@ -1189,6 +1199,7 @@ const fx = {
   freeEnhance: false,      // 끝나지 않은 맹세: 다음 강화 비용 무료 대기 중
   glideUntil: 0,           // 활공: 사냥터 이동 직후 공속 버프 만료 시각
   enduranceStart: 0,       // 늑대왕의 인장: 현재 사냥터에서 쉬지 않고 사냥을 지속한 시작 시각
+  hungerStackTimes: [],    // 끝없는 허기(글러트니): 최근 처치 시각 기록 (10초 지나면 자동 소멸)
 };
 
 // ---------- 강화 설정 (최대 +30, "운빨강화"의 핵심 — 진짜 도박) ----------
@@ -1388,6 +1399,7 @@ const PATCH_NOTES = [
       '🗑️ 클라우드 동기화 도입으로 필요 없어진 수동 저장/저장코드 내보내기·불러오기/파일로 저장·불러오기 버튼 정리',
       '🌾 무기 특수효과 "재료 계열" 신규 추가(유니크~신화 3종) — 재료 획득 시 확률적으로 추가 개수 획득. 신화 등급은 고급 재료 한정 "대풍작" 잭팟 보너스도 있음',
       '🌾 룬에도 수확의 룬(일반~유니크), 풍작의 룬(레전더리), 풍요의 룬(신화), 대풍요의 룬(고대) 신규 추가 — 같은 재료를 노리는 소스는 확률·개수가 합산되어 판정됨',
+      '🌌 태초의 유물 시스템 전면 재설계 — "보유만 해도 발동"하던 장신구에서 "장착해야 발동"하는 진짜 무기(전용 등급)로 전환. 판매·파괴 불가, 강화 실패는 유지/하락만(파괴 없음), 강화에 골드 외 "무기의 정수" 별도 필요. 글러트니의 목걸이는 처치 시 골드·드랍률이 스택형으로 쌓이는 "끝없는 허기"와, 다른 모든 보너스를 총합 10배로 뻥튀기하는 "끝없는 탐욕"을 지닌 무기로 재탄생',
     ],
   },
 ];
@@ -1490,7 +1502,7 @@ function raidGoldReward(stage) {
   const ae = accEff();
   let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
   goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
-  if (hasGenesis('gluttony')) goldMul *= 10;
+  if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
   const killsPerHour = weaponSpeed(w) * 3600;
   const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
   return Math.floor(base * Math.pow(RAID.goldGrowth, stage));
@@ -1536,7 +1548,7 @@ const GENESIS_ARTIFACTS = [
   { // floor 0 — 초원 — 슬라임
     id: 'gluttony',
     floor: 0,
-    type: 'accessory',
+    type: 'weapon',
     name: '글러트니의 목걸이',
     subtitle: 'The Gluttony',
     icon: '📿',
@@ -1571,18 +1583,42 @@ const GENESIS_ARTIFACTS = [
 
 이 목걸이는 그 태초의 탐욕을 담고 있다고 전해진다.`,
     effectsText: [
-      '끝없는 허기: 태초를 제외한 모든 아이템의 드랍률이 10배, 골드 획득량이 10배 상승한다.',
-      '끝없는 탐욕: 아이템 획득 시 10% 확률로 10배로 획득한다. 재료 또는 무기 판매 시에도 10% 확률로 10배의 골드를 획득한다.',
+      '끝없는 허기: 몬스터 처치 시 10초간 골드 획득량 +0.5%p, 드랍률 +0.5%p 중첩(최대 1000중첩). 보유 골드 1000억당 공격력이 증가한다(체감 성장 곡선, 최대 +10000%).',
+      '끝없는 탐욕: 태초를 제외한 모든 아이템 드랍률과 골드 획득량에 적용 중인 다른 모든 보너스를 "총합 배율" 기준으로 10배 상승시킨다(예: 기존 총 250% → 2500%). 아이템 획득 시 10% 확률로 10배 획득, 재료·무기 판매 시에도 10% 확률로 10배의 골드를 획득한다.',
     ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'gluttony', name: '끝없는 탐욕과 허기' },
   },
   null, null, null, null, null, null, null, null, null,
   null, null, null, null, null, null, null, null, null,
 ];
+// "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
+function equippedGenesisSkill() {
+  const w = getEquipped();
+  return (w && isGenesisWeapon(w)) ? w.genesisSkill : null;
+}
+function hasGenesisEquipped(skillKey) { return equippedGenesisSkill() === skillKey; }
 function grantGenesisArtifact(artifact) {
   S.genesisOwned.push(artifact.id);
+  const w = {
+    id: uid++,
+    grade: GENESIS_GRADE,
+    type: '고유',
+    icon: artifact.icon,
+    name: artifact.name,
+    enhance: 0,
+    effect: null,
+    runes: [],
+    genesisId: artifact.id,
+    genesisSkill: artifact.uniqueSkill.key,
+    speedOverride: artifact.speedOverride,
+    dmgMultOverride: artifact.dmgMultOverride,
+  };
+  S.weapons.push(w); // addWeapon()의 자동판매 필터를 거치지 않고 직접 추가 (태초는 절대 자동판매 대상이 아님)
   log(`🌌🌌🌌 <b style="color:#6cf0c2">[태초의 유물] ${artifact.name}</b>을(를) 획득했습니다!!! 🌌🌌🌌`, 'lg-prim');
-  log(`가방 탭에서 유물의 이야기를 확인해보세요.`, 'lg-prim');
+  log(`가방 탭에서 유물의 이야기를, 무기 탭에서 실제 무기를 확인하고 장착해보세요.`, 'lg-prim');
   renderInventory(); renderTop(); save();
 }
 // 사냥터별 유물이 아직 없다면 극희박한 확률로 드랍 시도. kindMult: 1=일반, 5=엘리트, 10=보스
@@ -1590,6 +1626,31 @@ function rollGenesisArtifact(floorIdx, kindMult) {
   const artifact = GENESIS_ARTIFACTS[floorIdx];
   if (!artifact || hasGenesis(artifact.id)) return;
   if (Math.random() < GENESIS_BASE_CHANCE * kindMult) grantGenesisArtifact(artifact);
+}
+
+// ---------- 글러트니(태초 무기) 전용 전투 효과 ----------
+// 끝없는 허기: 처치 시 스택 추가(최대 1000, 스택당 10초 지속) — 스택 수만큼 골드/드랍률 %p 보너스.
+function onGenesisHungerKill() {
+  if (!hasGenesisEquipped('gluttony')) return;
+  fx.hungerStackTimes = fx.hungerStackTimes || [];
+  fx.hungerStackTimes.push(Date.now());
+  if (fx.hungerStackTimes.length > 1000) fx.hungerStackTimes.shift();
+}
+function hungerStackCount() {
+  const now = Date.now();
+  fx.hungerStackTimes = (fx.hungerStackTimes || []).filter(t => now - t < 10000);
+  return Math.min(1000, fx.hungerStackTimes.length);
+}
+function hungerBonusPct() { return hungerStackCount() * 0.005; }
+// 끝없는 허기(B): 보유 골드가 많을수록 공격력 증가 — 선형보다 완만하고 sqrt보다 가파른 지수 0.7, 상한 +10000%.
+const GENESIS_GOLD_ATK_RATE = 0.01;
+const GENESIS_GOLD_ATK_UNIT = 1e11;
+const GENESIS_GOLD_ATK_EXP = 0.7;
+const GENESIS_GOLD_ATK_CAP = 100;
+function goldAtkBonusPct() {
+  if (!hasGenesisEquipped('gluttony')) return 0;
+  const raw = Math.pow(Math.max(0, S.gold) / GENESIS_GOLD_ATK_UNIT, GENESIS_GOLD_ATK_EXP) * GENESIS_GOLD_ATK_RATE;
+  return Math.min(GENESIS_GOLD_ATK_CAP, raw);
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -2135,6 +2196,7 @@ function newState() {
     training: {},      // 능력치 훈련 레벨: { atk, atkSpeed, critChance, critDamage, extraAtk, bossDmg }
     autoSellGrade: null, // 이 등급 이하 + 강화0 무기는 획득 즉시 자동판매 (null=끔)
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
+    weaponEssence: 0,  // 무기의 정수 — 태초 무기 강화 전용 재화 (고대의 도서관 컨텐츠에서 획득 예정)
     eggs: {},          // 달성한 이스터에그: { eggId: true }
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
@@ -2182,12 +2244,14 @@ function genWeapon(gradeIdx) {
 
 function weaponAtk(w) {
   const g = GRADES[w.grade];
-  const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
+  const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   const variant = weaponStatVariant(w);
   // 영혼 포식자(고대 에이션트 스피릿): 이 무기로 쌓은 처치 스택만큼 영구 공격력 증가
   const soulBonus = (w.spirit === 'soul' && w.soulStacks) ? w.soulStacks * ANCIENT_SPIRITS.soul.bonusPerStack : 0;
-  const base = g.atk * t.dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus);
-  return base * enhAtkMult(w.enhance, w.grade) * (1 + accEff().atk + typeTrait(w, 'atk'));
+  const dmgMult = isGenesisWeapon(w) && w.dmgMultOverride != null ? w.dmgMultOverride : t.dmgMult;
+  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus);
+  const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk')) * (1 + goldAtkBonusPct());
 }
 // 강화 단계별 누적 공격력 배율. +10까지는 강화 1회당 증가폭이 일정한 선형 구간(급등 없음),
 // +10 이후부터는 단계마다 곱연산으로 가속 성장한다.
@@ -2231,8 +2295,18 @@ function enhTierBonus(enhance) {
   }
   return bonus;
 }
+// 태초 무기 전용 강화 곡선: 등급 숫자(7)를 그대로 넣으면 고대(6)와 차이가 미미해지므로,
+// 성공확률용/성장률용 "가상 등급"을 따로 둔다. 성공확률은 고대보다 관대하게, 성장폭은
+// 고대의 2배 이상으로 잡아 "하나만 나와도 밸런스를 흔드는" 태초의 위상을 보장한다.
+const GENESIS_ENH = {
+  successGradeEquivalent: 5,
+  growthGradeEquivalent: 14,
+};
+function genesisAtkMult(enh) { return enhAtkMult(enh, GENESIS_ENH.growthGradeEquivalent); }
+function genesisSuccessChance(enh) { return gradeAdjustedSuccess(GENESIS_ENH.successGradeEquivalent, enh); }
 function weaponSpeed(w) {
-  const t = isFist(w) ? FIST : WEAPON_TYPES.find(x => x.name === w.type);
+  const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
+  const baseSpeed = isGenesisWeapon(w) && w.speedOverride != null ? w.speedOverride : t.speed;
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const effSpeed = e && e.speed ? e.speed : 0;
   // 공격속도 계열 효과의 임시 스택/버프 (해당 효과를 장착 중일 때만 적용)
@@ -2250,7 +2324,7 @@ function weaponSpeed(w) {
   if (w && w.effect === 'infinite' && now < fx.infiniteUntil) burstMult *= (e.burstMult || 1);
   const variant = weaponStatVariant(w);
   const variantMult = variant ? variant.speedMod : 1;
-  return t.speed * (1 + accEff().speed + typeTrait(w, 'speedBonus') + effSpeed + stackBonus) * (1 + weaponRuneStat(w, 'atkSpeed') / 100) * burstMult * variantMult;
+  return baseSpeed * (1 + accEff().speed + typeTrait(w, 'speedBonus') + effSpeed + stackBonus) * (1 + weaponRuneStat(w, 'atkSpeed') / 100) * burstMult * variantMult;
 }
 
 /* ===================== 룬 ===================== */
@@ -2418,6 +2492,11 @@ function enhanceCost(w) {
   // 기본비용 × costGrowth^단계 로 기하급수적 상승 (저강화도 결코 싸지 않음)
   return Math.floor(GRADES[w.grade].enhanceCost * Math.pow(ENH.costGrowth, w.enhance));
 }
+// 태초 무기 전용 강화 재화: 골드 외에 "무기의 정수"도 함께 소모한다. 정식 획득처("고대의
+// 도서관")가 아직 구현되지 않아 당장은 완강이 불가능한 게 의도된 설계 — 장기 목표로 남겨둔다.
+const GENESIS_ESSENCE_BASE = 1;
+const GENESIS_ESSENCE_GROWTH = 1.35;
+function genesisEssenceCost(w) { return Math.ceil(GENESIS_ESSENCE_BASE * Math.pow(GENESIS_ESSENCE_GROWTH, w.enhance)); }
 
 // 고레벨 강화에 필요한 고급 재료 수 (에픽 등급 이상 재료)
 // +15 강화부터 필요: +15→5개 ... +29→75개 (스팸성 강화 시도를 억제하기 위해 대폭 상향)
@@ -2554,7 +2633,7 @@ function gradeTag(w) {
         : ` <span style="font-size:12px">🔮×${runeList.length}</span>`)
     : '';
   const boss = w.bossFloor !== undefined ? ' 👹' : '';
-  const fist = isFist(w) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
+  const fist = (isFist(w) || isGenesisWeapon(w)) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
   const itemName = weaponItemName(w);
   return `<span class="grade-${g.name}">${w.icon}[${g.name}]${itemName}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}${rune}`;
 }
@@ -2620,6 +2699,7 @@ function spawnMonster() {
 }
 
 function dropRoll() {
+  onGenesisHungerKill(); // 끝없는 허기(글러트니): 처치마다 스택 적립 (장착 중이 아니면 내부에서 무시)
   const w = getEquipped();
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const ae = accEff();
@@ -2631,8 +2711,13 @@ function dropRoll() {
   if (isU) goldMul *= 10;
   // 전능의 룬(태초): 골드 획득 +50% (여러 개 장착하면 곱연산 중첩)
   goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
-  // 끝없는 허기(글러트니의 목걸이): 태초를 제외한 모든 아이템 드랍률 ×10, 골드 획득 ×10
-  if (hasGenesis('gluttony')) { dropMul *= 10; goldMul *= 10; }
+  // 끝없는 허기(글러트니 처치 스택) + 끝없는 탐욕: 태초를 제외한 모든 드랍률/골드 획득에
+  // 지금까지 결합된 총 배율에 (1+처치스택보너스)를 곱한 뒤, 그 총합 배율을 마지막에 10배.
+  if (hasGenesisEquipped('gluttony')) {
+    const hungerMul = (1 + hungerBonusPct()) * 10;
+    dropMul *= hungerMul;
+    goldMul *= hungerMul;
+  }
 
   // 골드
   let gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
@@ -2822,7 +2907,7 @@ function rollMatJackpot(w, slot) {
 function addMat(f, matSlot) {
   const key = f + '|' + matSlot;
   // 끝없는 탐욕(글러트니의 목걸이): 아이템 획득 시 10% 확률로 10배 획득
-  const gluttonyBonus = (hasGenesis('gluttony') && Math.random() < 0.1) ? 10 : 1;
+  const gluttonyBonus = (hasGenesisEquipped('gluttony') && Math.random() < 0.1) ? 10 : 1;
   const w = getEquipped();
   const slotName = MAT_SLOT_NAMES[matSlot];
   const harvestBonus = rollMatBonus(w, slotName) + rollMatJackpot(w, slotName);
@@ -2916,15 +3001,15 @@ function openBox(idx, src) {
 function addWeapon(w) {
   unlockCodexEntry(w); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록
   // 자동판매 필터: 지정 등급 이하 + 강화수치 0인 새 무기는 획득 즉시 자동 판매
-  if (S.autoSellGrade != null && w.grade <= S.autoSellGrade && w.enhance === 0) {
+  if (S.autoSellGrade != null && w.grade <= S.autoSellGrade && w.enhance === 0 && !isGenesisWeapon(w)) {
     const price = sellPrice(w);
     S.gold += price;
     log(`🗑️ 자동판매(${GRADES[w.grade].name} 이하): ${gradeTag(w)} → +${fmt(price)} 골드`);
     return;
   }
   if (S.weapons.length >= 60) {
-    // 가방이 가득 차면 맨손을 자동 판매 목록에서 제외하고 가장 약한 무기를 판매
-    const sellable = S.weapons.filter(x => !isFist(x) && x.id !== S.equipped);
+    // 가방이 가득 차면 맨손/태초 무기를 자동 판매 목록에서 제외하고 가장 약한 무기를 판매
+    const sellable = S.weapons.filter(x => !isFist(x) && !isGenesisWeapon(x) && x.id !== S.equipped);
     if (!sellable.length) {
       const price = sellPrice(w);
       S.gold += price;
@@ -3327,6 +3412,7 @@ function endRaidFight(win) {
   bossFight.isRaid = false;
   $('raidMonEmoji').classList.remove('boss-glow');
   if (win) {
+    onGenesisHungerKill(); // 끝없는 허기(글러트니): 토벌전 처치도 스택 적립 대상
     const tokens = raidTokenReward(stage);
     const gold = raidGoldReward(stage);
     S.gold += gold;
@@ -3407,6 +3493,7 @@ function endBossFight(win) {
   const f = bossFight.floor;
   const F = FLOORS[f];
   if (win) {
+    onGenesisHungerKill(); // 끝없는 허기(글러트니): 보스 처치도 스택 적립 대상
     S.bossWins++;
     S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped()) * (sealEquippedHas('quakeGuardian') ? 0.5 : 1);
     if (sealEquippedHas('endlessMarch')) S.bossFreeRetryReady = true; // 무한진군의 인장: 다음 재도전 1회 무료 충전
@@ -3417,7 +3504,7 @@ function endBossFight(win) {
     // (평시 사냥 골드 배율 스택과 동일하게: 무기 효과 골드% + 장신구 골드% + 전능의 룬 + 글러트니 유물)
     let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
     goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
-    if (hasGenesis('gluttony')) goldMul *= 10;
+    if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
     const killsPerHour = weaponSpeed(w) * 3600;
     const gold = Math.floor(floorGold(f) * killsPerHour * goldMul);
     S.gold += gold;
@@ -3689,6 +3776,12 @@ function tryEnhance(advanced) {
   // 고급 강화는 골드 소모량도 일반 강화의 3배
   const cost = freeThisTry ? 0 : (advanced ? advancedEnhGoldCost(w) : enhanceCost(w));
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
+  // 태초 무기: 골드 외에 "무기의 정수"도 함께 필요
+  const essenceNeed = isGenesisWeapon(w) ? genesisEssenceCost(w) : 0;
+  if (essenceNeed > 0 && (S.weaponEssence || 0) < essenceNeed) {
+    log(`무기의 정수가 부족합니다! (필요 ${essenceNeed}, 보유 ${S.weaponEssence || 0}) — 고대의 도서관에서 획득하세요`, 'lg-bad');
+    return;
+  }
   // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름). 고급 강화는 배수 소모.
   // 재료가 부족하면 그 부족분만큼 토벌의 증표로 대신 낼 수 있다(highMatStatus 참고).
   const matNeed = highMatsNeeded(w.enhance) * (advanced ? advancedEnhMult() : 1);
@@ -3699,6 +3792,7 @@ function tryEnhance(advanced) {
   }
   if (freeThisTry) { fx.freeEnhance = false; log('🕯️ 끝나지 않은 맹세 발동! 이번 강화는 무료입니다.', 'lg-prim'); }
   S.gold -= cost;
+  if (essenceNeed > 0) S.weaponEssence -= essenceNeed;
   if (matNeed > 0) {
     consumeHighMatsWithTokens(w.grade, matNeed);
     if (matSt.shortfall > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
@@ -3706,7 +3800,8 @@ function tryEnhance(advanced) {
   const advTag = advanced ? ' <span style="color:var(--unique)">[고급 강화]</span>' : '';
 
   const attemptLevel = w.enhance; // FX 연출 강도 판단용 (변경 전 단계)
-  const chance = Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + enhTierBonus(w.enhance));
+  const baseChance = isGenesisWeapon(w) ? genesisSuccessChance(w.enhance) : gradeAdjustedSuccess(w.grade, w.enhance);
+  const chance = Math.min(100, baseChance + enhTierBonus(w.enhance));
   if (Math.random() * 100 < chance) {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
@@ -4113,6 +4208,7 @@ function migrate(d) {
     if (!Array.isArray(w.runes)) w.runes = w.rune ? [w.rune] : [];
     delete w.rune;
   }
+  if (typeof d.weaponEssence !== 'number' || d.weaponEssence !== d.weaponEssence) d.weaponEssence = 0;
   // 죽은 무기 참조 정리 (id가 인벤토리에 없으면 해제)
   if (d.equipped != null && !d.weapons.some(w => w.id === d.equipped)) d.equipped = null;
   return d;
@@ -4127,6 +4223,22 @@ function load() {
     // 룬 uid 정리 (보유 룬 + 무기에 장착된 룬 전부 확인)
     const equippedRuneIds = data.weapons.flatMap(w => Array.isArray(w.runes) ? w.runes.map(r => r.id) : []);
     runeUid = [...data.runes.map(r => r.id), ...equippedRuneIds].reduce((m, id) => Math.max(m, id), 0) + 1;
+    // 태초 무기 재설계 이전 세이브 대응: 이미 "보유"만 하고 있던(장신구 시절) 태초 유물을
+    // 실제 무기 인스턴스로 변환해서 지급한다 (그렇지 않으면 보유 기록만 있고 실체가 없어짐).
+    // uid가 이미 정리된 뒤라 id 충돌 없이 새 무기를 추가할 수 있다.
+    if (Array.isArray(data.genesisOwned)) {
+      for (const id of data.genesisOwned) {
+        if (data.weapons.some(w => w.genesisId === id)) continue;
+        const artifact = GENESIS_ARTIFACTS.find(a => a.id === id);
+        if (!artifact) continue;
+        data.weapons.push({
+          id: uid++, grade: GENESIS_GRADE, type: '고유', icon: artifact.icon, name: artifact.name,
+          enhance: 0, effect: null, runes: [], genesisId: id, genesisSkill: artifact.uniqueSkill.key,
+          speedOverride: artifact.speedOverride, dmgMultOverride: artifact.dmgMultOverride,
+        });
+        log(`🌌 패치로 인해 [${artifact.name}]가 목걸이에서 태초 무기로 전환되었습니다! 가방에서 확인하고 장착하세요.`, 'lg-prim');
+      }
+    }
     return data;
   } catch (e) { return null; }
 }
@@ -4455,7 +4567,7 @@ function renderEnhance() {
   const maxed = w.enhance >= ENH.maxLevel;
   const nextAtk = maxed ? 0 : weaponAtk({ ...w, enhance: w.enhance + 1 });
   const cost = maxed ? 0 : enhanceCost(w);
-  const chance = maxed ? 0 : Math.min(100, gradeAdjustedSuccess(w.grade, w.enhance) + enhTierBonus(w.enhance));
+  const chance = maxed ? 0 : Math.min(100, (isGenesisWeapon(w) ? genesisSuccessChance(w.enhance) : gradeAdjustedSuccess(w.grade, w.enhance)) + enhTierBonus(w.enhance));
   const dChance = maxed ? 0 : effectiveDestroyChance(w);
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
   const matSt = highMatStatus(w.grade, matNeed);
@@ -4463,21 +4575,28 @@ function renderEnhance() {
   const matText = matNeed > 0
     ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matSt.have}/${matSt.need}</b>${matSt.shortfall > 0 ? ` <span style="font-size:11px;color:${matSt.ok ? '#7de08a' : '#ff7a7a'}">(부족분 🎫${matSt.tokensNeed}개로 대체, 보유 🎫${matSt.tokensHave})</span>` : ''}</div>`
     : '';
-  const typeInfo = isFist(w) ? null : WEAPON_TYPES.find(x => x.name === w.type);
+  const essenceNeed = maxed || !isGenesisWeapon(w) ? 0 : genesisEssenceCost(w);
+  const essenceOk = (S.weaponEssence || 0) >= essenceNeed;
+  const essenceText = essenceNeed > 0
+    ? `<div>무기의 정수<b style="color:${essenceOk ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence || 0)}/${fmt(essenceNeed)}</b></div>`
+    : '';
+  const typeInfo = isFist(w) ? null : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   const flavor = weaponFlavorText(w);
   const spirit = ancientSpirit(w);
+  const genesisArtifact = isGenesisWeapon(w) ? GENESIS_ARTIFACTS.find(a => a.id === w.genesisId) : null;
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
     ${flavor ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px;font-style:italic">${flavor}</div>` : ''}
     <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
     ${typeInfo ? `<div style="font-size:12px;color:var(--sub)">🗡️ ${typeInfo.name} 특성: ${typeInfo.traitDesc}</div>` : ''}
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
     ${spirit ? `<div class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</div>` : ''}
+    ${genesisArtifact ? genesisArtifact.effectsText.map(t => `<div class="grade-태초">🌌 ${t}</div>`).join('') : ''}
     ${(w.runes || []).map(r => `<div class="lg-prim">🔮 [${runeName(r)}] ${runeDesc(r)}</div>`).join('')}`;
   $('enhstat').innerHTML = `
     <div>${atkLabel(w)}<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
-    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}`;
+    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}${essenceText}`;
   const matNote = matNeed > 0 && !matOk
     ? ` · <span class="warn">고급 재료 부족 (${highMatFloorLabel(w.grade)} 재료 ${matNeed}개 필요, 🎫${matSt.tokensNeed}개 더 있으면 대체 가능)</span>` : '';
   $('enhrates').innerHTML = maxed
@@ -4570,7 +4689,7 @@ function setupAutoSellControls() {
   const sel = $('autoSellSelect');
   if (!sel) return;
   if (!sel.dataset.built) {
-    sel.innerHTML = '<option value="">끔</option>' + GRADES.map((g, i) => `<option value="${i}">${g.name}</option>`).join('');
+    sel.innerHTML = '<option value="">끔</option>' + GRADES.slice(0, GENESIS_GRADE).map((g, i) => `<option value="${i}">${g.name}</option>`).join('');
     sel.dataset.built = '1';
     sel.onchange = () => {
       S.autoSellGrade = sel.value === '' ? null : +sel.value;
@@ -4578,7 +4697,7 @@ function setupAutoSellControls() {
     };
     $('autoSellCleanBtn').onclick = () => {
       if (S.autoSellGrade == null) { log('먼저 자동판매 등급을 선택하세요.', 'lg-bad'); return; }
-      const targets = S.weapons.filter(w => !isFist(w) && w.id !== S.equipped && w.grade <= S.autoSellGrade && w.enhance === 0);
+      const targets = S.weapons.filter(w => !isFist(w) && !isGenesisWeapon(w) && w.id !== S.equipped && w.grade <= S.autoSellGrade && w.enhance === 0);
       if (!targets.length) { log('정리할 무기가 없습니다.'); return; }
       let total = 0;
       for (const w of targets) total += sellPrice(w);
@@ -4670,7 +4789,8 @@ function renderInventory() {
     const runes = w.runes || [];
     const flavor = weaponFlavorText(w);
     const spirit = ancientSpirit(w);
-    const hasDetail = !!(w.effect || runes.length || flavor || spirit);
+    const genesisArtifact = isGenesisWeapon(w) ? GENESIS_ARTIFACTS.find(a => a.id === w.genesisId) : null;
+    const hasDetail = !!(w.effect || runes.length || flavor || spirit || genesisArtifact);
     const expanded = hasDetail && expandedWeapons.has(w.id);
     const div = document.createElement('div');
     div.className = 'invitem' + (w.id === S.equipped ? ' equipped' : '');
@@ -4681,12 +4801,15 @@ function renderInventory() {
           ${w.effect && (runes.length || spirit) ? '<br>' : ''}
           ${spirit ? `<span class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</span>` : ''}
           ${spirit && runes.length ? '<br>' : ''}
+          ${genesisArtifact ? genesisArtifact.effectsText.map(t => `<span class="grade-태초">🌌 ${t}</span>`).join('<br>') : ''}
+          ${genesisArtifact && runes.length ? '<br>' : ''}
           ${runes.map(r => `🔮 [${runeName(r)}] ${runeDesc(r)}`).join('<br>')}
         </div>`
       : '';
+    const priceTag = isGenesisWeapon(w) ? '판매 불가' : `판매가 ${fmt(sellPrice(w))}`;
     div.innerHTML = `
       <div><div class="wn"${hasDetail ? ' style="cursor:pointer"' : ''}>${gradeTag(w)}${hasDetail ? ` <span style="font-size:11px;color:var(--sub)">${expanded ? '▴ 효과 접기' : '▾ 효과 보기'}</span>` : ''}</div>
-      <div class="wi">${atkLabel(w)} ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · 판매가 ${fmt(sellPrice(w))}</div>
+      <div class="wi">${atkLabel(w)} ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · ${priceTag}</div>
       ${detailHtml}</div>
       <div class="btns"></div>`;
     if (hasDetail) {
@@ -4707,10 +4830,10 @@ function renderInventory() {
       eq.onclick = () => { S.equipped = w.id; renderAll(); save(); };
       btns.appendChild(eq);
     }
-    // 맨손은 판매 불가
-    if (isFist(w)) {
+    // 맨손 / 태초 무기는 판매 불가
+    if (isFist(w) || isGenesisWeapon(w)) {
       const note = document.createElement('button');
-      note.textContent = '소유 무기 없음';
+      note.textContent = isGenesisWeapon(w) ? '판매 불가' : '소유 무기 없음';
       note.disabled = true;
       btns.appendChild(note);
     } else {
@@ -4723,7 +4846,7 @@ function renderInventory() {
       if (w.id === S.equipped) { log('장착 중인 무기는 판매할 수 없습니다.', 'lg-bad'); return; }
       const roll = rollSellPrice(sellPrice(w));
       // 끝없는 탐욕(글러트니의 목걸이): 판매 시 10% 확률로 추가 10배
-      const jackpot = hasGenesis('gluttony') && Math.random() < 0.1;
+      const jackpot = hasGenesisEquipped('gluttony') && Math.random() < 0.1;
       const finalPrice = jackpot ? roll.price * 10 : roll.price;
       S.gold += finalPrice;
       S.weapons = S.weapons.filter(x => x.id !== w.id);
@@ -5344,7 +5467,7 @@ function sellMat(key, n) {
   const [f, g] = key.split('|').map(Number);
   let price = matSellPrice(f, g) * n;
   // 끝없는 탐욕(글러트니의 목걸이): 판매 시 10% 확률로 10배 골드
-  const jackpot = hasGenesis('gluttony') && Math.random() < 0.1;
+  const jackpot = hasGenesisEquipped('gluttony') && Math.random() < 0.1;
   if (jackpot) price *= 10;
   S.mats[key] -= n;
   if (S.mats[key] <= 0) delete S.mats[key];
@@ -5543,6 +5666,15 @@ function updateAutoBtn() {
   b.textContent = S.auto ? '⏸ 사냥 중지' : '▶ 자동 사냥 시작';
   b.classList.toggle('primary', !S.auto);
 }
+
+// 개발자 전용 치트: 콘솔에서 cheatEssence(100) 형태로 호출 — "고대의 도서관" 컨텐츠가
+// 구현되기 전까지 무기의 정수를 얻을 정식 경로가 없어 QA 편의를 위해 임시로 마련해둔 것.
+window.cheatEssence = function (n) {
+  n = n || 100;
+  S.weaponEssence = (S.weaponEssence || 0) + n;
+  log(`🔧 개발자 치트: 무기의 정수 +${n} (보유 ${S.weaponEssence})`, 'lg-prim');
+  renderEnhance(); save();
+};
 
 syncApplyOnLoad().finally(init);
 </script>

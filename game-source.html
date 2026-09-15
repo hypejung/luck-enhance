@@ -1403,6 +1403,7 @@ const PATCH_NOTES = [
       '🌌 태초의 유물 시스템 전면 재설계 — "보유만 해도 발동"하던 장신구에서 "장착해야 발동"하는 진짜 무기(전용 등급)로 전환. 판매·파괴 불가, 강화 실패는 유지/하락만(파괴 없음), 강화에 골드 외 "무기의 정수" 별도 필요. 글러트니의 목걸이는 처치 시 골드·드랍률이 스택형으로 쌓이는 "끝없는 허기"와, 다른 모든 보너스를 총합 10배로 뻥튀기하는 "끝없는 탐욕"을 지닌 무기로 재탄생',
       '🏺🌌 고대 무기 / 태초의 유물 드랍률 조정 — 이제 장신구·도감·각인 등 모든 드롭률 보너스가 적용됨. 그 사냥터의 보스 장신구를 보유하고 보스 무기를 장착 중이면 드랍률이 3배로 상승(보스 세트효과). 기본 확률 자체도 재조정',
       '🏺 고대 무기 강화 규칙 변경 — 이제 파괴되지 않는 대신, 파괴가 확정됐을 순간 +0으로 초기화됨. 강화에 골드 외 "무기의 정수"도 소모(태초보다 적게)',
+      '📈 고대·태초 무기의 강화 성장 곡선 재조정 — 고대는 신화 대비 완강 시 약 4배, 태초는 고대 대비 약 9배 강해지도록 상향',
     ],
   },
 ];
@@ -2259,7 +2260,7 @@ function weaponAtk(w) {
   const soulBonus = (w.spirit === 'soul' && w.soulStacks) ? w.soulStacks * ANCIENT_SPIRITS.soul.bonusPerStack : 0;
   const dmgMult = isGenesisWeapon(w) && w.dmgMultOverride != null ? w.dmgMultOverride : t.dmgMult;
   const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus);
-  const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
+  const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : isAncientWeapon(w) ? ancientAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
   return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk')) * (1 + goldAtkBonusPct());
 }
 // 강화 단계별 누적 공격력 배율. +10까지는 강화 1회당 증가폭이 일정한 선형 구간(급등 없음),
@@ -2309,10 +2310,14 @@ function enhTierBonus(enhance) {
 // 고대의 2배 이상으로 잡아 "하나만 나와도 밸런스를 흔드는" 태초의 위상을 보장한다.
 const GENESIS_ENH = {
   successGradeEquivalent: 5,
-  growthGradeEquivalent: 14,
+  growthGradeEquivalent: 21, // 고대(아래 ANCIENT_ENH)를 신화 대비 4배로 끌어올린 뒤, 태초/고대 격차를 원래 수준(9배 안팎)으로 되살리기 위해 14→21로 상향
 };
 function genesisAtkMult(enh) { return enhAtkMult(enh, GENESIS_ENH.growthGradeEquivalent); }
 function genesisSuccessChance(enh) { return gradeAdjustedSuccess(GENESIS_ENH.successGradeEquivalent, enh); }
+// 고대 무기도 태초와 같은 방식으로 "성장 전용 가상 등급"을 둔다. 실제 grade(6)는 그대로 쓰되
+// 강화 성장 곡선만 신화(grade5) 대비 +30 기준 약 4배가 되도록 가상 등급을 끌어올렸다.
+const ANCIENT_ENH = { growthGradeEquivalent: 13 };
+function ancientAtkMult(enh) { return enhAtkMult(enh, ANCIENT_ENH.growthGradeEquivalent); }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   const baseSpeed = isGenesisWeapon(w) && w.speedOverride != null ? w.speedOverride : t.speed;

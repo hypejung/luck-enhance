@@ -5120,24 +5120,22 @@ function renderRuneInventory() {
     div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span>${r.equipped ? ' <span style="color:var(--unique);font-size:12px">(장착중)</span>' : ''}</div>
       <div class="wi">${runeDesc(r)}</div></div><div class="btns"></div>`;
     const btns = div.querySelector('.btns');
-    if (r.equipped) {
-      const bt = document.createElement('button');
-      bt.textContent = '장착해제';
-      bt.className = 'danger';
-      bt.onclick = () => unequipRuneFromCurrentWeapon(r.id);
-      btns.appendChild(bt);
-    } else {
-      const bt = document.createElement('button');
-      bt.textContent = '장착 무기에 장착';
-      bt.className = 'primary';
-      bt.onclick = () => equipRuneToCurrentWeapon(r.id);
-      btns.appendChild(bt);
+    // 판매(위험)는 항상 왼쪽 고정, 장착/장착해제(토글)는 항상 오른쪽 고정 위치에 둔다.
+    // 이렇게 해야 장착 상태가 바뀌어 버튼 구성이 달라져도 같은 자리를 연달아 눌렀을 때
+    // 절대 판매로 이어지지 않는다(이전엔 왼쪽이 장착/장착해제라 판매와 자리가 뒤섞였음).
+    if (!r.equipped) {
       const sellBt = document.createElement('button');
       sellBt.textContent = `판매 (+${fmt(runeSellPrice(r.grade))})`;
-      sellBt.style.marginLeft = 'auto';
+      sellBt.className = 'danger';
       sellBt.onclick = () => sellRune(r.id);
       btns.appendChild(sellBt);
     }
+    const bt = document.createElement('button');
+    bt.textContent = r.equipped ? '장착해제' : '장착 무기에 장착';
+    bt.className = r.equipped ? 'danger' : 'primary';
+    bt.style.marginLeft = 'auto';
+    bt.onclick = () => r.equipped ? unequipRuneFromCurrentWeapon(r.id) : equipRuneToCurrentWeapon(r.id);
+    btns.appendChild(bt);
     list.appendChild(div);
   }
 }

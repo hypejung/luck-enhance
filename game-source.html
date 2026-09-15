@@ -755,8 +755,12 @@ function atkLabel(w) { return (w && w.type === '지팡이') ? '마력' : '공격
 function effectiveDestroyChance(w) {
   if (isGenesisWeapon(w)) return 0; // 태초 무기는 파괴되지 않는다 (실패 시 유지 또는 하락뿐)
   const base = ENH.destroy[w.enhance] || 0;
+  // destroyReduce는 다른 %p 스탯(enh/critChance/critDamage 등)과 동일하게 "%p 차감"이어야
+  // 하는데, 예전엔 비율 곱연산(base*(1-reduce))으로 새고 있었다. %p 차감으로 고치되, 저강화
+  // 구간이 통째로 0%가 되지 않도록 소스 수치 자체를 낮게 재설계했다(신화까지 합계 8%p로,
+  // +16강까지만 0%가 되는 수준).
   const reduce = Math.min(0.95, typeTrait(w, 'destroyReduce') + accEff().destroyReduce);
-  return Math.round(base * (1 - reduce) * 10) / 10;
+  return Math.max(0, Math.round((base - reduce * 100) * 10) / 10);
 }
 // DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷(+고유 특성으로 개성 부여)
 
@@ -964,7 +968,7 @@ const CODEX_TYPE_SETS = {
   창:     { stat: 'critDamage',    legend: 0.03, myth: 0.06 },
   활:     { stat: 'speed',         legend: 0.04, myth: 0.08 },
   지팡이: { stat: 'gold',          legend: 0.04, myth: 0.08 },
-  둔기:   { stat: 'destroyReduce', legend: 0.03, myth: 0.06 },
+  둔기:   { stat: 'destroyReduce', legend: 0.01, myth: 0.02 }, // %p 차감 방식으로 바뀌면서 값도 하향(중장무기 쌍 5%p + 여기 3%p = 신화까지 합계 8%p)
 };
 // index = 사냥터(0~19). 'offline'은 accEff 합산 대상이 아니라 grantOffline()에서 별도로 처리.
 const CODEX_ANCIENT_SETS = [
@@ -1411,6 +1415,7 @@ const PATCH_NOTES = [
       '📈 고대·태초 무기의 강화 성장 곡선 재조정 — 고대는 신화 대비 완강 시 약 4배, 태초는 고대 대비 약 9배 강해지도록 상향',
       '🔨 둔기 무기특성 재설계 — "강화 파괴 확률 -30%"(다른 %p 스탯과 달리 실제로는 비율로만 깎이던 버그가 있었음) 대신, 매 5번째 공격이 강타로 적중해 무기 공격력 250% 고정 피해를 추가하는 "파쇄의 리듬"으로 변경',
       '📖 무기 도감 5층(폐허·스켈레톤) 세트효과 상향 — 강화 파괴 확률 감소 +3%p → +10%p (다른 사냥터들의 고대/신화 세트효과 비율에 맞춤, 신화 타입셋보다 낮았던 역전 현상 수정)',
+      '🛡️ 강화 파괴 확률 감소가 실제로는 비율로만 깎이던 버그 수정 — 이제 다른 %p 스탯들과 동일하게 정확히 %p만큼 차감됨. 대신 저강화 구간이 통째로 무효화되지 않도록 소스 수치도 재설계(둔기 도감 세트: 신화까지 다 모아도 +16강까지만 파괴 확률 0%, 그 이상은 위험 그대로)',
     ],
   },
 ];

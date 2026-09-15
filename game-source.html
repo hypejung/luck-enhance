@@ -3979,6 +3979,12 @@ function tryEnhance(advanced) {
       }
     }
   }
+  // 룬은 +15 이상 강화한 무기에만 장착 가능 — 강화 실패 등으로 그 밑으로 떨어지면 자동으로 빠진다.
+  if (w.enhance < 15 && Array.isArray(w.runes) && w.runes.length) {
+    S.runes.push(...w.runes);
+    log(`🔮 ${gradeTag(w)} 강화 단계가 +15 밑으로 떨어져 장착 중이던 룬 ${w.runes.length}개가 자동으로 빠졌습니다.`, 'lg-bad');
+    w.runes = [];
+  }
   renderEnhance(); renderInventory(); renderTop();
   $('enhBtn').classList.add('shake');
   setTimeout(() => $('enhBtn').classList.remove('shake'), 350);

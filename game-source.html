@@ -724,6 +724,10 @@ function isAncientWeapon(w) { return !!w && w.grade === 6; }
 // ---------- 무기 종류 (공속 = 초당 공격 횟수, 데미지 배율) ----------
 // 종류마다 고유 특성(trait)을 부여해서 같은 등급/강화라도 플레이 체감이 다르게 만듦.
 // 지팡이는 공격력 대신 "마력" 개념으로, 평타 대신 확률적으로 주문을 터뜨려 큰 피해를 줌.
+// 둔기 전용 "파쇄의 리듬": 확률이 아니라 일정 박자(공격 횟수)마다 확정 발동하는 강타 —
+// 다른 타입의 확률/상시 스탯형 특성과 결이 다르게, 묵직하고 예측 가능한 한방을 표현한다.
+const BLUNT_SMASH_EVERY = 5;
+const BLUNT_SMASH_MULT = 2.5;
 const WEAPON_TYPES = [
   { name: '단검',   icon: '🗡️', speed: 1.8,  dmgMult: 0.68, trait: { extra: 0.08 },                    traitDesc: '연타 확률 +8%' },
   { name: '검',     icon: '⚔️', speed: 1.2,  dmgMult: 0.90, trait: { atk: 0.15 },                       traitDesc: '공격력 +15%' },
@@ -732,7 +736,7 @@ const WEAPON_TYPES = [
   { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critDamage: 0.30 },                traitDesc: '치명타 피해 +30%p' },
   { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedBonus: 0.15 },                traitDesc: '공격속도 +15%' },
   { name: '지팡이', icon: '🪄', speed: 0.9,  dmgMult: 1.25, trait: { spellProc: 0.25, spellMult: 3 },   traitDesc: '공격력은 "마력"으로 작용, 25% 확률로 주문 작렬(피해 3배)' },
-  { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65, trait: { destroyReduce: 0.3 },              traitDesc: '강화 파괴 확률 -30%' },
+  { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65, trait: {},                                  traitDesc: `파쇄의 리듬: 매 ${BLUNT_SMASH_EVERY}번째 공격이 강타로 적중해 무기 공격력의 ${Math.round(BLUNT_SMASH_MULT * 100)}% 고정 피해 추가` },
 ];
 // 태초 무기 전용 "종류". WEAPON_TYPES 배열에는 넣지 않는다 — genWeapon() 등이 이 배열을
 // 무작위 뽑기 풀로도 쓰기 때문에, 여기 섞이면 일반 등급 무기가 "고유" 타입을 뽑는 사고가 난다.
@@ -969,7 +973,7 @@ const CODEX_ANCIENT_SETS = [
   { stat: 'luck', value: 0.30 },          // 2  숲길·독버섯
   { stat: 'speed', value: 0.20 },         // 3  숲깊은곳·들늑대
   { stat: 'gold', value: 0.30 },          // 4  고블린마을·고블린
-  { stat: 'destroyReduce', value: 0.03 }, // 5  폐허·스켈레톤
+  { stat: 'destroyReduce', value: 0.10 }, // 5  폐허·스켈레톤 (다른 스탯들의 고대/신화 비율(~1.67배)에 맞춰 0.03→0.10로 상향 — 신화 타입셋(둔기, 0.06)보다 낮았던 역전 현상 수정)
   { stat: 'atk', value: 0.15 },           // 6  오크진지·오크전사
   { stat: 'critDamage', value: 0.20 },    // 7  거미둥지·독거미
   { stat: 'bossDmg', value: 0.20 },       // 8  고대유적·골렘파수병
@@ -1197,6 +1201,7 @@ const fx = {
   berserkerUntil: 0,      // 광전사의 피: 공격력 버프 만료 시각
   poisonStacks: 0, poisonUntil: 0, // 누적 맹독: 스택 수 + 만료 시각
   quakeCount: 0,           // 거석의 진동: 누적 공격 횟수
+  bluntSmashCount: 0,      // 파쇄의 리듬(둔기 특성): 누적 공격 횟수
   freeEnhance: false,      // 끝나지 않은 맹세: 다음 강화 비용 무료 대기 중
   glideUntil: 0,           // 활공: 사냥터 이동 직후 공속 버프 만료 시각
   enduranceStart: 0,       // 늑대왕의 인장: 현재 사냥터에서 쉬지 않고 사냥을 지속한 시작 시각
@@ -1404,6 +1409,8 @@ const PATCH_NOTES = [
       '🏺🌌 고대 무기 / 태초의 유물 드랍률 조정 — 이제 장신구·도감·각인 등 모든 드롭률 보너스가 적용됨. 그 사냥터의 보스 장신구를 보유하고 보스 무기를 장착 중이면 드랍률이 3배로 상승(보스 세트효과). 기본 확률 자체도 재조정',
       '🏺 고대 무기 강화 규칙 변경 — 이제 파괴되지 않는 대신, 파괴가 확정됐을 순간 +0으로 초기화됨. 강화에 골드 외 "무기의 정수"도 소모(태초보다 적게)',
       '📈 고대·태초 무기의 강화 성장 곡선 재조정 — 고대는 신화 대비 완강 시 약 4배, 태초는 고대 대비 약 9배 강해지도록 상향',
+      '🔨 둔기 무기특성 재설계 — "강화 파괴 확률 -30%"(다른 %p 스탯과 달리 실제로는 비율로만 깎이던 버그가 있었음) 대신, 매 5번째 공격이 강타로 적중해 무기 공격력 250% 고정 피해를 추가하는 "파쇄의 리듬"으로 변경',
+      '📖 무기 도감 5층(폐허·스켈레톤) 세트효과 상향 — 강화 파괴 확률 감소 +3%p → +10%p (다른 사냥터들의 고대/신화 세트효과 비율에 맞춤, 신화 타입셋보다 낮았던 역전 현상 수정)',
     ],
   },
 ];
@@ -3293,6 +3300,15 @@ function attack(w) {
       } else {
         mon.hp -= quakeDmg;
       }
+    }
+  }
+  // 파쇄의 리듬(둔기 특성): 매 BLUNT_SMASH_EVERY번째 공격이 강타로 적중해 고정 피해 추가
+  if (w.type === '둔기') {
+    fx.bluntSmashCount = (fx.bluntSmashCount || 0) + 1;
+    if (fx.bluntSmashCount >= BLUNT_SMASH_EVERY) {
+      fx.bluntSmashCount = 0;
+      mon.hp -= weaponAtk(w) * BLUNT_SMASH_MULT;
+      floatText('🔨 파쇄!');
     }
   }
   mon.hp -= dmg;

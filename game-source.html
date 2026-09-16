@@ -1406,7 +1406,9 @@ const RAID = {
   // +능력치 훈련(각 10레벨)+도감 쌍 완성 상태를 실제로 구성해 120초 시뮬레이션(치명타/연타/
   // 보스 피해량 보정 포함)으로 실측한 DPS(약 7,966만) × 120초 ≈ 95.6억을 반올림.
   baseHp: 1e10,
-  hpGrowth: 1.5,        // 단계당 체력 성장 배율
+  hpGrowth: 2.2,        // 단계당 체력 성장 배율 (기존 1.5 — 강화 후반 구간의 급격한 데미지
+                        // 성장(레벨당 최대 ×4.3배)에 비해 너무 완만해서 강화 한 번으로
+                        // 토벌전 여러 단계를 건너뛰던 문제를 완화하기 위해 상향)
   baseGoldMult: 4,      // 1단계 골드 보상 = 20단계 사냥터 보스 골드 계산식 × 4
   goldGrowth: 1.5,      // 단계당 골드 보상 성장 배율
   dailyTotal: 3,        // 하루 총 도전 가능 횟수(전체 단계 합산)
@@ -1477,7 +1479,8 @@ const PATCH_NOTES = [
       '🐛 각인 재설정 시 "천장을 채우기 전엔 절대 승급하지 않는" 버그 수정 — 원래 의도대로 매 재설정마다 조기 승급 가능',
       '⚒️ 각인 조기 승급 확률을 등급 고정값(5%)에서 "천장의 70%만큼 시도하면 기대값상 한 번은 터지는" 등급별 확률로 변경 — 등급이 오를수록(천장이 커질수록) 조기 승급 확률도 자연히 낮아짐 (예: 천장 10 → 1/7, 천장 100 → 1/70, 천장 160 → 1/112)',
       '💰 레전더리 이상(등급 4+) 무기는 +20부터 강화 비용이 대폭 상승 — 토벌전 등 고소득 콘텐츠 골드가 조 단위인데 강화 비용은 억 단위에 머물러 사실상 유의미한 소모처가 아니었던 문제 보정(신화 +20 기준 3.77억 → 2.26조). 유니크 이하 등급은 기존 곡선 그대로 유지',
-      '💰 토벌전 골드 보상이 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/글러트니 등)에 더 이상 영향받지 않도록 변경 — 장비를 얼마나 갖췄든 동일한 보상을 받는 별도 콘텐츠로 취급(추후 전용 룬 등으로 별도 보너스 예정)',
+      '👹 토벌전 단계당 체력 성장률 1.5배 → 2.2배 상향 — 강화 후반 구간은 레벨 하나로 공격력이 최대 4배 넘게 뛰는데 토벌전 체력은 완만해서, 강화 한 번으로 토벌전 여러 단계를 한꺼번에 건너뛰던 문제를 완화',
+      '💰 토벌전 골드 보상에 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/글러트니 등)가 다시 적용되도록 변경 — 고강화 구간 비용을 감당하려면 토벌전 수입을 장비 투자로 직접 키울 수 있는 수단이 필요하다고 판단',
     ],
   },
   {
@@ -1610,14 +1613,18 @@ function raidHp(stage) { return Math.round(RAID.baseHp * Math.pow(RAID.hpGrowth,
 // 화룡의 인장: 하루 총 도전 횟수 +1
 function effectiveRaidDailyTotal() { return RAID.dailyTotal + (sealEquippedHas('dragonKing') ? 1 : 0); }
 function raidTokenReward(stage) { return 5 + stage * 2; }
-// 토벌전 골드 보상은 일반 사냥의 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/글러트니 등)를
-// 전혀 반영하지 않는다 — 장비를 얼마나 갖췄든 보상이 동일한 별도 콘텐츠로 취급(추후 전용 룬 등으로
-// 별도 보너스를 낼 계획). 공격속도(killsPerHour)는 골드 "획득률"이 아니라 처치 수 자체에 관여하는
-// 값이라 그대로 반영한다.
+// 토벌전 골드 보상도 일반 사냥과 동일하게 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/
+// 글러트니 등)가 그대로 적용된다 — 고강화 구간 비용을 감당하려면 토벌전 수입 자체를 플레이어가
+// 장비 투자로 키울 수 있는 레버가 필요하다고 판단해 다시 반영(이전엔 별도 콘텐츠로 분리했었음).
 function raidGoldReward(stage) {
   const w = getEquipped();
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const ae = accEff();
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
+  if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
   const killsPerHour = weaponSpeed(w) * 3600;
-  const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour) * RAID.baseGoldMult;
+  const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
   return Math.floor(base * Math.pow(RAID.goldGrowth, stage));
 }
 

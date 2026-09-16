@@ -1465,7 +1465,8 @@ const PATCH_NOTES = [
       '🔮 보유 룬(미장착) 최대 200개 상한 추가 + 등급별 자동판매 기능 신설(룬 탭 "보유 룬"에서 설정) — 오래 플레이해도 룬이 무한정 쌓여 렉이 걸리지 않도록',
       '⚒️ 무기 각인 표시에서 "윗줄:"/"아랫줄:" 라벨 제거 — 등급 태그만으로 충분히 구분되어 군더더기 텍스트 정리',
       '⚒️ 무기 각인에 고대·태초 등급 추가(최대 신화 → 태초로 확장, 천장 100/160회, 재설정 비용 🎫20/35) — 옵션 수치 범위도 전 등급 재설계해서 다음 등급 최솟값이 이전 등급 중간값에서 시작하도록 겹치게 하고, 등급별 편차(최대/최소 비율)도 2.5배로 넓게 통일',
-      '🐛 각인 재설정 시 "천장을 채우기 전엔 절대 승급하지 않는" 버그 수정 — 원래 의도대로 매 재설정마다 5% 확률로 천장과 무관하게 조기 승급 가능',
+      '🐛 각인 재설정 시 "천장을 채우기 전엔 절대 승급하지 않는" 버그 수정 — 원래 의도대로 매 재설정마다 조기 승급 가능',
+      '⚒️ 각인 조기 승급 확률을 등급 고정값(5%)에서 "천장의 70%만큼 시도하면 기대값상 한 번은 터지는" 등급별 확률로 변경 — 등급이 오를수록(천장이 커질수록) 조기 승급 확률도 자연히 낮아짐 (예: 천장 10 → 1/7, 천장 100 → 1/70, 천장 160 → 1/112)',
     ],
   },
   {
@@ -3831,10 +3832,16 @@ function advancedEnhGoldCost(w) { return enhanceCost(w) * ADVANCED_ENH_GOLD_MULT
 const ENCHANT_MIN_ENHANCE = 15;
 const ENCHANT_MAX_GRADE = 7; // 태초가 최대
 const ENCHANT_DEVIATION_CHANCE = 0.05; // 이탈 확률
-// 매 각인 재설정마다 천장과 별개로 즉시 승급을 시도하는 확률(원래 설계 의도였으나 미구현이었던 부분)
-const ENCHANT_EARLY_PROMOTE_CHANCE = 0.05;
 // 등급(현재) -> 다음 등급 승급까지 필요한 "효과 변경" 누적 횟수(천장)
 const ENCHANT_CEILING = { 1: 10, 2: 30, 3: 40, 4: 60, 5: 100, 6: 160 };
+// 매 각인 재설정마다 천장과 별개로 즉시 승급을 시도하는 확률(원래 설계 의도였으나 미구현이었던 부분).
+// 등급이 오를수록 천장도 커지는데, 조기 승급 확률은 고정값이 아니라 "천장의 70%만큼 시도하면
+// 기대값상 한 번은 터진다"는 기준으로 등급마다 다르게 낮아진다 (천장 100 -> 1/70 확률).
+const ENCHANT_EARLY_PROMOTE_CEILING_RATIO = 0.7;
+function enchantEarlyPromoteChance(grade) {
+  const ceiling = ENCHANT_CEILING[grade];
+  return ceiling ? 1 / (ENCHANT_EARLY_PROMOTE_CEILING_RATIO * ceiling) : 0;
+}
 const ENCHANT_TOKEN_COST = { 1: 1, 2: 2, 3: 4, 4: 7, 5: 12, 6: 20, 7: 35 };
 function enchantGoldCost(grade) { return Math.round(runeBoxCost(grade) * 2); }
 // 옵션 종류(8종) — ranges[grade-1] = [최소, 최대] (모두 accEff()의 eff 필드에 %(fraction)로 합산됨).
@@ -3896,7 +3903,7 @@ function resetEnchant(w) {
   const ceiling = ENCHANT_CEILING[grade];
   const canPromote = grade < ENCHANT_MAX_GRADE;
   // 천장(확정 승급)과 별개로, 매 재설정마다 낮은 확률로 천장 전이라도 즉시 승급을 시도한다.
-  const earlyPromote = canPromote && Math.random() < ENCHANT_EARLY_PROMOTE_CHANCE;
+  const earlyPromote = canPromote && Math.random() < enchantEarlyPromoteChance(grade);
   if (canPromote && ceiling != null && (earlyPromote || w.enchant.pity + 1 >= ceiling)) {
     w.enchant.grade = grade + 1;
     w.enchant.pity = 0;
@@ -3940,7 +3947,7 @@ function renderEnchantBox() {
     <div style="font-size:13px;margin-bottom:6px;">${gradeTag(w)} — 각인 등급 <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span></div>
     <div class="lg-prim" style="margin-bottom:2px;">${enchantLineText(en.lines[0])}</div>
     <div class="lg-prim" style="margin-bottom:8px;">${enchantLineText(en.lines[1])}</div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">${maxed ? `최대 등급(${GRADES[ENCHANT_MAX_GRADE].name})입니다.` : `다음 등급까지 효과 변경 ${en.pity}/${ceiling}회 (매 재설정마다 ${(ENCHANT_EARLY_PROMOTE_CHANCE * 100).toFixed(0)}% 확률로 조기 승급)`} · 보유 🎫 ${fmt(S.raidTokens || 0)}</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">${maxed ? `최대 등급(${GRADES[ENCHANT_MAX_GRADE].name})입니다.` : `다음 등급까지 효과 변경 ${en.pity}/${ceiling}회 (매 재설정마다 ${fmtPct(enchantEarlyPromoteChance(grade) * 100)} 확률로 조기 승급)`} · 보유 🎫 ${fmt(S.raidTokens || 0)}</div>
     <button class="primary" id="resetEnchantBtn" ${canAfford ? '' : 'disabled'}>각인 재설정 (🎫${tokenCost} + 💰${fmt(goldCost)})</button>`;
   $('resetEnchantBtn').onclick = () => resetEnchant(w);
 }

@@ -779,7 +779,7 @@ const WEAPON_TYPES = [
   { name: '쌍검',   icon: '🤺', speed: 1.5,  dmgMult: 0.85, trait: { critChance: 0.10, critDamage: 0.40 }, traitDesc: '치명타 확률 +10%p, 치명타 피해 +40%p' },
   { name: '도끼',   icon: '🪓', speed: 0.8,  dmgMult: 1.35, trait: { bossDmg: 0.25 },                   traitDesc: '보스 피해량 +25%' },
   { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critDamage: 0.30 },                traitDesc: '치명타 피해 +30%p' },
-  { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedBonus: 0.15 },                traitDesc: '공격속도 +15%' },
+  { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedAmp: 0.20 },                  traitDesc: '모든 공격속도 증가량 +20%' },
   { name: '지팡이', icon: '🪄', speed: 0.9,  dmgMult: 1.25, trait: { spellProc: 0.25, spellMult: 3 },   traitDesc: '공격력은 "마력"으로 작용, 25% 확률로 주문 작렬(피해 3배)' },
   { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65, trait: {},                                  traitDesc: `파쇄의 리듬: 매 ${BLUNT_SMASH_EVERY}번째 공격이 강타로 적중해 무기 공격력의 ${Math.round(BLUNT_SMASH_MULT * 100)}% 고정 피해 추가` },
 ];
@@ -1808,8 +1808,8 @@ const ANCIENT_SPIRITS = {
   bloodtribute: { name: '피의 갈증', desc: '공격 시 35% 확률로 대상에게 5초간 출혈을 건다(재발동 시 갱신). 출혈 지속 동안 매초 무기 공격력의 300%만큼 도트 피해를 입히며, 그 동안 사용자는 공격력과 공격속도가 각각 100% 상승한다.',
                   proc: 0.35, dur: 5, dmgPerSec: 3.0, selfAtkBonus: 1.0, selfSpeedBonus: 1.0 },
   // 10초마다 7초간 "포자 만개"가 발동해 적이 받는 피해를 늘리고 사용자의 연격 확률을 높인다.
-  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 200% 증가하고, 연타(추가공격) 확률이 +30%p 상승하며 연타 확률 상한 자체가 25% → 70%로 풀린다. 이 무기는 연타에도 별도로 치명타가 적용된다.',
-                interval: 10, dur: 7, enemyDmgTakenBonus: 2.0, extraAtkBonus: 0.30, extraAtkCap: 0.70 },
+  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 300% 증가하고, 연타(추가공격) 확률이 +30%p 상승하며 연타 확률 상한 자체가 25% → 70%로 풀린다. 이 무기는 연타에도 별도로 치명타가 적용된다.',
+                interval: 10, dur: 7, enemyDmgTakenBonus: 3.0, extraAtkBonus: 0.30, extraAtkCap: 0.70 },
   // 기본 공속을 큰 폭으로 올리고, 처치할수록 쌓이는 스택으로 공속이 계속 더 상승한다.
   // 쉬지 않고 사냥할 때만 유지되는 스택 — 3초 이상 처치가 없으면 스택이 서서히 줄어든다.
   wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 60% 증가한다. 추가로 몬스터를 처치할 때마다 질주 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%). 3초 이상 처치가 없으면 스택이 서서히 줄어든다. 공격속도가 빠를수록 공격력도 함께 오른다(공격속도 1당 공격력 +50%).',
@@ -2507,7 +2507,11 @@ function rawWeaponSpeed(w) {
   if (w && w.effect === 'infinite' && now < fx.infiniteUntil) burstMult *= (e.burstMult || 1);
   const variant = weaponStatVariant(w);
   const variantMult = variant ? variant.speedMod : 1;
-  return baseSpeed * (1 + accEff().speed + typeTrait(w, 'speedBonus') + effSpeed + stackBonus) * (1 + weaponRuneStat(w, 'atkSpeed') / 100) * burstMult * variantMult;
+  // 활 무기특성: 훈련/장신구/효과/스택/룬 등 모든 출처의 공격속도 "증가량"을 20% 증폭한다
+  // (기본 공속 자체가 아니라 그 위에 쌓이는 보너스 총합에만 곱해짐).
+  const speedBonusSum = accEff().speed + effSpeed + stackBonus + weaponRuneStat(w, 'atkSpeed') / 100;
+  const speedAmp = typeTrait(w, 'speedAmp');
+  return baseSpeed * (1 + speedBonusSum * (1 + speedAmp)) * burstMult * variantMult;
 }
 function weaponSpeed(w) {
   // 불멸의 진격(고대 에이션트 스피릿): 실질 공격속도를 고정값으로 못박는다(초과분은 weaponAtk로 환산됨)

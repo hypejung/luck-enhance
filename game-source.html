@@ -575,7 +575,7 @@
     <div class="panel">
       <h3>🔮 룬 상점</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다. 슬롯 수는 무기 등급에 따라 늘어납니다(일반 1개 ~ 고대 7개).
+        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다. 슬롯 수는 무기 등급에 따라 늘어납니다(일반 1개 ~ 신화 6개, 고대 8개, 태초 10개).
         <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다.
       </div>
       <div id="runeboxlist"></div>
@@ -596,7 +596,12 @@
       <div id="runefusionlist"></div>
     </div>
     <div class="panel">
-      <h3>🎒 보유 룬</h3>
+      <h3>🎒 보유 룬 <span style="font-size:12px;color:var(--sub)" id="runeinvcount"></span></h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        🗑️ 자동판매:
+        <select id="runeAutoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
+        이하 룬 획득 시 즉시 판매
+      </div>
       <div id="runeinvlist"></div>
     </div>
   </div>
@@ -1457,6 +1462,7 @@ const PATCH_NOTES = [
       '🛠️ 고대·태초 무기의 고급 강화(+15 이상) 효과를 등급에 맞게 재정의 — 고대는 원래대로 "초기화 확률 절반"(파괴 대신 표기만 정정), 태초는 애초에 파괴·초기화가 없어 효과가 없던 것을 "단계 하락 확률 절반"으로 변경',
       '🔮 고대·태초 무기의 최대 룬 장착 개수 상향 — 기존엔 등급 공식(등급+1)에 걸려 둘 다 7개로 같았는데, 고대 8개 / 태초 10개로 별도 확장',
       '🔢 큰 숫자 표기법 확장 — 10000억을 넘으면 조/경/해/자/양 등으로 계속 이어서 표기 (예: 21,752,709.50억 → 2175.27조)',
+      '🔮 보유 룬(미장착) 최대 200개 상한 추가 + 등급별 자동판매 기능 신설(룬 탭 "보유 룬"에서 설정) — 오래 플레이해도 룬이 무한정 쌓여 렉이 걸리지 않도록',
     ],
   },
   {
@@ -2299,6 +2305,7 @@ function newState() {
     runes: [],         // 보유 룬(미장착): [{ id, grade, key }]
     training: {},      // 능력치 훈련 레벨: { atk, atkSpeed, critChance, critDamage, extraAtk, bossDmg }
     autoSellGrade: null, // 이 등급 이하 + 강화0 무기는 획득 즉시 자동판매 (null=끔)
+    runeAutoSellGrade: null, // 이 등급 이하 룬은 획득 즉시 자동판매 (null=끔)
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
     weaponEssence: 0,  // 무기의 정수 — 태초 무기 강화 전용 재화 (고대의 도서관 컨텐츠에서 획득 예정)
     eggs: {},          // 달성한 이스터에그: { eggId: true }
@@ -2459,6 +2466,25 @@ function runeName(rune) { const d = runeDef(rune); return d ? d.name : ''; }
 function runeDesc(rune) {
   if (!rune) return '';
   return rune.grade <= 3 ? RUNE_STATS[rune.key].desc(RUNE_STATS[rune.key].values[rune.grade]) : RUNE_SPECIALS[rune.key].desc;
+}
+// 보유 룬(미장착) 최대 개수. 장착 해제·무기 파괴 등으로 "이미 갖고 있던 룬이 가방으로
+// 돌아오는" 경우는 이 상한과 무관하게 항상 성공해야 하므로 grantRune()을 거치지 않고
+// 직접 S.runes.push한다 — 룬박스 개봉/룬합성처럼 "새로 얻는" 경로에만 적용.
+const RUNE_BAG_MAX = 200;
+function grantRune(rune) {
+  if (S.runeAutoSellGrade != null && rune.grade <= S.runeAutoSellGrade) {
+    const price = runeSellPrice(rune.grade);
+    S.gold += price;
+    log(`🗑️ 룬 자동판매(${GRADES[rune.grade].name} 이하): <span class="grade-${GRADES[rune.grade].name}">${runeName(rune)}</span> → +${fmt(price)} 골드`);
+    return;
+  }
+  if (S.runes.length >= RUNE_BAG_MAX) {
+    const price = runeSellPrice(rune.grade);
+    S.gold += price;
+    log(`🔮 보유 룬이 가득 차서(${RUNE_BAG_MAX}개) 자동 판매: <span class="grade-${GRADES[rune.grade].name}">${runeName(rune)}</span> → +${fmt(price)} 골드`, 'lg-bad');
+    return;
+  }
+  S.runes.push(rune);
 }
 // 장착된 무기의 룬 슬롯(전부)이 주는 특정 일반 스탯 보너스 합계(%, %p 단위 그대로 반환).
 function weaponRuneStat(w, statKey) {
@@ -5065,7 +5091,7 @@ function renderAncientSealList() {
 }
 function renderInventory() {
   const list = $('invlist');
-  $('invcount').textContent = `(${S.weapons.length}/60)`;
+  $('invcount').textContent = `(${S.weapons.length}/${S.unlimitedBag ? 500 : 60})`;
   setupAutoSellControls();
   renderGenesisList();
   renderAncientSealList();
@@ -5218,7 +5244,7 @@ function openRuneBox(tier) {
   S.gold -= b.cost;
   const grade = wrand(applyMidasBoost(b.dropTable));
   const rune = genRune(grade);
-  S.runes.push(rune);
+  grantRune(rune);
   const gname = GRADES[grade].name;
   log(`🔮 [${b.name}] → <span class="grade-${gname}">${gname} ${runeName(rune)}</span> 획득! (${runeDesc(rune)})`, grade >= 4 ? 'lg-prim' : 'lg-good');
   if (currentTab === 'rune') {
@@ -5298,7 +5324,7 @@ function fuseSelectedRunes() {
   }
   if (Math.random() < chance) {
     const newRune = genRune(grade + 1);
-    S.runes.push(newRune);
+    grantRune(newRune);
     log(`🔮✨ 룬 합성 성공! <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> 룬 3개 → <span class="grade-${GRADES[grade + 1].name}">${runeName(newRune)}</span> 획득!`, 'lg-prim');
   } else {
     log(`💨 룬 합성 실패... ${GRADES[grade].name} 룬 3개가 소멸했습니다. (성공 확률 ${(chance * 100).toFixed(0)}%)`, 'lg-bad');
@@ -5338,7 +5364,7 @@ function buyRuneBoxesBulk(i, count) {
     if (S.gold < b.cost) break;
     S.gold -= b.cost;
     const grade = wrand(applyMidasBoost(b.dropTable));
-    S.runes.push(genRune(grade));
+    grantRune(genRune(grade));
     bought++;
   }
   if (bought === 0) { log('골드가 부족합니다!', 'lg-bad'); return; }
@@ -5368,9 +5394,26 @@ function renderRuneEquippedList() {
 }
 // 보유 룬 목록 — 장착 중인 룬도 장신구처럼 같은 목록에 자연스러운 위치(등급순) 그대로 섞어서
 // 보여주고, "장착"/"장착해제" 버튼만 상태에 따라 바뀐다(장신구 목록과 동일한 방식).
+// 룬 자동판매 등급 선택 UI — 가방 무기의 setupAutoSellControls()와 동일한 패턴.
+function setupRuneAutoSellControls() {
+  const sel = $('runeAutoSellSelect');
+  if (!sel) return;
+  if (!sel.dataset.built) {
+    sel.innerHTML = '<option value="">끔</option>' + GRADES.slice(0, 7).map((g, i) => `<option value="${i}">${g.name}</option>`).join('');
+    sel.dataset.built = '1';
+    sel.onchange = () => {
+      S.runeAutoSellGrade = sel.value === '' ? null : +sel.value;
+      save();
+    };
+  }
+  sel.value = S.runeAutoSellGrade == null ? '' : String(S.runeAutoSellGrade);
+}
 function renderRuneInventory() {
   const list = $('runeinvlist');
   if (!list) return;
+  setupRuneAutoSellControls();
+  const countEl = $('runeinvcount');
+  if (countEl) countEl.textContent = `(${S.runes.length}/${RUNE_BAG_MAX})`;
   const w = getEquipped();
   const equippedRunes = (w && Array.isArray(w.runes)) ? w.runes.map(r => ({ ...r, equipped: true })) : [];
   const bagRunes = S.runes.map(r => ({ ...r, equipped: false }));

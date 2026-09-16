@@ -588,13 +588,6 @@
       <div id="runeEquippedList"></div>
     </div>
     <div class="panel">
-      <h3>🛠️ 룬 합성</h3>
-      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        아래 보유 룬 목록에서 같은 등급 룬 3개를 직접 골라 슬롯에 채우면, 한 단계 위 등급의 랜덤한 룬 1개 획득을 시도합니다. 등급이 높을수록 성공 확률이 낮고, <b style="color:#ff7a7a">실패하면 선택한 룬 3개는 그대로 소멸</b>합니다.
-      </div>
-      <div id="runefusionlist"></div>
-    </div>
-    <div class="panel">
       <h3>🎒 보유 룬 <span style="font-size:12px;color:var(--sub)" id="runeinvcount"></span></h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
         🗑️ 자동판매:
@@ -602,6 +595,13 @@
         이하 룬 획득 시 즉시 판매
       </div>
       <div id="runeinvlist"></div>
+    </div>
+    <div class="panel">
+      <h3>🛠️ 룬 합성</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        위 보유 룬 목록에서 같은 등급 룬 3개를 직접 골라 슬롯에 채우면, 한 단계 위 등급의 랜덤한 룬 1개 획득을 시도합니다. 등급이 높을수록 성공 확률이 낮고, <b style="color:#ff7a7a">실패하면 선택한 룬 3개는 그대로 소멸</b>합니다.
+      </div>
+      <div id="runefusionlist"></div>
     </div>
   </div>
 
@@ -5672,7 +5672,7 @@ function renderRuneFusion() {
       <button class="primary big" id="fusionGoBtn">🛠️ <span class="grade-${GRADES[filledGrade].name}">${GRADES[filledGrade].name}</span> 룬 3개 → <span class="grade-${GRADES[filledGrade + 1].name}">${GRADES[filledGrade + 1].name}</span> 룬 1개 합성 (성공 확률 ${(chance * 100).toFixed(0)}%)</button>
     </div>`;
   } else {
-    html += `<div style="text-align:center; color:var(--sub); font-size:13px; margin-bottom:10px;">아래 보유 룬 목록에서 같은 등급 룬 3개를 선택해 슬롯을 채우세요.</div>`;
+    html += `<div style="text-align:center; color:var(--sub); font-size:13px; margin-bottom:10px;">위 보유 룬 목록에서 같은 등급 룬 3개를 선택해 슬롯을 채우세요.</div>`;
   }
   html += '<div id="fusionPicker"></div>';
   box.innerHTML = html;
@@ -5994,13 +5994,20 @@ function savePreset(idx) {
   if (!p || idx >= S.presetSlots) return;
   const w = getEquipped();
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
-  p.weaponId = w.id;
-  p.accEquipped = JSON.parse(JSON.stringify(S.accEquipped));
-  // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서, 무기 id만으론 "저장 당시의 룬 구성"이
-  // 보장되지 않는다 — 장착 중이던 룬의 id 목록을 스냅샷으로 별도 저장한다.
-  p.runeIds = Array.isArray(w.runes) ? w.runes.map(r => r.id) : [];
-  log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)}), 장신구 ${p.accEquipped.length}개, 룬 ${p.runeIds.length}개를 저장했습니다.`, 'lg-good');
-  renderPresetTab(); save();
+  const doSave = () => {
+    p.weaponId = w.id;
+    p.accEquipped = JSON.parse(JSON.stringify(S.accEquipped));
+    // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서, 무기 id만으론 "저장 당시의 룬 구성"이
+    // 보장되지 않는다 — 장착 중이던 룬의 id 목록을 스냅샷으로 별도 저장한다.
+    p.runeIds = Array.isArray(w.runes) ? w.runes.map(r => r.id) : [];
+    log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)}), 장신구 ${p.accEquipped.length}개, 룬 ${p.runeIds.length}개를 저장했습니다.`, 'lg-good');
+    renderPresetTab(); save();
+  };
+  if (p.weaponId != null) {
+    showConfirmModal(`<b>${p.name}</b>에 이미 저장된 구성이 있습니다. 현재 장착 중인 무기, 룬, 장신구를 덮어쓰시겠습니까?`, doSave, { confirmLabel: '덮어쓰기' });
+  } else {
+    doSave();
+  }
 }
 function loadPreset(idx) {
   const p = S.presets[idx];

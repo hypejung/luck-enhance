@@ -909,6 +909,34 @@ const WEAPON_MYTH_NAMES = {
     { name: '여의봉의 그림자', flavor: '자유자재로 크기가 변한다는 여의봉의 힘을 아주 조금 흉내 낸 철퇴. 손에 맞춰 무게가 달라진다.', atkMod: 1.0, speedMod: 1.02 },
   ],
 };
+// 사냥터 보스 전용 신화 무기(층당 1종 고정) — 예전엔 일반 신화와 같은 WEAPON_MYTH_NAMES
+// 풀에서 무작위 타입/이름으로 뽑혔는데, 그 사냥터 보스의 정체성과 무관해서 그 보스를
+// 처치할 때마다 항상 이 고정된 무기가 나오도록 리빌딩. index = 사냥터(0~19).
+const WEAPON_BOSS_NAMES = [
+  { name: '젤라트라의 왕홀',   type: '둔기',   flavor: '천 년을 산 슬라임 왕의 핵을 그대로 굳혀 왕홀로 다듬었다.' },
+  { name: '노스페라투의 숨결', type: '단검',   flavor: '그 숨결에 닿은 것은 서서히 피가 마른다.' },
+  { name: '미아크의 부패지팡이', type: '지팡이', flavor: '지팡이 끝에서 퍼지는 포자가 숲 전체를 뒤덮었다.' },
+  { name: '펜리르의 쌍아',     type: '쌍검',   flavor: '달조차 씹어삼켰다는 늑대의 두 송곳니.' },
+  { name: '그르쉬나크의 약탈도끼', type: '도끼', flavor: '백 번의 전투에서 단 한 번도 놓지 않았다는 도끼.' },
+  { name: '오시리우스의 무덤창', type: '창',    flavor: '무덤 깊은 곳에서 죽음을 관장하던 창.' },
+  { name: '크러시 브루트의 파산추', type: '둔기', flavor: '한 번 내려치면 산도 무너뜨렸다는 거대한 철퇴.' },
+  { name: '아라크네라의 팔지검', type: '쌍검',  flavor: '여제의 앞다리를 그대로 벼려낸, 거미줄보다 빠른 쌍검.' },
+  { name: '아틀라스의 천문도끼', type: '도끼',  flavor: '천계의 문을 지키던 거석 파수병의 팔.' },
+  { name: '바실리스크의 독아창', type: '창',    flavor: '늪 전체를 뒤흔든 독니를 벼려낸 창.' },
+  { name: '모르드레드의 파멸검', type: '검',    flavor: '성이 무너지던 날에도 손에서 놓지 않았다는 흑기사의 검.' },
+  { name: '아스테리온의 절망도끼', type: '도끼', flavor: '길 잃은 자들의 마지막 절망을 담은 미궁 군주의 도끼.' },
+  { name: '네크로티스의 금서지팡이', type: '지팡이', flavor: '삼켜버린 금서의 모든 지식이 지팡이 끝에 응축돼 있다.' },
+  { name: '퀴라사에의 폭풍궁', type: '활',     flavor: '시위를 당기면 폭풍이 함께 몰아친다.' },
+  { name: '베즐무트의 영혼저울', type: '둔기',  flavor: '죽은 자의 영혼 무게를 재던 저울추.' },
+  { name: '발자크의 계약검',   type: '검',     flavor: '피의 계약을 맺은 자만이 뽑을 수 있다는 마왕의 검.' },
+  { name: '단테스의 대지도끼', type: '도끼',   flavor: '한 걸음마다 대지가 갈라졌다는 재앙의 도끼.' },
+  { name: '아자토스의 천안단검', type: '단검', flavor: '천 개의 눈이 지켜보다 한순간 급소에 박히는 단검.' },
+  { name: '니드호그의 용린검', type: '검',     flavor: '세계수를 갉아먹은 재앙의 비늘로 벼린 검.' },
+  { name: '루멘 아르카의 심판창', type: '창',  flavor: '신들의 마지막 심판이 내려지던 순간 들려있던 창.' },
+];
+// 보스 신화 무기는 전 층 공통으로 살짝 더 강하게(+10% 공격력) — 일반 타입별 변형(atkMod
+// 0.95~1.15)의 상단보다도 위에 두어 "보스가 남긴 무기"라는 위상을 수치로도 드러낸다.
+for (const bw of WEAPON_BOSS_NAMES) { bw.atkMod = 1.1; bw.speedMod = 1.0; }
 // 등급별 무기 이름(브라켓 태그 안에 들어갈 텍스트) 계산
 function weaponItemName(w) {
   if (isFist(w)) return w.type;
@@ -929,7 +957,10 @@ function weaponItemName(w) {
 function weaponStatVariant(w) {
   if (isFist(w)) return null;
   if (w.grade === 4) return (WEAPON_LEGEND_NAMES[w.type] && WEAPON_LEGEND_NAMES[w.type][w.nameVariant || 0]) || null;
-  if (w.grade === 5) return (WEAPON_MYTH_NAMES[w.type] && WEAPON_MYTH_NAMES[w.type][w.nameVariant || 0]) || null;
+  if (w.grade === 5) {
+    if (w.bossFloor !== undefined) return WEAPON_BOSS_NAMES[w.bossFloor] || null;
+    return (WEAPON_MYTH_NAMES[w.type] && WEAPON_MYTH_NAMES[w.type][w.nameVariant || 0]) || null;
+  }
   if (w.grade === 6) return ancientVariant(w);
   return null;
 }
@@ -961,8 +992,10 @@ function codexKey(grade, type, variant, floorIdx) {
   if (grade === 6) return `g6_f${floorIdx}_${variant}`;
   return `g${grade}_${type}_${variant}`;
 }
+function bossCodexKey(bossFloor) { return `gboss_f${bossFloor}`; }
 function weaponCodexKey(w) {
   if (isFist(w)) return null;
+  if (w.bossFloor !== undefined) return bossCodexKey(w.bossFloor);
   if (w.grade === 6) return codexKey(6, null, w.nameVariant || 0, w.ancientFloor);
   if (w.grade >= 4) return codexKey(w.grade, w.type, w.nameVariant || 0);
   return codexKey(w.grade, w.type);
@@ -1002,6 +1035,11 @@ function codexEntries() {
     } else {
       list.push({ grade: 6, undesigned: true, floor: f, icon: '❓', name: `미발견 (${FLOORS[f].name} 고대 무기)` });
     }
+  }
+  for (let f = 0; f < WEAPON_BOSS_NAMES.length; f++) {
+    const bw = WEAPON_BOSS_NAMES[f];
+    const t = WEAPON_TYPES.find(x => x.name === bw.type);
+    list.push({ grade: 5, isBossSet: true, type: bw.type, icon: t.icon, floor: f, name: bw.name, flavor: bw.flavor });
   }
   return list;
 }
@@ -1051,6 +1089,27 @@ const CODEX_ANCIENT_SETS = [
   { stat: 'bossDmg', value: 0.20 },       // 18 용의둥지·고대드래곤
   { stat: 'offline', value: 0.10 },       // 19 신들의영역·몰락한신
 ];
+// 도감 "보스의 무력" — 20종 보스 신화 무기 중 몇 종을 수집했는지에 따른 누적(계단식) 보너스.
+// 각 구간의 효과는 이전 구간 위에 그대로 더해진다(도달한 구간 전부 동시 적용).
+// 14/20구간의 재도전 쿨타임 효과는 accEff 스탯이 아니라 endBossFight()에서 직접 처리한다.
+const CODEX_BOSS_MILESTONES = [
+  { count: 1,  effs: [['atk', 0.10]] },
+  { count: 2,  effs: [['gold', 0.08]] },
+  { count: 4,  effs: [['speed', 0.20]] },
+  { count: 6,  effs: [['critChance', 0.05]] },
+  { count: 8,  effs: [['bossDmg', 0.15]] },
+  { count: 10, effs: [['critDamage', 0.20], ['luck', 0.15]] },
+  { count: 12, effs: [['extraAtk', 0.05]] },
+  { count: 14, effs: [], text: '👹 보스 처치 시 8% 확률로 그 사냥터 재도전 쿨타임 즉시 초기화' },
+  { count: 16, effs: [['atk', 0.80], ['bossDmg', 0.15]] },
+  { count: 18, effs: [['atk', 0.08], ['speed', 0.08], ['critChance', 0.08], ['critDamage', 0.08], ['extraAtk', 0.08], ['bossDmg', 0.08]] },
+  { count: 20, effs: [['bossDmg', 0.70]], text: '👹 보스 피해량 +70%, 모든 사냥터 보스 재도전 쿨타임 -40%' },
+];
+function bossWeaponCodexCount() {
+  let n = 0;
+  for (let f = 0; f < WEAPON_BOSS_NAMES.length; f++) if (codexHas(bossCodexKey(f))) n++;
+  return n;
+}
 function codexHas(key) { return !!(S && S.codexSeen[key]); }
 function codexPairProgress(pair, grade) {
   return pair.types.filter(t => codexHas(codexKey(grade, t))).length;
@@ -1091,6 +1150,11 @@ function codexBonusEff() {
     if (set.stat === 'offline') continue;
     const prog = codexAncientSetProgress(f);
     if (prog.need > 0 && prog.have >= prog.need) eff[set.stat] += set.value;
+  }
+  const bossCount = bossWeaponCodexCount();
+  for (const m of CODEX_BOSS_MILESTONES) {
+    if (bossCount < m.count) continue;
+    for (const [stat, val] of m.effs) eff[stat] += val;
   }
   // 금서파편의 인장: 도감 컬렉션 보너스 전체 20% 증폭
   if (sealEquippedHas('bookFragment')) { for (const k of Object.keys(eff)) eff[k] *= 1.2; }
@@ -1152,6 +1216,13 @@ function renderCodexBonuses() {
     const effText = codexStatText(set.stat, set.value);
     if (prog.have >= prog.need) active.push({ grade: 6, label, effText });
     else pending.push({ grade: 6, label, effText, have: prog.have, need: prog.need });
+  }
+  const bossCount = bossWeaponCodexCount();
+  for (const m of CODEX_BOSS_MILESTONES) {
+    const label = `[보스의 무력] ${m.count}종 수집`;
+    const effText = m.text || m.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ');
+    if (bossCount >= m.count) active.push({ grade: 5, label, effText });
+    else pending.push({ grade: 5, label, effText, have: bossCount, need: m.count });
   }
   const row = (x, dim) => `
     <div class="invitem${dim ? '' : ' equipped'}"${dim ? ' style="opacity:0.55"' : ''}>
@@ -3869,7 +3940,15 @@ function endBossFight(win) {
   if (win) {
     onGenesisHungerKill(); // 끝없는 허기(글러트니): 보스 처치도 스택 적립 대상
     S.bossWins++;
-    S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped()) * (sealEquippedHas('quakeGuardian') ? 0.5 : 1);
+    // 도감 "보스의 무력" 마일스톤: 20종 완전 수집 시 모든 사냥터 보스 쿨타임 -40%,
+    // 14종 이상 수집 시 처치할 때마다 8% 확률로 그 사냥터 쿨타임 즉시 초기화
+    const bossSetCount = bossWeaponCodexCount();
+    const bossSetCdMult = bossSetCount >= 20 ? 0.6 : 1;
+    S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped()) * (sealEquippedHas('quakeGuardian') ? 0.5 : 1) * bossSetCdMult;
+    if (bossSetCount >= 14 && Math.random() < 0.08) {
+      S.bossCooldowns[f] = Date.now();
+      log('🏺 <b>보스의 무력</b> 컬렉션의 가호! 재도전 쿨타임이 즉시 초기화되었습니다.', 'lg-prim');
+    }
     if (sealEquippedHas('endlessMarch')) S.bossFreeRetryReady = true; // 무한진군의 인장: 다음 재도전 1회 무료 충전
     const w = getEquipped();
     const e = w && w.effect ? EFFECTS[w.effect] : null;
@@ -3904,15 +3983,15 @@ function endBossFight(win) {
     // 승리 연출
     $('monemoji').classList.add('boss-appear');
     setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
-    // 신화 보스무기 드롭
+    // 신화 보스무기 드롭 — 그 사냥터 보스 전용 고정 무기(WEAPON_BOSS_NAMES)가 항상 나온다
     if (Math.random() < BOSS.weaponDrop * (1 + accEff().luck)) {
-      const t = WEAPON_TYPES[Math.floor(Math.random() * WEAPON_TYPES.length)];
+      const bw = WEAPON_BOSS_NAMES[f];
+      const t = WEAPON_TYPES.find(x => x.name === bw.type);
       const pool = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === 5);
       const nw = {
-        id: uid++, grade: 5, type: t.name, icon: t.icon, enhance: 0,
+        id: uid++, grade: 5, type: bw.type, icon: t.icon, enhance: 0,
         effect: pool[Math.floor(Math.random() * pool.length)],
         runes: [],
-        nameVariant: Math.floor(Math.random() * 3),
         bossFloor: f,   // 보스무기 표식
       };
       addWeapon(nw);
@@ -4469,29 +4548,42 @@ function renderGambleTables() {
 // 무기 도감 렌더링 — 등급별로 섹션을 나눠서 표시
 // 변형 배지는 숫자만으로는 잘 안 보여서 변형마다 고정된 색(파랑/초록/주황)을 함께 사용
 const VARIANT_BADGES = ['1', '2', '3'];
+// 도감 항목 하나의 codexSeen 키. "보스의 무력"(isBossSet) 항목은 사냥터 보스 전용 네임스페이스를 쓴다.
+function codexEntKey(ent) {
+  if (ent.undesigned) return null;
+  if (ent.isBossSet) return bossCodexKey(ent.floor);
+  return codexKey(ent.grade, ent.type, ent.variant, ent.floor);
+}
 function renderCodex() {
   renderCodexBonuses();
   const box = $('codexGrid');
   if (!box) return;
   box.innerHTML = '';
-  const byGrade = {};
-  for (const ent of codexEntries()) (byGrade[ent.grade] = byGrade[ent.grade] || []).push(ent);
-  for (let grade = 0; grade < GRADES.length; grade++) {
-    const ents = byGrade[grade];
+  const byGroup = {};
+  // "보스의 무력"은 신화(5등급)와 같은 등급 색을 쓰지만 별도 섹션으로 분리해서 보여준다.
+  for (const ent of codexEntries()) {
+    const g = ent.isBossSet ? 'boss' : ent.grade;
+    (byGroup[g] = byGroup[g] || []).push(ent);
+  }
+  const sectionOrder = [0, 1, 2, 3, 4, 5, 'boss', 6, 7];
+  for (const grade of sectionOrder) {
+    const ents = byGroup[grade];
     if (!ents || !ents.length) continue;
-    const gcolor = GRADES[grade].color;
+    const isBoss = grade === 'boss';
+    const gcolor = isBoss ? GRADES[5].color : GRADES[grade].color;
+    const sectionTitle = isBoss ? '보스의 무력' : GRADES[grade].name;
     const unlockedCount = ents.filter(ent => {
-      const key = ent.undesigned ? null : codexKey(ent.grade, ent.type, ent.variant, ent.floor);
+      const key = codexEntKey(ent);
       return !!(key && S.codexSeen[key]);
     }).length;
     const section = document.createElement('div');
     section.className = 'codex-section';
-    section.innerHTML = `<div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name}
+    section.innerHTML = `<div class="codex-section-title ${isBoss ? 'grade-신화' : `grade-${GRADES[grade].name}`}">${sectionTitle}
       <span class="codex-section-count">${unlockedCount}/${ents.length}</span></div>
       <div class="codex-grid"></div>`;
     const grid = section.querySelector('.codex-grid');
     for (const ent of ents) {
-      const key = ent.undesigned ? null : codexKey(ent.grade, ent.type, ent.variant, ent.floor);
+      const key = codexEntKey(ent);
       const unlocked = !!(key && S.codexSeen[key]);
       const cell = document.createElement('div');
       cell.className = 'codex-cell' + (unlocked ? '' : ' locked');

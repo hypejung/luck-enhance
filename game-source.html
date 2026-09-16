@@ -5732,12 +5732,23 @@ function computeStats() {
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
   const extraChanceCap = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkCap || 0.70) : DMG_CAPS.extraChance;
   const extraChance = Math.min(extraChanceCap, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * 100;
+  // 골드/드랍률은 dropRoll()의 실제 계산식(곱연산)과 맞춘다 — 약탈자의 격노(고대 에이션트
+  // 스피릿)의 고정 +50%/스택 보너스가 예전엔 이 화면에 전혀 반영되지 않았음.
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  let dropMul = (e && e.drop ? 1 + e.drop : 1) * (1 + ae.luck);
+  if (w && w.spirit === 'goblinsteal') {
+    const spirit = ANCIENT_SPIRITS.goblinsteal;
+    const stacks = Math.min(spirit.stackMax || 0, w.goblinstealStacks || 0);
+    const gbMult = 1 + (spirit.goldBonus || 0) + stacks * (spirit.perStack || 0);
+    goldMul *= gbMult;
+    dropMul *= gbMult;
+  }
   return {
     atk, spd, dps: atk * spd,
     critChance, critMultPct, extraChance,
     bossBonus: bossDmgBonus() * 100,
-    goldBonus: ((e && e.gold ? e.gold : 0) + ae.gold) * 100,
-    dropBonus: ae.luck * 100,
+    goldBonus: (goldMul - 1) * 100,
+    dropBonus: (dropMul - 1) * 100,
     enhBonus: ae.enh,
     speedAccBonus: ae.speed * 100,
   };

@@ -1309,6 +1309,15 @@ const ENH = {
     62, 67, 72, 77, 82,            // +25 ~ +29
   ],
 };
+// 레전더리 이상(등급 4+) 전용 고강화 비용 폭증 — 토벌전 등 고소득 콘텐츠의 골드가 조 단위까지
+// 벌리는데 강화 비용은 억 단위에 머물러 있던 문제(강화가 사실상 유의미한 골드 소모처가 아니게
+// 됨)를 보정. 유니크 이하는 원래 costGrowth 곡선 그대로 둔다. enhanceCost()에서 사용.
+// (룬박스 가격 계산이 스크립트 로드 시점에 곧바로 enhanceCost()를 호출하므로, 그보다 반드시
+// 앞서 선언돼야 한다 — 아래쪽에 두면 TDZ로 인해 초기화 전 참조 에러가 난다)
+const ENHANCE_HIGH_GRADE_MIN = 4;   // 레전더리부터 적용
+const ENHANCE_HIGH_TIER_START = 20; // 이 단계부터 추가 배율 적용
+const ENHANCE_HIGH_TIER_BASE = 6000;   // +20 시점에 곱해지는 배율
+const ENHANCE_HIGH_TIER_GROWTH = 1.75; // 그 이후 단계당 추가로 곱해지는 배율
 
 // ---------- 사냥터 (20단계) ----------
 const FLOORS = [
@@ -1467,6 +1476,8 @@ const PATCH_NOTES = [
       '⚒️ 무기 각인에 고대·태초 등급 추가(최대 신화 → 태초로 확장, 천장 100/160회, 재설정 비용 🎫20/35) — 옵션 수치 범위도 전 등급 재설계해서 다음 등급 최솟값이 이전 등급 중간값에서 시작하도록 겹치게 하고, 등급별 편차(최대/최소 비율)도 2.5배로 넓게 통일',
       '🐛 각인 재설정 시 "천장을 채우기 전엔 절대 승급하지 않는" 버그 수정 — 원래 의도대로 매 재설정마다 조기 승급 가능',
       '⚒️ 각인 조기 승급 확률을 등급 고정값(5%)에서 "천장의 70%만큼 시도하면 기대값상 한 번은 터지는" 등급별 확률로 변경 — 등급이 오를수록(천장이 커질수록) 조기 승급 확률도 자연히 낮아짐 (예: 천장 10 → 1/7, 천장 100 → 1/70, 천장 160 → 1/112)',
+      '💰 레전더리 이상(등급 4+) 무기는 +20부터 강화 비용이 대폭 상승 — 토벌전 등 고소득 콘텐츠 골드가 조 단위인데 강화 비용은 억 단위에 머물러 사실상 유의미한 소모처가 아니었던 문제 보정(신화 +20 기준 3.77억 → 2.26조). 유니크 이하 등급은 기존 곡선 그대로 유지',
+      '💰 토벌전 골드 보상이 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/글러트니 등)에 더 이상 영향받지 않도록 변경 — 장비를 얼마나 갖췄든 동일한 보상을 받는 별도 콘텐츠로 취급(추후 전용 룬 등으로 별도 보너스 예정)',
     ],
   },
   {
@@ -1599,15 +1610,14 @@ function raidHp(stage) { return Math.round(RAID.baseHp * Math.pow(RAID.hpGrowth,
 // 화룡의 인장: 하루 총 도전 횟수 +1
 function effectiveRaidDailyTotal() { return RAID.dailyTotal + (sealEquippedHas('dragonKing') ? 1 : 0); }
 function raidTokenReward(stage) { return 5 + stage * 2; }
+// 토벌전 골드 보상은 일반 사냥의 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/글러트니 등)를
+// 전혀 반영하지 않는다 — 장비를 얼마나 갖췄든 보상이 동일한 별도 콘텐츠로 취급(추후 전용 룬 등으로
+// 별도 보너스를 낼 계획). 공격속도(killsPerHour)는 골드 "획득률"이 아니라 처치 수 자체에 관여하는
+// 값이라 그대로 반영한다.
 function raidGoldReward(stage) {
   const w = getEquipped();
-  const e = w && w.effect ? EFFECTS[w.effect] : null;
-  const ae = accEff();
-  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
-  goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
-  if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
   const killsPerHour = weaponSpeed(w) * 3600;
-  const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
+  const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour) * RAID.baseGoldMult;
   return Math.floor(base * Math.pow(RAID.goldGrowth, stage));
 }
 
@@ -2642,9 +2652,18 @@ function playerDPS() {
   if (!w) return 0;
   return weaponAtk(w) * weaponSpeed(w);
 }
+// 레전더리 이상(등급 4+)은 +20부터 비용이 한 번 더 크게 튄다 — 토벌전 등 고소득 콘텐츠의
+// 골드가 조 단위까지 벌리는데 강화 비용은 억 단위에 머물러 있던 문제(강화가 사실상
+// 유의미한 골드 소모처가 아니게 됨)를 보정. 유니크 이하는 원래 곡선 그대로 둔다.
+// (관련 상수 ENHANCE_HIGH_* 는 룬박스 가격 계산이 이 함수를 로드 시점에 곧바로 호출하므로
+// 더 위쪽, ENH 객체 옆에 선언되어 있다 — 여기서 선언하면 TDZ로 인해 초기화 전 참조 에러가 난다)
 function enhanceCost(w) {
   // 기본비용 × costGrowth^단계 로 기하급수적 상승 (저강화도 결코 싸지 않음)
-  return Math.floor(GRADES[w.grade].enhanceCost * Math.pow(ENH.costGrowth, w.enhance));
+  let cost = GRADES[w.grade].enhanceCost * Math.pow(ENH.costGrowth, w.enhance);
+  if (w.grade >= ENHANCE_HIGH_GRADE_MIN && w.enhance >= ENHANCE_HIGH_TIER_START) {
+    cost *= ENHANCE_HIGH_TIER_BASE * Math.pow(ENHANCE_HIGH_TIER_GROWTH, w.enhance - ENHANCE_HIGH_TIER_START);
+  }
+  return Math.floor(cost);
 }
 // 태초 무기 전용 강화 재화: 골드 외에 "무기의 정수"도 함께 소모한다. 정식 획득처("고대의
 // 도서관")가 아직 구현되지 않아 당장은 완강이 불가능한 게 의도된 설계 — 장기 목표로 남겨둔다.

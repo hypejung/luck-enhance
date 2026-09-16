@@ -1453,6 +1453,7 @@ const PATCH_NOTES = [
       '🔨 강화기에서 비장착 무기도 강화 가능 — 기본은 장착 무기를 강화하되, "가방에서 다른 무기 강화하기"로 원하는 무기(맨손 제외)를 장착하지 않고도 강화할 수 있음. 자동 강화도 선택한 무기에 고정되어, 중간에 다른 무기를 장착해도 계속 진행됨',
       '📖 도감 세트 이름 개선 — 레전더리/신화 무기 타입셋의 밋밋했던 `[등급] 타입 전체 수집` 라벨을, 세 무기의 공통 테마를 반영한 이름(예: 레전더리 검 "하늘이 벼린 세 자루", 신화 검 "신화를 가른 세 자루")으로 교체',
       '👹 보스 세트 효과 설명 개선 — "X단계 사냥터"를 실제 사냥터 이름으로 표기하고, 빠져있던 고대·태초 무기 드롭률 3배 효과를 설명에 추가. 또한 "세트 발동중" 표시가 장비 조건만 보고 뜨던 것을 실제로 그 사냥터에서 사냥 중일 때만 뜨도록 수정하고, 사냥 화면에도 [보스세트효과 발동중] 표시를 새로 추가',
+      '🛠️ 초기화·동기화 불러오기·무기 판매·보스전 포기 등의 확인창을 브라우저 네이티브 확인창 대신 게임 자체 팝업으로 교체 — 일부 환경(모바일 인앱 브라우저 등)에서 네이티브 확인창이 뜨지 않거나 자동으로 취소되어 버튼이 먹통처럼 보이던 문제 해결',
     ],
   },
   {
@@ -3747,9 +3748,10 @@ function fleeBoss() {
     : bossFight.isPunch
       ? '펀치기계 측정을 중단하시겠습니까? (지금까지의 누적 데미지로 기록됩니다)'
       : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
-  if (!confirm(msg)) return;
-  log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : bossFight.isPunch ? '🏳️ 펀치기계 측정을 중단했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');
-  endBossFight(false);
+  showConfirmModal(msg, () => {
+    log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : bossFight.isPunch ? '🏳️ 펀치기계 측정을 중단했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');
+    endBossFight(false);
+  });
 }
 
 /* ===================== 강화 ===================== */
@@ -4531,6 +4533,23 @@ function showWeaponDestroyModal(destroyedTag) {
   `);
   $('alertOkBtn').onclick = hideAlertModal;
 }
+// 네이티브 confirm()은 일부 브라우저/웹뷰(모바일 인앱 브라우저 등)에서 조용히 차단되거나
+// 자동으로 "취소"로 처리되는 경우가 있어(연속 호출 시 크롬이 다이얼로그를 아예 막기도 함),
+// 데이터 삭제처럼 되돌릴 수 없는 동작의 확인창은 항상 이 커스텀 모달을 써야 한다.
+function showConfirmModal(message, onConfirm, opts) {
+  opts = opts || {};
+  const confirmLabel = opts.confirmLabel || '확인';
+  const confirmClass = opts.safe ? 'primary' : 'danger';
+  showAlertModal(`
+    <p style="text-align:left">${message}</p>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <button id="confirmModalCancelBtn" style="flex:1;width:auto;">취소</button>
+      <button id="confirmModalOkBtn" class="${confirmClass}" style="flex:1;width:auto;">${confirmLabel}</button>
+    </div>
+  `);
+  $('confirmModalCancelBtn').onclick = hideAlertModal;
+  $('confirmModalOkBtn').onclick = () => { hideAlertModal(); onConfirm(); };
+}
 
 function syncModalHome() {
   if (!syncConfigured()) {
@@ -4560,11 +4579,11 @@ function syncModalHome() {
     $('syncCopyIdBtn').onclick = () => syncCopyText(id, 'ID가 복사되었습니다.');
     $('syncReconnectBtn').onclick = () => syncModalChoice(false);
     $('syncDisconnectBtn').onclick = () => {
-      if (confirm('이 기기의 동기화 연결을 해제할까요? (저장된 진행 상황은 그대로 남고, 더 이상 클라우드에 자동 백업되지 않습니다)')) {
+      showConfirmModal('이 기기의 동기화 연결을 해제할까요? (저장된 진행 상황은 그대로 남고, 더 이상 클라우드에 자동 백업되지 않습니다)', () => {
         clearSyncCreds();
         log('🔗 동기화 연결이 해제되었습니다.');
         hideSyncModal();
-      }
+      });
     };
     $('syncCloseBtn').onclick = hideSyncModal;
   } else {
@@ -4657,14 +4676,13 @@ function syncModalEnterExisting() {
       } else if (rec.pw && rec.pw !== pw) {
         $('syncModalErr').textContent = '비밀번호가 일치하지 않습니다.';
       } else {
-        if (!confirm('현재 기기의 진행 상황을 덮어쓰고 불러온 데이터로 시작할까요?')) {
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = '불러오기';
-          return;
-        }
-        try { localStorage.setItem(SAVE_KEY, rec.data); } catch (e2) {}
-        setSyncCreds(id, pw);
-        location.reload();
+        showConfirmModal('현재 기기의 진행 상황을 덮어쓰고 불러온 데이터로 시작할까요?', () => {
+          try { localStorage.setItem(SAVE_KEY, rec.data); } catch (e2) {}
+          setSyncCreds(id, pw);
+          location.reload();
+        });
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = '불러오기';
         return;
       }
     } catch (e) {
@@ -5086,11 +5104,7 @@ function renderInventory() {
     sel.textContent = '판매';
     sel.className = 'danger';
     sel.style.marginLeft = 'auto';
-    sel.onclick = () => {
-      // 이미 판매된(목록에 없는) 무기면 무시 — 중복 클릭 방지
-      if (!S.weapons.some(x => x.id === w.id)) { renderInventory(); return; }
-      if (w.id === S.equipped) { log('장착 중인 무기는 판매할 수 없습니다.', 'lg-bad'); return; }
-      if (w.enhance > 0 && !confirm(`강화한 무기입니다(+${w.enhance}). 정말 판매하시겠습니까?`)) return;
+    const doSell = () => {
       const roll = rollSellPrice(sellPrice(w));
       // 끝없는 탐욕(글러트니의 목걸이): 판매 시 10% 확률로 추가 10배
       const jackpot = hasGenesisEquipped('gluttony') && Math.random() < 0.1;
@@ -5100,6 +5114,13 @@ function renderInventory() {
       const tag = jackpot ? ' <span class="lg-prim">(끝없는 탐욕! ×10 추가!)</span>' : (roll.label ? ` <span class="${roll.mult >= 3 ? 'lg-prim' : ''}">(${roll.label})</span>` : '');
       log(`판매: ${gradeTag(w)} → +${fmt(finalPrice)} 골드${tag}`);
       renderAll(); save();
+    };
+    sel.onclick = () => {
+      // 이미 판매된(목록에 없는) 무기면 무시 — 중복 클릭 방지
+      if (!S.weapons.some(x => x.id === w.id)) { renderInventory(); return; }
+      if (w.id === S.equipped) { log('장착 중인 무기는 판매할 수 없습니다.', 'lg-bad'); return; }
+      if (w.enhance > 0) showConfirmModal(`강화한 무기입니다(+${w.enhance}). 정말 판매하시겠습니까?`, doSell);
+      else doSell();
     };
     btns.appendChild(sel);
     }
@@ -5999,11 +6020,11 @@ function init() {
   document.querySelectorAll('#betbtns button').forEach(b => b.onclick = () => gamble(parseFloat(b.dataset.bet)));
   $('syncBtn').onclick = syncModalHome;
   $('resetBtn').onclick = () => {
-    if (confirm('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?')) {
+    showConfirmModal('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?', () => {
       resetting = true;  // 언로드 핸들러가 재저장하는 것을 차단
       localStorage.removeItem(SAVE_KEY);
       location.reload();
-    }
+    });
   };
   // 자동 사냥 토글
   $('autoBtn').onclick = () => {

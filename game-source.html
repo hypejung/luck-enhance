@@ -1808,8 +1808,8 @@ const ANCIENT_SPIRITS = {
   bloodtribute: { name: '피의 갈증', desc: '공격 시 35% 확률로 대상에게 5초간 출혈을 건다(재발동 시 갱신). 출혈 지속 동안 매초 무기 공격력의 300%만큼 도트 피해를 입히며, 그 동안 사용자는 공격력과 공격속도가 각각 100% 상승한다.',
                   proc: 0.35, dur: 5, dmgPerSec: 3.0, selfAtkBonus: 1.0, selfSpeedBonus: 1.0 },
   // 10초마다 7초간 "포자 만개"가 발동해 적이 받는 피해를 늘리고 사용자의 연격 확률을 높인다.
-  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 100% 증가하고, 사용자의 연타(추가공격) 확률이 30%p 상승한다.',
-                interval: 10, dur: 7, enemyDmgTakenBonus: 1.0, extraAtkBonus: 0.30 },
+  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 100% 증가하고, 연타(추가공격) 확률이 +30%p 상승하며 그 순간만큼은 연타 확률 상한 자체가 25% → 70%로 풀린다.',
+                interval: 10, dur: 7, enemyDmgTakenBonus: 1.0, extraAtkBonus: 0.30, extraAtkCap: 0.70 },
   // 기본 공속을 큰 폭으로 올리고, 처치할수록 영구히 쌓이는 스택으로 공속이 계속 더 상승한다.
   wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 영구히 60% 증가한다. 추가로 몬스터를 처치할 때마다 질주 스택이 영구히 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%).',
                 speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003 },
@@ -3608,8 +3608,13 @@ function attack(w) {
     floatText('🔮 주문 작렬!');
   }
   // 연타 효과 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
-  const sporeExtraBonus = (w.spirit === 'sporeburst' && now < fx.sporeburstUntil) ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
-  const extraChance = Math.min(DMG_CAPS.extraChance,
+  // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 연타 확률 상한 자체를 25% → 70%로
+  // 뚫어준다 — 그냥 더해주기만 하면 다른 원천만으로도 이미 상한(25%)에 닿아있는 경우가 많아
+  // 사실상 무의미해지기 때문.
+  const sporeActive = w.spirit === 'sporeburst' && now < fx.sporeburstUntil;
+  const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
+  const extraChanceCap = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkCap || 0.70) : DMG_CAPS.extraChance;
+  const extraChance = Math.min(extraChanceCap,
     (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus);
   if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= preCritDmg * EXTRA_ATK_DMG_MULT;

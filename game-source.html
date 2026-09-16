@@ -2437,7 +2437,10 @@ const ANCIENT_ENH = { growthGradeEquivalent: 13 };
 function ancientAtkMult(enh) { return enhAtkMult(enh, ANCIENT_ENH.growthGradeEquivalent); }
 function weaponSpeed(w) {
   const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
-  const baseSpeed = isGenesisWeapon(w) && w.speedOverride != null ? w.speedOverride : t.speed;
+  // speedOverride는 원래 태초 무기 전용이었지만, 필드 자체는 등급 무관하게 존중한다 —
+  // 정상 플레이로는 태초 외 무기에 이 필드가 절대 붙지 않으므로 무해하고, 테스트 계정에서
+  // 특정 무기의 공격속도를 임의로 고정해야 할 때(예: 파밍 속도 실험) 유용하다.
+  const baseSpeed = w.speedOverride != null ? w.speedOverride : t.speed;
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const effSpeed = e && e.speed ? e.speed : 0;
   // 공격속도 계열 효과의 임시 스택/버프 (해당 효과를 장착 중일 때만 적용)

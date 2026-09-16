@@ -329,6 +329,22 @@
   #syncModalBox .syncRow button { flex: 1; }
   #syncModalBox label.syncCheck { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-top: 8px; }
 
+  #alertModal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.72);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 150;
+  }
+  #alertModal[hidden] { display: none; }
+  #alertModalBox {
+    background: var(--panel2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; max-width: 360px; width: 100%; max-height: 85vh; overflow-y: auto;
+    font-size: 14px; text-align: center;
+  }
+  #alertModalBox h3 { margin: 0 0 12px; font-size: 18px; }
+  #alertModalBox p { margin: 0 0 10px; line-height: 1.5; }
+  #alertModalBox .alertSub { font-size: 12px; color: var(--sub); margin-bottom: 16px; }
+  #alertModalBox button { width: 100%; }
+
   .flash { animation: flash .4s; }
   @keyframes flash { 0%{filter:brightness(3)} 100%{filter:brightness(1)} }
   .shake { animation: shake .35s; }
@@ -710,6 +726,11 @@
 <div id="syncModal" hidden>
   <div id="syncModalBox">
     <div id="syncModalContent"></div>
+  </div>
+</div>
+<div id="alertModal" hidden>
+  <div id="alertModalBox">
+    <div id="alertModalContent"></div>
   </div>
 </div>
 
@@ -1424,6 +1445,7 @@ const PATCH_NOTES = [
       '👹 사냥 중 무기 드롭 시 신화 등급 확률을 레전더리 대비 정확히 25배 희귀하게 조정 (판매값 비율에 맞춤)',
       '💰 특수효과가 붙은 무기(유니크 이상은 항상 특수효과 보유)의 판매가 ×5 배율 제거 — 새 기본 판매값 자체가 이미 "특수효과 있는 무기" 기준으로 산정돼 있어 중복 적용되고 있었음',
       '👹 보스 무기 표시 개선 — 드롭된 사냥터 이름을 배지에 표시하고(예: 👹[폐허]) 사이언 색으로 강조해 일반 신화 무기와 한눈에 구분되도록 변경',
+      '💥 강화 중 무기가 파괴되면 바로 다음 무기가 강화기에 올라와서, 바뀐 줄 모르고 그대로 강화를 이어 누르는 실수가 있었음 — 이제 파괴 시 판타지풍 문구와 함께 확인 팝업이 떠서 한 번 멈추고 확인하게 됨',
     ],
   },
   {
@@ -3941,7 +3963,8 @@ function tryEnhance(advanced) {
       log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
     } else if (!isAncientWeapon(w) && !sealbreakActive && !undyingSave && destroyRoll < dChance) {
       playEnhanceFx('destroy', attemptLevel);
-      log(`💥 무기가 파괴되었습니다!! ${gradeTag(w)}${advTag}`, 'lg-bad');
+      const destroyedTag = gradeTag(w);
+      log(`💥 무기가 파괴되었습니다!! ${destroyedTag}${advTag}`, 'lg-bad');
       S.destroyedCount++;
       if (S.destroyedCount >= 50) unlockEgg('blacksmith');
       // 타락의 유산(고대): 파괴 시 판매가의 절반만큼 골드로 환급
@@ -3973,6 +3996,7 @@ function tryEnhance(advanced) {
       }
       renderEnhance(); renderInventory(); renderTop();
       save();
+      showWeaponDestroyModal(destroyedTag);
       return;
     } else {
       if (sealbreakActive || undyingSave) {
@@ -4453,6 +4477,31 @@ function hideSyncModal() { $('syncModal').hidden = true; }
 function showSyncModal(html) {
   $('syncModalContent').innerHTML = html;
   $('syncModal').hidden = false;
+}
+
+function hideAlertModal() { $('alertModal').hidden = true; }
+function showAlertModal(html) {
+  $('alertModalContent').innerHTML = html;
+  $('alertModal').hidden = false;
+}
+// 무기 파괴 시 "무기의 힘이 사라졌다"를 판타지풍으로 풀어쓴 문구 — 파괴 직후 바로 다음
+// 무기가 강화기에 올라와서, 무기가 바뀐 줄 모르고 그대로 강화를 이어서 누르는 실수를
+// 막기 위해 팝업으로 한 번 멈춰 세운다.
+const WEAPON_DESTROY_FLAVORS = [
+  '무기가 강화의 반동을 이기지 못하고 산산조각났습니다. 그 안에 잠들어 있던 힘도 함께, 영영 사라졌습니다.',
+  '빛을 잃은 무기가 한 줌 재가 되어 흩어지고, 그 힘도 바람과 함께 사라졌습니다.',
+  '무기를 감싸던 마력의 결계가 무너지며, 그 안의 힘도 산산이 흩어져 다시는 돌아오지 않았습니다.',
+  '한계를 넘어선 힘의 무게를 견디지 못하고, 무기는 형체도 없이 사라졌습니다.',
+];
+function showWeaponDestroyModal(destroyedTag) {
+  const flavor = WEAPON_DESTROY_FLAVORS[Math.floor(Math.random() * WEAPON_DESTROY_FLAVORS.length)];
+  showAlertModal(`
+    <h3>💥 무기 파괴</h3>
+    <p>${flavor}</p>
+    <div class="alertSub">${destroyedTag}</div>
+    <button class="danger" id="alertOkBtn">확인</button>
+  `);
+  $('alertOkBtn').onclick = hideAlertModal;
 }
 
 function syncModalHome() {

@@ -2629,6 +2629,9 @@ function bossSetFloor() {
   if (!S || !Array.isArray(S.bossAccs) || !S.bossAccs.length) return null;
   const w = getEquipped();
   if (!w || w.bossFloor === undefined) return null;
+  // bossFloor: 'all'은 정상 드롭으로는 절대 나오지 않는 테스트 전용 값 — 지금 있는 사냥터에
+  // 그 층 보스장신구를 보유하고 있기만 하면 어디서든 세트효과가 발동한다.
+  if (w.bossFloor === 'all') return S.bossAccs.includes(S.floor) ? S.floor : null;
   return S.bossAccs.includes(w.bossFloor) ? w.bossFloor : null;
 }
 // 보스 무기/보스 장신구 여부

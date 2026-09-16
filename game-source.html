@@ -3144,7 +3144,7 @@ function addWeapon(w) {
     log(`🗑️ 자동판매(${GRADES[w.grade].name} 이하): ${gradeTag(w)} → +${fmt(price)} 골드`);
     return;
   }
-  if (S.weapons.length >= 60) {
+  if (!S.unlimitedBag && S.weapons.length >= 60) {
     // 가방이 가득 차면 맨손/태초 무기를 자동 판매 목록에서 제외하고 가장 약한 무기를 판매
     const sellable = S.weapons.filter(x => !isFist(x) && !isGenesisWeapon(x) && !isAncientWeapon(x) && x.id !== S.equipped);
     if (!sellable.length) {

@@ -1810,12 +1810,14 @@ const ANCIENT_SPIRITS = {
   // 10초마다 7초간 "포자 만개"가 발동해 적이 받는 피해를 늘리고 사용자의 연격 확률을 높인다.
   sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 100% 증가하고, 연타(추가공격) 확률이 +30%p 상승하며 그 순간만큼은 연타 확률 상한 자체가 25% → 70%로 풀린다.',
                 interval: 10, dur: 7, enemyDmgTakenBonus: 1.0, extraAtkBonus: 0.30, extraAtkCap: 0.70 },
-  // 기본 공속을 큰 폭으로 올리고, 처치할수록 영구히 쌓이는 스택으로 공속이 계속 더 상승한다.
-  wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 영구히 60% 증가한다. 추가로 몬스터를 처치할 때마다 질주 스택이 영구히 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%).',
-                speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003 },
-  // 골드/드랍률을 고정으로 크게 올리고, 처치할수록 영구히 쌓이는 스택으로 공속·골드·드랍률이 함께 더 상승한다.
-  goblinsteal: { name: '약탈자의 격노', desc: '골드 획득과 드랍률이 각각 50% 고정 상승한다. 추가로 몬스터를 처치할 때마다 격노 스택이 영구히 1씩 쌓이며(최대 1000), 스택당 공격속도·골드 획득·드랍률이 각각 0.1%p씩 더 오른다(만스택 시 각각 +100%p 추가).',
-                 goldBonus: 0.50, dropBonus: 0.50, stackMax: 1000, perStack: 0.001 },
+  // 기본 공속을 큰 폭으로 올리고, 처치할수록 쌓이는 스택으로 공속이 계속 더 상승한다.
+  // 쉬지 않고 사냥할 때만 유지되는 스택 — 3초 이상 처치가 없으면 스택이 서서히 줄어든다.
+  wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 60% 증가한다. 추가로 몬스터를 처치할 때마다 질주 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%). 3초 이상 처치가 없으면 스택이 서서히 줄어든다.',
+                speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003, decaySec: 3 },
+  // 골드/드랍률을 고정으로 크게 올리고, 처치할수록 쌓이는 스택으로 공속·골드·드랍률이 함께 더 상승한다.
+  // 쉬지 않고 사냥할 때만 유지되는 스택 — 3초 이상 처치가 없으면 스택이 서서히 줄어든다.
+  goblinsteal: { name: '약탈자의 격노', desc: '골드 획득과 드랍률이 각각 50% 고정 상승한다. 추가로 몬스터를 처치할 때마다 격노 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도·골드 획득·드랍률이 각각 0.1%p씩 더 오른다(만스택 시 각각 +100%p 추가). 3초 이상 처치가 없으면 스택이 서서히 줄어든다.',
+                 goldBonus: 0.50, dropBonus: 0.50, stackMax: 1000, perStack: 0.001, decaySec: 3 },
   // 공격속도를 고정값에 못박고, 그로 인해 남는(원래 쌓였을) 속도를 통째로 공격력으로 환산한다.
   // 오버킬(처치 후 남는 피해량)만큼 사냥터 일반/엘리트 몬스터를 추가로 "진짜" 처치 판정한다
   // (보상 배수 지급이 아니라 dropRoll 등 정식 처치 로직을 그 횟수만큼 실제로 돌림). 보스/토벌전 제외.
@@ -3316,13 +3318,17 @@ function handleKill() {
       floatText('👻 영혼 흡수!');
     }
   }
-  // 늑대의 질주(고대 에이션트 스피릿): 처치마다 영구 스택 적립(최대 1000, 공속 보너스로 환산)
+  // 늑대의 질주(고대 에이션트 스피릿): 처치마다 스택 적립(최대 1000, 공속 보너스로 환산).
+  // 마지막 처치 시각을 함께 기록해, 쉬면 tick()에서 스택이 서서히 줄어들게 한다.
   if (w && w.spirit === 'wolfsprint') {
     w.wolfsprintStacks = Math.min(ANCIENT_SPIRITS.wolfsprint.stackMax || 0, (w.wolfsprintStacks || 0) + 1);
+    w.wolfsprintLastKill = Date.now();
   }
-  // 약탈자의 격노(고대 에이션트 스피릿): 처치마다 영구 스택 적립(최대 1000, 공속/골드/드랍률 보너스로 환산)
+  // 약탈자의 격노(고대 에이션트 스피릿): 처치마다 스택 적립(최대 1000, 공속/골드/드랍률 보너스로 환산).
+  // 마지막 처치 시각을 함께 기록해, 쉬면 tick()에서 스택이 서서히 줄어들게 한다.
   if (w && w.spirit === 'goblinsteal') {
     w.goblinstealStacks = Math.min(ANCIENT_SPIRITS.goblinsteal.stackMax || 0, (w.goblinstealStacks || 0) + 1);
+    w.goblinstealLastKill = Date.now();
   }
   spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
   // 돌진(고대 에이션트 스피릿): 처치 시 낮은 확률로 방금 리스폰된 다음 몬스터도 함께 처치
@@ -3362,6 +3368,14 @@ function tick(dt) {
   }
   if (fx.accelStacks > 0 && nowDecay - fx.accelLast > (EFFECTS.accel.decaySec || 5) * 1000) {
     fx.accelStacks--; fx.accelLast = nowDecay;
+  }
+  // 늑대의 질주/약탈자의 격노(고대 에이션트 스피릿): 광란/가속 각인과 동일한 패턴으로,
+  // 일정 시간(decaySec) 처치가 없으면 스택이 서서히 감소한다(쉬지 않고 사냥해야 유지됨).
+  if (w.spirit === 'wolfsprint' && (w.wolfsprintStacks || 0) > 0 && nowDecay - (w.wolfsprintLastKill || 0) > (ANCIENT_SPIRITS.wolfsprint.decaySec || 3) * 1000) {
+    w.wolfsprintStacks--; w.wolfsprintLastKill = nowDecay;
+  }
+  if (w.spirit === 'goblinsteal' && (w.goblinstealStacks || 0) > 0 && nowDecay - (w.goblinstealLastKill || 0) > (ANCIENT_SPIRITS.goblinsteal.decaySec || 3) * 1000) {
+    w.goblinstealStacks--; w.goblinstealLastKill = nowDecay;
   }
   // 포자 폭발(고대 에이션트 스피릿): 10초마다 7초간 "포자 만개" 발동(적 받는 피해/연격 확률 상승)
   if (w.spirit === 'sporeburst') {

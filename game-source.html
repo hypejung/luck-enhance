@@ -3171,7 +3171,9 @@ function addWeapon(w) {
     log(`🗑️ 자동판매(${GRADES[w.grade].name} 이하): ${gradeTag(w)} → +${fmt(price)} 골드`);
     return;
   }
-  if (!S.unlimitedBag && S.weapons.length >= 60) {
+  // unlimitedBag 계정도 완전 무제한은 아니고 500개로 크게만 늘려둔다 — 진짜 무제한으로 두면
+  // 오래 자동사냥한 테스트 계정의 가방이 수천 개까지 불어나 인벤토리 렌더링이 매우 느려진다.
+  if (S.weapons.length >= (S.unlimitedBag ? 500 : 60)) {
     // 가방이 가득 차면 맨손/태초 무기를 자동 판매 목록에서 제외하고 가장 약한 무기를 판매
     const sellable = S.weapons.filter(x => !isFist(x) && !isGenesisWeapon(x) && !isAncientWeapon(x) && x.id !== S.equipped);
     if (!sellable.length) {

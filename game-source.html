@@ -1456,6 +1456,7 @@ const PATCH_NOTES = [
       '🛠️ 초기화·동기화 불러오기·무기 판매·보스전 포기 등의 확인창을 브라우저 네이티브 확인창 대신 게임 자체 팝업으로 교체 — 일부 환경(모바일 인앱 브라우저 등)에서 네이티브 확인창이 뜨지 않거나 자동으로 취소되어 버튼이 먹통처럼 보이던 문제 해결',
       '🛠️ 고대·태초 무기의 고급 강화(+15 이상) 효과를 등급에 맞게 재정의 — 고대는 원래대로 "초기화 확률 절반"(파괴 대신 표기만 정정), 태초는 애초에 파괴·초기화가 없어 효과가 없던 것을 "단계 하락 확률 절반"으로 변경',
       '🔮 고대·태초 무기의 최대 룬 장착 개수 상향 — 기존엔 등급 공식(등급+1)에 걸려 둘 다 7개로 같았는데, 고대 8개 / 태초 10개로 별도 확장',
+      '🔢 큰 숫자 표기법 확장 — 10000억을 넘으면 조/경/해/자/양 등으로 계속 이어서 표기 (예: 21,752,709.50억 → 2175.27조)',
     ],
   },
   {
@@ -2748,10 +2749,28 @@ function rollSellPrice(basePrice) {
 
 /* ===================== 유틸 ===================== */
 const $ = id => document.getElementById(id);
+// 만 단위(10^4)마다 새 한자 단위로 올라가는 큰 수 표기법. 강화 곡선/판매가 등이 억 단위를
+// 훌쩍 넘어가는 경우(조 단위 이상)가 흔해져서, 10000억을 그냥 "10000.00억"으로 뭉개지 않고
+// 조/경/해 등으로 계속 이어서 표기한다.
+const NUM_UNITS = [
+  { value: 1e48, label: '극' },
+  { value: 1e44, label: '재' },
+  { value: 1e40, label: '정' },
+  { value: 1e36, label: '간' },
+  { value: 1e32, label: '구' },
+  { value: 1e28, label: '양' },
+  { value: 1e24, label: '자' },
+  { value: 1e20, label: '해' },
+  { value: 1e16, label: '경' },
+  { value: 1e12, label: '조' },
+  { value: 1e8,  label: '억' },
+  { value: 1e4,  label: '만' },
+];
 function fmt(n) {
   n = Math.floor(n);
-  if (n >= 1e8) return (n / 1e8).toFixed(2).replace(/\.?0+$/, '') + '억';
-  if (n >= 1e4) return (n / 1e4).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1') + '만';
+  for (const u of NUM_UNITS) {
+    if (n >= u.value) return (n / u.value).toFixed(2).replace(/\.?0+$/, '') + u.label;
+  }
   return n.toLocaleString();
 }
 // 아주 작은 확률(고등급 고강화)도 0%로 뭉개지지 않고 보이도록

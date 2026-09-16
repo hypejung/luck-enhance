@@ -2359,9 +2359,10 @@ function newState() {
     bossFreeRetryReady: false, // 무한진군의 인장: 충전된 무료 보스 재도전 여부
     matAutoSell: {},   // 재료 자동판매 필터: 'f|g' 키가 true면 그 재료는 획득 즉시 자동 판매됨
     lastSeenPatchVersion: latestPatchVersion(), // 신규 플레이어는 처음부터 전부 "읽은" 상태로 시작
-    // 전투 프리셋: 무기는 id로 참조(룬은 무기에 귀속되므로 자동 포함), 장신구는 스냅샷.
+    // 전투 프리셋: 무기는 id로 참조, 장신구와 룬 구성(runeIds)은 스냅샷으로 저장한다.
+    // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서 id 참조만으론 "그때 그 구성"이 보장 안 됨.
     // 슬롯 자체는 항상 5개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
-    presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null })),
+    presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null })),
     presetSlots: 3,
   };
 }
@@ -4590,7 +4591,7 @@ function migrate(d) {
   if (!Array.isArray(d.ancientSeals)) d.ancientSeals = [];
   if (!Array.isArray(d.presets) || !d.presets.length) d.presets = [];
   // 프리셋 슬롯을 5개로 확장하면서, 기존에 3개만 있던 세이브는 나머지를 빈 슬롯으로 채운다.
-  while (d.presets.length < 5) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null });
+  while (d.presets.length < 5) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null, runeIds: null });
   if (typeof d.presetSlots !== 'number' || d.presetSlots < 3) d.presetSlots = 3;
   if (!Array.isArray(d.sealEquipped)) d.sealEquipped = [];
   if (typeof d.matAutoSell !== 'object' || d.matAutoSell === null || Array.isArray(d.matAutoSell)) d.matAutoSell = {};
@@ -5995,7 +5996,10 @@ function savePreset(idx) {
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
   p.weaponId = w.id;
   p.accEquipped = JSON.parse(JSON.stringify(S.accEquipped));
-  log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)})와 장신구 ${p.accEquipped.length}개를 저장했습니다.`, 'lg-good');
+  // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서, 무기 id만으론 "저장 당시의 룬 구성"이
+  // 보장되지 않는다 — 장착 중이던 룬의 id 목록을 스냅샷으로 별도 저장한다.
+  p.runeIds = Array.isArray(w.runes) ? w.runes.map(r => r.id) : [];
+  log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)}), 장신구 ${p.accEquipped.length}개, 룬 ${p.runeIds.length}개를 저장했습니다.`, 'lg-good');
   renderPresetTab(); save();
 }
 function loadPreset(idx) {
@@ -6008,7 +6012,26 @@ function loadPreset(idx) {
     S.equipped = w.id;
   }
   if (Array.isArray(p.accEquipped)) S.accEquipped = JSON.parse(JSON.stringify(p.accEquipped));
-  log(`📥 <b>${p.name}</b>을(를) 불러왔습니다.${w ? ` ${gradeTag(w)} 장착.` : ''}`, 'lg-prim');
+  // 룬 구성 복원: 저장 당시 장착돼 있던 룬 id 목록과 지금 무기에 낀 룬을 비교해서,
+  // 목록에 없는 건 빼서 보유 룬으로 돌려놓고, 목록에 있는데 안 낀 건 보유 룬에서 찾아 낀다.
+  // (옛날에 저장된 프리셋은 runeIds가 없으므로 이 로직 자체를 건너뛰어 기존 동작을 유지한다)
+  let runeNote = '';
+  if (w && Array.isArray(p.runeIds)) {
+    if (!Array.isArray(w.runes)) w.runes = [];
+    const wantedIds = new Set(p.runeIds);
+    for (const r of w.runes.filter(r => !wantedIds.has(r.id))) S.runes.push(r);
+    w.runes = w.runes.filter(r => wantedIds.has(r.id));
+    const maxSlots = runeSlotsForGrade(w.grade);
+    let missing = 0;
+    for (const id of p.runeIds) {
+      if (w.runes.some(r => r.id === id)) continue;
+      const idx2 = S.runes.findIndex(r => r.id === id);
+      if (idx2 < 0 || w.enhance < 15 || w.runes.length >= maxSlots) { missing++; continue; }
+      w.runes.push(S.runes.splice(idx2, 1)[0]);
+    }
+    if (missing > 0) runeNote = ` (룬 ${missing}개는 찾을 수 없거나 장착 불가해 제외됨)`;
+  }
+  log(`📥 <b>${p.name}</b>을(를) 불러왔습니다.${w ? ` ${gradeTag(w)} 장착.` : ''}${runeNote}`, 'lg-prim');
   renderAll(); save();
 }
 function renamePreset(idx, newName) {
@@ -6047,7 +6070,7 @@ function renderPresetTab() {
     let summary;
     if (p2.weaponId == null) summary = '<span style="color:var(--sub)">저장된 내용 없음</span>';
     else if (!w) summary = '<span style="color:#ff7a7a">저장된 무기를 찾을 수 없음(판매·파괴됨)</span>';
-    else summary = `${gradeTag(w)}${accNames.length ? ` · 📿 ${accNames.join(', ')}` : ' · 장신구 없음'}`;
+    else summary = `${gradeTag(w)}${accNames.length ? ` · 📿 ${accNames.join(', ')}` : ' · 장신구 없음'}${Array.isArray(p2.runeIds) ? ` · 🔮 룬 ${p2.runeIds.length}개` : ''}`;
     div.className = 'invitem';
     div.innerHTML = `
       <div style="flex:1;min-width:0;">

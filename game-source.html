@@ -3345,6 +3345,26 @@ function tick(dt) {
   }
   const w = getEquipped();
   if (!w) return;
+  // 시간이 지나야 서서히 줄어드는 스택(광란/가속 각인/늑대의 질주/약탈자의 격노)은 사냥터
+  // 자동사냥이 꺼져 있어도 계속 흘러야 한다 — "사냥을 멈추면 스택도 빠진다"가 성립하려면
+  // 이 감소 판정 자체는 일시정지 여부와 무관하게 항상 돌아야 하기 때문. (반대로 스택이
+  // 새로 쌓이는 건 attack()이 실제로 호출될 때만 일어나므로, 정지 중엔 자연히 늘지 않는다.)
+  const nowDecay = Date.now();
+  if (fx.frenzyStacks > 0 && nowDecay - fx.frenzyLast > (EFFECTS.frenzy.decaySec || 5) * 1000) {
+    fx.frenzyStacks--; fx.frenzyLast = nowDecay;
+  }
+  if (fx.accelStacks > 0 && nowDecay - fx.accelLast > (EFFECTS.accel.decaySec || 5) * 1000) {
+    fx.accelStacks--; fx.accelLast = nowDecay;
+  }
+  if (w.spirit === 'wolfsprint' && (w.wolfsprintStacks || 0) > 0 && nowDecay - (w.wolfsprintLastKill || 0) > (ANCIENT_SPIRITS.wolfsprint.decaySec || 3) * 1000) {
+    w.wolfsprintStacks--; w.wolfsprintLastKill = nowDecay;
+  }
+  if (w.spirit === 'goblinsteal' && (w.goblinstealStacks || 0) > 0 && nowDecay - (w.goblinstealLastKill || 0) > (ANCIENT_SPIRITS.goblinsteal.decaySec || 3) * 1000) {
+    w.goblinstealStacks--; w.goblinstealLastKill = nowDecay;
+  }
+  // 아래부터는 실질적인 전투 진행 — 사냥터 자동사냥이 꺼져 있고 보스전/토벌전/펀치기계도
+  // 아니면 여기서 멈춘다(보스전·토벌전·펀치기계는 자동사냥 스위치와 무관하게 항상 진행됨).
+  if (!S.auto && !bossFight.active) return;
   let attacked = false;
   let killedAny = false;
   const e0 = w.effect ? EFFECTS[w.effect] : null;
@@ -3354,22 +3374,6 @@ function tick(dt) {
     // 매 틱(0.1초)마다 소수점 단위의 아주 작은 골드가 붙기 때문에 여기서 floor하면
     // 안 된다(반올림 손실로 사실상 이자가 거의 발동하지 않게 됨) — 표시는 fmt()가 처리.
     S.gold *= (1 + e0.interestRate * dt);
-  }
-  // 광란/가속 각인: 일정 시간(decaySec) 발동이 없으면 스택이 서서히 감소 (온라인 중에만 진행)
-  const nowDecay = Date.now();
-  if (fx.frenzyStacks > 0 && nowDecay - fx.frenzyLast > (EFFECTS.frenzy.decaySec || 5) * 1000) {
-    fx.frenzyStacks--; fx.frenzyLast = nowDecay;
-  }
-  if (fx.accelStacks > 0 && nowDecay - fx.accelLast > (EFFECTS.accel.decaySec || 5) * 1000) {
-    fx.accelStacks--; fx.accelLast = nowDecay;
-  }
-  // 늑대의 질주/약탈자의 격노(고대 에이션트 스피릿): 광란/가속 각인과 동일한 패턴으로,
-  // 일정 시간(decaySec) 공격이 없으면 스택이 서서히 감소한다(쉬지 않고 공격해야 유지됨).
-  if (w.spirit === 'wolfsprint' && (w.wolfsprintStacks || 0) > 0 && nowDecay - (w.wolfsprintLastKill || 0) > (ANCIENT_SPIRITS.wolfsprint.decaySec || 3) * 1000) {
-    w.wolfsprintStacks--; w.wolfsprintLastKill = nowDecay;
-  }
-  if (w.spirit === 'goblinsteal' && (w.goblinstealStacks || 0) > 0 && nowDecay - (w.goblinstealLastKill || 0) > (ANCIENT_SPIRITS.goblinsteal.decaySec || 3) * 1000) {
-    w.goblinstealStacks--; w.goblinstealLastKill = nowDecay;
   }
   // 포자 폭발(고대 에이션트 스피릿): 10초마다 7초간 "포자 만개" 발동(적 받는 피해/연격 확률 상승)
   if (w.spirit === 'sporeburst') {
@@ -6342,7 +6346,9 @@ function init() {
     const dt = Math.min(0.25, (now - last) / 1000);
     last = now;
     try {
-      if (S.auto) tick(dt);
+      // tick() 내부에서 자동사냥 여부·보스전/토벌전/펀치기계 여부를 직접 가려서 처리한다
+      // (자동사냥이 꺼져 있어도 진행 중인 보스전/토벌전/펀치기계와 스택 감소는 계속돼야 함).
+      tick(dt);
       // 전투 중 실시간으로 쌓이는 능력치(스택형 공속/공격력, 일시 버프 등)가 상단 DPS와
       // 능력치 탭에 곧바로 반영되도록 매 틱 갱신한다 — 예전엔 특정 행동(강화/상자 등)을
       // 해야만 갱신돼서, 가만히 사냥만 하고 있으면 스택이 쌓여도 화면이 그대로였다.

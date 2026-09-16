@@ -1422,6 +1422,7 @@ const PATCH_NOTES = [
       '🔮 룬 장착 조건(+15 이상)을 벗어나게 강화 단계가 떨어져도 룬이 그대로 남아있던 문제 수정 — 이제 자동으로 해제되어 보유 룬으로 반환',
       '⚙️ 자동 강화 지원 범위 +15 → +20으로 확장',
       '👹 사냥 중 무기 드롭 시 신화 등급 확률을 레전더리 대비 정확히 25배 희귀하게 조정 (판매값 비율에 맞춤)',
+      '💰 특수효과가 붙은 무기(유니크 이상은 항상 특수효과 보유)의 판매가 ×5 배율 제거 — 새 기본 판매값 자체가 이미 "특수효과 있는 무기" 기준으로 산정돼 있어 중복 적용되고 있었음',
     ],
   },
   {
@@ -2677,7 +2678,7 @@ function sellPrice(w) {
   const g = GRADES[w.grade] || GRADES[0];
   const enh = typeof w.enhance === 'number' && w.enhance >= 0 ? w.enhance : 0;
   const raw = g.sell + (enh > 0 ? enhanceExpectedCost({ grade: w.grade, enhance: enh }) * SELL_ENH_FACTOR : 0);
-  const price = Math.max(1, Math.floor(raw * (w.effect ? 5 : 1)));
+  const price = Math.max(1, Math.floor(raw));
   return sealEquippedHas('thiefKing') ? Math.floor(price * 1.2) : price;
 }
 // 판매 운빨 테이블 — 대부분 무난하지만 드물게 대박(혹은 쪽박)이 남

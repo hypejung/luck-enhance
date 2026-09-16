@@ -1423,6 +1423,7 @@ const PATCH_NOTES = [
       '⚙️ 자동 강화 지원 범위 +15 → +20으로 확장',
       '👹 사냥 중 무기 드롭 시 신화 등급 확률을 레전더리 대비 정확히 25배 희귀하게 조정 (판매값 비율에 맞춤)',
       '💰 특수효과가 붙은 무기(유니크 이상은 항상 특수효과 보유)의 판매가 ×5 배율 제거 — 새 기본 판매값 자체가 이미 "특수효과 있는 무기" 기준으로 산정돼 있어 중복 적용되고 있었음',
+      '👹 보스 무기 표시 개선 — 드롭된 사냥터 이름을 배지에 표시하고(예: 👹[폐허]) 사이언 색으로 강조해 일반 신화 무기와 한눈에 구분되도록 변경',
     ],
   },
   {
@@ -2720,7 +2721,11 @@ function gradeTag(w) {
         ? ` <span style="font-size:12px">🔮[${runeName(runeList[0])}]</span>`
         : ` <span style="font-size:12px">🔮×${runeList.length}</span>`)
     : '';
-  const boss = w.bossFloor !== undefined ? ' 👹' : '';
+  // 보스무기: 어느 층 보스에게서 나왔는지 알아볼 수 있도록 층 이름을 표시하고,
+  // 일반 신화(핑크)와 시각적으로 구분되도록 사이언 색으로 강조한다.
+  const boss = w.bossFloor !== undefined
+    ? ` <span style="font-size:12px;color:#3ddfff;font-weight:bold">👹[${FLOORS[w.bossFloor].name}]</span>`
+    : '';
   const fist = (isFist(w) || isGenesisWeapon(w) || isAncientWeapon(w)) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
   const itemName = weaponItemName(w);
   return `<span class="grade-${g.name}">${w.icon}[${g.name}]${itemName}${w.enhance > 0 ? ' <span class="enhnum">+' + w.enhance + '</span>' : ''}</span>${boss}${fist}${eff}${rune}`;

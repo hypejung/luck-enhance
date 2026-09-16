@@ -1812,8 +1812,8 @@ const ANCIENT_SPIRITS = {
                 interval: 10, dur: 7, enemyDmgTakenBonus: 1.0, extraAtkBonus: 0.30, extraAtkCap: 0.70 },
   // 기본 공속을 큰 폭으로 올리고, 처치할수록 쌓이는 스택으로 공속이 계속 더 상승한다.
   // 쉬지 않고 사냥할 때만 유지되는 스택 — 3초 이상 처치가 없으면 스택이 서서히 줄어든다.
-  wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 60% 증가한다. 추가로 몬스터를 처치할 때마다 질주 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%). 3초 이상 처치가 없으면 스택이 서서히 줄어든다.',
-                speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003, decaySec: 3 },
+  wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 60% 증가한다. 추가로 몬스터를 처치할 때마다 질주 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%). 3초 이상 처치가 없으면 스택이 서서히 줄어든다. 공격속도가 빠를수록 공격력도 함께 오른다(공격속도 1당 공격력 +50%).',
+                speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003, decaySec: 3, atkPerSpeed: 0.5 },
   // 골드/드랍률을 고정으로 크게 올리고, 처치할수록 쌓이는 스택으로 공속·골드·드랍률이 함께 더 상승한다.
   // 쉬지 않고 사냥할 때만 유지되는 스택 — 3초 이상 처치가 없으면 스택이 서서히 줄어든다.
   goblinsteal: { name: '약탈자의 격노', desc: '골드 획득과 드랍률이 각각 50% 고정 상승한다. 추가로 몬스터를 처치할 때마다 격노 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도·골드 획득·드랍률이 각각 0.1%p씩 더 오른다(만스택 시 각각 +100%p 추가). 3초 이상 처치가 없으면 스택이 서서히 줄어든다.',
@@ -2409,8 +2409,10 @@ function weaponAtk(w) {
   const undyingExcessBonus = (w.spirit === 'undyingbone')
     ? Math.max(0, rawWeaponSpeed(w) - (ANCIENT_SPIRITS.undyingbone.fixedSpeed || 0)) * (ANCIENT_SPIRITS.undyingbone.atkPerExcessSpeed || 0)
     : 0;
+  // 늑대의 질주(고대 에이션트 스피릿): 공격속도가 빠를수록 공격력도 함께 상승
+  const wolfsprintAtkBonus = (w.spirit === 'wolfsprint') ? weaponSpeed(w) * (ANCIENT_SPIRITS.wolfsprint.atkPerSpeed || 0) : 0;
   const dmgMult = isGenesisWeapon(w) && w.dmgMultOverride != null ? w.dmgMultOverride : t.dmgMult;
-  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus);
+  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus + wolfsprintAtkBonus);
   const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : isAncientWeapon(w) ? ancientAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
   return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk')) * (1 + goldAtkBonusPct());
 }
@@ -3631,7 +3633,13 @@ function attack(w) {
   const extraChance = Math.min(extraChanceCap,
     (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus);
   if (extraChance > 0 && Math.random() < extraChance) {
-    mon.hp -= preCritDmg * EXTRA_ATK_DMG_MULT;
+    let extraDmg = preCritDmg * EXTRA_ATK_DMG_MULT;
+    // 포자 폭발(고대 에이션트 스피릿): 다른 무기와 달리 연타(추가공격)도 별도로 치명타 판정을 받는다
+    if (w.spirit === 'sporeburst' && critChance > 0 && Math.random() < critChance) {
+      extraDmg *= critMult;
+      floatText('💥 연격 치명타!');
+    }
+    mon.hp -= extraDmg;
     floatText('⚡ 연타!');
     if (w.effect === 'sprint') fx.sprintUntil = now + (e.sprintDur || 3) * 1000;
     if (w.effect === 'frenzy') { fx.frenzyStacks = Math.min(e.stackMax || 5, (fx.frenzyStacks || 0) + 1); fx.frenzyLast = now; }

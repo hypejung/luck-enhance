@@ -941,6 +941,16 @@ function weaponFlavorText(w) {
 function ancientSpirit(w) {
   return (w && w.spirit && ANCIENT_SPIRITS[w.spirit]) || null;
 }
+// 영구 누적형 에이션트 스피릿(영혼 포식자/부식의 정령/늑대의 질주/약탈자의 격노)의
+// 현재 스택 수를 표시용 텍스트로 반환. 해당 없으면 빈 문자열.
+function spiritStackText(w) {
+  if (!w || !w.spirit) return '';
+  if (w.spirit === 'soul') return ` (현재 ${w.soulStacks || 0}스택)`;
+  if (w.spirit === 'acid') return ` (현재 ${w.acidStacks || 0}스택)`;
+  if (w.spirit === 'wolfsprint') return ` (현재 ${w.wolfsprintStacks || 0}/${ANCIENT_SPIRITS.wolfsprint.stackMax}스택)`;
+  if (w.spirit === 'goblinsteal') return ` (현재 ${w.goblinstealStacks || 0}/${ANCIENT_SPIRITS.goblinsteal.stackMax}스택)`;
+  return '';
+}
 
 // ---------- 무기 도감 ----------
 // 일반~고대 모든 "이름 있는 무기"를 나열한다. 일반~유니크는 타입당 1개, 레전더리/신화는
@@ -1258,6 +1268,10 @@ const fx = {
   glideUntil: 0,           // 활공: 사냥터 이동 직후 공속 버프 만료 시각
   enduranceStart: 0,       // 늑대왕의 인장: 현재 사냥터에서 쉬지 않고 사냥을 지속한 시작 시각
   hungerStackTimes: [],    // 끝없는 허기(글러트니): 최근 처치 시각 기록 (10초 지나면 자동 소멸)
+  bloodThirstUntil: 0,     // 피의 갈증: 자가 공격력/공격속도 버프 만료 시각
+  bloodThirstDot: null,    // 피의 갈증: 대상에게 건 출혈 도트 { dmgPerSec, remain } (재발동 시 갱신)
+  sporeburstUntil: 0,      // 포자 폭발: "포자 만개" 활성 만료 시각
+  sporeburstNext: 0,       // 포자 폭발: 다음 발동 예정 시각
 };
 
 // ---------- 강화 설정 (최대 +30, "운빨강화"의 핵심 — 진짜 도박) ----------
@@ -1782,19 +1796,31 @@ const ANCIENT_BOSS_MULT = 10;
 // acid: 슬라임류(독/산성) 컨셉의 도트 피해. soul: 리치류(영혼) 컨셉의 영구 성장.
 // ambush: 심연의 감시자 컨셉의 기습 — 몬스터 스폰 직후 첫 공격 확정 치명타 + 피해 2배.
 const ANCIENT_SPIRITS = {
-  acid: { name: '부식의 정령', desc: '공격 시 20% 확률로 대상에게 4초간 산성 부식(도트, 무기 공격력의 12%/초)을 건다.',
-          proc: 0.20, dmgPerSec: 0.12, dur: 4 },
+  // 10초마다 부식 스택이 영구히 1씩 쌓인다(상한 없음, 이 무기에 귀속). 스택당 매초
+  // 무기 공격력의 300%만큼 고정 피해가 지속적으로 들어간다 — 오래 붙어있을수록 끝없이 강해짐.
+  acid: { name: '부식의 정령', desc: '10초마다 부식 스택이 영구히 1씩 쌓인다(상한 없음). 스택당 매초 무기 공격력의 300%만큼 고정 피해를 추가로 입힌다.',
+          stackInterval: 10, dmgPerStackPerSec: 3.0 },
   soul: { name: '영혼 포식자', desc: '이 무기로 몬스터를 20마리 처치할 때마다 흡수한 영혼으로 영구히 공격력이 0.4% 증가한다(이 무기에 귀속).',
           killsPer: 20, bonusPerStack: 0.004 },
   ambush: { name: '심연의 기습', desc: '몬스터가 스폰되면 그 몬스터에 대한 첫 공격은 무조건 치명타로 적중하며, 치명타 피해가 추가로 2배 적용된다.',
             extraMult: 2 },
-  bloodtribute: { name: '피의 조공', desc: '공격 시 15% 확률로 대상에게서 소량의 골드를 흡수한다(처치 골드의 50%).',
-                  proc: 0.15, goldMult: 0.5 },
-  sporeburst: { name: '포자 폭발', desc: '처치 시 5% 확률로 포자가 퍼져 다음 몬스터도 즉시 함께 처치한다.', proc: 0.05 },
-  wolfsprint: { name: '늑대의 질주', desc: '공격속도가 영구히 +12% 증가한다.', speedBonus: 0.12 },
-  goblinsteal: { name: '도둑의 손버릇', desc: '처치 시 10% 확률로 그 처치 골드의 5배를 추가로 "훔쳐서" 획득한다.',
-                 proc: 0.10, mult: 5 },
-  undyingbone: { name: '불멸의 뼈', desc: '강화 파괴가 확정된 순간 30% 확률로 파괴를 무효화하고 단계를 유지한다.', proc: 0.30 },
+  // 공격 시 확률적으로 출혈을 걸고, 지속 시간 동안 적은 도트 피해를 입으며 사용자는 공격력·공격속도가 함께 상승한다.
+  bloodtribute: { name: '피의 갈증', desc: '공격 시 35% 확률로 대상에게 5초간 출혈을 건다(재발동 시 갱신). 출혈 지속 동안 매초 무기 공격력의 300%만큼 도트 피해를 입히며, 그 동안 사용자는 공격력과 공격속도가 각각 100% 상승한다.',
+                  proc: 0.35, dur: 5, dmgPerSec: 3.0, selfAtkBonus: 1.0, selfSpeedBonus: 1.0 },
+  // 10초마다 7초간 "포자 만개"가 발동해 적이 받는 피해를 늘리고 사용자의 연격 확률을 높인다.
+  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 100% 증가하고, 사용자의 연타(추가공격) 확률이 30%p 상승한다.',
+                interval: 10, dur: 7, enemyDmgTakenBonus: 1.0, extraAtkBonus: 0.30 },
+  // 기본 공속을 큰 폭으로 올리고, 처치할수록 영구히 쌓이는 스택으로 공속이 계속 더 상승한다.
+  wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 영구히 60% 증가한다. 추가로 몬스터를 처치할 때마다 질주 스택이 영구히 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%).',
+                speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003 },
+  // 골드/드랍률을 고정으로 크게 올리고, 처치할수록 영구히 쌓이는 스택으로 공속·골드·드랍률이 함께 더 상승한다.
+  goblinsteal: { name: '약탈자의 격노', desc: '골드 획득과 드랍률이 각각 50% 고정 상승한다. 추가로 몬스터를 처치할 때마다 격노 스택이 영구히 1씩 쌓이며(최대 1000), 스택당 공격속도·골드 획득·드랍률이 각각 0.1%p씩 더 오른다(만스택 시 각각 +100%p 추가).',
+                 goldBonus: 0.50, dropBonus: 0.50, stackMax: 1000, perStack: 0.001 },
+  // 공격속도를 고정값에 못박고, 그로 인해 남는(원래 쌓였을) 속도를 통째로 공격력으로 환산한다.
+  // 오버킬(처치 후 남는 피해량)만큼 사냥터 일반/엘리트 몬스터를 추가로 "진짜" 처치 판정한다
+  // (보상 배수 지급이 아니라 dropRoll 등 정식 처치 로직을 그 횟수만큼 실제로 돌림). 보스/토벌전 제외.
+  undyingbone: { name: '불멸의 진격', desc: '이 무기의 실질 공격속도가 고정값 1.0/초로 못박힌다. 원래 계산됐을 총 공격속도에서 1.0을 뺀 초과분은 무기 공격력으로 환산되어 추가된다(초과 속도 1당 공격력 +100%). 사냥터 일반·엘리트 몬스터를 처치할 때 남는 공격력만큼 몫을 계산해 그 수만큼 실제로 처치 판정을 돌린다(보스·토벌전 제외).',
+                fixedSpeed: 1.0, atkPerExcessSpeed: 1.0 },
   berserkerblood: { name: '광전사의 피', desc: '공격 시 5% 확률로 4초간 공격력이 +15% 증가하는 버프를 얻는다.',
                      proc: 0.05, dur: 4, bonus: 0.15 },
   stackpoison: { name: '누적 맹독', desc: '공격 시 20% 확률로 독이 쌓인다(최대 3중첩, 중첩마다 도트 피해 강화, 무기 공격력의 8%/초/스택).',
@@ -2374,8 +2400,15 @@ function weaponAtk(w) {
   const variant = weaponStatVariant(w);
   // 영혼 포식자(고대 에이션트 스피릿): 이 무기로 쌓은 처치 스택만큼 영구 공격력 증가
   const soulBonus = (w.spirit === 'soul' && w.soulStacks) ? w.soulStacks * ANCIENT_SPIRITS.soul.bonusPerStack : 0;
+  // 피의 갈증(고대 에이션트 스피릿): 출혈을 건 동안 자가 공격력 버프
+  const bloodThirstBonus = (w.spirit === 'bloodtribute' && Date.now() < fx.bloodThirstUntil) ? (ANCIENT_SPIRITS.bloodtribute.selfAtkBonus || 0) : 0;
+  // 불멸의 진격(고대 에이션트 스피릿): 공격속도를 고정값에 못박는 대신, 원래 쌓였을 초과
+  // 속도만큼을 공격력으로 환산해 되돌려준다.
+  const undyingExcessBonus = (w.spirit === 'undyingbone')
+    ? Math.max(0, rawWeaponSpeed(w) - (ANCIENT_SPIRITS.undyingbone.fixedSpeed || 0)) * (ANCIENT_SPIRITS.undyingbone.atkPerExcessSpeed || 0)
+    : 0;
   const dmgMult = isGenesisWeapon(w) && w.dmgMultOverride != null ? w.dmgMultOverride : t.dmgMult;
-  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus);
+  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus);
   const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : isAncientWeapon(w) ? ancientAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
   return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk')) * (1 + goldAtkBonusPct());
 }
@@ -2434,7 +2467,9 @@ function genesisSuccessChance(enh) { return gradeAdjustedSuccess(GENESIS_ENH.suc
 // 강화 성장 곡선만 신화(grade5) 대비 +30 기준 약 4배가 되도록 가상 등급을 끌어올렸다.
 const ANCIENT_ENH = { growthGradeEquivalent: 13 };
 function ancientAtkMult(enh) { return enhAtkMult(enh, ANCIENT_ENH.growthGradeEquivalent); }
-function weaponSpeed(w) {
+// 불멸의 진격(고대 에이션트 스피릿)이 실제 공격속도를 고정값에 못박기 전, "원래 쌓였을"
+// 공격속도 전부를 그대로 계산한다. weaponAtk()가 그 초과분을 공격력으로 환산할 때도 재사용.
+function rawWeaponSpeed(w) {
   const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   // speedOverride는 원래 태초 무기 전용이었지만, 필드 자체는 등급 무관하게 존중한다 —
   // 정상 플레이로는 태초 외 무기에 이 필드가 절대 붙지 않으므로 무해하고, 테스트 계정에서
@@ -2448,8 +2483,19 @@ function weaponSpeed(w) {
   if (w && w.effect === 'accel') stackBonus += fx.accelStacks * (e.stackBonus || 0);
   if (w && w.effect === 'frenzy') stackBonus += fx.frenzyStacks * (e.stackBonus || 0);
   if (w && w.effect === 'sprint' && now < fx.sprintUntil) stackBonus += e.sprintBonus || 0;
-  // 늑대의 질주(고대 에이션트 스피릿): 영구 고정 공속 보너스
-  if (w && w.spirit === 'wolfsprint') stackBonus += ANCIENT_SPIRITS.wolfsprint.speedBonus || 0;
+  // 늑대의 질주(고대 에이션트 스피릿): 영구 고정 공속 보너스 + 처치마다 쌓이는 영구 스택
+  if (w && w.spirit === 'wolfsprint') {
+    const spirit = ANCIENT_SPIRITS.wolfsprint;
+    stackBonus += spirit.speedBonus || 0;
+    stackBonus += Math.min(spirit.stackMax || 0, w.wolfsprintStacks || 0) * (spirit.speedPerStack || 0);
+  }
+  // 약탈자의 격노(고대 에이션트 스피릿): 처치마다 쌓이는 영구 스택만큼 공속도 함께 상승
+  if (w && w.spirit === 'goblinsteal') {
+    const spirit = ANCIENT_SPIRITS.goblinsteal;
+    stackBonus += Math.min(spirit.stackMax || 0, w.goblinstealStacks || 0) * (spirit.perStack || 0);
+  }
+  // 피의 갈증(고대 에이션트 스피릿): 출혈을 건 동안 자가 공격속도 버프
+  if (w && w.spirit === 'bloodtribute' && now < fx.bloodThirstUntil) stackBonus += ANCIENT_SPIRITS.bloodtribute.selfSpeedBonus || 0;
   // 활공(고대 에이션트 스피릿): 사냥터 이동 직후 한시적 공속 대폭 상승
   if (w && w.spirit === 'glide' && now < fx.glideUntil) stackBonus += ANCIENT_SPIRITS.glide.bonus || 0;
   let burstMult = 1;
@@ -2458,6 +2504,11 @@ function weaponSpeed(w) {
   const variant = weaponStatVariant(w);
   const variantMult = variant ? variant.speedMod : 1;
   return baseSpeed * (1 + accEff().speed + typeTrait(w, 'speedBonus') + effSpeed + stackBonus) * (1 + weaponRuneStat(w, 'atkSpeed') / 100) * burstMult * variantMult;
+}
+function weaponSpeed(w) {
+  // 불멸의 진격(고대 에이션트 스피릿): 실질 공격속도를 고정값으로 못박는다(초과분은 weaponAtk로 환산됨)
+  if (w && w.spirit === 'undyingbone') return ANCIENT_SPIRITS.undyingbone.fixedSpeed || 1;
+  return rawWeaponSpeed(w);
 }
 
 /* ===================== 룬 ===================== */
@@ -2910,6 +2961,13 @@ function dropRoll() {
   const luck = ae.luck;
   let dropMul = (e && e.drop ? 1 + e.drop : 1) * (1 + luck);
   let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  // 약탈자의 격노(고대 에이션트 스피릿): 골드/드랍률 고정 보너스 + 처치 스택 비례 추가 보너스
+  if (w && w.spirit === 'goblinsteal') {
+    const spirit = ANCIENT_SPIRITS.goblinsteal;
+    const stacks = Math.min(spirit.stackMax || 0, w.goblinstealStacks || 0);
+    goldMul *= 1 + (spirit.goldBonus || 0) + stacks * (spirit.perStack || 0);
+    dropMul *= 1 + (spirit.dropBonus || 0) + stacks * (spirit.perStack || 0);
+  }
   const isU = mon.unique;
 
   if (isU) goldMul *= 10;
@@ -2953,12 +3011,6 @@ function dropRoll() {
   }
   S.gold += gold;
   log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}${jackpot ? ' <span class="lg-prim">(골드 잭팟!)</span>' : ''}`);
-  // 도둑의 손버릇(고대 에이션트 스피릿): 처치 시 낮은 확률로 그 처치 골드의 배수를 추가로 "훔침"
-  if (w && w.spirit === 'goblinsteal' && Math.random() < ANCIENT_SPIRITS.goblinsteal.proc) {
-    const stolen = Math.floor(floorGold(S.floor) * (ANCIENT_SPIRITS.goblinsteal.mult || 1));
-    S.gold += stolen;
-    log(`🖐️ 도둑의 손버릇! 추가로 +${fmt(stolen)} 골드를 훔쳤습니다.`, 'lg-prim');
-  }
 
   // 재료 드롭 (항상 1~2개)
   dropMaterials(isU, luck);
@@ -3264,12 +3316,17 @@ function handleKill() {
       floatText('👻 영혼 흡수!');
     }
   }
+  // 늑대의 질주(고대 에이션트 스피릿): 처치마다 영구 스택 적립(최대 1000, 공속 보너스로 환산)
+  if (w && w.spirit === 'wolfsprint') {
+    w.wolfsprintStacks = Math.min(ANCIENT_SPIRITS.wolfsprint.stackMax || 0, (w.wolfsprintStacks || 0) + 1);
+  }
+  // 약탈자의 격노(고대 에이션트 스피릿): 처치마다 영구 스택 적립(최대 1000, 공속/골드/드랍률 보너스로 환산)
+  if (w && w.spirit === 'goblinsteal') {
+    w.goblinstealStacks = Math.min(ANCIENT_SPIRITS.goblinsteal.stackMax || 0, (w.goblinstealStacks || 0) + 1);
+  }
   spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
-  // 포자 폭발 / 돌진(고대 에이션트 스피릿): 처치 시 낮은 확률로 방금 리스폰된 다음 몬스터도 함께 처치
-  if (w && w.spirit === 'sporeburst' && Math.random() < ANCIENT_SPIRITS.sporeburst.proc) {
-    floatText('🍄 포자 폭발!');
-    handleKill();
-  } else if (w && w.spirit === 'charge' && Math.random() < ANCIENT_SPIRITS.charge.proc) {
+  // 돌진(고대 에이션트 스피릿): 처치 시 낮은 확률로 방금 리스폰된 다음 몬스터도 함께 처치
+  if (w && w.spirit === 'charge' && Math.random() < ANCIENT_SPIRITS.charge.proc) {
     floatText('🐂 돌진!');
     handleKill();
   }
@@ -3305,6 +3362,46 @@ function tick(dt) {
   }
   if (fx.accelStacks > 0 && nowDecay - fx.accelLast > (EFFECTS.accel.decaySec || 5) * 1000) {
     fx.accelStacks--; fx.accelLast = nowDecay;
+  }
+  // 포자 폭발(고대 에이션트 스피릿): 10초마다 7초간 "포자 만개" 발동(적 받는 피해/연격 확률 상승)
+  if (w.spirit === 'sporeburst') {
+    const spirit = ANCIENT_SPIRITS.sporeburst;
+    if (!fx.sporeburstNext) fx.sporeburstNext = nowDecay + (spirit.interval || 10) * 1000;
+    if (nowDecay >= fx.sporeburstNext) {
+      fx.sporeburstUntil = nowDecay + (spirit.dur || 7) * 1000;
+      fx.sporeburstNext = nowDecay + (spirit.interval || 10) * 1000;
+      floatText('🍄 포자 만개!');
+    }
+  }
+  // 부식의 정령(고대 에이션트 스피릿): 10초마다 영구 스택 적립(이 무기에 귀속, 상한 없음),
+  // 스택당 매초 지속 고정 피해
+  if (w.spirit === 'acid') {
+    const spirit = ANCIENT_SPIRITS.acid;
+    w.acidTimer = (w.acidTimer || 0) + dt;
+    while (w.acidTimer >= (spirit.stackInterval || 10)) {
+      w.acidTimer -= (spirit.stackInterval || 10);
+      w.acidStacks = (w.acidStacks || 0) + 1;
+      floatText('🧪 부식 심화!');
+    }
+    if (w.acidStacks > 0) {
+      mon.hp -= weaponAtk(w) * (spirit.dmgPerStackPerSec || 0) * w.acidStacks * dt;
+      attacked = true;
+      if (mon.hp <= 0) {
+        if (handleKill() === 'boss') return;
+        killedAny = true;
+      }
+    }
+  }
+  // 피의 갈증(고대 에이션트 스피릿): 출혈 지속 피해 처리(단일 슬롯, 재발동 시 갱신)
+  if (fx.bloodThirstDot) {
+    mon.hp -= fx.bloodThirstDot.dmgPerSec * dt;
+    fx.bloodThirstDot.remain -= dt;
+    attacked = true;
+    if (fx.bloodThirstDot.remain <= 0) fx.bloodThirstDot = null;
+    if (mon.hp <= 0) {
+      if (handleKill() === 'boss') return;
+      killedAny = true;
+    }
   }
   // 출혈(레전더리 치명타) 지속 피해 처리
   if (fx.bleeds && fx.bleeds.length) {
@@ -3366,6 +3463,10 @@ function attack(w) {
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
     dmg *= 1 + bossDmgBonus();
+  }
+  // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 적이 받는 모든 피해 증가
+  if (w.spirit === 'sporeburst' && now < fx.sporeburstUntil) {
+    dmg *= 1 + (ANCIENT_SPIRITS.sporeburst.enemyDmgTakenBonus || 0);
   }
   // 신벌(룬 특수효과): 일반 몬스터는 즉시 처치, 보스는 최대 체력의 1% 고정 피해로 대체.
   // 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
@@ -3438,20 +3539,13 @@ function attack(w) {
       floatText('⚖️ 심판의 가호!');
     }
   }
-  // 부식의 정령(고대 에이션트 스피릿, 산성): 치명타 여부와 무관하게 공격마다 판정
-  if (w.spirit === 'acid') {
-    const spirit = ANCIENT_SPIRITS.acid;
-    if (Math.random() < spirit.proc) {
-      fx.bleeds = fx.bleeds || [];
-      fx.bleeds.push({ dmgPerSec: weaponAtk(w) * spirit.dmgPerSec, remain: spirit.dur });
-      floatText('🧪 부식!');
-    }
-  }
-  // 피의 조공(고대 에이션트 스피릿): 공격 시 낮은 확률로 골드 소량 흡수
+  // 피의 갈증(고대 에이션트 스피릿): 공격 시 확률적으로 출혈을 걸고(재발동 시 갱신),
+  // 지속 시간 동안 자가 공격력/공격속도 버프도 함께 얻는다
   if (w.spirit === 'bloodtribute' && Math.random() < ANCIENT_SPIRITS.bloodtribute.proc) {
-    const gained = Math.floor(floorGold(S.floor) * ANCIENT_SPIRITS.bloodtribute.goldMult);
-    S.gold += gained;
-    floatText(`🩸 +${fmt(gained)}`);
+    const spirit = ANCIENT_SPIRITS.bloodtribute;
+    fx.bloodThirstDot = { dmgPerSec: weaponAtk(w) * (spirit.dmgPerSec || 0), remain: spirit.dur || 5 };
+    fx.bloodThirstUntil = now + (spirit.dur || 5) * 1000;
+    floatText('🩸 갈증!');
   }
   // 광전사의 피(고대 에이션트 스피릿): 공격 시 낮은 확률로 일시적 공격력 버프 발동
   if (w.spirit === 'berserkerblood' && Math.random() < ANCIENT_SPIRITS.berserkerblood.proc) {
@@ -3494,7 +3588,18 @@ function attack(w) {
       floatText('🔨 파쇄!');
     }
   }
-  mon.hp -= dmg;
+  // 불멸의 진격(고대 에이션트 스피릿): 사냥터 일반/엘리트 몬스터 한정(보스·토벌전 제외),
+  // 오버킬(처치 후 남는 피해량 ÷ 몬스터 최대체력)만큼 실제 처치 판정을 추가로 돌린다
+  // (보상 배수 지급이 아니라 dropRoll 등 정식 처치 로직을 그 횟수만큼 진짜로 실행).
+  if (w.spirit === 'undyingbone' && !bossFight.active && dmg >= mon.hp) {
+    const monHpFull = mon.maxHp || 1;
+    const overkill = dmg - mon.hp;
+    // 무기가 극도로 강해지면 처치 수가 천문학적으로 커질 수 있어 상한을 둔다(성능 보호 목적)
+    const totalKills = Math.min(500, 1 + Math.floor(overkill / monHpFull));
+    for (let i = 0; i < totalKills; i++) handleKill();
+  } else {
+    mon.hp -= dmg;
+  }
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc');
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -3503,8 +3608,9 @@ function attack(w) {
     floatText('🔮 주문 작렬!');
   }
   // 연타 효과 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
+  const sporeExtraBonus = (w.spirit === 'sporeburst' && now < fx.sporeburstUntil) ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
   const extraChance = Math.min(DMG_CAPS.extraChance,
-    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk);
+    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus);
   if (extraChance > 0 && Math.random() < extraChance) {
     mon.hp -= preCritDmg * EXTRA_ATK_DMG_MULT;
     floatText('⚡ 연타!');
@@ -4060,9 +4166,7 @@ function tryEnhance(advanced, targetWeapon) {
     // (일반/고대의 고급 강화가 파괴·초기화 확률을 절반으로 낮추는 것과 대응되는 태초 전용 효과).
     const stayChance = (advanced && isGenesisWeapon(w)) ? 0.75 : 0.5;
     // 봉인 해제(고대): 파괴 판정 자체를 무시하고 무조건 유지로 대체
-    // 불멸의 뼈(고대): 파괴가 확정된 순간 30% 확률로 무효화(유지로 대체)
     const sealbreakActive = w.spirit === 'sealbreak';
-    const undyingSave = w.spirit === 'undyingbone' && Math.random() < (ANCIENT_SPIRITS.undyingbone.proc || 0);
     // 파괴/초기화 여부는 단 한 번만 굴려서(destroyRoll) 재사용한다 — 분기마다 새로 굴리면
     // "파괴 대신 초기화" 분기가 빗나가도 바로 아래 일반 파괴 분기가 또 한 번 굴려 파괴로
     // 새어나가는 이중 판정 버그가 생긴다.
@@ -4072,12 +4176,12 @@ function tryEnhance(advanced, targetWeapon) {
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
-    } else if (isAncientWeapon(w) && !sealbreakActive && !undyingSave && destroyRoll < dChance) {
+    } else if (isAncientWeapon(w) && !sealbreakActive && destroyRoll < dChance) {
       // 고대 무기는 파괴되지 않는 대신, 파괴가 확정됐을 순간 통째로 +0 초기화된다.
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
-    } else if (!isAncientWeapon(w) && !sealbreakActive && !undyingSave && destroyRoll < dChance) {
+    } else if (!isAncientWeapon(w) && !sealbreakActive && destroyRoll < dChance) {
       playEnhanceFx('destroy', attemptLevel);
       const destroyedTag = gradeTag(w);
       log(`💥 무기가 파괴되었습니다!! ${destroyedTag}${advTag}`, 'lg-bad');
@@ -4119,10 +4223,9 @@ function tryEnhance(advanced, targetWeapon) {
       showWeaponDestroyModal(destroyedTag);
       return;
     } else {
-      if (sealbreakActive || undyingSave) {
+      if (sealbreakActive) {
         playEnhanceFx('protect', attemptLevel);
-        const spiritName = sealbreakActive ? '봉인 해제' : '불멸의 뼈';
-        log(`🛡️ <b>${spiritName}</b> 발동! 초기화를 막아내고 단계를 유지했습니다.${riskTag}`, 'lg-prim');
+        log(`🛡️ <b>봉인 해제</b> 발동! 초기화를 막아내고 단계를 유지했습니다.${riskTag}`, 'lg-prim');
       } else if (Math.random() < stayChance) {
         // 유지: 실패해도 단계가 그대로 유지됨 (파괴/초기화도, 하락도 아닌 세 번째 결과)
         playEnhanceFx('fail', attemptLevel);
@@ -4926,7 +5029,7 @@ function renderEnhance() {
     <div style="font-size:14px;color:var(--sub)">${dpsLine}</div>
     ${typeInfo ? `<div style="font-size:12px;color:var(--sub)">🗡️ ${typeInfo.name} 특성: ${typeInfo.traitDesc}</div>` : ''}
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
-    ${spirit ? `<div class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</div>` : ''}
+    ${spirit ? `<div class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${spiritStackText(w)}</div>` : ''}
     ${genesisArtifact ? genesisArtifact.effectsText.map(t => `<div class="grade-태초">🌌 ${t}</div>`).join('') : ''}
     ${(w.runes || []).map(r => `<div class="lg-prim">🔮 [${runeName(r)}] ${runeDesc(r)}</div>`).join('')}`;
   $('enhstat').innerHTML = `
@@ -5147,7 +5250,7 @@ function renderInventory() {
           ${flavor ? `<div style="font-style:italic;margin-bottom:${w.effect || runes.length || spirit ? '4px' : '0'}">${flavor}</div>` : ''}
           ${w.effect && EFFECTS[w.effect] ? `✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}` : ''}
           ${w.effect && (runes.length || spirit) ? '<br>' : ''}
-          ${spirit ? `<span class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</span>` : ''}
+          ${spirit ? `<span class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${spiritStackText(w)}</span>` : ''}
           ${spirit && runes.length ? '<br>' : ''}
           ${genesisArtifact ? genesisArtifact.effectsText.map(t => `<span class="grade-태초">🌌 ${t}</span>`).join('<br>') : ''}
           ${genesisArtifact && runes.length ? '<br>' : ''}

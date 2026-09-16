@@ -2836,7 +2836,7 @@ function gradeTag(w) {
   // 보스무기: 어느 층 보스에게서 나왔는지 알아볼 수 있도록 층 이름을 표시하고,
   // 일반 신화(핑크)와 시각적으로 구분되도록 사이언 색으로 강조한다.
   const boss = w.bossFloor !== undefined
-    ? ` <span style="font-size:12px;color:#3ddfff;font-weight:bold">👹[${FLOORS[w.bossFloor].name}]</span>`
+    ? ` <span style="font-size:12px;color:#3ddfff;font-weight:bold">👹[${w.bossFloor === 'all' ? '전체' : FLOORS[w.bossFloor].name}]</span>`
     : '';
   const fist = (isFist(w) || isGenesisWeapon(w) || isAncientWeapon(w)) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
   const itemName = weaponItemName(w);

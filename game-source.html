@@ -1454,6 +1454,7 @@ const PATCH_NOTES = [
       '📖 도감 세트 이름 개선 — 레전더리/신화 무기 타입셋의 밋밋했던 `[등급] 타입 전체 수집` 라벨을, 세 무기의 공통 테마를 반영한 이름(예: 레전더리 검 "하늘이 벼린 세 자루", 신화 검 "신화를 가른 세 자루")으로 교체',
       '👹 보스 세트 효과 설명 개선 — "X단계 사냥터"를 실제 사냥터 이름으로 표기하고, 빠져있던 고대·태초 무기 드롭률 3배 효과를 설명에 추가. 또한 "세트 발동중" 표시가 장비 조건만 보고 뜨던 것을 실제로 그 사냥터에서 사냥 중일 때만 뜨도록 수정하고, 사냥 화면에도 [보스세트효과 발동중] 표시를 새로 추가',
       '🛠️ 초기화·동기화 불러오기·무기 판매·보스전 포기 등의 확인창을 브라우저 네이티브 확인창 대신 게임 자체 팝업으로 교체 — 일부 환경(모바일 인앱 브라우저 등)에서 네이티브 확인창이 뜨지 않거나 자동으로 취소되어 버튼이 먹통처럼 보이던 문제 해결',
+      '🛠️ 고대·태초 무기의 고급 강화(+15 이상) 효과를 등급에 맞게 재정의 — 고대는 원래대로 "초기화 확률 절반"(파괴 대신 표기만 정정), 태초는 애초에 파괴·초기화가 없어 효과가 없던 것을 "단계 하락 확률 절반"으로 변경',
     ],
   },
   {
@@ -3967,6 +3968,12 @@ function tryEnhance(advanced, targetWeapon) {
     log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)${advTag}`, 'lg-good');
   } else {
     const dChance = effectiveDestroyChance(w) * (advanced ? ADVANCED_ENH_DESTROY_MULT : 1);
+    // 로그 문구용: 고대는 "파괴"가 아니라 "초기화"가, 태초는 파괴/초기화 자체가 없으니 아예 표기하지 않는다.
+    const riskWord = isGenesisWeapon(w) ? null : isAncientWeapon(w) ? '초기화' : '파괴';
+    const riskTag = riskWord ? ` (${riskWord} 확률이었음: ${dChance}%)` : '';
+    // 태초 무기는 파괴/초기화가 없는 대신, 고급 강화 시 "단계 하락" 확률 자체가 절반으로 줄어든다
+    // (일반/고대의 고급 강화가 파괴·초기화 확률을 절반으로 낮추는 것과 대응되는 태초 전용 효과).
+    const stayChance = (advanced && isGenesisWeapon(w)) ? 0.75 : 0.5;
     // 봉인 해제(고대): 파괴 판정 자체를 무시하고 무조건 유지로 대체
     // 불멸의 뼈(고대): 파괴가 확정된 순간 30% 확률로 무효화(유지로 대체)
     const sealbreakActive = w.spirit === 'sealbreak';
@@ -4030,21 +4037,21 @@ function tryEnhance(advanced, targetWeapon) {
       if (sealbreakActive || undyingSave) {
         playEnhanceFx('protect', attemptLevel);
         const spiritName = sealbreakActive ? '봉인 해제' : '불멸의 뼈';
-        log(`🛡️ <b>${spiritName}</b> 발동! 파괴를 막아내고 단계를 유지했습니다. (파괴 확률이었음: ${dChance}%)`, 'lg-prim');
-      } else if (Math.random() < 0.5) {
-        // 유지: 실패해도 단계가 그대로 유지됨 (파괴도, 하락도 아닌 세 번째 결과)
+        log(`🛡️ <b>${spiritName}</b> 발동! 초기화를 막아내고 단계를 유지했습니다.${riskTag}`, 'lg-prim');
+      } else if (Math.random() < stayChance) {
+        // 유지: 실패해도 단계가 그대로 유지됨 (파괴/초기화도, 하락도 아닌 세 번째 결과)
         playEnhanceFx('fail', attemptLevel);
-        log(`😮‍💨 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
+        log(`😮‍💨 강화 실패... 다행히 단계는 유지됨${riskTag}${advTag}`, 'lg-bad');
       } else if (sealEquippedHas('fallenWarrior') && Math.random() < 0.3) {
         // 파계전사의 인장: 단계 하락 상황을 30% 확률로 소량 골드 획득으로 대체
         const refund = Math.floor(sellPrice(w) * 0.1);
         S.gold += refund;
         playEnhanceFx('fail', attemptLevel);
-        log(`😈 <b>파계전사의 인장</b> 발동! 단계 하락 대신 +${fmt(refund)} 골드를 얻었습니다. (파괴 확률이었음: ${dChance}%)${advTag}`, 'lg-prim');
+        log(`😈 <b>파계전사의 인장</b> 발동! 단계 하락 대신 +${fmt(refund)} 골드를 얻었습니다.${riskTag}${advTag}`, 'lg-prim');
       } else {
         w.enhance = Math.max(0, w.enhance - 1);
         playEnhanceFx('fail', attemptLevel);
-        log(`❌ 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
+        log(`❌ 강화 실패... 단계 하락${riskTag}${advTag}`, 'lg-bad');
       }
       // 끝나지 않은 맹세(고대): 파괴가 아닌 실패 시 낮은 확률로 다음 강화 무료 예약
       if (w.spirit === 'unbrokenoath' && !fx.freeEnhance && Math.random() < (ANCIENT_SPIRITS.unbrokenoath.proc || 0)) {
@@ -4850,7 +4857,9 @@ function renderEnhance() {
       ? `✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
       : isAncientWeapon(w)
         ? `🏺 고대 무기는 파괴되지 않습니다. 실패 시: 유지 / 단계 -1 / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''}${matNote} · 현재 <b>+${w.enhance}</b>`
-        : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
+        : isGenesisWeapon(w)
+          ? `🌌 태초 무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / 단계 -1 (고급 강화 시 유지 확률 상승)${matNote} · 현재 <b>+${w.enhance}</b>`
+          : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderAdvancedEnhance(w, maxed);
   renderAutoEnhance(w, maxed);
 }
@@ -4902,9 +4911,12 @@ function renderAdvancedEnhance(w, maxed) {
   const goldNeed = advancedEnhGoldCost(w);
   const affordable = matSt.ok && S.gold >= goldNeed;
   const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🎫${matSt.tokensNeed}개로 대체` : '';
+  // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대는 "초기화" 확률을,
+  // 그 외 등급은 "파괴" 확률을 절반으로 낮춘다는 걸 정확히 표기한다.
+  const riskLabel = isGenesisWeapon(w) ? '하락' : isAncientWeapon(w) ? '초기화' : '파괴';
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="advancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
-      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
+      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${riskLabel} 확률 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
     </button>`;
   const btn = $('advancedEnhBtn');
   if (btn) btn.onclick = () => tryEnhance(true);

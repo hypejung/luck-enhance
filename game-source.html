@@ -5675,9 +5675,21 @@ function computeStats() {
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const atk = w ? weaponAtk(w) : 0;
   const spd = w ? weaponSpeed(w) : 0;
-  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance) * 100;
-  const critMultPct = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage) * 100;
-  const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk) * 100;
+  const now = Date.now();
+  // 아래 세 스탯은 attack()의 실제 전투 계산식과 동일하게 맞춘다 — 폭풍의 검(공속→치명타 전환),
+  // 심판의 전조(고정 치명타+오버플로우), 포자 폭발("포자 만개" 중 연타 상한 상향) 등 일시적/
+  // 파생 보너스도 전투 중 실시간으로 그대로 반영되어야 하기 때문.
+  const stormBonus = (w && w.effect === 'stormblade') ? spd * ((e && e.critFromSpeed) || 0) : 0;
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus;
+  const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
+  const critChance = (fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance)) * 100;
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage);
+  if (fixedCrit !== null) critMult += otherCritChance * ((e && e.overflowRatio) || 0);
+  const critMultPct = critMult * 100;
+  const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
+  const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
+  const extraChanceCap = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkCap || 0.70) : DMG_CAPS.extraChance;
+  const extraChance = Math.min(extraChanceCap, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * 100;
   return {
     atk, spd, dps: atk * spd,
     critChance, critMultPct, extraChance,
@@ -6280,6 +6292,11 @@ function init() {
     last = now;
     try {
       if (S.auto) tick(dt);
+      // 전투 중 실시간으로 쌓이는 능력치(스택형 공속/공격력, 일시 버프 등)가 상단 DPS와
+      // 능력치 탭에 곧바로 반영되도록 매 틱 갱신한다 — 예전엔 특정 행동(강화/상자 등)을
+      // 해야만 갱신돼서, 가만히 사냥만 하고 있으면 스택이 쌓여도 화면이 그대로였다.
+      renderTop();
+      if (currentTab === 'stats') renderStats();
     } catch (e) {
       console.error('tick error:', e);
     }

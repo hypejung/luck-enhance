@@ -450,6 +450,7 @@
   <div id="tab-enhance" style="display:none">
     <div class="panel">
       <h3>🔨 무기 강화기</h3>
+      <div id="enhTargetBar" style="margin-bottom:8px;"></div>
       <div id="enhweapon"></div>
       <div id="enhstat"></div>
       <div class="enhrates" id="enhrates"></div>
@@ -1446,6 +1447,7 @@ const PATCH_NOTES = [
       '💰 특수효과가 붙은 무기(유니크 이상은 항상 특수효과 보유)의 판매가 ×5 배율 제거 — 새 기본 판매값 자체가 이미 "특수효과 있는 무기" 기준으로 산정돼 있어 중복 적용되고 있었음',
       '👹 보스 무기 표시 개선 — 드롭된 사냥터 이름을 배지에 표시하고(예: 👹[폐허]) 사이언 색으로 강조해 일반 신화 무기와 한눈에 구분되도록 변경',
       '💥 강화 중 무기가 파괴되면 바로 다음 무기가 강화기에 올라와서, 바뀐 줄 모르고 그대로 강화를 이어 누르는 실수가 있었음 — 이제 파괴 시 판타지풍 문구와 함께 확인 팝업이 떠서 한 번 멈추고 확인하게 됨',
+      '🔨 강화기에서 비장착 무기도 강화 가능 — 기본은 장착 무기를 강화하되, "가방에서 다른 무기 강화하기"로 원하는 무기(맨손 제외)를 장착하지 않고도 강화할 수 있음. 자동 강화도 선택한 무기에 고정되어, 중간에 다른 무기를 장착해도 계속 진행됨',
     ],
   },
   {
@@ -2578,6 +2580,18 @@ function bossSetFloor() {
 function isBossWeapon(w) { return w && w.bossFloor !== undefined; }
 function getEquipped() {
   return S.weapons.find(w => w.id === S.equipped) || null;
+}
+// 강화기의 강화 대상: 기본은 장착 무기지만, 가방의 다른 무기를 장착하지 않고도
+// 강화할 수 있도록 별도로 선택해둘 수 있다(세션 한정 상태 — 저장하지 않음).
+let enhanceTargetId = null;
+let enhTargetPickerOpen = false;
+function getEnhanceTarget() {
+  if (enhanceTargetId != null) {
+    const w = S.weapons.find(x => x.id === enhanceTargetId);
+    if (w) return w;
+    enhanceTargetId = null; // 대상이 판매·파괴 등으로 사라짐 → 장착 무기로 복귀
+  }
+  return getEquipped();
 }
 function playerDPS() {
   const w = getEquipped();
@@ -3901,8 +3915,11 @@ function renderRaidTab() {
   }
 }
 
-function tryEnhance(advanced) {
-  const w = getEquipped();
+function tryEnhance(advanced, targetWeapon) {
+  // targetWeapon: 자동 강화(autoEnhanceTick)가 명시적으로 넘겨주는 대상 — 그 사이 사용자가
+  // 다른 무기를 장착/선택해도 원래 강화하던 무기가 계속 강화되도록 고정해준다.
+  // 수동 강화(강화하기 버튼)는 인자 없이 호출되어 항상 현재 강화 대상을 다시 조회한다.
+  const w = targetWeapon || getEnhanceTarget();
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
   if (w.enhance >= ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
   if (advanced && !advancedEnhEligible(w)) { log('고급 강화는 고급 재료가 필요한 +15 이상부터 사용할 수 있습니다.', 'lg-bad'); return; }
@@ -3981,18 +3998,22 @@ function tryEnhance(advanced) {
         log(`🔮 장착 중이던 룬 ${w.runes.length}개는 무기와 함께 사라지지 않고 보유 룬으로 돌아왔습니다.`, 'lg-prim');
         w.runes = [];
       }
+      const wasEquipped = w.id === S.equipped;
       S.weapons = S.weapons.filter(x => x.id !== w.id);
-      S.equipped = null;
-      const best = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a))[0];
-      if (best) {
-        S.equipped = best.id;
-        log(`자동으로 다음 무기 장착: ${gradeTag(best)}`);
-      } else {
-        // 무기가 전부 파괴됨 → 맨손 지급
-        const fist = makeFist(0);
-        S.weapons.push(fist);
-        S.equipped = fist.id;
-        log(`✊ 더 이상 무기가 없습니다... <b>맨손으로 싸웁니다.</b> (맨손도 강화 가능! 파괴 대신 +0 초기화)`, 'lg-prim');
+      // 강화기에서 미장착 상태로 강화하던 가방 무기였다면, 장착 중이던 무기는 건드리지 않는다.
+      if (wasEquipped) {
+        S.equipped = null;
+        const best = [...S.weapons].sort((a, b) => weaponAtk(b) - weaponAtk(a))[0];
+        if (best) {
+          S.equipped = best.id;
+          log(`자동으로 다음 무기 장착: ${gradeTag(best)}`);
+        } else {
+          // 무기가 전부 파괴됨 → 맨손 지급
+          const fist = makeFist(0);
+          S.weapons.push(fist);
+          S.equipped = fist.id;
+          log(`✊ 더 이상 무기가 없습니다... <b>맨손으로 싸웁니다.</b> (맨손도 강화 가능! 파괴 대신 +0 초기화)`, 'lg-prim');
+        }
       }
       renderEnhance(); renderInventory(); renderTop();
       save();
@@ -4049,7 +4070,7 @@ let autoEnhanceTarget = null;
 let autoEnhanceWeaponId = null;
 function isAutoEnhanceRunning() { return autoEnhanceTimer != null; }
 function startAutoEnhance(target) {
-  const w = getEquipped();
+  const w = getEnhanceTarget();
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
   target = Math.floor(Number(target));
   if (!Number.isFinite(target) || target < 1) { log('자동 강화 목표 단계를 올바르게 입력하세요.', 'lg-bad'); return; }
@@ -4070,11 +4091,13 @@ function stopAutoEnhance() {
   renderEnhance();
 }
 function autoEnhanceTick() {
-  const cur = getEquipped();
-  if (!cur || cur.id !== autoEnhanceWeaponId) {
+  // 장착 무기가 아니라 강화 "대상"이 여전히 존재하는지로 판단 — 가방에서 미장착
+  // 무기를 대상으로 자동 강화 중일 땐, 다른 무기를 장착해도 멈추지 않는다.
+  const cur = S.weapons.find(x => x.id === autoEnhanceWeaponId);
+  if (!cur) {
     const target = autoEnhanceTarget;
     stopAutoEnhance();
-    log(`⚙️ 장착 무기가 바뀌어(파괴 포함) 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
+    log(`⚙️ 강화 대상 무기가 사라져(파괴 포함) 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
     return;
   }
   if (cur.enhance >= autoEnhanceTarget) {
@@ -4101,7 +4124,7 @@ function autoEnhanceTick() {
       return;
     }
   }
-  tryEnhance(false);
+  tryEnhance(false, cur);
 }
 
 /* ===================== 도박 ===================== */
@@ -4747,7 +4770,8 @@ function renderFloorBtns() {
 }
 
 function renderEnhance() {
-  const w = getEquipped();
+  const w = getEnhanceTarget();
+  renderEnhTargetBar();
   const box = $('enhweapon');
   if (!w) {
     box.innerHTML = `<div style="color:var(--sub)">장착된 무기가 없습니다. 사냥을 하거나 가방에서 무기를 장착하세요.</div>`;
@@ -4777,9 +4801,13 @@ function renderEnhance() {
   const flavor = weaponFlavorText(w);
   const spirit = ancientSpirit(w);
   const genesisArtifact = isGenesisWeapon(w) ? GENESIS_ARTIFACTS.find(a => a.id === w.genesisId) : null;
+  const isEquippedTarget = w.id === S.equipped;
+  const dpsLine = isEquippedTarget
+    ? `공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}`
+    : `공속 ${weaponSpeed(w).toFixed(1)}/초 → 이 무기 기준 DPS 약 ${fmt(weaponAtk(w) * weaponSpeed(w))} <span style="color:var(--sub)">(미장착 — 참고용)</span>`;
   box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
     ${flavor ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px;font-style:italic">${flavor}</div>` : ''}
-    <div style="font-size:14px;color:var(--sub)">공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}</div>
+    <div style="font-size:14px;color:var(--sub)">${dpsLine}</div>
     ${typeInfo ? `<div style="font-size:12px;color:var(--sub)">🗡️ ${typeInfo.name} 특성: ${typeInfo.traitDesc}</div>` : ''}
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
     ${spirit ? `<div class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${w.spirit === 'soul' ? ` (현재 ${w.soulStacks || 0}스택)` : ''}</div>` : ''}
@@ -4801,6 +4829,41 @@ function renderEnhance() {
         : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderAdvancedEnhance(w, maxed);
   renderAutoEnhance(w, maxed);
+}
+
+// 강화기 상단의 "강화 대상 선택" 바 — 기본은 장착 무기, 가방에서 다른 무기를 골라
+// 장착하지 않고도 그 무기를 강화할 수 있다(맨손은 선택 목록에서 제외).
+function renderEnhTargetBar() {
+  const bar = $('enhTargetBar');
+  if (!bar) return;
+  const usingBag = enhanceTargetId != null;
+  const curId = usingBag ? enhanceTargetId : S.equipped;
+  let html = '';
+  if (usingBag) {
+    html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <div style="flex:1;font-size:12px;color:var(--sub)">🎒 가방의 무기를 강화 중입니다 (미장착)</div>
+      <button id="enhBackToEquippedBtn" style="font-size:12px;">⚔️ 장착 무기로</button>
+    </div>`;
+  }
+  html += `<button id="enhPickTargetBtn" style="width:100%;font-size:12px;">${enhTargetPickerOpen ? '▴ 닫기' : '🎒 가방에서 다른 무기 강화하기'}</button>`;
+  if (enhTargetPickerOpen) {
+    const list = S.weapons.filter(x => !isFist(x) && x.id !== curId);
+    html += `<div id="enhTargetList" style="margin-top:6px;max-height:220px;overflow-y:auto;">`;
+    html += list.length
+      ? list.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);">
+          <div style="flex:1;font-size:12px;">${gradeTag(x)}<div style="color:var(--sub)">${atkLabel(x)} ${fmt(weaponAtk(x))}</div></div>
+          <button class="primary" data-pick="${x.id}" style="font-size:12px;">선택</button>
+        </div>`).join('')
+      : `<div style="font-size:12px;color:var(--sub);text-align:center;padding:8px;">강화할 다른 무기가 없습니다.</div>`;
+    html += `</div>`;
+  }
+  bar.innerHTML = html;
+  $('enhPickTargetBtn').onclick = () => { enhTargetPickerOpen = !enhTargetPickerOpen; renderEnhTargetBar(); };
+  if (usingBag) $('enhBackToEquippedBtn').onclick = () => { enhanceTargetId = null; enhTargetPickerOpen = false; renderEnhance(); };
+  bar.querySelectorAll('[data-pick]').forEach(btn => {
+    btn.onclick = () => { enhanceTargetId = +btn.dataset.pick; enhTargetPickerOpen = false; renderEnhance(); };
+  });
 }
 
 function renderAdvancedEnhance(w, maxed) {

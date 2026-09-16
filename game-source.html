@@ -3680,6 +3680,19 @@ function bossDmgBonus() {
   return bonus;
 }
 
+// 전투 중 시간이 지나야 쌓이는 스택들(광란/가속 각인/누적 맹독/늑대의 질주/약탈자의 격노)을
+// 초기화한다. 사냥터에서 미리 쌓아온 스택을 그대로 들고 보스전·토벌전에 들어가면 불공평하므로,
+// 보스전·토벌전은 항상 스택 0인 상태에서 새로 시작한다.
+function resetTimedStacks() {
+  fx.frenzyStacks = 0;
+  fx.accelStacks = 0;
+  fx.poisonStacks = 0;
+  fx.poisonUntil = 0;
+  const w = getEquipped();
+  if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
+  if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
+}
+
 function startBossFight() {
   if (bossFight.active) { log('이미 다른 전투가 진행 중입니다.', 'lg-bad'); return; }
   const f = S.floor;
@@ -3695,6 +3708,7 @@ function startBossFight() {
     }
   }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
+  resetTimedStacks();
   bossFight.active = true;
   bossFight.floor = f;
   bossFight.timeLeft = BOSS.timeLimit + weaponBossTimeBonus(getEquipped());
@@ -3735,6 +3749,7 @@ function startRaidFight(stage) {
   // 도전 시작 시점에 즉시 소모(승패 무관 — "도전"에 초점)
   S.raid.done[stage] = S.raid.day;
   S.raid.count++;
+  resetTimedStacks();
   bossFight.active = true;
   bossFight.isRaid = true;
   bossFight.raidStage = stage;

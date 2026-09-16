@@ -1463,6 +1463,7 @@ const PATCH_NOTES = [
       '🔮 고대·태초 무기의 최대 룬 장착 개수 상향 — 기존엔 등급 공식(등급+1)에 걸려 둘 다 7개로 같았는데, 고대 8개 / 태초 10개로 별도 확장',
       '🔢 큰 숫자 표기법 확장 — 10000억을 넘으면 조/경/해/자/양 등으로 계속 이어서 표기 (예: 21,752,709.50억 → 2175.27조)',
       '🔮 보유 룬(미장착) 최대 200개 상한 추가 + 등급별 자동판매 기능 신설(룬 탭 "보유 룬"에서 설정) — 오래 플레이해도 룬이 무한정 쌓여 렉이 걸리지 않도록',
+      '⚒️ 무기 각인 표시에서 "윗줄:"/"아랫줄:" 라벨 제거 — 등급 태그만으로 충분히 구분되어 군더더기 텍스트 정리',
     ],
   },
   {
@@ -3926,8 +3927,8 @@ function renderEnchantBox() {
   const canAfford = (S.raidTokens || 0) >= tokenCost && S.gold >= goldCost;
   box.innerHTML = `
     <div style="font-size:13px;margin-bottom:6px;">${gradeTag(w)} — 각인 등급 <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span></div>
-    <div class="lg-prim" style="margin-bottom:2px;">윗줄: ${enchantLineText(en.lines[0])}</div>
-    <div class="lg-prim" style="margin-bottom:8px;">아랫줄: ${enchantLineText(en.lines[1])}</div>
+    <div class="lg-prim" style="margin-bottom:2px;">${enchantLineText(en.lines[0])}</div>
+    <div class="lg-prim" style="margin-bottom:8px;">${enchantLineText(en.lines[1])}</div>
     <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">${maxed ? '최대 등급(신화)입니다.' : `다음 등급까지 효과 변경 ${en.pity}/${ceiling}회`} · 보유 🎫 ${fmt(S.raidTokens || 0)}</div>
     <button class="primary" id="resetEnchantBtn" ${canAfford ? '' : 'disabled'}>각인 재설정 (🎫${tokenCost} + 💰${fmt(goldCost)})</button>`;
   $('resetEnchantBtn').onclick = () => resetEnchant(w);

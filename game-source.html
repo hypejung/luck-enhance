@@ -3804,6 +3804,7 @@ const PUNCH_DUMMY_HP = 1e18;
 function startPunchFight() {
   if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
+  resetTimedStacks();
   bossFight.active = true;
   bossFight.isPunch = true;
   bossFight.timeLeft = PUNCH_TIME_LIMIT + weaponBossTimeBonus(getEquipped());

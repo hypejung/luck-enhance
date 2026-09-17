@@ -1883,10 +1883,13 @@ const ANCIENT_SPIRITS = {
   // (사냥터) 보스전·토벌전·펀치기계가 새로 시작되면 0부터 다시 쌓인다(무한 누적 아님).
   acid: { name: '부식의 정령', desc: '10초마다 부식 스택이 1씩 쌓인다(상한 없음). 스택당 매초 무기 공격력의 1300%만큼 고정 피해를 추가로 입힌다. 이 스택은 지금 싸우고 있는 대상 한정이라, 몬스터가 바뀌거나 새로운 전투(보스전·토벌전·펀치기계)가 시작되면 0부터 다시 쌓인다.',
           stackInterval: 10, dmgPerStackPerSec: 13.0 },
-  soul: { name: '영혼 포식자', desc: '이 무기로 몬스터를 20마리 처치할 때마다 흡수한 영혼으로 영구히 공격력이 0.4% 증가한다(이 무기에 귀속).',
-          killsPer: 20, bonusPerStack: 0.004 },
-  ambush: { name: '심연의 기습', desc: '몬스터가 스폰되면 그 몬스터에 대한 첫 공격은 무조건 치명타로 적중하며, 치명타 피해가 추가로 2배 적용된다.',
-            extraMult: 2 },
+  // 사냥터에서 쌓은 영혼 스택은 무기에 영구 귀속되며, 보스전·토벌전·펀치기계 시작 시
+  // 그 스택 전부를 이용해 즉시 고정 피해를 선타로 날린다(스택은 소모되지 않고 유지).
+  soul: { name: '영혼 포식자', desc: '이 무기로 몬스터를 20마리 처치할 때마다 흡수한 영혼으로 영구히 공격력이 2.1% 증가한다(이 무기에 귀속). 보스전·토벌전 시작 시, 쌓인 영혼 스택만큼 무기 공격력의 55%씩 "사신의 낫" 고정 피해로 선타를 날린다(스택은 소모되지 않고 계속 유지된다).',
+          killsPer: 20, bonusPerStack: 0.021, burstPerStack: 0.55 },
+  // 보스전 중에도 일정 주기마다 기습이 다시 걸린다("재기습") — 감시자는 한 번 놓쳐도 계속 노린다.
+  ambush: { name: '심연의 기습', desc: '몬스터가 스폰되면 그 몬스터에 대한 첫 공격은 무조건 치명타로 적중하며, 치명타 피해가 추가로 16배 적용된다. 보스전 중에는 1초마다 "재기습"이 걸려 확정 치명타가 다시 발동한다.',
+            extraMult: 16, bossRearmInterval: 1 },
   // 공격 시 확률적으로 출혈을 걸고, 지속 시간 동안 적은 도트 피해를 입으며 사용자는 공격력·공격속도가 함께 상승한다.
   bloodtribute: { name: '피의 갈증', desc: '공격 시 35% 확률로 대상에게 5초간 출혈을 건다(재발동 시 갱신). 출혈 지속 동안 매초 무기 공격력의 240%만큼 도트 피해를 입히며, 그 동안 사용자는 공격력과 공격속도가 각각 170% 상승하고, 연타 시 타격 횟수가 5번이 됩니다.',
                   proc: 0.35, dur: 5, dmgPerSec: 2.4, selfAtkBonus: 1.7, selfSpeedBonus: 1.7, extraAtkHits: 5 },
@@ -1923,12 +1926,29 @@ const ANCIENT_SPIRITS = {
   // 연쇄가 이어질 때마다 45%로 재판정하며, 최대 8마리(원래 처치분 포함)까지 이어질 수 있다.
   charge: { name: '돌파의 질주', desc: '처치 시 45% 확률로 관성이 유지되어 다음 몬스터도 함께 처치한다(연쇄당 45%로 재판정, 최대 8마리까지 연쇄). 보스전·토벌전 시작 후 70초간 "돌파 상태"가 되어 공격속도 +350%, 공격력 +150%가 적용된다.',
            proc: 0.45, chainMax: 8, bossSpeedBonus: 3.50, bossAtkBonus: 1.50, bossDur: 70 },
-  sealbreak: { name: '봉인 해제', desc: '강화 실패 시 파괴 확률 판정 자체가 무시되고 무조건 "유지"로 처리된다.' },
-  glide: { name: '활공', desc: '사냥터를 이동한 직후 10초간 공격속도가 크게 상승한다(+80%).', dur: 10, bonus: 0.8 },
-  demonlegacy: { name: '타락의 유산', desc: '이 무기가 강화 파괴로 사라지면, 파괴 당시 판매가의 절반만큼이 골드로 환원되어 즉시 지급된다(일부러 파괴하는 것보다는 항상 파는 쪽이 이득).', sellMult: 0.5 },
-  trampling: { name: '압도적 진군', desc: '처치 시 5% 확률로 사냥터 해금 처치 수 카운트가 2배로 집계된다.', proc: 0.05 },
-  dragonmajesty: { name: '용의 위엄', desc: '이 무기로 보스를 처치하면 보스 장신구 드랍 확률이 2배가 된다.', mult: 2 },
-  fallengod: { name: '몰락한 신의 가호', desc: '오프라인 사냥 효율이 70%에서 90%로 상승한다.', offlineEff: 0.9 },
+  // 치명타가 불발한 타격을 확률적으로 강제 치명타로 뒤집는다("운명 역전"). 발동할 때마다
+  // 영구 스택이 쌓여(무기 귀속) 치명타 피해량이 계속 늘어난다 — "확률 자체를 비트는" 컨셉.
+  sealbreak: { name: '확률의 역설', desc: '치명타가 발동하지 않은 타격을 90% 확률로 "운명 역전"시켜 강제로 치명타로 전환하고, 그 일격에는 추가로 150%의 보너스 피해가 붙는다. 역전이 발동할 때마다 "역설" 스택이 영구히 쌓이며(무기 귀속, 최대 100), 스택당 치명타 피해량이 +3%p씩 영구 상승한다.',
+              proc: 0.90, stackMax: 100, critDmgPerStack: 0.03, reversalBonusMult: 1.5 },
+  // 3초마다 낙뢰가 떨어져 고정 피해를 입히고, 그 직후 짧게 공격속도가 크게 오른다("후폭풍").
+  // 보스전에서는 낙뢰에 맞은 보스가 잠시 "감전"되어 받는 피해가 늘어난다.
+  glide: { name: '폭풍우의 강림', desc: '3초마다 낙뢰가 떨어져 무기 공격력 9000%의 고정 피해를 입히고, 그 직후 3초간 공격속도가 크게 상승한다(+150%, "후폭풍"). 보스전에서는 낙뢰에 맞은 대상이 3초간 "감전"되어 받는 피해가 +80% 증가한다.',
+          interval: 3, mult: 90.0, bonus: 1.5, aftermathDur: 3, bossShockBonus: 0.80, bossShockDur: 3 },
+  // 주기적으로 "위험한 서약"이 발동해 짧은 공격력 폭증 뒤에 곧바로 공격력 하락이 따라온다
+  // (대가 없이는 아무것도 내주지 않는다는 컨셉). 서약 버프 중 보스에게 적중하면 추가 피해.
+  demonlegacy: { name: '악마의 서약', desc: '6초마다 "위험한 서약"이 발동한다 — 4초간 공격력이 +300% 폭증하지만, 그 직후 4초간은 공격력이 -40% 하락한다. 보스전에서는 서약 버프가 활성화된 동안 적중 시 추가 피해 +100%가 붙는다.',
+                 interval: 6, buffDur: 4, buffAtkBonus: 3.0, debuffDur: 4, debuffAtkPenalty: 0.4, bossBonusDmgMult: 1.0 },
+  // 공격할 때마다 "짓밟기" 피해가 누적 가산되며, 일정 횟수에 도달하면 훨씬 강한 "붕괴"가
+  // 터지고 다시 0부터 쌓인다 — 대륙을 짓밟고 지나간다는 컨셉을 반복되는 파괴로 표현.
+  trampling: { name: '거인의 진군', desc: '공격할 때마다 "짓밟기" 피해가 누적된다(무기 공격력의 150% × 현재 스택). 스택이 20에 도달하면 대신 무기 공격력 6500%의 "붕괴"가 터지며 스택이 0으로 리셋된다.',
+               stackMax: 20, dmgPerStack: 1.5, collapseMult: 65.0 },
+  // 일정 주기로 화염 브레스를 내뿜어 강력한 고정 피해를 입히고, 보스에게는 화상 도트도 추가로 건다.
+  dragonmajesty: { name: '용의 브레스', desc: '5초마다 화염 브레스를 내뿜어 무기 공격력 20000%의 고정 피해를 입힌다. 보스전에서는 브레스가 적중한 대상에게 4초간 "화상"이 걸려 매초 무기 공격력의 1800%만큼 추가 도트 피해를 입힌다.',
+                   interval: 5, mult: 200.0, burnDur: 4, burnDmgPerSec: 18.0 },
+  // 공격할 때마다 "진노" 게이지가 차오르고, 가득 차면 압도적인 "심판의 강타"가 터진다.
+  // 보스전에서는 게이지가 2배 속도로 차올라 더 자주 심판이 내린다 — 최종 층다운 임팩트.
+  fallengod: { name: '몰락한 신의 진노', desc: '공격할 때마다 "진노" 게이지가 20씩 쌓이고(보스전에서는 2배 속도), 게이지가 100에 도달하면 소모되며 무기 공격력 3600%의 "심판의 강타"가 터진다.',
+               gaugePerHit: 20, bossGaugeMult: 2.0, judgmentMult: 36.0 },
 };
 const WEAPON_ANCIENT_NAMES = [
   [ // floor 0 — 초원 — 슬라임의 태고 조상: 모든 것을 녹이던 산성 괴물
@@ -2511,8 +2531,16 @@ function weaponAtk(w) {
   const rageBonus = (w.spirit === 'berserkerblood') ? (w.rageStacks || 0) * (ANCIENT_SPIRITS.berserkerblood.atkPerStack || 0) : 0;
   // 돌파의 질주(고대 에이션트 스피릿): 보스전·토벌전 시작 후 한시적으로 "돌파 상태" 발동
   const chargeBossBonus = (w.spirit === 'charge' && Date.now() < fx.chargeBossUntil) ? (ANCIENT_SPIRITS.charge.bossAtkBonus || 0) : 0;
+  // 악마의 서약(고대 에이션트 스피릿): 서약 버프 중엔 공격력 폭증, 그 직후 하락 구간엔 공격력 감소
+  const demonOathBonus = (() => {
+    if (w.spirit !== 'demonlegacy') return 0;
+    const now2 = Date.now();
+    if (now2 < fx.oathBuffUntil) return ANCIENT_SPIRITS.demonlegacy.buffAtkBonus || 0;
+    if (now2 < fx.oathDebuffUntil) return -(ANCIENT_SPIRITS.demonlegacy.debuffAtkPenalty || 0);
+    return 0;
+  })();
   const dmgMult = isGenesisWeapon(w) && w.dmgMultOverride != null ? w.dmgMultOverride : t.dmgMult;
-  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus + wolfsprintAtkBonus + goblinstealAtkBonus + rageBonus + chargeBossBonus);
+  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus + wolfsprintAtkBonus + goblinstealAtkBonus + rageBonus + chargeBossBonus + demonOathBonus);
   const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : isAncientWeapon(w) ? ancientAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
   return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk')) * (1 + goldAtkBonusPct());
 }
@@ -3174,10 +3202,7 @@ function dropRoll() {
   }
 
   // 처치 수 & 해금
-  // 압도적 진군(고대 에이션트 스피릿): 낮은 확률로 해금 처치 수 카운트가 2배로 집계
-  const tramplingProc = w.spirit === 'trampling' && Math.random() < ANCIENT_SPIRITS.trampling.proc;
-  S.kills[S.floor] = (S.kills[S.floor] || 0) + (tramplingProc ? 2 : 1);
-  if (tramplingProc) floatText('🦶 압도적 진군!');
+  S.kills[S.floor] = (S.kills[S.floor] || 0) + 1;
   S.totalKills++;
   if (isU) { S.uniqueKills++; }
   if (S.floor + 1 < FLOORS.length && (S.kills[S.floor] || 0) >= FLOOR.unlockKills && S.unlocked < S.floor + 2) {
@@ -3508,6 +3533,72 @@ function tick(dt) {
       floatText('🍄 포자 만개!');
     }
   }
+  // 폭풍우의 강림(고대 에이션트 스피릿): 8초마다 낙뢰 낙하 — 고정 피해 + 짧은 "후폭풍" 공속버프,
+  // 보스전에서는 낙뢰에 맞은 대상에게 "감전" 디버프도 함께 건다.
+  if (w.spirit === 'glide') {
+    const spirit = ANCIENT_SPIRITS.glide;
+    if (!fx.stormNext) fx.stormNext = nowDecay + (spirit.interval || 8) * 1000;
+    if (nowDecay >= fx.stormNext) {
+      fx.stormNext = nowDecay + (spirit.interval || 8) * 1000;
+      fx.glideUntil = nowDecay + (spirit.aftermathDur || 3) * 1000;
+      fx.stormShockUntil = nowDecay + (spirit.bossShockDur || 3) * 1000;
+      mon.hp -= weaponAtk(w) * (spirit.mult || 0);
+      attacked = true;
+      floatText('⚡ 낙뢰!');
+      if (mon.hp <= 0) {
+        if (handleKill() === 'boss') return;
+        killedAny = true;
+      }
+    }
+  }
+  // 악마의 서약(고대 에이션트 스피릿): 12초마다 위험한 서약 발동 — 공격력 폭증 후 곧바로 하락
+  if (w.spirit === 'demonlegacy') {
+    const spirit = ANCIENT_SPIRITS.demonlegacy;
+    if (!fx.oathNext) fx.oathNext = nowDecay + (spirit.interval || 12) * 1000;
+    if (nowDecay >= fx.oathNext) {
+      fx.oathNext = nowDecay + (spirit.interval || 12) * 1000;
+      fx.oathBuffUntil = nowDecay + (spirit.buffDur || 4) * 1000;
+      fx.oathDebuffUntil = fx.oathBuffUntil + (spirit.debuffDur || 4) * 1000;
+      floatText('😈 위험한 서약!');
+    }
+  }
+  // 심연의 기습(고대 에이션트 스피릿): 보스전 중에는 일정 주기마다 기습이 다시 걸린다
+  if (w.spirit === 'ambush' && bossFight.active) {
+    const spirit = ANCIENT_SPIRITS.ambush;
+    if (!fx.ambushRearmNext) fx.ambushRearmNext = nowDecay + (spirit.bossRearmInterval || 15) * 1000;
+    if (nowDecay >= fx.ambushRearmNext) {
+      fx.ambushRearmNext = nowDecay + (spirit.bossRearmInterval || 15) * 1000;
+      fx.ambushReady = true;
+    }
+  }
+  // 용의 브레스(고대 에이션트 스피릿): 9초마다 화염 브레스 — 고정 피해 + 보스전 한정 화상 도트
+  if (w.spirit === 'dragonmajesty') {
+    const spirit = ANCIENT_SPIRITS.dragonmajesty;
+    if (!fx.breathNext) fx.breathNext = nowDecay + (spirit.interval || 9) * 1000;
+    if (nowDecay >= fx.breathNext) {
+      fx.breathNext = nowDecay + (spirit.interval || 9) * 1000;
+      mon.hp -= weaponAtk(w) * (spirit.mult || 0);
+      attacked = true;
+      floatText('🔥 브레스!');
+      if (bossFight.active) {
+        fx.dragonBurnDot = { dmgPerSec: weaponAtk(w) * (spirit.burnDmgPerSec || 0), remain: spirit.burnDur || 4 };
+      }
+      if (mon.hp <= 0) {
+        if (handleKill() === 'boss') return;
+        killedAny = true;
+      }
+    }
+  }
+  if (fx.dragonBurnDot) {
+    mon.hp -= fx.dragonBurnDot.dmgPerSec * dt;
+    fx.dragonBurnDot.remain -= dt;
+    attacked = true;
+    if (fx.dragonBurnDot.remain <= 0) fx.dragonBurnDot = null;
+    if (mon.hp <= 0) {
+      if (handleKill() === 'boss') return;
+      killedAny = true;
+    }
+  }
   // 부식의 정령(고대 에이션트 스피릿): 10초마다 영구 스택 적립(이 무기에 귀속, 상한 없음),
   // 스택당 매초 지속 고정 피해
   if (w.spirit === 'acid') {
@@ -3632,6 +3723,14 @@ function attack(w) {
   if (w.spirit === 'pearl' && now < fx.floodUntil) {
     dmg *= 1 + (ANCIENT_SPIRITS.pearl.floodDmgBonus || 0);
   }
+  // 폭풍우의 강림(고대 에이션트 스피릿): 낙뢰에 감전된 대상은 받는 피해 증가
+  if (w.spirit === 'glide' && now < fx.stormShockUntil) {
+    dmg *= 1 + (ANCIENT_SPIRITS.glide.bossShockBonus || 0);
+  }
+  // 악마의 서약(고대 에이션트 스피릿): 보스전에서 서약 버프가 활성화된 동안 추가 피해
+  if (w.spirit === 'demonlegacy' && bossFight.active && now < fx.oathBuffUntil) {
+    dmg *= 1 + (ANCIENT_SPIRITS.demonlegacy.bossBonusDmgMult || 0);
+  }
   // 신벌(룬 특수효과): 일반 몬스터는 즉시 처치, 보스는 최대 체력의 1% 고정 피해로 대체.
   // 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
   const divineCount = weaponSpecialCount(w, 'divinestrike');
@@ -3656,8 +3755,10 @@ function attack(w) {
   // 일부를 치명타 피해로 전환해준다(overflowRatio).
   const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
   const critChance = fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
+  // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
+  const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage);
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus);
   if (fixedCrit !== null) critMult += otherCritChance * (e.overflowRatio || 0);
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
@@ -3671,6 +3772,13 @@ function attack(w) {
     dmg *= critMult;
     didCrit = true;
     floatText('💥 치명타!');
+  } else if (w.spirit === 'sealbreak' && Math.random() < ANCIENT_SPIRITS.sealbreak.proc) {
+    // 확률의 역설(고대 에이션트 스피릿): 불발한 치명타를 강제로 뒤집는다 + 영구 스택 적립.
+    // 치명타 배율 자체는 DMG_CAPS.critMult에 걸리므로, 상한 밖에서 별도로 추가 배율을 곱해준다.
+    dmg *= critMult * (1 + (ANCIENT_SPIRITS.sealbreak.reversalBonusMult || 0));
+    didCrit = true;
+    w.paradoxStacks = Math.min(ANCIENT_SPIRITS.sealbreak.stackMax || 100, (w.paradoxStacks || 0) + 1);
+    floatText('🔮 운명 역전!');
   }
   if (ambushCrit) {
     dmg *= ANCIENT_SPIRITS.ambush.extraMult || 1;
@@ -3770,6 +3878,32 @@ function attack(w) {
       floatText('🔨 파쇄!');
     }
   }
+  // 거인의 진군(고대 에이션트 스피릿): 매 공격마다 "짓밟기" 피해가 누적 가산되고,
+  // 최대 스택에 도달하면 훨씬 강한 "붕괴"가 대신 터지며 스택이 0으로 리셋된다.
+  if (w.spirit === 'trampling') {
+    const spirit = ANCIENT_SPIRITS.trampling;
+    w.stompStacks = (w.stompStacks || 0) + 1;
+    if (w.stompStacks >= (spirit.stackMax || 20)) {
+      w.stompStacks = 0;
+      mon.hp -= weaponAtk(w) * (spirit.collapseMult || 8);
+      floatText('💥 붕괴!');
+    } else {
+      mon.hp -= weaponAtk(w) * (spirit.dmgPerStack || 0) * w.stompStacks;
+      floatText('🦶 짓밟기!');
+    }
+  }
+  // 몰락한 신의 진노(고대 에이션트 스피릿): 공격할 때마다 진노 게이지 적립(보스전엔 2배속),
+  // 가득 차면 소모하며 강력한 "심판의 강타" 발동
+  if (w.spirit === 'fallengod') {
+    const spirit = ANCIENT_SPIRITS.fallengod;
+    const gain = (spirit.gaugePerHit || 0) * (bossFight.active ? (spirit.bossGaugeMult || 1) : 1);
+    w.wrathGauge = (w.wrathGauge || 0) + gain;
+    if (w.wrathGauge >= 100) {
+      w.wrathGauge -= 100;
+      mon.hp -= weaponAtk(w) * (spirit.judgmentMult || 0);
+      floatText('⚡ 심판의 강타!');
+    }
+  }
   // 불멸의 진격(고대 에이션트 스피릿): 사냥터 일반/엘리트 몬스터 한정(보스·토벌전 제외),
   // 오버킬(처치 후 남는 피해량 ÷ 몬스터 최대체력)만큼 실제 처치 판정을 추가로 돌린다
   // (보상 배수 지급이 아니라 dropRoll 등 정식 처치 로직을 그 횟수만큼 진짜로 실행).
@@ -3865,17 +3999,27 @@ function resetTimedStacks() {
   fx.quakeDebuffUntil = 0;
   fx.floodUntil = 0;
   fx.floodDotTimer = 0;
+  fx.stormNext = 0;
+  fx.stormShockUntil = 0;
+  fx.oathNext = 0;
+  fx.oathBuffUntil = 0;
+  fx.oathDebuffUntil = 0;
+  fx.ambushRearmNext = 0;
+  fx.breathNext = 0;
+  fx.dragonBurnDot = null;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
   if (w && w.spirit === 'berserkerblood') w.rageStacks = 0;
+  if (w && w.spirit === 'trampling') w.stompStacks = 0;
+  if (w && w.spirit === 'fallengod') w.wrathGauge = 0;
   // 부식의 정령(고대 에이션트 스피릿): 무한 누적이 아니라 "전투 하나"에 한정된 스택으로 변경 —
   // 보스전·토벌전·펀치기계도 새로운 전투이므로 항상 0부터 다시 쌓인다.
   if (w && w.spirit === 'acid') { w.acidStacks = 0; w.acidTimer = 0; }
 }
 // 보스전·토벌전·펀치기계가 실제로 시작된 직후(더미/보스 체력이 세팅된 뒤) 호출되는 일회성
-// 발동 효과들. 돌파의 질주(공속/공격력 버프 시작)와 끝나지 않은 맹세(원한 스택 선타)가 대상이다.
-// 원한 스택은 여기서 소모되지 않고 계속 누적된다.
+// 발동 효과들. 돌파의 질주(공속/공격력 버프 시작), 끝나지 않은 맹세/영혼 포식자(스택 선타)가 대상이다.
+// 스택은 여기서 소모되지 않고 계속 누적된다.
 function triggerFightStartSpirits() {
   const w = getEquipped();
   if (!w) return;
@@ -3886,6 +4030,11 @@ function triggerFightStartSpirits() {
     const dmg = weaponAtk(w) * w.oathStacks * (ANCIENT_SPIRITS.unbrokenoath.burstPerStack || 0);
     mon.hp = Math.max(1, mon.hp - dmg);
     floatText('⚔️ 맹세의 일격!');
+  }
+  if (w.spirit === 'soul' && (w.soulStacks || 0) > 0) {
+    const dmg = weaponAtk(w) * w.soulStacks * (ANCIENT_SPIRITS.soul.burstPerStack || 0);
+    mon.hp = Math.max(1, mon.hp - dmg);
+    floatText('💀 사신의 낫!');
   }
 }
 
@@ -4119,9 +4268,7 @@ function endBossFight(win) {
       log(`💎 <b>신화 보스무기 드롭!</b> ${gradeTag(nw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
     }
     // 신화 보스장신구 드롭
-    // 용의 위엄(고대 에이션트 스피릿): 보스 장신구 드랍 확률 2배
-    const dragonMult = getEquipped() && getEquipped().spirit === 'dragonmajesty' ? (ANCIENT_SPIRITS.dragonmajesty.mult || 1) : 1;
-    if (Math.random() < BOSS.accDrop * dragonMult * (1 + accEff().luck)) {
+    if (Math.random() < BOSS.accDrop * (1 + accEff().luck)) {
       if (S.bossAccs.some(bf => bf === f)) {
         log(`보스 장신구는 이미 보유 중이라 골드로 대체 지급됩니다.`);
         S.gold += Math.floor(floorGold(f) * 10);
@@ -4415,8 +4562,6 @@ function tryEnhance(advanced, targetWeapon) {
     // 태초 무기는 파괴/초기화가 없는 대신, 고급 강화 시 "단계 하락" 확률 자체가 절반으로 줄어든다
     // (일반/고대의 고급 강화가 파괴·초기화 확률을 절반으로 낮추는 것과 대응되는 태초 전용 효과).
     const stayChance = (advanced && isGenesisWeapon(w)) ? 0.75 : 0.5;
-    // 봉인 해제(고대): 파괴 판정 자체를 무시하고 무조건 유지로 대체
-    const sealbreakActive = w.spirit === 'sealbreak';
     // 파괴/초기화 여부는 단 한 번만 굴려서(destroyRoll) 재사용한다 — 분기마다 새로 굴리면
     // "파괴 대신 초기화" 분기가 빗나가도 바로 아래 일반 파괴 분기가 또 한 번 굴려 파괴로
     // 새어나가는 이중 판정 버그가 생긴다.
@@ -4426,23 +4571,17 @@ function tryEnhance(advanced, targetWeapon) {
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
-    } else if (isAncientWeapon(w) && !sealbreakActive && destroyRoll < dChance) {
+    } else if (isAncientWeapon(w) && destroyRoll < dChance) {
       // 고대 무기는 파괴되지 않는 대신, 파괴가 확정됐을 순간 통째로 +0 초기화된다.
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
-    } else if (!isAncientWeapon(w) && !sealbreakActive && destroyRoll < dChance) {
+    } else if (!isAncientWeapon(w) && destroyRoll < dChance) {
       playEnhanceFx('destroy', attemptLevel);
       const destroyedTag = gradeTag(w);
       log(`💥 무기가 파괴되었습니다!! ${destroyedTag}${advTag}`, 'lg-bad');
       S.destroyedCount++;
       if (S.destroyedCount >= 50) unlockEgg('blacksmith');
-      // 타락의 유산(고대): 파괴 시 판매가의 절반만큼 골드로 환급
-      if (w.spirit === 'demonlegacy') {
-        const refund = Math.floor(sellPrice(w) * (ANCIENT_SPIRITS.demonlegacy.sellMult || 0));
-        S.gold += refund;
-        log(`💰 <b>타락의 유산</b> 발동! 파괴된 힘이 골드로 환원되어 +${fmt(refund)} 골드를 얻었습니다.`, 'lg-prim');
-      }
       // 고대 등급 무기는 파괴돼도 완전히 사라지지 않고 "흔적"이 남아 대장장이 탭에서 복구 가능
       if (w.grade === 6) addBlacksmithTrace(w);
       // 무기는 파괴돼도 장착 중이던 룬은 함께 사라지지 않고 가방(보유 룬)으로 돌아온다
@@ -4473,10 +4612,7 @@ function tryEnhance(advanced, targetWeapon) {
       showWeaponDestroyModal(destroyedTag);
       return;
     } else {
-      if (sealbreakActive) {
-        playEnhanceFx('protect', attemptLevel);
-        log(`🛡️ <b>봉인 해제</b> 발동! 초기화를 막아내고 단계를 유지했습니다.${riskTag}`, 'lg-prim');
-      } else if (Math.random() < stayChance) {
+      if (Math.random() < stayChance) {
         // 유지: 실패해도 단계가 그대로 유지됨 (파괴/초기화도, 하락도 아닌 세 번째 결과)
         playEnhanceFx('fail', attemptLevel);
         log(`😮‍💨 강화 실패... 다행히 단계는 유지됨${riskTag}${advTag}`, 'lg-bad');
@@ -5236,12 +5372,6 @@ function renderFloorBtns() {
         if (bossFight.active) { endBossFight(false); log('사냥터 이동으로 보스전이 중단되었습니다.', 'lg-bad'); }
         S.floor = i; spawnMonster(); renderFloorBtns(); renderFloorUI(); renderBossBtn();
         fx.enduranceStart = Date.now(); // 늑대왕의 인장: 사냥터 이동 시 지구력 보너스 초기화
-        // 활공(고대 에이션트 스피릿): 사냥터 이동 직후 한시적으로 공속 대폭 상승
-        const eqw = getEquipped();
-        if (eqw && eqw.spirit === 'glide') {
-          fx.glideUntil = Date.now() + (ANCIENT_SPIRITS.glide.dur || 10) * 1000;
-          log('🪽 활공! 잠시 공격속도가 크게 상승합니다.', 'lg-prim');
-        }
         save();
       };
     } else {
@@ -6644,10 +6774,8 @@ function init() {
     }
     const e = w && w.effect ? EFFECTS[w.effect] : null;
     const goldMul = (1 + accEff().gold) * (1 + (e && e.gold ? e.gold : 0));
-    // 몰락한 신의 가호(고대 에이션트 스피릿): 오프라인 효율 70% -> 90%
-    // + 신들의 영역(20층) 고대 세트 보너스: 오프라인 효율 +10%p 추가
-    const baseOfflineEff = (w && w.spirit === 'fallengod') ? (ANCIENT_SPIRITS.fallengod.offlineEff || 0.7) : 0.7;
-    const offlineEff = Math.min(1, baseOfflineEff + codexOfflineBonus());
+    // 신들의 영역(20층) 고대 세트 보너스: 오프라인 효율 +10%p 추가
+    const offlineEff = Math.min(1, 0.7 + codexOfflineBonus());
     const gold = Math.floor(floorGold(S.floor) * goldMul * kills * offlineEff);
     S.gold += gold;
     const h = Math.floor(capped / 3600), m = Math.floor((capped % 3600) / 60), s = capped % 60;

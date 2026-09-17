@@ -1878,42 +1878,51 @@ const ANCIENT_BOSS_MULT = 10;
 // acid: 슬라임류(독/산성) 컨셉의 도트 피해. soul: 리치류(영혼) 컨셉의 영구 성장.
 // ambush: 심연의 감시자 컨셉의 기습 — 몬스터 스폰 직후 첫 공격 확정 치명타 + 피해 2배.
 const ANCIENT_SPIRITS = {
-  // 10초마다 부식 스택이 영구히 1씩 쌓인다(상한 없음, 이 무기에 귀속). 스택당 매초
-  // 무기 공격력의 300%만큼 고정 피해가 지속적으로 들어간다 — 오래 붙어있을수록 끝없이 강해짐.
-  acid: { name: '부식의 정령', desc: '10초마다 부식 스택이 영구히 1씩 쌓인다(상한 없음). 스택당 매초 무기 공격력의 300%만큼 고정 피해를 추가로 입힌다.',
-          stackInterval: 10, dmgPerStackPerSec: 3.0 },
+  // 10초마다 부식 스택이 1씩 쌓인다(상한 없음). 스택당 매초 무기 공격력의 1300%만큼 고정
+  // 피해가 지속적으로 들어간다 — 단, 이 스택은 "지금 이 전투" 한정이라 몬스터가 바뀌거나
+  // (사냥터) 보스전·토벌전·펀치기계가 새로 시작되면 0부터 다시 쌓인다(무한 누적 아님).
+  acid: { name: '부식의 정령', desc: '10초마다 부식 스택이 1씩 쌓인다(상한 없음). 스택당 매초 무기 공격력의 1300%만큼 고정 피해를 추가로 입힌다. 이 스택은 지금 싸우고 있는 대상 한정이라, 몬스터가 바뀌거나 새로운 전투(보스전·토벌전·펀치기계)가 시작되면 0부터 다시 쌓인다.',
+          stackInterval: 10, dmgPerStackPerSec: 13.0 },
   soul: { name: '영혼 포식자', desc: '이 무기로 몬스터를 20마리 처치할 때마다 흡수한 영혼으로 영구히 공격력이 0.4% 증가한다(이 무기에 귀속).',
           killsPer: 20, bonusPerStack: 0.004 },
   ambush: { name: '심연의 기습', desc: '몬스터가 스폰되면 그 몬스터에 대한 첫 공격은 무조건 치명타로 적중하며, 치명타 피해가 추가로 2배 적용된다.',
             extraMult: 2 },
   // 공격 시 확률적으로 출혈을 걸고, 지속 시간 동안 적은 도트 피해를 입으며 사용자는 공격력·공격속도가 함께 상승한다.
-  bloodtribute: { name: '피의 갈증', desc: '공격 시 35% 확률로 대상에게 5초간 출혈을 건다(재발동 시 갱신). 출혈 지속 동안 매초 무기 공격력의 300%만큼 도트 피해를 입히며, 그 동안 사용자는 공격력과 공격속도가 각각 200% 상승하고, 연타 시 타격 횟수가 5번이 됩니다.',
-                  proc: 0.35, dur: 5, dmgPerSec: 3.0, selfAtkBonus: 2.0, selfSpeedBonus: 2.0, extraAtkHits: 5 },
+  bloodtribute: { name: '피의 갈증', desc: '공격 시 35% 확률로 대상에게 5초간 출혈을 건다(재발동 시 갱신). 출혈 지속 동안 매초 무기 공격력의 240%만큼 도트 피해를 입히며, 그 동안 사용자는 공격력과 공격속도가 각각 170% 상승하고, 연타 시 타격 횟수가 5번이 됩니다.',
+                  proc: 0.35, dur: 5, dmgPerSec: 2.4, selfAtkBonus: 1.7, selfSpeedBonus: 1.7, extraAtkHits: 5 },
   // 10초마다 7초간 "포자 만개"가 발동해 적이 받는 피해를 늘리고 사용자의 연격 확률을 높인다.
-  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 400% 증가하고, 연타(추가공격) 확률이 +40%p 상승하며 연타 확률 상한 자체가 25% → 70%로 풀린다. 연타 데미지가 기본 피해의 75%에서 125%로 오르며, 이 무기는 연타에도 별도로 치명타가 적용된다.',
-                interval: 10, dur: 7, enemyDmgTakenBonus: 4.0, extraAtkBonus: 0.40, extraAtkCap: 0.70, extraAtkDmgMult: 1.25 },
+  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 300% 증가하고, 연타(추가공격) 확률이 +40%p 상승하며 연타 확률 상한 자체가 25% → 70%로 풀린다. 연타 데미지가 기본 피해의 75%에서 110%로 오르며, 이 무기는 연타에도 별도로 치명타가 적용된다.',
+                interval: 10, dur: 7, enemyDmgTakenBonus: 3.0, extraAtkBonus: 0.40, extraAtkCap: 0.70, extraAtkDmgMult: 1.1 },
   // 기본 공속을 큰 폭으로 올리고, 공격할수록 쌓이는 스택으로 공속이 계속 더 상승한다.
   // 쉬지 않고 공격할 때만 유지되는 스택 — 3초 이상 공격이 없으면 스택이 서서히 줄어든다.
-  wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 60% 증가한다. 추가로 공격할 때마다 질주 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%). 3초 이상 공격이 없으면 스택이 서서히 줄어든다. 공격속도가 빠를수록 공격력도 함께 오른다(공격속도 1당 공격력 +50%).',
-                speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003, decaySec: 3, atkPerSpeed: 0.5 },
-  // 골드/드랍률을 고정으로 크게 올리고, 공격할수록 쌓이는 스택으로 공속·골드·드랍률이 함께 더 상승한다.
+  wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 60% 증가한다. 추가로 공격할 때마다 질주 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%). 3초 이상 공격이 없으면 스택이 서서히 줄어든다. 공격속도가 빠를수록 공격력도 함께 오른다(공격속도 1당 공격력 +40%).',
+                speedBonus: 0.60, stackMax: 1000, speedPerStack: 0.003, decaySec: 3, atkPerSpeed: 0.4 },
+  // 골드/드랍률을 고정으로 크게 올리고, 공격할수록 쌓이는 스택으로 공속·골드·드랍률·공격력이 함께 더 상승한다.
   // 쉬지 않고 공격할 때만 유지되는 스택 — 3초 이상 공격이 없으면 스택이 서서히 줄어든다.
-  goblinsteal: { name: '약탈자의 격노', desc: '골드 획득과 드랍률이 각각 50% 고정 상승한다. 추가로 공격할 때마다 격노 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도·골드 획득·드랍률이 각각 0.1%p씩 더 오른다(만스택 시 각각 +100%p 추가). 3초 이상 공격이 없으면 스택이 서서히 줄어든다.',
-                 goldBonus: 0.50, dropBonus: 0.50, stackMax: 1000, perStack: 0.001, decaySec: 3 },
+  goblinsteal: { name: '약탈자의 격노', desc: '골드 획득과 드랍률이 각각 50% 고정 상승한다. 추가로 공격할 때마다 격노 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도·골드 획득·드랍률이 각각 0.1%p씩, 공격력이 0.9%p씩 더 오른다(만스택 시 공속·골드·드랍 각각 +100%p, 공격력 +900%p 추가). 3초 이상 공격이 없으면 스택이 서서히 줄어든다.',
+                 goldBonus: 0.50, dropBonus: 0.50, stackMax: 1000, perStack: 0.001, decaySec: 3, atkPerStack: 0.009 },
   // 공격속도를 고정값에 못박고, 그로 인해 남는(원래 쌓였을) 속도를 통째로 공격력으로 환산한다.
   // 오버킬(처치 후 남는 피해량)만큼 사냥터 일반/엘리트 몬스터를 추가로 "진짜" 처치 판정한다
   // (보상 배수 지급이 아니라 dropRoll 등 정식 처치 로직을 그 횟수만큼 실제로 돌림). 보스/토벌전 제외.
-  undyingbone: { name: '불멸의 진격', desc: '이 무기의 실질 공격속도가 고정값 1.0/초로 못박힌다. 원래 계산됐을 총 공격속도에서 1.0을 뺀 초과분은 무기 공격력으로 환산되어 추가된다(초과 속도 1당 공격력 +100%). 사냥터 일반·엘리트 몬스터를 처치할 때 남는 공격력만큼 몫을 계산해 그 수만큼 실제로 처치 판정을 돌린다(보스·토벌전 제외).',
-                fixedSpeed: 1.0, atkPerExcessSpeed: 1.0 },
-  berserkerblood: { name: '광전사의 피', desc: '공격 시 5% 확률로 4초간 공격력이 +15% 증가하는 버프를 얻는다.',
-                     proc: 0.05, dur: 4, bonus: 0.15 },
-  stackpoison: { name: '누적 맹독', desc: '공격 시 20% 확률로 독이 쌓인다(최대 3중첩, 중첩마다 도트 피해 강화, 무기 공격력의 8%/초/스택).',
-                 proc: 0.20, stackMax: 3, dmgPerSecPerStack: 0.08, dur: 4 },
-  quake: { name: '거석의 진동', desc: '공격이 20회 누적될 때마다 무기 공격력 300%의 지진파를 방출한다. 지진파 피해가 몬스터 체력을 넘으면 초과분만큼 몬스터를 추가로 즉시 처치한다.',
-           every: 20, mult: 3.0 },
-  pearl: { name: '늪의 진주', desc: '처치 시 5% 확률로 귀한 "늪지의 흑진주" 재료를 발견한다. 별도로 비싸게 판매할 수 있다.', proc: 0.05 },
-  unbrokenoath: { name: '끝나지 않은 맹세', desc: '강화 실패(파괴 제외) 시 10% 확률로 다음 강화 비용이 무료가 된다.', proc: 0.10 },
-  charge: { name: '돌진', desc: '처치 시 8% 확률로 관성이 남아 다음 몬스터도 함께 처치한다.', proc: 0.08 },
+  undyingbone: { name: '불멸의 진격', desc: '이 무기의 실질 공격속도가 고정값 1.0/초로 못박힌다. 원래 계산됐을 총 공격속도에서 1.0을 뺀 초과분은 무기 공격력으로 환산되어 추가된다(초과 속도 1당 공격력 +380%). 사냥터 일반/엘리트 몬스터를 처치할 때 남는 공격력만큼 몫을 계산해 그 수만큼 실제로 처치 판정을 돌린다(보스·토벌전 제외).',
+                fixedSpeed: 1.0, atkPerExcessSpeed: 3.8 },
+  // 분노는 쉬지 않고 몰아칠 때만 유지된다 — 3초 이상 손을 놓으면 스택이 전부 날아간다.
+  berserkerblood: { name: '분노의 폭주', desc: '공격할 때마다 "분노" 스택이 1씩 쌓인다(최대 100, 스택당 공격력 +5%p, 만스택 시 +500%p). 3초 이상 공격이 없으면 스택이 전부 초기화된다. 보스 체력이 30% 이하로 떨어지면 "최후의 광기"가 발동해 남은 전투 동안 공격속도가 +200% 상승한다.',
+                     stackMax: 100, atkPerStack: 0.05, decaySec: 3, bossHpThreshold: 0.30, bossSpeedBonus: 2.0 },
+  // 스택이 가득 차면 다음 적중에 전부 소모되어 자동으로 폭발한다(폭발 후 0부터 다시 쌓임).
+  stackpoison: { name: '맹독의 여왕', desc: '공격 시 60% 확률로 맹독이 쌓인다(최대 10중첩, 중첩마다 도트 피해 강화, 무기 공격력의 720%/초/스택). 스택이 가득 찬 상태에서 다시 적중하면 스택을 전부 소모하며 무기 공격력 10000%의 고정 피해로 폭발한다.',
+                 proc: 0.60, stackMax: 10, dmgPerSecPerStack: 7.2, dur: 4, burstMult: 100.0 },
+  quake: { name: '균열의 진동', desc: '공격이 12회 누적될 때마다 무기 공격력 800%의 지진파를 방출한다(지진파 피해가 몬스터 체력을 넘으면 초과분만큼 추가로 즉시 처치). 지진파가 적중하면 "균열" 디버프가 부여되어 3초간 대상이 받는 피해가 +60%p 증가한다(최대 3중첩, 중첩 시 지속시간 갱신).',
+           every: 12, mult: 8.0, debuffPerStack: 0.60, debuffStackMax: 3, debuffDur: 3 },
+  // 침수 디버프 자체는 일반 몬스터에게도 걸리지만, 주기적 추가 피해(수렁 침식)는 보스전 전용이다.
+  pearl: { name: '늪지의 올가미', desc: '공격 시 55% 확률로 대상에게 "침수"를 건다(3초간 받는 피해 +300%, 재적중 시 갱신). 보스전에서는 침수 상태가 유지되는 동안 5초마다 무기 공격력 1000%의 고정 피해("수렁 침식")가 추가로 들어간다. 낮은 확률(5%)로 귀한 "늪지의 흑진주" 재료도 함께 발견한다.',
+          proc: 0.05, floodProc: 0.55, floodDmgBonus: 3.0, floodDur: 3, bossDotMult: 10.0, bossDotInterval: 5 },
+  // 사냥터에서 처치할 때마다 쌓이는 "원한"은 무기에 영구 귀속되며 절대 줄어들지 않는다.
+  unbrokenoath: { name: '끝나지 않은 맹세', desc: '사냥터에서 몬스터를 처치할 때마다 "원한" 스택이 영구히 1씩 쌓인다(최대 100, 무기 귀속). 원한 스택당 보스 피해량이 +8%p 상승한다(만스택 시 +800%p). 보스전·토벌전 시작 시, 그동안 쌓인 원한 스택 전부를 이용해 무기 공격력의 (스택×50%)만큼 즉시 고정 피해로 선타를 날린다(스택은 소모되지 않고 계속 유지된다).',
+                 stackMax: 100, bossDmgPerStack: 0.08, burstPerStack: 0.50 },
+  // 연쇄가 이어질 때마다 45%로 재판정하며, 최대 8마리(원래 처치분 포함)까지 이어질 수 있다.
+  charge: { name: '돌파의 질주', desc: '처치 시 45% 확률로 관성이 유지되어 다음 몬스터도 함께 처치한다(연쇄당 45%로 재판정, 최대 8마리까지 연쇄). 보스전·토벌전 시작 후 70초간 "돌파 상태"가 되어 공격속도 +350%, 공격력 +150%가 적용된다.',
+           proc: 0.45, chainMax: 8, bossSpeedBonus: 3.50, bossAtkBonus: 1.50, bossDur: 70 },
   sealbreak: { name: '봉인 해제', desc: '강화 실패 시 파괴 확률 판정 자체가 무시되고 무조건 "유지"로 처리된다.' },
   glide: { name: '활공', desc: '사냥터를 이동한 직후 10초간 공격속도가 크게 상승한다(+80%).', dur: 10, bonus: 0.8 },
   demonlegacy: { name: '타락의 유산', desc: '이 무기가 강화 파괴로 사라지면, 파괴 당시 판매가의 절반만큼이 골드로 환원되어 즉시 지급된다(일부러 파괴하는 것보다는 항상 파는 쪽이 이득).', sellMult: 0.5 },
@@ -2494,8 +2503,16 @@ function weaponAtk(w) {
     : 0;
   // 늑대의 질주(고대 에이션트 스피릿): 공격속도가 빠를수록 공격력도 함께 상승
   const wolfsprintAtkBonus = (w.spirit === 'wolfsprint') ? weaponSpeed(w) * (ANCIENT_SPIRITS.wolfsprint.atkPerSpeed || 0) : 0;
+  // 약탈자의 격노(고대 에이션트 스피릿): 처치마다 쌓이는 영구 스택만큼 공격력도 함께 상승
+  const goblinstealAtkBonus = (w.spirit === 'goblinsteal')
+    ? Math.min(ANCIENT_SPIRITS.goblinsteal.stackMax || 0, w.goblinstealStacks || 0) * (ANCIENT_SPIRITS.goblinsteal.atkPerStack || 0)
+    : 0;
+  // 분노의 폭주(고대 에이션트 스피릿): 쉬지 않고 공격할 때 쌓이는 분노 스택만큼 공격력 상승
+  const rageBonus = (w.spirit === 'berserkerblood') ? (w.rageStacks || 0) * (ANCIENT_SPIRITS.berserkerblood.atkPerStack || 0) : 0;
+  // 돌파의 질주(고대 에이션트 스피릿): 보스전·토벌전 시작 후 한시적으로 "돌파 상태" 발동
+  const chargeBossBonus = (w.spirit === 'charge' && Date.now() < fx.chargeBossUntil) ? (ANCIENT_SPIRITS.charge.bossAtkBonus || 0) : 0;
   const dmgMult = isGenesisWeapon(w) && w.dmgMultOverride != null ? w.dmgMultOverride : t.dmgMult;
-  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus + wolfsprintAtkBonus);
+  const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus + wolfsprintAtkBonus + goblinstealAtkBonus + rageBonus + chargeBossBonus);
   const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : isAncientWeapon(w) ? ancientAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
   return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk')) * (1 + goldAtkBonusPct());
 }
@@ -2589,6 +2606,12 @@ function rawWeaponSpeed(w) {
   if (w && w.spirit === 'bloodtribute' && now < fx.bloodThirstUntil) stackBonus += ANCIENT_SPIRITS.bloodtribute.selfSpeedBonus || 0;
   // 활공(고대 에이션트 스피릿): 사냥터 이동 직후 한시적 공속 대폭 상승
   if (w && w.spirit === 'glide' && now < fx.glideUntil) stackBonus += ANCIENT_SPIRITS.glide.bonus || 0;
+  // 분노의 폭주(고대 에이션트 스피릿): 보스 체력이 30% 이하로 떨어지면 "최후의 광기" 발동
+  if (w && w.spirit === 'berserkerblood' && bossFight.active && mon.hp <= mon.maxHp * (ANCIENT_SPIRITS.berserkerblood.bossHpThreshold || 0.3)) {
+    stackBonus += ANCIENT_SPIRITS.berserkerblood.bossSpeedBonus || 0;
+  }
+  // 돌파의 질주(고대 에이션트 스피릿): 보스전·토벌전 시작 후 한시적으로 "돌파 상태" 발동
+  if (w && w.spirit === 'charge' && now < fx.chargeBossUntil) stackBonus += ANCIENT_SPIRITS.charge.bossSpeedBonus || 0;
   let burstMult = 1;
   if (w && w.effect === 'moment' && now < fx.momentUntil) burstMult *= (e.momentMult || 1);
   if (w && w.effect === 'infinite' && now < fx.infiniteUntil) burstMult *= (e.burstMult || 1);
@@ -3031,6 +3054,8 @@ function spawnMonster() {
   // 심연의 기습(고대 에이션트 스피릿): 새 몬스터가 스폰되면 첫 공격 확정 치명타 대기
   const eqw = getEquipped();
   if (eqw && eqw.spirit === 'ambush') fx.ambushReady = true;
+  // 부식의 정령(고대 에이션트 스피릿): 새 몬스터가 스폰되면(=새로운 전투) 부식 스택 초기화
+  if (eqw && eqw.spirit === 'acid') { eqw.acidStacks = 0; eqw.acidTimer = 0; }
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -3386,7 +3411,8 @@ function addWeapon(w) {
 
 // 몬스터가 죽었을 때 공통 처리(연출 + 보스/일반 분기). 'boss'를 반환하면 호출부는
 // 그 즉시 tick()을 종료해야 한다(보스전은 별도 흐름이라 남은 틱을 이어갈 수 없음).
-function handleKill() {
+function handleKill(chainDepth) {
+  chainDepth = chainDepth || 0;
   const flashId = bossFight.isRaid ? 'raidMonEmoji' : bossFight.isPunch ? 'punchMonEmoji' : 'monemoji';
   const flashEl = $(flashId);
   if (flashEl) { flashEl.classList.add('flash'); setTimeout(() => flashEl.classList.remove('flash'), 400); }
@@ -3411,11 +3437,16 @@ function handleKill() {
       floatText('👻 영혼 흡수!');
     }
   }
+  // 끝나지 않은 맹세(고대 에이션트 스피릿): 사냥터에서 처치할 때마다 "원한" 영구 스택 적립
+  if (w && w.spirit === 'unbrokenoath') {
+    w.oathStacks = Math.min(ANCIENT_SPIRITS.unbrokenoath.stackMax || 100, (w.oathStacks || 0) + 1);
+  }
   spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
-  // 돌진(고대 에이션트 스피릿): 처치 시 낮은 확률로 방금 리스폰된 다음 몬스터도 함께 처치
-  if (w && w.spirit === 'charge' && Math.random() < ANCIENT_SPIRITS.charge.proc) {
-    floatText('🐂 돌진!');
-    handleKill();
+  // 돌파의 질주(고대 에이션트 스피릿): 처치 시 확률적으로 관성이 남아 다음 몬스터도 함께 처치
+  // (연쇄당 다시 판정, chainDepth로 최대 연쇄 마리 수를 제한한다)
+  if (w && w.spirit === 'charge' && chainDepth < (ANCIENT_SPIRITS.charge.chainMax || 8) - 1 && Math.random() < ANCIENT_SPIRITS.charge.proc) {
+    floatText('🐂 돌파!');
+    handleKill(chainDepth + 1);
   }
   return 'normal';
 }
@@ -3448,6 +3479,11 @@ function tick(dt) {
   }
   if (w.spirit === 'goblinsteal' && (w.goblinstealStacks || 0) > 0 && nowDecay - (w.goblinstealLastKill || 0) > (ANCIENT_SPIRITS.goblinsteal.decaySec || 3) * 1000) {
     w.goblinstealStacks--; w.goblinstealLastKill = nowDecay;
+  }
+  // 분노의 폭주(고대 에이션트 스피릿): 다른 스택과 달리 서서히 줄지 않고, 3초 이상 공격이
+  // 없으면 한 번에 전부 초기화된다("멈추면 식는" 광전사 컨셉).
+  if (w.spirit === 'berserkerblood' && (w.rageStacks || 0) > 0 && nowDecay - (w.rageLastHit || 0) > (ANCIENT_SPIRITS.berserkerblood.decaySec || 3) * 1000) {
+    w.rageStacks = 0;
   }
   // 아래부터는 실질적인 전투 진행 — 사냥터 자동사냥이 꺼져 있고 보스전/토벌전/펀치기계도
   // 아니면 여기서 멈춘다(보스전·토벌전·펀치기계는 자동사냥 스위치와 무관하게 항상 진행됨).
@@ -3534,6 +3570,21 @@ function tick(dt) {
       fx.poisonStacks = 0;
     }
   }
+  // 늪지의 올가미(고대 에이션트 스피릿): 보스전에서 침수 상태가 유지되는 동안 주기적으로 추가 고정 피해
+  if (w.spirit === 'pearl' && bossFight.active && nowDecay < fx.floodUntil) {
+    const spirit = ANCIENT_SPIRITS.pearl;
+    fx.floodDotTimer = (fx.floodDotTimer || 0) + dt;
+    if (fx.floodDotTimer >= (spirit.bossDotInterval || 5)) {
+      fx.floodDotTimer -= (spirit.bossDotInterval || 5);
+      mon.hp -= weaponAtk(w) * (spirit.bossDotMult || 0);
+      attacked = true;
+      floatText('🌀 수렁 침식!');
+      if (mon.hp <= 0) {
+        if (handleKill() === 'boss') return;
+        killedAny = true;
+      }
+    }
+  }
   mon.atkTimer += dt * weaponSpeed(w);
   while (mon.atkTimer >= 1) {
     mon.atkTimer -= 1;
@@ -3565,10 +3616,6 @@ function attack(w) {
   }
   let dmg = weaponAtk(w) * (0.9 + Math.random() * 0.2);
   const e = w.effect ? EFFECTS[w.effect] : null;
-  // 광전사의 피(고대 에이션트 스피릿): 버프가 활성화되어 있으면 이번 공격에도 적용
-  if (w.spirit === 'berserkerblood' && now < fx.berserkerUntil) {
-    dmg *= 1 + (ANCIENT_SPIRITS.berserkerblood.bonus || 0);
-  }
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
     dmg *= 1 + bossDmgBonus();
@@ -3576,6 +3623,14 @@ function attack(w) {
   // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 적이 받는 모든 피해 증가
   if (w.spirit === 'sporeburst' && now < fx.sporeburstUntil) {
     dmg *= 1 + (ANCIENT_SPIRITS.sporeburst.enemyDmgTakenBonus || 0);
+  }
+  // 균열의 진동(고대 에이션트 스피릿): 지진파가 남긴 "균열" 디버프 — 중첩당 받는 피해 증가
+  if (w.spirit === 'quake' && now < fx.quakeDebuffUntil) {
+    dmg *= 1 + (fx.quakeDebuffStacks || 0) * (ANCIENT_SPIRITS.quake.debuffPerStack || 0);
+  }
+  // 늪지의 올가미(고대 에이션트 스피릿): "침수" 상태의 대상은 받는 피해 증가
+  if (w.spirit === 'pearl' && now < fx.floodUntil) {
+    dmg *= 1 + (ANCIENT_SPIRITS.pearl.floodDmgBonus || 0);
   }
   // 신벌(룬 특수효과): 일반 몬스터는 즉시 처치, 보스는 최대 체력의 1% 고정 피해로 대체.
   // 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
@@ -3656,26 +3711,44 @@ function attack(w) {
     fx.bloodThirstUntil = now + (spirit.dur || 5) * 1000;
     floatText('🩸 갈증!');
   }
-  // 광전사의 피(고대 에이션트 스피릿): 공격 시 낮은 확률로 일시적 공격력 버프 발동
-  if (w.spirit === 'berserkerblood' && Math.random() < ANCIENT_SPIRITS.berserkerblood.proc) {
-    fx.berserkerUntil = now + (ANCIENT_SPIRITS.berserkerblood.dur || 4) * 1000;
-    floatText('💢 광전사!');
+  // 분노의 폭주(고대 에이션트 스피릿): 공격할 때마다 분노 스택 적립(최대 100). 마지막 공격
+  // 시각을 기록해, 3초 이상 공격이 없으면 tick()에서 스택이 전부 초기화되게 한다.
+  if (w.spirit === 'berserkerblood') {
+    w.rageStacks = Math.min(ANCIENT_SPIRITS.berserkerblood.stackMax || 0, (w.rageStacks || 0) + 1);
+    w.rageLastHit = now;
   }
-  // 누적 맹독(고대 에이션트 스피릿): 공격 시 낮은 확률로 독 1스택 적립(최대 3, 지속시간 갱신)
-  if (w.spirit === 'stackpoison' && Math.random() < ANCIENT_SPIRITS.stackpoison.proc) {
-    fx.poisonStacks = Math.min(ANCIENT_SPIRITS.stackpoison.stackMax || 3, (fx.poisonStacks || 0) + 1);
-    fx.poisonUntil = now + (ANCIENT_SPIRITS.stackpoison.dur || 4) * 1000;
-    floatText(`☠️ 맹독 x${fx.poisonStacks}`);
+  // 맹독의 여왕(고대 에이션트 스피릿): 스택이 가득 찬 상태에서 다시 적중하면 전부 소모하며 폭발.
+  // 그렇지 않으면 확률적으로 독 1스택 적립(재발동 시 지속시간 갱신)
+  if (w.spirit === 'stackpoison') {
+    const spirit = ANCIENT_SPIRITS.stackpoison;
+    if ((fx.poisonStacks || 0) >= (spirit.stackMax || 10)) {
+      mon.hp -= weaponAtk(w) * (spirit.burstMult || 0);
+      fx.poisonStacks = 0;
+      fx.poisonUntil = 0;
+      floatText('☠️ 맹독 폭발!');
+    } else if (Math.random() < spirit.proc) {
+      fx.poisonStacks = Math.min(spirit.stackMax || 10, (fx.poisonStacks || 0) + 1);
+      fx.poisonUntil = now + (spirit.dur || 4) * 1000;
+      floatText(`☠️ 맹독 x${fx.poisonStacks}`);
+    }
   }
-  // 거석의 진동(고대 에이션트 스피릿): 공격 20회 누적마다 지진파. 보스가 아닐 때 지진파
+  // 늪지의 올가미(고대 에이션트 스피릿): 공격 시 확률적으로 "침수" 부여(재적중 시 갱신)
+  if (w.spirit === 'pearl' && Math.random() < (ANCIENT_SPIRITS.pearl.floodProc || 0)) {
+    fx.floodUntil = now + (ANCIENT_SPIRITS.pearl.floodDur || 3) * 1000;
+    floatText('🌊 침수!');
+  }
+  // 균열의 진동(고대 에이션트 스피릿): 공격 12회 누적마다 지진파. 보스가 아닐 때 지진파
   // 피해가 몬스터 체력을 넘으면, 초과분(지진파피해÷몬스터체력, 내림)만큼 몬스터를 추가로
   // 즉시 처치한다(1+초과처치 전부를 handleKill()로 직접 처리하고 원래 몬스터는 남기지 않음).
+  // 지진파가 적중하면 "균열" 디버프도 함께 부여(최대 3중첩, 중첩 시 지속시간 갱신).
   if (w.spirit === 'quake') {
     fx.quakeCount = (fx.quakeCount || 0) + 1;
     if (fx.quakeCount >= (ANCIENT_SPIRITS.quake.every || 20)) {
       fx.quakeCount = 0;
       const quakeDmg = weaponAtk(w) * (ANCIENT_SPIRITS.quake.mult || 3);
       floatText('💥 지진파!');
+      fx.quakeDebuffStacks = Math.min(ANCIENT_SPIRITS.quake.debuffStackMax || 3, (fx.quakeDebuffStacks || 0) + 1);
+      fx.quakeDebuffUntil = now + (ANCIENT_SPIRITS.quake.debuffDur || 3) * 1000;
       if (!bossFight.active && quakeDmg >= mon.hp) {
         const monHpFull = mon.maxHp || 1;
         const overkill = quakeDmg - mon.hp;
@@ -3772,6 +3845,8 @@ function bossDmgBonus() {
     if (e && e.bossDmg) bonus += e.bossDmg;
     bonus += weaponRuneStat(w, 'bossDmg') / 100;
     bonus += typeTrait(w, 'bossDmg');
+    // 끝나지 않은 맹세(고대 에이션트 스피릿): 사냥터에서 쌓은 원한 스택만큼 보스 피해량 영구 상승
+    if (w.spirit === 'unbrokenoath') bonus += (w.oathStacks || 0) * (ANCIENT_SPIRITS.unbrokenoath.bossDmgPerStack || 0);
   }
   bonus += trainingValue('bossDmg');
   bonus += accEff().bossDmg;
@@ -3786,9 +3861,32 @@ function resetTimedStacks() {
   fx.accelStacks = 0;
   fx.poisonStacks = 0;
   fx.poisonUntil = 0;
+  fx.quakeDebuffStacks = 0;
+  fx.quakeDebuffUntil = 0;
+  fx.floodUntil = 0;
+  fx.floodDotTimer = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
+  if (w && w.spirit === 'berserkerblood') w.rageStacks = 0;
+  // 부식의 정령(고대 에이션트 스피릿): 무한 누적이 아니라 "전투 하나"에 한정된 스택으로 변경 —
+  // 보스전·토벌전·펀치기계도 새로운 전투이므로 항상 0부터 다시 쌓인다.
+  if (w && w.spirit === 'acid') { w.acidStacks = 0; w.acidTimer = 0; }
+}
+// 보스전·토벌전·펀치기계가 실제로 시작된 직후(더미/보스 체력이 세팅된 뒤) 호출되는 일회성
+// 발동 효과들. 돌파의 질주(공속/공격력 버프 시작)와 끝나지 않은 맹세(원한 스택 선타)가 대상이다.
+// 원한 스택은 여기서 소모되지 않고 계속 누적된다.
+function triggerFightStartSpirits() {
+  const w = getEquipped();
+  if (!w) return;
+  if (w.spirit === 'charge') {
+    fx.chargeBossUntil = Date.now() + (ANCIENT_SPIRITS.charge.bossDur || 15) * 1000;
+  }
+  if (w.spirit === 'unbrokenoath' && (w.oathStacks || 0) > 0) {
+    const dmg = weaponAtk(w) * w.oathStacks * (ANCIENT_SPIRITS.unbrokenoath.burstPerStack || 0);
+    mon.hp = Math.max(1, mon.hp - dmg);
+    floatText('⚔️ 맹세의 일격!');
+  }
 }
 
 function startBossFight() {
@@ -3817,6 +3915,7 @@ function startBossFight() {
   mon.atkTimer = 0;
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격 확정 치명타 대기
   fx.executionerReady = true;
+  triggerFightStartSpirits();
   const F = FLOORS[f];
   const b = F.boss;
   // 신살자(태초 보스): 보스전 시작 즉시 보스 체력 고정 비율 삭감
@@ -3860,6 +3959,7 @@ function startRaidFight(stage) {
   mon.atkTimer = 0;
   // 처단자(레전더리 보스 효과): 토벌전도 보스 취급이므로 동일하게 첫 타격 확정 치명타 대기
   fx.executionerReady = true;
+  triggerFightStartSpirits();
   const rm = RAID_MONSTERS[stage];
   $('raidMonEmoji').textContent = rm.emoji;
   $('raidMonEmoji').classList.add('boss-appear');
@@ -3912,6 +4012,7 @@ function startPunchFight() {
   mon.dead = false;
   mon.atkTimer = 0;
   fx.executionerReady = true;
+  triggerFightStartSpirits();
   $('punchMonEmoji').textContent = '🥊';
   $('punchMonEmoji').classList.add('boss-appear');
   $('punchMonName').innerHTML = `<span class="grade-고대" style="font-size:19px">🥊 펀치기계</span> <span style="font-size:12px;color:#ff7cf0;">★ 딜 측정 ★</span>`;

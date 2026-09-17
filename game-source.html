@@ -3737,7 +3737,7 @@ function attack(w) {
     const bloodThirstActive = w.spirit === 'bloodtribute' && now < fx.bloodThirstUntil;
     const extraHits = bloodThirstActive ? (ANCIENT_SPIRITS.bloodtribute.extraAtkHits - 1) : 1;
     mon.hp -= extraDmg * extraHits;
-    floatText(bloodThirstActive ? '🦇 박쥐 떼의 광란!' : '⚡ 연타!');
+    floatText(bloodThirstActive ? '🦇 광란!' : '⚡ 연타!');
     if (w.effect === 'sprint') fx.sprintUntil = now + (e.sprintDur || 3) * 1000;
     if (w.effect === 'frenzy') { fx.frenzyStacks = Math.min(e.stackMax || 5, (fx.frenzyStacks || 0) + 1); fx.frenzyLast = now; }
     if (w.effect === 'moment' && Math.random() < (e.momentProc || 0)) {

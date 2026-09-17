@@ -2524,20 +2524,24 @@ function gradeAdjustedSuccess(grade, enhance) {
   const exponent = 1 + (grade || 0) * ENH.gradeSuccessExp;
   return Math.max(0.0000001, Math.pow(base / 100, exponent) * 100);
 }
-// 강화 확률 보정: 출처별로 "이 단계 이하에서만 적용"되는 상한을 둬서, 확률이 이미 0에 가까운
-// 고단계 구간에서 고정 %p 보정이 상대적으로 터무니없이 커지는 현상(예: 실제확률 5~6%가 보정만으로
-// 12~13%가 되는 등)을 막는다. 늦게 얻는 장비/도감일수록 상한도 더 높은 단계까지 적용된다.
+// 강화 확률 보정: 각 소스는 "cap 단계에서 딱 그 %p가 적용되는" 기준점만 가지고, 실제 적용값은
+// ENH.success 표 자체의 굴곡을 가중치로 써서 전 구간에 걸쳐 연속적으로 계산한다
+// (weight = ENH.success[현재단계] / ENH.success[cap]). cap보다 낮은 단계는 자동으로 더 후하게
+// 나오지만 기본확률 자체가 이미 높아 min(100,...)에 묻히고, cap보다 높은 단계는 성공확률표 자체가
+// 가속도로 무너지는 형태를 그대로 물려받아 뚝 끊기지 않고 갈수록 가파르게 줄어든다.
+// 획득 난이도가 어려운 소스일수록 cap과 %p 모두 더 높게 배정한다(저주받은성 세트가 최상단).
 const ENH_BONUS_SOURCES = [
-  { cap: 14, value: 5, has: () => { const p = codexAncientSetProgress(10); return p.need > 0 && p.have >= p.need; } }, // 도감: 저주받은성 세트
-  { cap: 16, value: 3, has: () => S.accEquipped.some(a => a.floor === 12) },   // 13층 장신구
+  { cap: 22, value: 9, has: () => { const p = codexAncientSetProgress(10); return p.need > 0 && p.have >= p.need; } }, // 도감: 저주받은성 세트 (획득 최난도)
+  { cap: 20, value: 5, has: () => S.bossAccs.includes(19) },                  // 신왕의 태초 인장 (20층 보스장신구)
   { cap: 18, value: 4, has: () => S.bossAccs.includes(12) },                  // 대현자의 금서 (13층 보스장신구)
-  { cap: 20, value: 4, has: () => S.accEquipped.some(a => a.floor === 19) },  // 20층 장신구
-  { cap: 22, value: 9, has: () => S.bossAccs.includes(19) },                  // 신왕의 태초 인장 (20층 보스장신구)
+  { cap: 16, value: 4, has: () => S.accEquipped.some(a => a.floor === 19) },  // 20층 장신구
+  { cap: 14, value: 3, has: () => S.accEquipped.some(a => a.floor === 12) },  // 13층 장신구 (획득 최이지)
 ];
 function enhTierBonus(enhance) {
   let bonus = 0;
   for (const src of ENH_BONUS_SOURCES) {
-    if (enhance <= src.cap && src.has()) bonus += src.value;
+    if (!src.has()) continue;
+    bonus += src.value * (ENH.success[enhance] / ENH.success[src.cap]);
   }
   return bonus;
 }

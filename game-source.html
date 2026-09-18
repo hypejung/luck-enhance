@@ -128,9 +128,9 @@
   .fbtn.on { border-color: var(--gold); color: var(--gold); background: #3d3d1f; }
   .fbtn.locked { opacity: .3; }
 
-  #monbox, #raidMonBox, #punchMonBox { text-align: center; padding: 10px 0; position: relative; }
-  #monemoji, #raidMonEmoji, #punchMonEmoji { font-size: 64px; line-height: 1.2; }
-  #monname, #raidMonName, #punchMonName { font-size: 18px; margin: 4px 0; }
+  #monbox, #raidMonBox, #punchMonBox, #libraryMonBox { text-align: center; padding: 10px 0; position: relative; }
+  #monemoji, #raidMonEmoji, #punchMonEmoji, #libraryMonEmoji { font-size: 64px; line-height: 1.2; }
+  #monname, #raidMonName, #punchMonName, #libraryMonName { font-size: 18px; margin: 4px 0; }
   .floatmsg {
     position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
     font-weight: bold; font-size: 15px; color: var(--unique);
@@ -142,16 +142,16 @@
     15%  { opacity: 1; transform: translate(-50%, -55%) scale(1.05); }
     100% { opacity: 0; transform: translate(-50%, -95%) scale(1); }
   }
-  #hpbarWrap, #raidHpBarWrap, #punchHpBarWrap {
+  #hpbarWrap, #raidHpBarWrap, #punchHpBarWrap, #libraryHpBarWrap {
     width: 100%; height: 22px; background: #333; border-radius: 11px;
     overflow: hidden; border: 1px solid var(--border); margin: 8px 0;
   }
-  #hpbar, #raidHpBar, #punchHpBar {
+  #hpbar, #raidHpBar, #punchHpBar, #libraryHpBar {
     height: 100%; width: 100%;
     background: linear-gradient(90deg, #e04545, #ff7a5c);
     transition: width .1s;
   }
-  #hptext, #raidHpText, #punchHpText { font-size: 13px; color: var(--sub); }
+  #hptext, #raidHpText, #punchHpText, #libraryHpText { font-size: 13px; color: var(--sub); }
 
   #huntinfo { display: flex; justify-content: space-between; font-size: 13px; color: var(--sub); margin-top: 8px; flex-wrap: wrap; gap: 4px; }
   #dropinfo { font-size: 12px; color: var(--sub); margin-top: 6px; text-align: center; }
@@ -385,6 +385,7 @@
       <div class="tabgroup-body">
         <div class="tab on" data-tab="hunt">⚔️ 사냥터</div>
         <div class="tab" data-tab="raid">🚩 토벌전</div>
+        <div class="tab" data-tab="library">📖 도서관</div>
         <div class="tab" data-tab="preset">💾 프리셋</div>
       </div>
     </div>
@@ -459,6 +460,7 @@
         <div id="enhFxOverlay"></div>
       </div>
       <div id="advancedEnhanceBox" style="margin-top:8px;"></div>
+      <div id="awakeningBox" style="margin-top:8px;"></div>
       <div id="autoEnhanceBox" style="margin-top:8px;"></div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
@@ -701,6 +703,29 @@
     </div>
   </div>
 
+  <div id="tab-library" style="display:none">
+    <div class="panel">
+      <h3>📖 고대의 도서관</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        <div style="font-style:italic;margin-bottom:6px;">토벌전조차 겪어보지 못한 자들은 이 서고의 입구도 찾지 못한다.
+        한 번 들어가면 서고는 끝없이 이어지고, 그 안의 지식은 갈수록 무겁고 위험해진다.</div>
+        <div>토벌전보다 상위 컨텐츠로, <b style="color:var(--unique)">주간 3회</b>까지 도전할 수 있고,
+        <b style="color:#ff7a7a">도전을 시작하면 승패와 무관하게 그 횟수가 소모</b>됩니다. 최고 기록(서고 깊이)을 계속 갱신해나가는 방식입니다.</div>
+      </div>
+      <div id="libraryBattlePanel" style="display:none">
+        <div id="libraryMonBox">
+          <div id="libraryMonEmoji">❓</div>
+          <div id="libraryMonName"></div>
+          <div id="libraryHpBarWrap"><div id="libraryHpBar"></div></div>
+          <div id="libraryHpText"></div>
+        </div>
+        <div id="libraryTimer" style="text-align:center;font-weight:bold;margin:6px 0;"></div>
+        <button class="big danger" id="libraryFleeBtn" style="width:100%;">🏳️ 도서관 도전 포기</button>
+      </div>
+      <div id="libraryBox"></div>
+    </div>
+  </div>
+
   <div id="tab-preset" style="display:none">
     <div class="panel">
       <h3>💾 전투 프리셋</h3>
@@ -804,7 +829,7 @@ function effectiveDestroyChance(w) {
   // 하는데, 예전엔 비율 곱연산(base*(1-reduce))으로 새고 있었다. %p 차감으로 고치되, 저강화
   // 구간이 통째로 0%가 되지 않도록 소스 수치 자체를 낮게 재설계했다(신화까지 합계 8%p로,
   // +16강까지만 0%가 되는 수준).
-  const reduce = Math.min(0.95, typeTrait(w, 'destroyReduce') + accEff().destroyReduce);
+  const reduce = Math.min(0.95, typeTrait(w, 'destroyReduce') + accEff().destroyReduce + awakenStat(w, 'destroyReduce'));
   return Math.max(0, Math.round((base - reduce * 100) * 10) / 10);
 }
 // DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷(+고유 특성으로 개성 부여)
@@ -1109,6 +1134,48 @@ function bossWeaponCodexCount() {
   let n = 0;
   for (let f = 0; f < WEAPON_BOSS_NAMES.length; f++) if (codexHas(bossCodexKey(f))) n++;
   return n;
+}
+// 고대의 유물 — 각 사냥터(1~20층) 몬스터 컨셉에 맞춘 수집형 아이템. 무기 도감과는 완전히
+// 별개의 트랙이며, 고대의 도서관에서만 낮은 확률로 드롭된다. index = 층 번호.
+const RELICS = [
+  { name: '용해된 왕관 조각', flavor: '슬라임 왕이 남긴, 녹아내리다 만 왕관의 파편. 만지면 아직도 미열이 남아있다.' },
+  { name: '마르지 않는 피의 성배', flavor: '흡혈귀 시조가 모든 것을 마시고도 채우지 못했던 잔.' },
+  { name: '태고의 포자 주머니', flavor: '터뜨리지 않았지만, 지금도 미세하게 부풀어 오른다.' },
+  { name: '늑대왕의 발톱 목걸이', flavor: '무리를 이끌던 우두머리가 마지막까지 걸고 있던 목걸이.' },
+  { name: '셀 수 없는 도둑의 장부', flavor: '훔친 모든 것의 목록. 마지막 장은 비어있다 — 아직 못 훔친 게 남았다는 뜻.' },
+  { name: '부서지지 않는 백골 열쇠', flavor: '무엇을 여는 열쇠인지는 아무도 모른다. 다만 부러지지 않는다.' },
+  { name: '식지 않는 분노의 잉걸불', flavor: '대제가 죽은 뒤에도 여전히 뜨겁다.' },
+  { name: '여왕의 마지막 독니', flavor: '뽑혀 나온 지 오래인데도 독이 마르지 않았다.' },
+  { name: '멈춘 파수병의 톱니', flavor: '유적의 심장부에서 나온 부품. 아직도 미세하게 떨린다.' },
+  { name: '진주가 빠져나간 조개껍질', flavor: '늪의 심장이 품었던 진주의 흔적만 남은 껍질.' },
+  { name: '지워지지 않는 맹세의 서약서', flavor: '잉크가 마른 지 오래인데도 글씨가 계속 선명하다.' },
+  { name: '길을 기억하는 실타래', flavor: '미궁 전체의 길을 기억한다는 실. 풀면 다시 감기지 않는다.' },
+  { name: '확률을 삼킨 주사위', flavor: '아무리 던져도 같은 눈만 나온다는 저주받은 주사위.' },
+  { name: '잠들지 않는 천둥의 씨앗', flavor: '심으면 자란다는 말이 있지만, 아직 아무도 심어보지 못했다.' },
+  { name: '거두지 못한 마지막 영혼 조각', flavor: '리치왕조차 완전히 삼키지 못한 영혼의 파편.' },
+  { name: '대가를 기다리는 계약서', flavor: '서명란이 비어있다. 누군가 서명하길 아직도 기다린다.' },
+  { name: '짓밟힌 대지의 마지막 조각', flavor: '거수가 지나간 자리에서 유일하게 부서지지 않은 땅.' },
+  { name: '감기지 않는 천 개의 눈 중 하나', flavor: '떼어내도 여전히 무언가를 지켜보고 있는 느낌이 든다.' },
+  { name: '식지 않는 용의 숨결 조각', flavor: '응축된 화염이 유리처럼 굳어버린 파편.' },
+  { name: '몰락한 신의 마지막 왕관 조각', flavor: '부서진 왕관에서 유일하게 남은 조각. 아직도 희미하게 빛난다.' },
+];
+const RELIC_MILESTONES = [
+  { count: 5,  effs: [['gold', 0.10]] },
+  { count: 10, effs: [['luck', 0.10]] },
+  { count: 15, effs: [], text: '📖 무기의 정수 획득량 +20%' },
+  { count: 20, effs: [], text: '📖 각성의 정수 획득량 +30%' },
+];
+function relicCollectedCount() { return (S.relics || []).filter(Boolean).length; }
+function relicEssenceMult() { return relicCollectedCount() >= 15 ? 1.2 : 1; }
+function relicAwakenMult() { return relicCollectedCount() >= 20 ? 1.3 : 1; }
+function relicBonusEff() {
+  const eff = { gold: 0, luck: 0 };
+  const n = relicCollectedCount();
+  for (const m of RELIC_MILESTONES) {
+    if (n < m.count) continue;
+    for (const [stat, val] of m.effs) eff[stat] += val;
+  }
+  return eff;
 }
 function codexHas(key) { return !!(S && S.codexSeen[key]); }
 function codexPairProgress(pair, grade) {
@@ -1520,6 +1587,18 @@ const RAID_MONSTERS = [
 // 배열은 최신 항목이 맨 앞(index 0)에 오도록 유지 — latestPatchVersion()이 이 순서를 가정함.
 const PATCH_NOTES = [
   {
+    version: 4,
+    versionLabel: '1.0.3',
+    date: '2026-09-18',
+    title: '고대의 도서관 신설 + 무기 각성 시스템',
+    changes: [
+      '📖 고대의 도서관 신설 — 토벌전보다 상위 컨텐츠. 토벌전 13단계 클리어 시 해금되며, 1단계 난이도는 토벌전 13단계와 동급으로 시작해 훨씬 가파르게 성장. 주간 3회 도전 가능, 최고 깊이 기록을 계속 갱신하는 방식. 보상으로 무기의 정수·각성의 정수·도서관 전용 룬·고대의 유물을 획득',
+      '✨ 무기 각성 시스템 신설 — 강화 RNG와 완전히 분리된 확정 파워 트랙. 무기가 +20강 이상이면 각성의 정수로 5개 슬롯(★1~★5)을 순서대로 언락(더 저렴한 비용으로 재도전도 가능), 슬롯마다 일반/레어/에픽/전설 등급 확률표에서 효과가 랜덤으로 결정되며 전부 동시 중첩 적용',
+      '🔮 고대의 도서관 전용 룬 8종 추가 — 룬박스에서는 절대 드롭되지 않고 도서관 보상으로만 획득. 여운 증폭/탐구/낙인 폭발/심층 지식/인과율/만물 공명/필멸 파훼/천공서고',
+      '📖 고대의 유물 컬렉션 신설 — 사냥터 1~20층 몬스터 컨셉에 맞춘 수집형 아이템 20종(무기 도감과는 완전히 별개 트랙), 5/10/15/20종 수집 시 계단식 보너스(골드/드롭률/무기의 정수/각성의 정수 획득량 상승)',
+    ],
+  },
+  {
     version: 3,
     versionLabel: '1.0.2',
     date: '2026-09-17',
@@ -1712,6 +1791,165 @@ function raidGoldReward(stage) {
   const killsPerHour = weaponSpeed(w) * 3600;
   const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
   return Math.floor(base * Math.pow(RAID.goldGrowth, stage));
+}
+
+// ---------- 고대의 도서관 (토벌전보다 상위 컨텐츠, 주간 도전 · 깊이 기록형) ----------
+// 1단계(깊이 0) 난이도 = 토벌전 13단계(stage index 12)와 동급으로 시작하되, 단계 성장률은
+// 토벌전(2.2배)보다 훨씬 가파르게(2.8배) 잡아서 몇 단계만 더 들어가도 토벌전을 추월한다.
+// 스테이지 선택형이 아니라 "최고 기록"을 갱신해나가는 방식 — 도전은 항상 현재 기록의 다음
+// 깊이에서 시작되고, 승패 무관하게 주간 도전 횟수를 소모한다(토벌전과 동일한 "도전 자체가
+// 소모" 철학).
+const LIBRARY = {
+  timeLimit: 120,
+  unlockRaidStage: 12,   // 토벌전 13단계(0-indexed 12) 클리어 시 해금
+  baseHpStage: 12,       // 깊이 0의 체력 = raidHp(12)와 동일
+  hpGrowth: 2.8,
+  weeklyTotal: 3,
+  baseEssence: 3,        // 깊이 0의 무기의 정수 보상
+  baseAwaken: 2,         // 깊이 0의 각성의 정수 보상
+  rewardGrowth: 1.35,
+  runeDropChance: 0.15,
+  relicDropChance: 0.10,
+};
+function libraryHp(depth) { return Math.round(raidHp(LIBRARY.baseHpStage) * Math.pow(LIBRARY.hpGrowth, depth)); }
+function libraryEssenceReward(depth) { return Math.round(LIBRARY.baseEssence * Math.pow(LIBRARY.rewardGrowth, depth)); }
+function libraryAwakenReward(depth) { return Math.round(LIBRARY.baseAwaken * Math.pow(LIBRARY.rewardGrowth, depth)); }
+function weekKey() {
+  // 토벌전과 같은 09:00 기준 날짜 계산 후, 일수를 7로 나눠 "주" 단위로 묶는다(정확한 달력
+  // 주 정렬보다는 "7일마다 바뀌는 안정적인 정수"면 충분).
+  const d = new Date(Date.now() - 9 * 3600 * 1000);
+  const dayIndex = Math.floor(d.getTime() / 86400000);
+  return Math.floor(dayIndex / 7);
+}
+function libraryEnsureWeek() {
+  const wk = weekKey();
+  if (S.library.week !== wk) { S.library.week = wk; S.library.count = 0; }
+}
+function libraryUnlocked() { return (S.raidMaxCleared || 0) > LIBRARY.unlockRaidStage; }
+
+// ---------- 각성 시스템 (+20강 이상 무기 전용, 강화 RNG와 완전히 분리된 확정 파워 트랙) ----------
+// 5개 슬롯(★1~★5)을 각각 독립적으로 각성의 정수로 "언락"하며, 언락 시 등급(일반/레어/에픽/전설)
+// 테이블에서 확률적으로 하나를 뽑는다(이미 뽑은 슬롯도 더 저렴한 비용으로 재도전 가능).
+// 모든 슬롯의 효과는 동시에 중첩 적용된다 — 상위 랭크가 하위 랭크를 대체하지 않는다.
+const AWAKENING_ENH_REQ = 20;
+const AWAKENING_RANKS = [
+  { unlockCost: 5,   rerollCost: 3,   odds: [70, 25, 5, 0] },
+  { unlockCost: 15,  rerollCost: 9,   odds: [60, 28, 10, 2] },
+  { unlockCost: 40,  rerollCost: 25,  odds: [50, 30, 15, 5] },
+  { unlockCost: 100, rerollCost: 60,  odds: [40, 32, 20, 8] },
+  { unlockCost: 250, rerollCost: 150, odds: [30, 32, 25, 13] },
+];
+const AWAKENING_RARITY_LABEL = { common: '일반', rare: '레어', epic: '에픽', legendary: '전설' };
+const AWAKENING_COMMON_POOL = [
+  { key: 'atk',   label: '공격력',   min: 0.08, max: 0.15 },
+  { key: 'speed', label: '공격속도', min: 0.05, max: 0.10 },
+  { key: 'gold',  label: '골드 획득', min: 0.10, max: 0.20 },
+  { key: 'luck',  label: '드롭률',   min: 0.08, max: 0.15 },
+];
+const AWAKENING_RARE_POOL = ['keenEye', 'critBoost', 'treasureHunt', 'swiftStep'];
+const AWAKENING_EPIC_POOL = ['libraryEcho', 'resonance', 'unbreakable', 'critFollowup'];
+const AWAKENING_LEGENDARY_POOL = ['fullBloom', 'awakenWave', 'harmony'];
+const AWAKENING_EFFECTS = {
+  keenEye:      { name: '심안의 각성',   desc: '치명타 확률 +8%p',   critChance: 0.08 },
+  critBoost:    { name: '파괴의 각성',   desc: '치명타 피해 +25%p',  critDamage: 0.25 },
+  treasureHunt: { name: '탐욕의 각성',   desc: '드롭률 +15%p',      luck: 0.15 },
+  swiftStep:    { name: '가속의 각성',   desc: '공격속도 +12%p',    speed: 0.12 },
+  libraryEcho:  { name: '서고의 메아리', desc: '무기의 정수·각성의 정수 획득량 +50%', essenceMult: 0.5 },
+  resonance:    { name: '각성 공명',     desc: '다른 각성 슬롯 하나당 공격력 +5%p', atkPerOtherSlot: 0.05 },
+  unbreakable:  { name: '필멸자의 저항', desc: '강화 파괴·초기화 확률 -20%p', destroyReduce: 0.20 },
+  critFollowup: { name: '회심의 연격',   desc: '치명타 발생 시 20% 확률로 무료 추가타 1회 발동', proc: 0.20 },
+  fullBloom:    { name: '완전한 개화',   desc: '공격력 +30%p의 강력한 고정 보너스', atk: 0.30 },
+  awakenWave:   { name: '각성의 파도',   desc: '재료 소모 없이 아직 열리지 않은 다른 슬롯 하나가 즉시 무료로 각성된다', special: 'freeSlot' },
+  harmony:      { name: '만물의 조화',   desc: '공격력·공속·치명타확률·치명타피해·골드·드롭이 모두 +5%p', allStats: 0.05 },
+};
+function rollAwakeningResult(rankIdx) {
+  const odds = AWAKENING_RANKS[rankIdx].odds;
+  const r = Math.random() * 100;
+  let rarity;
+  if (r < odds[0]) rarity = 'common';
+  else if (r < odds[0] + odds[1]) rarity = 'rare';
+  else if (r < odds[0] + odds[1] + odds[2]) rarity = 'epic';
+  else rarity = 'legendary';
+  if (rarity === 'common') {
+    const pick = AWAKENING_COMMON_POOL[Math.floor(Math.random() * AWAKENING_COMMON_POOL.length)];
+    const value = +(pick.min + Math.random() * (pick.max - pick.min)).toFixed(3);
+    return { rarity, statKey: pick.key, value };
+  }
+  const pool = rarity === 'rare' ? AWAKENING_RARE_POOL : rarity === 'epic' ? AWAKENING_EPIC_POOL : AWAKENING_LEGENDARY_POOL;
+  const key = pool[Math.floor(Math.random() * pool.length)];
+  return { rarity, key };
+}
+function awakenSlotLabel(slot) {
+  if (!slot) return '';
+  if (slot.rarity === 'common') {
+    const p = AWAKENING_COMMON_POOL.find(x => x.key === slot.statKey);
+    return `${p ? p.label : slot.statKey} +${(slot.value * 100).toFixed(1)}%`;
+  }
+  const def = AWAKENING_EFFECTS[slot.key];
+  return def ? `${def.name} — ${def.desc}` : slot.key;
+}
+// 각 슬롯의 효과를 특정 스탯 키(atk/speed/critChance/critDamage/gold/luck/destroyReduce) 기준으로 합산.
+function awakenStat(w, statKey) {
+  if (!w || !Array.isArray(w.awakening)) return 0;
+  let total = 0;
+  const filled = w.awakening.filter(Boolean).length;
+  for (const slot of w.awakening) {
+    if (!slot) continue;
+    if (slot.rarity === 'common') {
+      if (slot.statKey === statKey) total += slot.value;
+      continue;
+    }
+    const def = AWAKENING_EFFECTS[slot.key];
+    if (!def) continue;
+    if (def.allStats && ['atk', 'speed', 'critChance', 'critDamage', 'gold', 'luck'].includes(statKey)) total += def.allStats;
+    if (statKey === 'critChance' && def.critChance) total += def.critChance;
+    if (statKey === 'critDamage' && def.critDamage) total += def.critDamage;
+    if (statKey === 'luck' && def.luck) total += def.luck;
+    if (statKey === 'speed' && def.speed) total += def.speed;
+    if (statKey === 'atk' && def.atk) total += def.atk;
+    if (statKey === 'atk' && def.atkPerOtherSlot) total += Math.max(0, filled - 1) * def.atkPerOtherSlot;
+    if (statKey === 'destroyReduce' && def.destroyReduce) total += def.destroyReduce;
+  }
+  return total;
+}
+function hasAwakenEffect(w, key) {
+  return !!(w && Array.isArray(w.awakening) && w.awakening.some(s => s && s.key === key));
+}
+function awakenEssenceMult(w) {
+  return hasAwakenEffect(w, 'libraryEcho') ? 1 + (AWAKENING_EFFECTS.libraryEcho.essenceMult || 0) : 1;
+}
+// 무기의 정수/각성의 정수 보상에 적용되는 전체 배율 — 각성(서고의 메아리) + 도서관 전용 룬
+// (탐구의 룬/천공서고의 룬, 둘 다 중첩 가능) + 유물 마일스톤을 전부 곱연산으로 합산.
+function essenceRewardMult(w) {
+  let mult = awakenEssenceMult(w);
+  mult *= Math.pow(1 + (RUNE_SPECIALS.scholarRune.mult || 0), weaponSpecialCount(w, 'scholarRune'));
+  mult *= Math.pow(1 + (RUNE_SPECIALS.skyArchiveRune.mult || 0), weaponSpecialCount(w, 'skyArchiveRune'));
+  return mult;
+}
+function awakenEligible(w) { return !!w && !isFist(w) && (w.enhance || 0) >= AWAKENING_ENH_REQ; }
+function awakenAttempt(w, rankIdx) {
+  if (!w || !awakenEligible(w)) { log(`+${AWAKENING_ENH_REQ}강 이상부터 각성할 수 있습니다.`, 'lg-bad'); return; }
+  if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
+  const rank = AWAKENING_RANKS[rankIdx];
+  if (!rank) return;
+  const isReroll = !!w.awakening[rankIdx];
+  if (!isReroll && rankIdx > 0 && !w.awakening[rankIdx - 1]) { log('이전 랭크(★' + rankIdx + ')를 먼저 각성해야 합니다.', 'lg-bad'); return; }
+  const cost = isReroll ? rank.rerollCost : rank.unlockCost;
+  if ((S.awakeningEssence || 0) < cost) { log(`각성의 정수가 부족합니다! (필요 ${cost}, 보유 ${S.awakeningEssence || 0})`, 'lg-bad'); return; }
+  S.awakeningEssence -= cost;
+  const result = rollAwakeningResult(rankIdx);
+  w.awakening[rankIdx] = result;
+  log(`✨ 각성 ★${rankIdx + 1} ${isReroll ? '재도전' : '발동'}! [${AWAKENING_RARITY_LABEL[result.rarity]}] ${awakenSlotLabel(result)}`, 'lg-prim');
+  if (result.rarity === 'legendary' && result.key === 'awakenWave') {
+    const emptyIdx = [];
+    for (let i = 0; i < 5; i++) if (i !== rankIdx && !w.awakening[i]) emptyIdx.push(i);
+    if (emptyIdx.length) {
+      const pick = emptyIdx[Math.floor(Math.random() * emptyIdx.length)];
+      w.awakening[pick] = rollAwakeningResult(pick);
+      log(`🌊 각성의 파도! ★${pick + 1} 슬롯도 무료로 각성되었습니다.`, 'lg-prim');
+    }
+  }
+  renderEnhance(); save();
 }
 
 // 신화 등급 무기 특수 효과는 EFFECTS에 통합 (grade: 5)
@@ -2348,9 +2586,29 @@ const RUNE_SPECIALS = {
   grandHarvest: { name: '대풍요의 룬',     grade: 6,
                   ladder: [{ chance: 0.001, amount: 30 }, { chance: 0.01, amount: 10 }, { chance: 0.05, amount: 5 }, { chance: 0.10, amount: 3 }],
                   desc: '모든 재료 획득 시 10% 확률로 +3개, 5% 확률로 +5개, 1% 확률로 +10개, 0.1% 확률로 +30개 추가 (한 번에 하나만 적용)' },
+  // ---- 고대의 도서관 전용 룬 (libraryOnly: 룬박스에서는 절대 드롭되지 않고 도서관 보상으로만 획득) ----
+  echoRune:      { name: '여운 증폭의 룬', grade: 4, libraryOnly: true, proc: 0.20,
+                   desc: '연타(추가공격) 발동 시 20% 확률로 연타가 한 번 더 즉시 발동한다.' },
+  scholarRune:   { name: '탐구의 룬',      grade: 4, libraryOnly: true, mult: 0.5,
+                   desc: '무기의 정수 획득량 +50% (중첩 가능)' },
+  brandRune:     { name: '낙인 폭발의 룬', grade: 5, libraryOnly: true, markDur: 3, burstMult: 2.0,
+                   desc: '치명타 적중 시 대상에게 표식을 남긴다. 3초 내 다시 치명타가 적중하면 표식이 터지며 무기 공격력 200%의 고정 피해가 추가로 터진다.' },
+  insightRune:   { name: '심층 지식의 룬', grade: 5, libraryOnly: true, bonus: 0.15,
+                   desc: '룬 합성 성공 확률 +15%p' },
+  causalityRune: { name: '인과율의 룬',    grade: 6, libraryOnly: true, proc: 0.05,
+                   desc: '공격 시 5% 확률로 "잔향"이 발생해, 이번 타격의 피해량을 기억해뒀다가 다음 공격에 고정 피해로 그대로 한 번 더 적용한다.' },
+  resonanceRune: { name: '만물 공명의 룬', grade: 6, libraryOnly: true, atkPerEffect: 0.04,
+                   desc: '자신에게 현재 적용 중인 도트/버프 효과 1개당 공격력 +4%p' },
+  mortalRune:    { name: '필멸 파훼의 룬', grade: 6, libraryOnly: true, stackMax: 5, perStack: 0.10, interval: 3,
+                   desc: '같은 대상을 3초 이상 계속 공격 중이면 3초마다 그 대상이 받는 피해가 누적 상승한다(최대 5중첩, 대상이 바뀌면 초기화).' },
+  skyArchiveRune:{ name: '천공서고의 룬', grade: 6, libraryOnly: true, mult: 1.0,
+                   desc: '무기의 정수 획득량 +100% (중첩 가능)' },
 };
 const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
-for (const [k, v] of Object.entries(RUNE_SPECIALS)) RUNE_SPECIALS_BY_GRADE[v.grade].push(k);
+for (const [k, v] of Object.entries(RUNE_SPECIALS)) { if (!v.libraryOnly) RUNE_SPECIALS_BY_GRADE[v.grade].push(k); }
+// 도서관 보상 전용 뽑기 풀 — libraryOnly 룬만 등급별로 모아둔다.
+const RUNE_SPECIALS_LIBRARY_BY_GRADE = { 4: [], 5: [], 6: [] };
+for (const [k, v] of Object.entries(RUNE_SPECIALS)) { if (v.libraryOnly) RUNE_SPECIALS_LIBRARY_BY_GRADE[v.grade].push(k); }
 
 // 룬박스 등급별 드롭 확률(%) — 등급별로 직접 지정한 고정 테이블.
 // 인덱스 0~6 = 일반/레어/에픽/유니크/레전더리/신화/고대. 각 행의 합은 100.
@@ -2475,6 +2733,10 @@ function newState() {
     // 슬롯 자체는 항상 5개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
     presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null })),
     presetSlots: 3,
+    raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
+    awakeningEssence: 0,   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
+    library: { week: null, count: 0, best: 0 }, // 고대의 도서관: 주간 도전 횟수 + 최고 깊이 기록
+    relics: [],            // 고대의 유물 컬렉션: [true/false, ...] 20개, index = 층 번호
   };
 }
 
@@ -2542,7 +2804,30 @@ function weaponAtk(w) {
   const dmgMult = isGenesisWeapon(w) && w.dmgMultOverride != null ? w.dmgMultOverride : t.dmgMult;
   const base = g.atk * dmgMult * (variant ? variant.atkMod : 1) * (1 + soulBonus + bloodThirstBonus + undyingExcessBonus + wolfsprintAtkBonus + goblinstealAtkBonus + rageBonus + chargeBossBonus + demonOathBonus);
   const enhMult = isGenesisWeapon(w) ? genesisAtkMult(w.enhance) : isAncientWeapon(w) ? ancientAtkMult(w.enhance) : enhAtkMult(w.enhance, w.grade);
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk')) * (1 + goldAtkBonusPct());
+  // 만물 공명의 룬(도서관 전용): 자신에게 적용 중인 도트/버프 효과 개수만큼 공격력 상승
+  const resonanceRuneBonus = weaponSpecialCount(w, 'resonanceRune') > 0
+    ? countActiveFxEffects(w) * (RUNE_SPECIALS.resonanceRune.atkPerEffect || 0)
+    : 0;
+  // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
+  const awakenAtkBonus = awakenStat(w, 'atk');
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct());
+}
+// 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
+function countActiveFxEffects(w) {
+  const now = Date.now();
+  let n = 0;
+  if (fx.bloodThirstDot) n++;
+  if (fx.bleeds && fx.bleeds.length) n++;
+  if ((fx.poisonStacks || 0) > 0) n++;
+  if (w && w.spirit === 'acid' && (w.acidStacks || 0) > 0) n++;
+  if (w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil) n++;
+  if (now < fx.quakeDebuffUntil) n++;
+  if (now < fx.floodUntil) n++;
+  if (now < fx.stormShockUntil) n++;
+  if (now < fx.oathBuffUntil || now < fx.oathDebuffUntil) n++;
+  if (fx.dragonBurnDot) n++;
+  if (now < fx.brandUntil) n++;
+  return n;
 }
 // 강화 단계별 누적 공격력 배율. +10까지는 강화 1회당 증가폭이 일정한 선형 구간(급등 없음),
 // +10 이후부터는 단계마다 곱연산으로 가속 성장한다.
@@ -2647,7 +2932,7 @@ function rawWeaponSpeed(w) {
   const variantMult = variant ? variant.speedMod : 1;
   // 활 무기특성: 훈련/장신구/효과/스택/룬 등 모든 출처의 공격속도 "증가량"을 20% 증폭한다
   // (기본 공속 자체가 아니라 그 위에 쌓이는 보너스 총합에만 곱해짐).
-  const speedBonusSum = accEff().speed + effSpeed + stackBonus + weaponRuneStat(w, 'atkSpeed') / 100;
+  const speedBonusSum = accEff().speed + effSpeed + stackBonus + weaponRuneStat(w, 'atkSpeed') / 100 + awakenStat(w, 'speed');
   const speedAmp = typeTrait(w, 'speedAmp');
   return baseSpeed * (1 + speedBonusSum * (1 + speedAmp)) * burstMult * variantMult;
 }
@@ -2799,6 +3084,9 @@ function accEff() {
   // 도감 컬렉션 보너스(쌍/타입 풀세트/사냥터 풀세트) — 등록 현황에 따라 항상 자동 적용
   const cbe = codexBonusEff();
   for (const k of Object.keys(cbe)) eff[k] = (eff[k] || 0) + cbe[k];
+  // 고대의 유물 컬렉션 마일스톤 보너스
+  const rbe = relicBonusEff();
+  for (const k of Object.keys(rbe)) eff[k] = (eff[k] || 0) + rbe[k];
   // 무기 각인: 장착 무기에 새겨진 각인 2줄의 효과 합산 (파괴되면 함께 사라짐)
   const enchantW = S && getEquipped();
   if (enchantW && enchantW.enchant) {
@@ -3084,6 +3372,8 @@ function spawnMonster() {
   if (eqw && eqw.spirit === 'ambush') fx.ambushReady = true;
   // 부식의 정령(고대 에이션트 스피릿): 새 몬스터가 스폰되면(=새로운 전투) 부식 스택 초기화
   if (eqw && eqw.spirit === 'acid') { eqw.acidStacks = 0; eqw.acidTimer = 0; }
+  // 필멸 파훼의 룬(도서관 전용): 대상이 바뀌면 누적 스택 초기화
+  if (eqw && weaponSpecialCount(eqw, 'mortalRune') > 0) { fx.mortalStacks = 0; fx.mortalNext = 0; }
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -3106,9 +3396,9 @@ function dropRoll() {
   const w = getEquipped();
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const ae = accEff();
-  const luck = ae.luck;
+  const luck = ae.luck + awakenStat(w, 'luck');
   let dropMul = (e && e.drop ? 1 + e.drop : 1) * (1 + luck);
-  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold + awakenStat(w, 'gold'));
   // 약탈자의 격노(고대 에이션트 스피릿): 골드/드랍률 고정 보너스 + 처치 스택 비례 추가 보너스
   if (w && w.spirit === 'goblinsteal') {
     const spirit = ANCIENT_SPIRITS.goblinsteal;
@@ -3484,6 +3774,7 @@ function tick(dt) {
     renderBossBtn();
     if (bossFight.isRaid) renderRaidBattleHP();
     else if (bossFight.isPunch) renderPunchBattleHP();
+    else if (bossFight.isLibrary) renderLibraryBattleHP();
     if (bossFight.timeLeft <= 0) { endBossFight(false); return; }
   }
   const w = getEquipped();
@@ -3560,6 +3851,15 @@ function tick(dt) {
       fx.oathBuffUntil = nowDecay + (spirit.buffDur || 4) * 1000;
       fx.oathDebuffUntil = fx.oathBuffUntil + (spirit.debuffDur || 4) * 1000;
       floatText('😈 위험한 서약!');
+    }
+  }
+  // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
+  if (weaponSpecialCount(w, 'mortalRune') > 0) {
+    const rune = RUNE_SPECIALS.mortalRune;
+    if (!fx.mortalNext) fx.mortalNext = nowDecay + (rune.interval || 3) * 1000;
+    if (nowDecay >= fx.mortalNext) {
+      fx.mortalNext = nowDecay + (rune.interval || 3) * 1000;
+      fx.mortalStacks = Math.min(rune.stackMax || 5, (fx.mortalStacks || 0) + 1);
     }
   }
   // 심연의 기습(고대 에이션트 스피릿): 보스전 중에는 일정 주기마다 기습이 다시 걸린다
@@ -3695,6 +3995,12 @@ function tick(dt) {
 
 function attack(w) {
   const now = Date.now();
+  // 인과율의 룬(도서관 전용): 이전 공격에서 남겨둔 "잔향" 피해를 이번 공격 시작 시 그대로 적용
+  if (fx.causalityEcho) {
+    mon.hp -= fx.causalityEcho;
+    fx.causalityEcho = null;
+    floatText('🔁 잔향!');
+  }
   // 늑대의 질주/약탈자의 격노(고대 에이션트 스피릿): 공격할 때마다 스택 적립(최대 1000).
   // 마지막 공격 시각을 함께 기록해, 3초 이상 공격이 없으면 tick()에서 스택이 서서히 줄어들게 한다.
   if (w.spirit === 'wolfsprint') {
@@ -3731,6 +4037,10 @@ function attack(w) {
   if (w.spirit === 'demonlegacy' && bossFight.active && now < fx.oathBuffUntil) {
     dmg *= 1 + (ANCIENT_SPIRITS.demonlegacy.bossBonusDmgMult || 0);
   }
+  // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격할수록 받는 피해가 누적 상승
+  if (weaponSpecialCount(w, 'mortalRune') > 0 && (fx.mortalStacks || 0) > 0) {
+    dmg *= 1 + (fx.mortalStacks || 0) * (RUNE_SPECIALS.mortalRune.perStack || 0);
+  }
   // 신벌(룬 특수효과): 일반 몬스터는 즉시 처치, 보스는 최대 체력의 1% 고정 피해로 대체.
   // 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
   const divineCount = weaponSpecialCount(w, 'divinestrike');
@@ -3749,7 +4059,7 @@ function attack(w) {
   const ae2 = accEff();
   // 폭풍의 검(신화 공격속도): 공격속도가 빠를수록 치명타 확률도 함께 상승
   const stormBonus = (w.effect === 'stormblade') ? weaponSpeed(w) * (e.critFromSpeed || 0) : 0;
-  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus;
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus + awakenStat(w, 'critChance');
   // fixedCrit: 다른 원천의 치명타 확률과 무관하게 고정된 확률로 치명타가 발동하는 효과
   // (심판의 전조=70%, 심판의 시간류는 100%). 고정이라 못 쓰는 "다른 원천" 치명타 확률의
   // 일부를 치명타 피해로 전환해준다(overflowRatio).
@@ -3758,7 +4068,7 @@ function attack(w) {
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus);
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage'));
   if (fixedCrit !== null) critMult += otherCritChance * (e.overflowRatio || 0);
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
@@ -3779,6 +4089,28 @@ function attack(w) {
     didCrit = true;
     w.paradoxStacks = Math.min(ANCIENT_SPIRITS.sealbreak.stackMax || 100, (w.paradoxStacks || 0) + 1);
     floatText('🔮 운명 역전!');
+  }
+  // 낙인 폭발의 룬(도서관 전용): 치명타 적중 시 표식을 남기고, 표식이 남아있는 동안 다시
+  // 치명타가 적중하면 표식을 터뜨려 고정 피해를 추가로 입힌다.
+  if (didCrit && weaponSpecialCount(w, 'brandRune') > 0) {
+    if (now < fx.brandUntil) {
+      mon.hp -= weaponAtk(w) * (RUNE_SPECIALS.brandRune.burstMult || 0);
+      fx.brandUntil = 0;
+      floatText('🩸 낙인 폭발!');
+    } else {
+      fx.brandUntil = now + (RUNE_SPECIALS.brandRune.markDur || 3) * 1000;
+      floatText('🩸 낙인!');
+    }
+  }
+  // 인과율의 룬(도서관 전용): 낮은 확률로 이번 타격의 피해를 "잔향"으로 저장해뒀다가
+  // 다음 공격 시작 시 고정 피해로 그대로 한 번 더 적용한다.
+  if (weaponSpecialCount(w, 'causalityRune') > 0 && Math.random() < RUNE_SPECIALS.causalityRune.proc) {
+    fx.causalityEcho = dmg;
+  }
+  // 회심의 연격(각성 에픽 효과): 치명타 발생 시 확률적으로 무료 추가타 1회 발동
+  if (didCrit && hasAwakenEffect(w, 'critFollowup') && Math.random() < (AWAKENING_EFFECTS.critFollowup.proc || 0)) {
+    mon.hp -= preCritDmg * EXTRA_ATK_DMG_MULT;
+    floatText('⚡ 회심의 연격!');
   }
   if (ambushCrit) {
     dmg *= ANCIENT_SPIRITS.ambush.extraMult || 1;
@@ -3946,6 +4278,11 @@ function attack(w) {
     const extraHits = bloodThirstActive ? (ANCIENT_SPIRITS.bloodtribute.extraAtkHits - 1) : 1;
     mon.hp -= extraDmg * extraHits;
     floatText(bloodThirstActive ? '🦇 광란!' : '⚡ 연타!');
+    // 여운 증폭의 룬(도서관 전용): 연타 발동 시 확률적으로 연타가 한 번 더 즉시 발동
+    if (weaponSpecialCount(w, 'echoRune') > 0 && Math.random() < RUNE_SPECIALS.echoRune.proc) {
+      mon.hp -= extraDmg * extraHits;
+      floatText('🔁 여운!');
+    }
     if (w.effect === 'sprint') fx.sprintUntil = now + (e.sprintDur || 3) * 1000;
     if (w.effect === 'frenzy') { fx.frenzyStacks = Math.min(e.stackMax || 5, (fx.frenzyStacks || 0) + 1); fx.frenzyLast = now; }
     if (w.effect === 'moment' && Math.random() < (e.momentProc || 0)) {
@@ -3968,7 +4305,7 @@ function attack(w) {
 }
 
 /* ===================== 보스 전투 ===================== */
-const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0, isPunch: false };
+const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0, isPunch: false, isLibrary: false, libraryDepth: 0 };
 
 // 보스 데미지 보너스: 세트 효과(+30%) + 용살자의 서약(+100%)
 function bossDmgBonus() {
@@ -4007,6 +4344,10 @@ function resetTimedStacks() {
   fx.ambushRearmNext = 0;
   fx.breathNext = 0;
   fx.dragonBurnDot = null;
+  fx.mortalStacks = 0;
+  fx.mortalNext = 0;
+  fx.brandUntil = 0;
+  fx.causalityEcho = null;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -4134,6 +4475,8 @@ function endRaidFight(win) {
     $('raidMonEmoji').classList.add('boss-appear');
     setTimeout(() => $('raidMonEmoji').classList.remove('boss-appear'), 700);
     rollAncientSeal(stage);
+    // 고대의 도서관 해금 조건(토벌전 특정 단계 클리어)을 위한 영구 최고 기록
+    S.raidMaxCleared = Math.max(S.raidMaxCleared || 0, stage + 1);
   } else {
     log(`⏰ 토벌전 실패... <span class="grade-고대">${rm.name}</span>에게 패배했습니다. (오늘 이 단계는 재도전 불가)`, 'lg-bad');
   }
@@ -4200,11 +4543,122 @@ function renderPunchBox() {
   if (btn) btn.onclick = startPunchFight;
 }
 
+// ---------- 고대의 도서관 전투 흐름 ----------
+function startLibraryFight() {
+  if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
+  if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
+  if (!libraryUnlocked()) { log(`고대의 도서관은 토벌전 ${LIBRARY.unlockRaidStage + 1}단계를 클리어해야 해금됩니다.`, 'lg-bad'); return; }
+  libraryEnsureWeek();
+  if (S.library.count >= LIBRARY.weeklyTotal) { log(`이번 주 도서관 도전 횟수를 모두 사용했습니다. (주간 ${LIBRARY.weeklyTotal}회)`, 'lg-bad'); return; }
+  // 도전 시작 시점에 즉시 소모(승패 무관 — 토벌전과 동일한 "도전 자체가 소모" 철학)
+  S.library.count++;
+  resetTimedStacks();
+  bossFight.active = true;
+  bossFight.isLibrary = true;
+  bossFight.libraryDepth = S.library.best;
+  bossFight.timeLeft = LIBRARY.timeLimit + weaponBossTimeBonus(getEquipped());
+  mon.unique = false;
+  mon.maxHp = libraryHp(S.library.best);
+  mon.hp = mon.maxHp;
+  mon.dead = false;
+  mon.atkTimer = 0;
+  fx.executionerReady = true;
+  triggerFightStartSpirits();
+  $('libraryMonEmoji').textContent = '📖';
+  $('libraryMonEmoji').classList.add('boss-appear');
+  $('libraryMonName').innerHTML = `<span class="grade-태초" style="font-size:19px">📖 제${S.library.best + 1}서고의 수호자</span> <span style="font-size:12px;color:#ff7cf0;">★ 고대의 도서관 ★</span>`;
+  log(`📖 <b>고대의 도서관 진입!</b> 제${S.library.best + 1}서고 — 2분 안에 처치하세요! (HP: ${fmt(mon.maxHp)})`, 'lg-prim');
+  setTimeout(() => $('libraryMonEmoji').classList.remove('boss-appear'), 700);
+  $('libraryMonEmoji').classList.add('boss-glow');
+  renderBossBtn(); renderHP(); renderLibraryTab(); save();
+}
+function endLibraryFight(win) {
+  const depth = bossFight.libraryDepth;
+  bossFight.isLibrary = false;
+  $('libraryMonEmoji').classList.remove('boss-glow');
+  if (win) {
+    onGenesisHungerKill();
+    S.library.best = depth + 1;
+    const w = getEquipped();
+    const essence = Math.round(libraryEssenceReward(depth) * essenceRewardMult(w) * relicEssenceMult());
+    const awaken = Math.round(libraryAwakenReward(depth) * essenceRewardMult(w) * relicAwakenMult());
+    S.weaponEssence = (S.weaponEssence || 0) + essence;
+    S.awakeningEssence = (S.awakeningEssence || 0) + awaken;
+    let msg = `🏆 <b>고대의 도서관 승리!</b> 제${depth + 1}서고 돌파! 📜 무기의 정수 +${essence}, 💠 각성의 정수 +${awaken}`;
+    // 도서관 전용 룬 드롭 (등급은 레전더리 위주, 신화/고대는 드물게)
+    if (Math.random() < LIBRARY.runeDropChance) {
+      const grade = wrand([[4, 60], [5, 30], [6, 10]]);
+      const pool = RUNE_SPECIALS_LIBRARY_BY_GRADE[grade];
+      if (pool && pool.length) {
+        const key = pool[Math.floor(Math.random() * pool.length)];
+        S.runes.push({ id: runeUid++, grade, key });
+        msg += ` / 🔮 <span class="grade-${GRADES[grade].name}">${RUNE_SPECIALS[key].name}</span> 획득!`;
+      }
+    }
+    // 고대의 유물 드롭 (아직 없는 유물 중 무작위 하나)
+    if (Math.random() < LIBRARY.relicDropChance) {
+      const uncollected = [];
+      for (let i = 0; i < RELICS.length; i++) if (!S.relics[i]) uncollected.push(i);
+      if (uncollected.length) {
+        const idx = uncollected[Math.floor(Math.random() * uncollected.length)];
+        S.relics[idx] = true;
+        msg += ` / 📖 유물 "${RELICS[idx].name}" 발견!`;
+      }
+    }
+    log(msg, 'lg-prim');
+    $('libraryMonEmoji').classList.add('boss-appear');
+    setTimeout(() => $('libraryMonEmoji').classList.remove('boss-appear'), 700);
+  } else {
+    log(`⏰ 도서관 도전 실패... 제${depth + 1}서고를 넘지 못했습니다. (최고 기록은 그대로 유지)`, 'lg-bad');
+  }
+  spawnMonster();
+  renderBossBtn(); renderTop(); renderLibraryTab(); save();
+}
+function renderLibraryBox() {
+  const battlePanel = $('libraryBattlePanel');
+  const box = $('libraryBox');
+  if (!box || !battlePanel) return;
+  if (bossFight.active && bossFight.isLibrary) {
+    battlePanel.style.display = '';
+    box.style.display = 'none';
+    return;
+  }
+  battlePanel.style.display = 'none';
+  box.style.display = '';
+  libraryEnsureWeek();
+  if (!libraryUnlocked()) {
+    box.innerHTML = `<div style="font-size:13px;color:var(--sub);">🔒 토벌전 ${LIBRARY.unlockRaidStage + 1}단계를 클리어하면 해금됩니다. (현재 최고 클리어: ${S.raidMaxCleared || 0}단계)</div>`;
+    return;
+  }
+  const available = !bossFight.active && S.library.count < LIBRARY.weeklyTotal;
+  const nextHp = libraryHp(S.library.best);
+  const nextEssence = libraryEssenceReward(S.library.best);
+  const nextAwaken = libraryAwakenReward(S.library.best);
+  box.innerHTML = `
+    <div style="font-size:13px;margin-bottom:8px;">최고 기록: <b style="color:var(--gold)">제${S.library.best}서고 돌파</b> · 이번 주 도전: <b>${S.library.count}/${LIBRARY.weeklyTotal}</b></div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">다음 도전: 제${S.library.best + 1}서고 (HP ${fmt(nextHp)}) — 보상 📜${nextEssence} / 💠${nextAwaken}</div>
+    <button class="primary" id="libraryBtn" ${available ? '' : 'disabled'}>📖 고대의 도서관 도전</button>
+    <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : S.library.count >= LIBRARY.weeklyTotal ? '이번 주 도전 횟수를 모두 사용했습니다.' : '승패 무관하게 도전 횟수가 소모됩니다.'}</div>
+    <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
+      <div style="font-size:13px;margin-bottom:6px;">📖 고대의 유물 (${relicCollectedCount()}/${RELICS.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">
+        ${RELICS.map((r, i) => S.relics[i]
+          ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a2a1a;" title="${r.flavor}"><b style="color:var(--gold)">${r.name}</b></div>`
+          : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ 미발견</div>`
+        ).join('')}
+      </div>
+    </div>`;
+  const btn = $('libraryBtn');
+  if (btn) btn.onclick = startLibraryFight;
+}
+function renderLibraryTab() { renderLibraryBox(); }
+
 function endBossFight(win) {
   bossFight.active = false;
   $('monemoji').classList.remove('boss-glow');
   if (bossFight.isRaid) { endRaidFight(win); return; }
   if (bossFight.isPunch) { bossFight.isPunch = false; endPunchFight(); return; }
+  if (bossFight.isLibrary) { endLibraryFight(win); return; }
   const f = bossFight.floor;
   const F = FLOORS[f];
   if (win) {
@@ -4289,9 +4743,9 @@ function renderBossBtn() {
   const flee = $('bossFleeBtn');
   if (!el) return;
   if (bossFight.active) {
-    if (bossFight.isRaid || bossFight.isPunch) {
-      // 토벌전/펀치기계는 각자 전용 탭에서 진행되므로, 사냥터 탭의 보스 버튼은 잠금만 표시
-      el.textContent = bossFight.isRaid ? '⏱ 토벌전이 진행 중입니다 (토벌전 탭 참고)' : '⏱ 펀치기계 측정 중입니다 (능력치 탭 참고)';
+    if (bossFight.isRaid || bossFight.isPunch || bossFight.isLibrary) {
+      // 토벌전/펀치기계/도서관은 각자 전용 탭에서 진행되므로, 사냥터 탭의 보스 버튼은 잠금만 표시
+      el.textContent = bossFight.isRaid ? '⏱ 토벌전이 진행 중입니다 (토벌전 탭 참고)' : bossFight.isPunch ? '⏱ 펀치기계 측정 중입니다 (능력치 탭 참고)' : '⏱ 고대의 도서관 도전 중입니다 (도서관 탭 참고)';
       el.disabled = true;
       if (flee) flee.style.display = 'none';
       return;
@@ -4321,9 +4775,11 @@ function fleeBoss() {
     ? '토벌전을 포기하시겠습니까? (이미 소모된 오늘의 도전 횟수는 돌아오지 않습니다)'
     : bossFight.isPunch
       ? '펀치기계 측정을 중단하시겠습니까? (지금까지의 누적 데미지로 기록됩니다)'
-      : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
+      : bossFight.isLibrary
+        ? '고대의 도서관 도전을 포기하시겠습니까? (이미 소모된 이번 주 도전 횟수는 돌아오지 않습니다)'
+        : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
   showConfirmModal(msg, () => {
-    log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : bossFight.isPunch ? '🏳️ 펀치기계 측정을 중단했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');
+    log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : bossFight.isPunch ? '🏳️ 펀치기계 측정을 중단했습니다.' : bossFight.isLibrary ? '🏳️ 고대의 도서관 도전을 포기했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');
     endBossFight(false);
   });
 }
@@ -4938,6 +5394,13 @@ function migrate(d) {
   if (typeof d.raidTokens !== 'number') d.raidTokens = 0;
   if (!d.punch || typeof d.punch !== 'object') d.punch = { best: 0, last: 0 };
   if (!Array.isArray(d.ancientSeals)) d.ancientSeals = [];
+  if (typeof d.raidMaxCleared !== 'number') d.raidMaxCleared = 0;
+  if (typeof d.awakeningEssence !== 'number') d.awakeningEssence = 0;
+  if (!d.library || typeof d.library !== 'object') d.library = { week: null, count: 0, best: 0 };
+  if (!Array.isArray(d.relics)) d.relics = [];
+  for (const w of d.weapons || []) {
+    if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
+  }
   if (!Array.isArray(d.presets) || !d.presets.length) d.presets = [];
   // 프리셋 슬롯을 5개로 확장하면서, 기존에 3개만 있던 세이브는 나머지를 빈 슬롯으로 채운다.
   while (d.presets.length < 5) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null, runeIds: null });
@@ -5335,9 +5798,16 @@ function renderPunchBattleHP() {
   $('punchHpText').textContent = `누적 데미지 ${fmt(dealt)}`;
   $('punchTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
 }
+function renderLibraryBattleHP() {
+  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
+  $('libraryHpBar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  $('libraryHpText').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
+  $('libraryTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
+}
 function renderHP() {
   if (bossFight.active && bossFight.isRaid) { renderRaidBattleHP(); return; }
   if (bossFight.active && bossFight.isPunch) { renderPunchBattleHP(); return; }
+  if (bossFight.active && bossFight.isLibrary) { renderLibraryBattleHP(); return; }
   mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
   $('hpbar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
   $('hptext').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
@@ -5388,7 +5858,7 @@ function renderEnhance() {
   if (!w) {
     box.innerHTML = `<div style="color:var(--sub)">장착된 무기가 없습니다. 사냥을 하거나 가방에서 무기를 장착하세요.</div>`;
     $('enhstat').innerHTML = ''; $('enhrates').innerHTML = ''; $('enhBtn').disabled = true;
-    $('advancedEnhanceBox').innerHTML = ''; $('autoEnhanceBox').innerHTML = '';
+    $('advancedEnhanceBox').innerHTML = ''; $('autoEnhanceBox').innerHTML = ''; $('awakeningBox').innerHTML = '';
     return;
   }
   $('enhBtn').disabled = false;
@@ -5442,6 +5912,7 @@ function renderEnhance() {
           ? `🌌 태초 무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / 단계 -1 (고급 강화 시 유지 확률 상승)${matNote} · 현재 <b>+${w.enhance}</b>`
           : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderAdvancedEnhance(w, maxed);
+  renderAwakening(w, maxed);
   renderAutoEnhance(w, maxed);
 }
 
@@ -5501,6 +5972,41 @@ function renderAdvancedEnhance(w, maxed) {
     </button>`;
   const btn = $('advancedEnhBtn');
   if (btn) btn.onclick = () => tryEnhance(true);
+}
+
+// 각성 시스템: 강화 RNG와 별개인 확정 파워 트랙. +20강부터 열리며, 5개 슬롯을 각성의 정수로
+// 언락/재도전(리롤)한다. isFist는 대상에서 제외(맨손은 각성 의미가 없음).
+function renderAwakening(w, maxed) {
+  const box = $('awakeningBox');
+  if (!box) return;
+  if (isFist(w)) { box.innerHTML = ''; return; }
+  if ((w.enhance || 0) < AWAKENING_ENH_REQ) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--sub);text-align:center;">📖 각성은 <b style="color:var(--unique)">+${AWAKENING_ENH_REQ}</b> 이상부터 가능합니다 (강화 RNG와 무관한 확정 파워 트랙, 고대의 도서관에서 "각성의 정수" 획득).</div>`;
+    return;
+  }
+  if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
+  const rows = AWAKENING_RANKS.map((rank, i) => {
+    const slot = w.awakening[i];
+    const locked = !slot && i > 0 && !w.awakening[i - 1];
+    const cost = slot ? rank.rerollCost : rank.unlockCost;
+    const affordable = !locked && (S.awakeningEssence || 0) >= cost;
+    const label = slot ? `[${AWAKENING_RARITY_LABEL[slot.rarity]}] ${awakenSlotLabel(slot)}` : locked ? '이전 랭크를 먼저 각성하세요' : '아직 각성되지 않음';
+    const btnLabel = slot ? `재도전 (💠${cost})` : `각성 (💠${cost})`;
+    return `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);">
+        <div style="flex:1;font-size:12px;">
+          <b style="color:var(--gold)">★${i + 1}</b>
+          <div style="color:${slot ? '#7de08a' : 'var(--sub)'}">${label}</div>
+        </div>
+        <button class="${affordable ? 'primary' : ''}" data-awaken="${i}" style="font-size:11px;" ${locked || !affordable ? 'disabled' : ''}>${btnLabel}</button>
+      </div>`;
+  }).join('');
+  box.innerHTML = `
+    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">📖 각성 — 보유 각성의 정수 <b style="color:var(--gold)">💠${fmt(S.awakeningEssence || 0)}</b></div>
+    ${rows}`;
+  box.querySelectorAll('[data-awaken]').forEach(btn => {
+    btn.onclick = () => awakenAttempt(w, +btn.dataset.awaken);
+  });
 }
 
 function renderAutoEnhance(w, maxed) {
@@ -5844,7 +6350,7 @@ function fuseSelectedRunes() {
   if (!runes.every(r => r.grade === grade)) { log('같은 등급의 룬 3개만 합성할 수 있습니다.', 'lg-bad'); return; }
   const baseChance = RUNE_FUSION_CHANCE[grade];
   if (baseChance == null) { log('이 등급은 합성할 수 없습니다.', 'lg-bad'); return; }
-  const chance = Math.min(1, baseChance + (sealEquippedHas('venomQueen') ? 0.10 : 0));
+  const chance = Math.min(1, baseChance + (sealEquippedHas('venomQueen') ? 0.10 : 0) + (weaponSpecialCount(getEquipped(), 'insightRune') > 0 ? RUNE_SPECIALS.insightRune.bonus : 0));
   // 정확히 선택한 3개(id 기준)만 제거 — 같은 등급의 다른 룬은 건드리지 않는다
   for (const id of ids) {
     const idx = S.runes.findIndex(r => r.id === id);
@@ -5990,7 +6496,7 @@ function renderRuneFusion() {
   const slotRunes = fusionSlots.map(id => id != null ? S.runes.find(r => r.id === id) : null);
   const filledGrade = slotRunes.find(r => r) ? slotRunes.find(r => r).grade : null;
   const allFilled = slotRunes.every(r => r);
-  const chance = allFilled ? Math.min(1, (RUNE_FUSION_CHANCE[filledGrade] ?? 0) + (sealEquippedHas('venomQueen') ? 0.10 : 0)) : 0;
+  const chance = allFilled ? Math.min(1, (RUNE_FUSION_CHANCE[filledGrade] ?? 0) + (sealEquippedHas('venomQueen') ? 0.10 : 0) + (weaponSpecialCount(getEquipped(), 'insightRune') > 0 ? RUNE_SPECIALS.insightRune.bonus : 0)) : 0;
   const canFuse = allFilled && RUNE_FUSION_CHANCE[filledGrade] != null;
 
   let html = '<div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">';
@@ -6068,10 +6574,11 @@ function computeStats() {
   // 심판의 전조(고정 치명타+오버플로우), 포자 폭발("포자 만개" 중 연타 상한 상향) 등 일시적/
   // 파생 보너스도 전투 중 실시간으로 그대로 반영되어야 하기 때문.
   const stormBonus = (w && w.effect === 'stormblade') ? spd * ((e && e.critFromSpeed) || 0) : 0;
-  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus;
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance');
   const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
   const critChance = (fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance)) * 100;
-  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage);
+  const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage'));
   if (fixedCrit !== null) critMult += otherCritChance * ((e && e.overflowRatio) || 0);
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
@@ -6156,7 +6663,7 @@ function renderAll() {
 
 // 탭 카테고리(접기/펼치기 메뉴) 구성
 const TAB_GROUPS = [
-  { id: 'combat', tabs: ['hunt', 'raid'] },
+  { id: 'combat', tabs: ['hunt', 'raid', 'library'] },
   { id: 'growth', tabs: ['enhance', 'stats', 'rune', 'blacksmith'] },
   { id: 'items', tabs: ['inventory', 'craft', 'box'] },
   { id: 'etc', tabs: ['gamble', 'codex', 'patchnotes'] },
@@ -6174,10 +6681,11 @@ function switchTab(name) {
   currentTab = name;
   setActiveTabGroup(name);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'patchnotes', 'preset']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'preset') renderPresetTab();
+  if (name === 'library') renderLibraryTab();
   if (name === 'enhance') renderEnhance();
   if (name === 'stats') renderStats();
   if (name === 'craft') renderCraft();
@@ -6702,6 +7210,7 @@ function init() {
   // 토벌전 / 펀치기계 포기(전용 UI에서도 동일한 fleeBoss 로직 재사용)
   $('raidFleeBtn').onclick = fleeBoss;
   $('punchFleeBtn').onclick = fleeBoss;
+  $('libraryFleeBtn').onclick = fleeBoss;
   // 도감 팝업: 닫기 버튼 또는 바깥(어두운 배경) 클릭으로 닫기
   $('codexPopupClose').onclick = hideCodexPopup;
   $('codexPopup').onclick = (e) => { if (e.target.id === 'codexPopup') hideCodexPopup(); };

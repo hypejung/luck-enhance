@@ -4466,8 +4466,9 @@ function startRaidFight(stage) {
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   raidEnsureDay();
   if (stage >= S.unlocked) { log('아직 해금되지 않은 사냥터의 토벌전입니다.', 'lg-bad'); return; }
-  if (S.raid.done[stage]) { log('이 단계 토벌전은 오늘 이미 도전했습니다.', 'lg-bad'); return; }
-  if (S.raid.count >= effectiveRaidDailyTotal()) { log(`오늘 토벌전 도전 횟수를 모두 사용했습니다. (일일 ${effectiveRaidDailyTotal()}회)`, 'lg-bad'); return; }
+  // unlimitedAttempts: 테스트 계정 전용 필드(정상 플레이로는 절대 붙지 않음) — 일일 제한 무시
+  if (!S.unlimitedAttempts && S.raid.done[stage]) { log('이 단계 토벌전은 오늘 이미 도전했습니다.', 'lg-bad'); return; }
+  if (!S.unlimitedAttempts && S.raid.count >= effectiveRaidDailyTotal()) { log(`오늘 토벌전 도전 횟수를 모두 사용했습니다. (일일 ${effectiveRaidDailyTotal()}회)`, 'lg-bad'); return; }
   // 도전 시작 시점에 즉시 소모(승패 무관 — "도전"에 초점)
   S.raid.done[stage] = S.raid.day;
   S.raid.count++;
@@ -4584,7 +4585,8 @@ function startLibraryFight() {
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   if (!libraryUnlocked()) { log(`고대의 도서관은 토벌전 ${LIBRARY.unlockRaidStage + 1}단계를 클리어해야 해금됩니다.`, 'lg-bad'); return; }
   libraryEnsureWeek();
-  if (S.library.count >= LIBRARY.weeklyTotal) { log(`이번 주 도서관 도전 횟수를 모두 사용했습니다. (주간 ${LIBRARY.weeklyTotal}회)`, 'lg-bad'); return; }
+  // unlimitedAttempts: 테스트 계정 전용 필드(정상 플레이로는 절대 붙지 않음) — 주간 제한 무시
+  if (!S.unlimitedAttempts && S.library.count >= LIBRARY.weeklyTotal) { log(`이번 주 도서관 도전 횟수를 모두 사용했습니다. (주간 ${LIBRARY.weeklyTotal}회)`, 'lg-bad'); return; }
   // 도전 시작 시점에 즉시 소모(승패 무관 — 토벌전과 동일한 "도전 자체가 소모" 철학)
   S.library.count++;
   resetTimedStacks();
@@ -4665,7 +4667,7 @@ function renderLibraryBox() {
     box.innerHTML = `<div style="font-size:13px;color:var(--sub);">🔒 토벌전 ${LIBRARY.unlockRaidStage + 1}단계를 클리어하면 해금됩니다. (현재 최고 클리어: ${S.raidMaxCleared || 0}단계)</div>`;
     return;
   }
-  const available = !bossFight.active && S.library.count < LIBRARY.weeklyTotal;
+  const available = !bossFight.active && (S.unlimitedAttempts || S.library.count < LIBRARY.weeklyTotal);
   const nextHp = libraryHp(S.library.best);
   const nextEssence = libraryEssenceReward(S.library.best);
   const nextAwaken = libraryAwakenReward(S.library.best);
@@ -4983,7 +4985,7 @@ function renderRaidTab() {
   for (let stage = 0; stage < RAID_MONSTERS.length; stage++) {
     const rm = RAID_MONSTERS[stage];
     const locked = stage >= S.unlocked;
-    const usedToday = !!S.raid.done[stage];
+    const usedToday = !S.unlimitedAttempts && !!S.raid.done[stage];
     const div = document.createElement('div');
     div.className = 'invitem';
     div.innerHTML = `
@@ -4994,7 +4996,7 @@ function renderRaidTab() {
     const btn = document.createElement('button');
     if (locked) { btn.textContent = '🔒 미해금'; btn.disabled = true; }
     else if (usedToday) { btn.textContent = '오늘 도전 완료'; btn.disabled = true; }
-    else if (S.raid.count >= effectiveRaidDailyTotal()) { btn.textContent = '일일 횟수 소진'; btn.disabled = true; }
+    else if (!S.unlimitedAttempts && S.raid.count >= effectiveRaidDailyTotal()) { btn.textContent = '일일 횟수 소진'; btn.disabled = true; }
     else if (bossFight.active) { btn.textContent = '전투 중'; btn.disabled = true; }
     else { btn.textContent = '도전'; btn.className = 'primary'; btn.onclick = () => startRaidFight(stage); }
     div.querySelector('.btns').appendChild(btn);

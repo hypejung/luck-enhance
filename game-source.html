@@ -2615,12 +2615,17 @@ const RUNE_SPECIALS = {
                    desc: '같은 대상을 3초 이상 계속 공격 중이면 3초마다 그 대상이 받는 피해가 누적 상승한다(최대 5중첩, 대상이 바뀌면 초기화).' },
   skyArchiveRune:{ name: '천공서고의 룬', grade: 6, libraryOnly: true, mult: 1.0,
                    desc: '무기의 정수 획득량 +100% (중첩 가능)' },
+  // 맨손 전용 태초 룬 — 드롭/합성으로는 절대 얻을 수 없고, 맨손이 +30을 달성하는 순간
+  // 기존 장착 룬을 전부 반납하며 자동으로 장착된다.
+  fireFist: { name: '불주먹', grade: 7, uniqueGrant: true, speedBonus: 3.0, critChance: 0.25, critDamage: 2.0,
+              proc: 0.10, skillMult: 100.0,
+              desc: '공격속도 +300%p, 치명타 확률 +25%p, 치명타 피해 +200%p. 공격 시 10% 확률로 "염왕"이 발동해 무기 공격력의 10000%에 달하는 피해를 입힌다(염왕 발동 시에도 별도로 치명타가 적용될 수 있다).' },
 };
 const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
-for (const [k, v] of Object.entries(RUNE_SPECIALS)) { if (!v.libraryOnly) RUNE_SPECIALS_BY_GRADE[v.grade].push(k); }
+for (const [k, v] of Object.entries(RUNE_SPECIALS)) { if (!v.libraryOnly && !v.uniqueGrant) RUNE_SPECIALS_BY_GRADE[v.grade].push(k); }
 // 도서관 보상 전용 뽑기 풀 — libraryOnly 룬만 등급별로 모아둔다.
 const RUNE_SPECIALS_LIBRARY_BY_GRADE = { 4: [], 5: [], 6: [] };
-for (const [k, v] of Object.entries(RUNE_SPECIALS)) { if (v.libraryOnly) RUNE_SPECIALS_LIBRARY_BY_GRADE[v.grade].push(k); }
+for (const [k, v] of Object.entries(RUNE_SPECIALS)) { if (v.libraryOnly && !v.uniqueGrant) RUNE_SPECIALS_LIBRARY_BY_GRADE[v.grade].push(k); }
 
 // 룬박스 등급별 드롭 확률(%) — 등급별로 직접 지정한 고정 테이블.
 // 인덱스 0~6 = 일반/레어/에픽/유니크/레전더리/신화/고대. 각 행의 합은 100.
@@ -2944,7 +2949,9 @@ function rawWeaponSpeed(w) {
   const variantMult = variant ? variant.speedMod : 1;
   // 활 무기특성: 훈련/장신구/효과/스택/룬 등 모든 출처의 공격속도 "증가량"을 20% 증폭한다
   // (기본 공속 자체가 아니라 그 위에 쌓이는 보너스 총합에만 곱해짐).
-  const speedBonusSum = accEff().speed + effSpeed + stackBonus + weaponRuneStat(w, 'atkSpeed') / 100 + awakenStat(w, 'speed');
+  // 불주먹(맨손 전용 태초 룬): 공격속도 고정 보너스
+  const fireFistSpeedBonus = weaponSpecialCount(w, 'fireFist') * (RUNE_SPECIALS.fireFist.speedBonus || 0);
+  const speedBonusSum = accEff().speed + effSpeed + stackBonus + weaponRuneStat(w, 'atkSpeed') / 100 + awakenStat(w, 'speed') + fireFistSpeedBonus;
   const speedAmp = typeTrait(w, 'speedAmp');
   return baseSpeed * (1 + speedBonusSum * (1 + speedAmp)) * burstMult * variantMult;
 }
@@ -4071,7 +4078,11 @@ function attack(w) {
   const ae2 = accEff();
   // 폭풍의 검(신화 공격속도): 공격속도가 빠를수록 치명타 확률도 함께 상승
   const stormBonus = (w.effect === 'stormblade') ? weaponSpeed(w) * (e.critFromSpeed || 0) : 0;
-  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus + awakenStat(w, 'critChance');
+  // 불주먹(맨손 전용 태초 룬): 치명타 확률/피해 고정 보너스
+  const fireFistCount = weaponSpecialCount(w, 'fireFist');
+  const fireFistCritChance = fireFistCount * (RUNE_SPECIALS.fireFist.critChance || 0);
+  const fireFistCritDamage = fireFistCount * (RUNE_SPECIALS.fireFist.critDamage || 0);
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCritChance;
   // fixedCrit: 다른 원천의 치명타 확률과 무관하게 고정된 확률로 치명타가 발동하는 효과
   // (심판의 전조=70%, 심판의 시간류는 100%). 고정이라 못 쓰는 "다른 원천" 치명타 확률의
   // 일부를 치명타 피해로 전환해준다(overflowRatio).
@@ -4080,7 +4091,7 @@ function attack(w) {
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage'));
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage);
   if (fixedCrit !== null) critMult += otherCritChance * (e.overflowRatio || 0);
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
@@ -4123,6 +4134,15 @@ function attack(w) {
   if (didCrit && hasAwakenEffect(w, 'critFollowup') && Math.random() < (AWAKENING_EFFECTS.critFollowup.proc || 0)) {
     mon.hp -= preCritDmg * EXTRA_ATK_DMG_MULT;
     floatText('⚡ 회심의 연격!');
+  }
+  // 불주먹(맨손 전용 태초 룬): 공격 시 확률적으로 "염왕" 발동 — 무기 공격력의 10000% 고정 피해.
+  // 염왕도 별도로 치명타 판정을 받는다(같은 치명타 확률/배율 재사용).
+  if (fireFistCount > 0 && Math.random() < RUNE_SPECIALS.fireFist.proc) {
+    let skillDmg = weaponAtk(w) * (RUNE_SPECIALS.fireFist.skillMult || 0);
+    let skillCrit = false;
+    if (critChance > 0 && Math.random() < critChance) { skillDmg *= critMult; skillCrit = true; }
+    mon.hp -= skillDmg;
+    floatText(skillCrit ? '🔥 염왕 치명타!' : '🔥 염왕!');
   }
   if (ambushCrit) {
     dmg *= ANCIENT_SPIRITS.ambush.extraMult || 1;
@@ -5022,6 +5042,15 @@ function tryEnhance(advanced, targetWeapon) {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
     log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)${advTag}`, 'lg-good');
+    // 맨손 +30 달성: 기존 장착 룬을 전부 반납하고 태초 룬 "불주먹"을 자동 장착한다.
+    if (isFist(w) && w.enhance >= ENH.maxLevel) {
+      if (Array.isArray(w.runes) && w.runes.length) {
+        S.runes.push(...w.runes);
+        w.runes = [];
+      }
+      w.runes = [{ id: runeUid++, grade: 7, key: 'fireFist' }];
+      log(`🔥 맨손이 +${ENH.maxLevel}에 도달하며 태초 룬 <b>[불주먹]</b>이 자동으로 깃들었습니다!`, 'lg-prim');
+    }
   } else {
     const dChance = effectiveDestroyChance(w) * (advanced ? ADVANCED_ENH_DESTROY_MULT : 1);
     // 로그 문구용: 고대는 "파괴"가 아니라 "초기화"가, 태초는 파괴/초기화 자체가 없으니 아예 표기하지 않는다.
@@ -6586,11 +6615,12 @@ function computeStats() {
   // 심판의 전조(고정 치명타+오버플로우), 포자 폭발("포자 만개" 중 연타 상한 상향) 등 일시적/
   // 파생 보너스도 전투 중 실시간으로 그대로 반영되어야 하기 때문.
   const stormBonus = (w && w.effect === 'stormblade') ? spd * ((e && e.critFromSpeed) || 0) : 0;
-  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance');
+  const fireFistCount2 = weaponSpecialCount(w, 'fireFist');
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0);
   const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
   const critChance = (fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance)) * 100;
   const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
-  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage'));
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0));
   if (fixedCrit !== null) critMult += otherCritChance * ((e && e.overflowRatio) || 0);
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);

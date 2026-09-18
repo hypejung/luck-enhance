@@ -1815,11 +1815,14 @@ const LIBRARY = {
   timeLimit: 120,
   unlockRaidStage: 11,   // 토벌전 12단계(0-indexed 11) 클리어 시 해금
   baseHpStage: 11,       // 깊이 0의 체력 = raidHp(11)와 동일
-  hpGrowth: 2.8,
+  // 체력 성장률 완화(기존 2.8 -> 2.35) — 무기 강화를 제외한 모든 요소(룬/장신구/인장/도감/
+  // 유물/각성)를 이론상 최대치로 갖춘 상태를 기준으로, 20서고(깊이19) 클리어에 필요한 화력이
+  // 태초 +27 정도가 되도록 역산해서 잡은 값.
+  hpGrowth: 2.35,
   weeklyTotal: 3,
-  baseEssence: 15,       // 깊이 0의 무기의 정수 보상 (대폭 상향)
-  baseAwaken: 10,        // 깊이 0의 각성의 정수 보상 (대폭 상향)
-  rewardGrowth: 1.5,     // 정수 보상 성장률도 함께 상향(기존 1.35)
+  baseEssence: 20,       // 깊이 0의 무기의 정수 보상 (재상향)
+  baseAwaken: 14,        // 깊이 0의 각성의 정수 보상 (재상향)
+  rewardGrowth: 1.7,     // 정수 보상 성장률도 체력 완화에 맞춰 더 올림(기존 1.5)
   runeDropChance: 0.15,
   relicDropChance: 0.10,
 };
@@ -5525,7 +5528,7 @@ function load() {
     if (Array.isArray(data.genesisOwned)) {
       for (const id of data.genesisOwned) {
         if (data.weapons.some(w => w.genesisId === id)) continue;
-        const artifact = GENESIS_ARTIFACTS.find(a => a.id === id);
+        const artifact = GENESIS_ARTIFACTS.find(a => a && a.id === id);
         if (!artifact) continue;
         data.weapons.push({
           id: uid++, grade: GENESIS_GRADE, type: '고유', icon: artifact.icon, name: artifact.name,
@@ -5923,7 +5926,7 @@ function renderEnhance() {
   const typeInfo = isFist(w) ? null : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   const flavor = weaponFlavorText(w);
   const spirit = ancientSpirit(w);
-  const genesisArtifact = isGenesisWeapon(w) ? GENESIS_ARTIFACTS.find(a => a.id === w.genesisId) : null;
+  const genesisArtifact = isGenesisWeapon(w) ? GENESIS_ARTIFACTS.find(a => a && a.id === w.genesisId) : null;
   const isEquippedTarget = w.id === S.equipped;
   const dpsLine = isEquippedTarget
     ? `공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}`
@@ -6180,7 +6183,7 @@ function renderInventory() {
     const runes = w.runes || [];
     const flavor = weaponFlavorText(w);
     const spirit = ancientSpirit(w);
-    const genesisArtifact = isGenesisWeapon(w) ? GENESIS_ARTIFACTS.find(a => a.id === w.genesisId) : null;
+    const genesisArtifact = isGenesisWeapon(w) ? GENESIS_ARTIFACTS.find(a => a && a.id === w.genesisId) : null;
     const hasDetail = !!(w.effect || runes.length || flavor || spirit || genesisArtifact);
     const expanded = hasDetail && expandedWeapons.has(w.id);
     const div = document.createElement('div');

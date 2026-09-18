@@ -5034,17 +5034,17 @@ function tryEnhance(advanced, targetWeapon) {
     // "파괴 대신 초기화" 분기가 빗나가도 바로 아래 일반 파괴 분기가 또 한 번 굴려 파괴로
     // 새어나가는 이중 판정 버그가 생긴다.
     const destroyRoll = Math.random() * 100;
-    // 맨손은 파괴되지 않고 +0으로 초기화
-    if (isFist(w)) {
+    // 맨손/고대 무기는 파괴되지 않는 대신, 파괴가 확정됐을 순간 통째로 +0 초기화된다.
+    // 그 외의 경우(파괴 확률에 안 걸림)는 다른 무기와 똑같이 유지/단계 하락으로 처리된다.
+    if ((isFist(w) || isAncientWeapon(w)) && destroyRoll < dChance) {
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
-      log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (파괴 확률이었음: ${dChance}%)`, 'lg-bad');
-    } else if (isAncientWeapon(w) && destroyRoll < dChance) {
-      // 고대 무기는 파괴되지 않는 대신, 파괴가 확정됐을 순간 통째로 +0 초기화된다.
-      w.enhance = 0;
-      playEnhanceFx('fail', attemptLevel);
-      log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
-    } else if (!isAncientWeapon(w) && destroyRoll < dChance) {
+      if (isFist(w)) {
+        log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (초기화 확률이었음: ${dChance}%)`, 'lg-bad');
+      } else {
+        log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
+      }
+    } else if (!isFist(w) && !isAncientWeapon(w) && destroyRoll < dChance) {
       playEnhanceFx('destroy', attemptLevel);
       const destroyedTag = gradeTag(w);
       log(`💥 무기가 파괴되었습니다!! ${destroyedTag}${advTag}`, 'lg-bad');
@@ -5917,7 +5917,7 @@ function renderEnhance() {
   $('enhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
     : isFist(w)
-      ? `✊ 맨손은 파괴되지 않습니다. 실패 시 <span class="warn">+0으로 초기화</span>${dChance > 0 ? ` (원래 파괴 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
+      ? `✊ 맨손은 파괴되지 않습니다. 실패 시: 유지 / 단계 -1 / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
       : isAncientWeapon(w)
         ? `🏺 고대 무기는 파괴되지 않습니다. 실패 시: 유지 / 단계 -1 / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''}${matNote} · 현재 <b>+${w.enhance}</b>`
         : isGenesisWeapon(w)

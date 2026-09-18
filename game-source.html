@@ -1552,10 +1552,22 @@ const RAID = {
                         // 성장(레벨당 최대 ×4.3배)에 비해 너무 완만해서 강화 한 번으로
                         // 토벌전 여러 단계를 건너뛰던 문제를 완화하기 위해 상향)
   baseGoldMult: 4,      // 1단계 골드 보상 = 20단계 사냥터 보스 골드 계산식 × 4
-  goldGrowth: 1.7,      // 단계당 골드 보상 성장 배율 (기존 1.5 — 체력 성장률(2.2배) 상향에 맞춰
-                        // 고단계 보상도 함께 키우기 위해 상향, 20단계 기준 약 10.8배 증가)
+  // 골드/증표 보상 모두 "단계당 성장률 자체가 커지는" 가속형 곱연산으로 계산한다(강화의
+  // enhAtkMult와 같은 방식) — 단순 지수(성장률 고정)보다 후반 단계로 갈수록 훨씬 가파르게 벌어진다.
+  goldGrowthBase: 0.5,     // 0단계에서의 단계당 성장률(=×1.5)
+  goldGrowthLinear: 0.03,  // 단계마다 성장률 자체가 이만큼씩 더 커짐
+  tokenBase: 5,            // 0단계 토벌의 증표 보상
+  tokenGrowthBase: 0.35,   // 0단계에서의 단계당 성장률(=×1.35)
+  tokenGrowthLinear: 0.01, // 단계마다 성장률 자체가 이만큼씩 더 커짐
   dailyTotal: 3,        // 하루 총 도전 가능 횟수(전체 단계 합산)
 };
+// 단계가 오를수록 성장률 자체가 커지는 가속형 누적 배율 (0단계부터 stage단계까지 매 단계의
+// (1+growthBase+growthLinear*s) 배율을 전부 곱함)
+function raidAccelMult(stage, growthBase, growthLinear) {
+  let m = 1;
+  for (let s = 0; s <= stage; s++) m *= (1 + growthBase + growthLinear * s);
+  return m;
+}
 const RAID_MONSTERS = [
   { name: '잠식하는 태고의 슬라임핵', emoji: '🟢', flavor: '순수했던 슬라임의 핵을 부식시켜 거대화시킨 고대의 화신.' },
   { name: '천 마리를 삼킨 흡혈 군주', emoji: '🦇', flavor: '무수한 박쥐의 피를 흡수해 하나로 뭉친 고대의 존재.' },
@@ -1777,7 +1789,7 @@ function raidEnsureDay() {
 function raidHp(stage) { return Math.round(RAID.baseHp * Math.pow(RAID.hpGrowth, stage)); }
 // 화룡의 인장: 하루 총 도전 횟수 +1
 function effectiveRaidDailyTotal() { return RAID.dailyTotal + (sealEquippedHas('dragonKing') ? 1 : 0); }
-function raidTokenReward(stage) { return 5 + stage * 2; }
+function raidTokenReward(stage) { return Math.round(RAID.tokenBase * raidAccelMult(stage, RAID.tokenGrowthBase, RAID.tokenGrowthLinear)); }
 // 토벌전 골드 보상도 일반 사냥과 동일하게 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/
 // 글러트니 등)가 그대로 적용된다 — 고강화 구간 비용을 감당하려면 토벌전 수입 자체를 플레이어가
 // 장비 투자로 키울 수 있는 레버가 필요하다고 판단해 다시 반영(이전엔 별도 콘텐츠로 분리했었음).
@@ -1790,24 +1802,24 @@ function raidGoldReward(stage) {
   if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
   const killsPerHour = weaponSpeed(w) * 3600;
   const base = Math.floor(floorGold(FLOORS.length - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
-  return Math.floor(base * Math.pow(RAID.goldGrowth, stage));
+  return Math.floor(base * raidAccelMult(stage, RAID.goldGrowthBase, RAID.goldGrowthLinear));
 }
 
 // ---------- 고대의 도서관 (토벌전보다 상위 컨텐츠, 주간 도전 · 깊이 기록형) ----------
-// 1단계(깊이 0) 난이도 = 토벌전 13단계(stage index 12)와 동급으로 시작하되, 단계 성장률은
-// 토벌전(2.2배)보다 훨씬 가파르게(2.8배) 잡아서 몇 단계만 더 들어가도 토벌전을 추월한다.
+// 1단계(깊이 0) 난이도 = 토벌전 12단계(stage index 11)와 동급으로 시작하되, 단계 성장률은
+// 토벌전보다 훨씬 가파르게(2.8배) 잡아서 몇 단계만 더 들어가도 토벌전을 추월한다.
 // 스테이지 선택형이 아니라 "최고 기록"을 갱신해나가는 방식 — 도전은 항상 현재 기록의 다음
 // 깊이에서 시작되고, 승패 무관하게 주간 도전 횟수를 소모한다(토벌전과 동일한 "도전 자체가
 // 소모" 철학).
 const LIBRARY = {
   timeLimit: 120,
-  unlockRaidStage: 12,   // 토벌전 13단계(0-indexed 12) 클리어 시 해금
-  baseHpStage: 12,       // 깊이 0의 체력 = raidHp(12)와 동일
+  unlockRaidStage: 11,   // 토벌전 12단계(0-indexed 11) 클리어 시 해금
+  baseHpStage: 11,       // 깊이 0의 체력 = raidHp(11)와 동일
   hpGrowth: 2.8,
   weeklyTotal: 3,
-  baseEssence: 3,        // 깊이 0의 무기의 정수 보상
-  baseAwaken: 2,         // 깊이 0의 각성의 정수 보상
-  rewardGrowth: 1.35,
+  baseEssence: 15,       // 깊이 0의 무기의 정수 보상 (대폭 상향)
+  baseAwaken: 10,        // 깊이 0의 각성의 정수 보상 (대폭 상향)
+  rewardGrowth: 1.5,     // 정수 보상 성장률도 함께 상향(기존 1.35)
   runeDropChance: 0.15,
   relicDropChance: 0.10,
 };

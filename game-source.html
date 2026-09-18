@@ -707,8 +707,8 @@
     <div class="panel">
       <h3>📖 고대의 도서관</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        <div style="font-style:italic;margin-bottom:6px;">토벌전조차 겪어보지 못한 자들은 이 서고의 입구도 찾지 못한다.
-        한 번 들어가면 서고는 끝없이 이어지고, 그 안의 지식은 갈수록 무겁고 위험해진다.</div>
+        <div style="font-style:italic;margin-bottom:6px;">고대의 존재에게 패배한 자들의 기록만이 이 서고에 남는다.
+        한 번 발을 들이면 서고는 끝없이 이어지고, 그 안의 지식은 갈수록 무겁고 위험해진다.</div>
         <div>토벌전보다 상위 컨텐츠로, <b style="color:var(--unique)">주간 3회</b>까지 도전할 수 있고,
         <b style="color:#ff7a7a">도전을 시작하면 승패와 무관하게 그 횟수가 소모</b>됩니다. 최고 기록(서고 깊이)을 계속 갱신해나가는 방식입니다.</div>
       </div>
@@ -3023,7 +3023,7 @@ function weaponBossTimeBonus(w) { return weaponSpecialCount(w, 'timedilation') *
 function weaponCooldownMult(w) { return Math.pow(RUNE_SPECIALS.bossrush.mult, weaponSpecialCount(w, 'bossrush')); }
 // 전투 화면에 잠깐 떠오르는 효과 발동 텍스트
 function floatText(msg) {
-  const hostId = bossFight.isRaid ? 'raidMonBox' : bossFight.isPunch ? 'punchMonBox' : 'monbox';
+  const hostId = bossFight.isRaid ? 'raidMonBox' : bossFight.isPunch ? 'punchMonBox' : bossFight.isLibrary ? 'libraryMonBox' : 'monbox';
   const host = $(hostId);
   if (!host) return;
   const el = document.createElement('div');
@@ -3750,7 +3750,7 @@ function addWeapon(w) {
 // 그 즉시 tick()을 종료해야 한다(보스전은 별도 흐름이라 남은 틱을 이어갈 수 없음).
 function handleKill(chainDepth) {
   chainDepth = chainDepth || 0;
-  const flashId = bossFight.isRaid ? 'raidMonEmoji' : bossFight.isPunch ? 'punchMonEmoji' : 'monemoji';
+  const flashId = bossFight.isRaid ? 'raidMonEmoji' : bossFight.isPunch ? 'punchMonEmoji' : bossFight.isLibrary ? 'libraryMonEmoji' : 'monemoji';
   const flashEl = $(flashId);
   if (flashEl) { flashEl.classList.add('flash'); setTimeout(() => flashEl.classList.remove('flash'), 400); }
   if (bossFight.active) {

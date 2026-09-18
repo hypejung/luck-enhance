@@ -1855,6 +1855,8 @@ const AWAKENING_RANKS = [
   { unlockCost: 250, rerollCost: 150, odds: [30, 32, 25, 13] },
 ];
 const AWAKENING_RARITY_LABEL = { common: '일반', rare: '레어', epic: '에픽', legendary: '전설' };
+// 기존 무기/룬 등급 색상 체계(.grade-일반=회색 ~ .grade-레전더리=빨강)를 각성 등급 표시에도 그대로 재사용
+const AWAKENING_RARITY_GRADE_CLASS = { common: 'grade-일반', rare: 'grade-레어', epic: 'grade-에픽', legendary: 'grade-레전더리' };
 const AWAKENING_COMMON_POOL = [
   { key: 'atk',   label: '공격력',   min: 0.08, max: 0.15 },
   { key: 'speed', label: '공격속도', min: 0.05, max: 0.10 },
@@ -6036,7 +6038,11 @@ function renderAwakening(w, maxed) {
     const locked = !slot && i > 0 && !w.awakening[i - 1];
     const cost = slot ? rank.rerollCost : rank.unlockCost;
     const affordable = !locked && (S.awakeningEssence || 0) >= cost;
-    const label = slot ? `[${AWAKENING_RARITY_LABEL[slot.rarity]}] ${awakenSlotLabel(slot)}` : locked ? '이전 랭크를 먼저 각성하세요' : '아직 각성되지 않음';
+    // 각성 등급도 기존 무기/룬 등급과 같은 색상 체계(일반=회색 ~ 전설=레전더리 빨강)를 그대로 재사용
+    const rarityClass = slot ? (AWAKENING_RARITY_GRADE_CLASS[slot.rarity] || '') : '';
+    const label = slot
+      ? `<span class="${rarityClass}">[${AWAKENING_RARITY_LABEL[slot.rarity]}]</span> ${awakenSlotLabel(slot)}`
+      : locked ? '이전 랭크를 먼저 각성하세요' : '아직 각성되지 않음';
     const btnLabel = slot ? `재도전 (💠${cost})` : `각성 (💠${cost})`;
     return `
       <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);">

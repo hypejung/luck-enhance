@@ -1077,14 +1077,15 @@ function subweaponActiveTierMult(tier) {
   for (let i = 0; i < tier; i++) m *= (1 + (SUBWEAPON_ACTIVE_TIER_GROWTH[i] || 0));
   return m;
 }
-// 강화 단계(1~30)별로 무엇이 오르는지 — 3단계 주기로 스탯→패시브→액티브가 순환하고,
-// 액티브 차례(3의 배수)에서는 %(홀수 번째)와 지속시간(짝수 번째)이 번갈아 오른다.
+// 강화 단계(1~30)별로 "추가 보너스"가 무엇인지 — 기본 능력치(공격력)는 무기처럼 매 강화마다
+// 항상 오르고, 그 위에 3단계 주기로 패시브→액티브가 번갈아 추가로 오른다. 액티브 차례(3의
+// 배수)에서는 %(홀수 번째)와 지속시간(짝수 번째)이 번갈아 오른다.
 function subEnhRiseType(level) {
   const m = level % 3;
-  if (m === 1) return 'stat';
-  if (m === 2) return 'passive';
+  if (m === 1) return 'stat'; // 이번 강화는 공격력만 오름(추가 보너스 없음)
+  if (m === 2) return 'passive'; // 공격력 + 패시브
   const activeTier = level / 3; // 1,2,3,...,10
-  return (activeTier % 2 === 1) ? 'activePct' : 'activeDuration';
+  return (activeTier % 2 === 1) ? 'activePct' : 'activeDuration'; // 공격력 + 액티브
 }
 // 보조무기 전용 강화확률/파괴확률 곡선 — 메인 무기 ENH와 완전히 분리된 자체 테이블.
 // 메인 무기보다 전반적으로 관대하게 잡았다(파괴 상한도 절반 이하). 이 확률에 영향을 주는
@@ -3537,9 +3538,8 @@ function accEff() {
     if (k === 'spellProc' || k === 'smashMultBonus') continue;
     eff[k] = (eff[k] || 0) + v;
   }
-  // 보조무기 기본 능력치(공격력%) — 등급/강화로만 커지고 subAmp 증폭은 받지 않음(패시브 전용 취지)
-  const equippedSub = getEquippedSubweapon();
-  if (equippedSub) eff.atk = (eff.atk || 0) + subweaponBaseAtk(equippedSub);
+  // 보조무기 자체 공격력(subweaponAtk)은 %가 아니라 절대 데미지값이라 여기(accEff)가 아니라
+  // 공격 판정 시 weaponAtk()와 직접 더해진다 — subweaponAtk() 정의부 참고.
   // 무기 각인: 장착 무기에 새겨진 각인 2줄의 효과 합산 (파괴되면 함께 사라짐, 월드 구분 없음)
   const enchantW = S && getEquipped();
   if (enchantW && enchantW.enchant) {
@@ -4196,15 +4196,24 @@ function addWeapon(w) {
 // 능력치는 상대적으로 초라했음). 고대/태초는 그 비율을 이어서 추정한 placeholder.
 const SUBWEAPON_GRADE_MULT = [1, 3, 4, 5, 6.5, 8, 13, 20]; // 일반~태초(0~7)
 function subGradeMult(grade) { return SUBWEAPON_GRADE_MULT[grade] || 1; }
-// 강화 1~30강 중 지금까지 각 항목이 몇 번 올랐는지 — subEnhRiseType()과 같은 3주기 규칙을
-// 역산한 공식이라 매 레벨을 순회할 필요가 없다.
-function subStatTier(enh) { return Math.floor((enh + 2) / 3); }
+// 패시브/액티브 차례가 강화 1~30강 중 지금까지 몇 번 돌아왔는지 — subEnhRiseType()과 같은
+// 3주기 규칙을 역산한 공식이라 매 레벨을 순회할 필요가 없다(기본 능력치는 아래처럼 매
+// 강화마다 항상 오르므로 별도의 "차례 카운트"가 필요 없다).
 function subPassiveTier(enh) { return Math.floor((enh + 1) / 3); }
 function subActiveTierTotal(enh) { return Math.floor(enh / 3); }
 function subActivePctTier(enh) { return Math.ceil(subActiveTierTotal(enh) / 2); }
 function subActiveDurTier(enh) { return Math.floor(subActiveTierTotal(enh) / 2); }
-// 기본 능력치 = 소폭의 공격력% (TODO 미확정 — "높진 않은 스펙업" 취지로 atk를 채택)
-function subweaponBaseAtk(sw) { return 0.02 * subStatTier(sw.enhance) * subGradeMult(sw.grade); }
+// 기본 능력치 = 보조무기 자체의 절대 공격력(%가 아니라 무기처럼 진짜 공격력 수치).
+// 메인 무기와 완전히 같은 GRADES[].atk 테이블 + enhAtkMult() 성장 곡선을 그대로 재사용하고,
+// sw.enhance(0~30)를 곧이곧대로 넣어서 "매 강화마다 공격력이 오르는" 일반 무기와 같은 체계로
+// 만들었다 — +10 이후 가속 구간까지 메인 무기와 똑같이 겪는다(패시브/액티브만 3주기로 별도 순환).
+// SUBWEAPON_ATK_MULT는 "보조"라는 위상에 맞게 메인 무기보다 낮춘 배수(TODO 미확정).
+const SUBWEAPON_ATK_MULT = 0.5;
+function subweaponAtk(sw) {
+  if (!sw) return 0;
+  const base = GRADES[sw.grade].atk * SUBWEAPON_ATK_MULT;
+  return base * enhAtkMult(sw.enhance, sw.grade);
+}
 // 패시브 = 종류 고유 효과(SUBWEAPON_TYPES[].passive) × 등급 배율 × 강화로 쌓인 증폭
 function subweaponPassiveMult(sw) { return 1 + 0.10 * subPassiveTier(sw.enhance); } // +30강 기준 최대 2배
 // ampBonus(=accEff().subAmp)는 호출부에서 넘겨받는다 — accEff() 내부에서 이 함수를 호출할 때
@@ -4695,7 +4704,7 @@ function attack(w) {
     w.goblinstealStacks = Math.min(ANCIENT_SPIRITS.goblinsteal.stackMax || 0, (w.goblinstealStacks || 0) + 1);
     w.goblinstealLastKill = now;
   }
-  let dmg = weaponAtk(w) * (0.9 + Math.random() * 0.2);
+  let dmg = (weaponAtk(w) + subweaponAtk(getEquippedSubweapon())) * (0.9 + Math.random() * 0.2);
   const e = w.effect ? EFFECTS[w.effect] : null;
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
@@ -7057,7 +7066,7 @@ function renderSubEquippedBox() {
     <div class="invitem equipped">
       <div><div class="wn">${subweaponGradeTag(sw)}</div>
       ${flavor ? `<div class="wi" style="font-style:italic">${flavor}</div>` : ''}
-      <div class="wi">기본 능력치: 공격력 +${(subweaponBaseAtk(sw) * 100).toFixed(1)}%</div>
+      <div class="wi">기본 능력치: 공격력 +${fmt(subweaponAtk(sw))} (메인 무기 공격력에 그대로 합산)</div>
       <div class="wi">패시브(${t.name}): ${passiveText || '없음'}</div>
       <div class="wi">액티브 "${SUBWEAPON_ACTIVE.name}": 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (전투당 1회, 발동 시점 아래에서 설정)</div>
       <div class="wi" style="margin-top:4px;">

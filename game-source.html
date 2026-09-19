@@ -404,6 +404,7 @@
         <div class="tab" data-tab="inventory">🎒 가방</div>
         <div class="tab" data-tab="craft">🧪 조합</div>
         <div class="tab" data-tab="box">🎁 랜덤박스</div>
+        <div class="tab" data-tab="subweapon">🗡️ 보조무기</div>
       </div>
     </div>
     <div class="tabgroup" data-group="etc">
@@ -568,6 +569,31 @@
       <h3>🎁 랜덤박스 상점</h3>
       <div id="boxlist"></div>
       <div id="gachaslot"></div>
+    </div>
+  </div>
+
+  <!-- 보조무기 (월드2 전용) -->
+  <div id="tab-subweapon" style="display:none">
+    <div class="panel">
+      <h3>🗡️ 보조무기란?</h3>
+      <div style="font-size:12px; color:var(--sub);">
+        메인 무기와 별개로 상시 장착하는 두 번째 장비입니다. <b style="color:var(--unique)">월드2(21층 이상)</b> 사냥터/뽑기에서만 얻을 수 있고,
+        기본 능력치(공격력) + 종류별 고유 패시브 + 공용 액티브 "결전의 기백"(보스 계열 전투에서 지정한 시점에 1회 자동 발동, 일정 시간 보스 피해량 대폭 증가)을 가집니다.
+        +30까지 강화 가능하며, 강화 1턴마다 스탯→패시브→액티브(위력/지속시간 교차)가 3주기로 순환 상승합니다.
+      </div>
+    </div>
+    <div class="panel">
+      <h3>🎰 보조무기 뽑기</h3>
+      <div id="subGachaBox"></div>
+      <div id="subGachaSlot"></div>
+    </div>
+    <div class="panel">
+      <h3>⚔️ 장착 중인 보조무기</h3>
+      <div id="subEquippedBox"></div>
+    </div>
+    <div class="panel">
+      <h3>🎒 보유 보조무기 <span style="font-size:12px;color:var(--sub)" id="subinvcount"></span></h3>
+      <div id="subinvlist"></div>
     </div>
   </div>
 
@@ -3084,6 +3110,8 @@ function newState() {
     relics: [],            // 고대의 유물 컬렉션: [true/false, ...] 20개, index = 층 번호
     subBossCodexSeen: [],  // 보스 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
     subRelics: [],         // 고대 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
+    subweapons: [],        // 보유 보조무기 목록: [{id, typeIdx, grade, enhance, activeTiming}, ...]
+    subEquipped: null,     // 장착 중인 보조무기 id
   };
 }
 
@@ -3467,6 +3495,17 @@ function accEff() {
   for (const k of Object.keys(sbe)) eff[k] = (eff[k] || 0) + sbe[k];
   const sre = subRelicMilestoneEff();
   for (const k of Object.keys(sre)) eff[k] = (eff[k] || 0) + sre[k];
+  // 장착 중인 보조무기의 패시브(공용 스탯 키만) — spellProc/smashMultBonus는 여기 없는 별도
+  // 훅(typeTrait 자리)에서 처리된다. ampBonus는 여기까지 누적된 eff.subAmp를 그대로 넘긴다
+  // (accEff() 안에서 accEff()를 다시 부르면 무한 재귀가 되므로).
+  const swPassive = subweaponPassiveEff(getEquippedSubweapon(), eff.subAmp);
+  for (const [k, v] of Object.entries(swPassive)) {
+    if (k === 'spellProc' || k === 'smashMultBonus') continue;
+    eff[k] = (eff[k] || 0) + v;
+  }
+  // 보조무기 기본 능력치(공격력%) — 등급/강화로만 커지고 subAmp 증폭은 받지 않음(패시브 전용 취지)
+  const equippedSub = getEquippedSubweapon();
+  if (equippedSub) eff.atk = (eff.atk || 0) + subweaponBaseAtk(equippedSub);
   // 무기 각인: 장착 무기에 새겨진 각인 2줄의 효과 합산 (파괴되면 함께 사라짐, 월드 구분 없음)
   const enchantW = S && getEquipped();
   if (enchantW && enchantW.enchant) {
@@ -3886,6 +3925,8 @@ function dropRoll() {
   rollGenesisArtifact(S.floor, isU ? GENESIS_ELITE_MULT : 1);
   // 고대 무기: 태초보다는 흔하지만 여전히 극희박한 확률로 드랍 시도 (엘리트는 5배)
   rollAncientWeapon(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
+  // 보조무기: 월드2(21~40층) 전용 드롭 시도 (엘리트는 5배, rollSubweaponDrop 내부에서 층 체크)
+  rollSubweaponDrop(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
 
   // 연쇄 처치(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공 시 처치 보상을 한 번 더 획득
   // 발동 알림은 화면 텍스트로만 — 실제 보상은 재귀 호출된 dropRoll()의 일반 로그로 남음
@@ -4104,6 +4145,206 @@ function addWeapon(w) {
   if (WEAPON_TYPES.every(t => S.weapons.some(x => x.type === t.name))) unlockEgg('collector');
 }
 
+/* ===================== 보조무기 (월드2 전용, 아직 UI 없음 — 로직만) ===================== */
+// 등급별 파워 배율. 메인 무기 GRADES[].atk와 별개의 자체 곡선 — %p류 패시브가 태초에서
+// 터무니없이 커지지 않도록 완만하게 잡았다. 전부 밸런스 미확정 임시값(TODO).
+const SUBWEAPON_GRADE_MULT = [1, 1.4, 2, 2.8, 4, 5.5, 8, 12]; // 일반~태초(0~7)
+function subGradeMult(grade) { return SUBWEAPON_GRADE_MULT[grade] || 1; }
+// 강화 1~30강 중 지금까지 각 항목이 몇 번 올랐는지 — subEnhRiseType()과 같은 3주기 규칙을
+// 역산한 공식이라 매 레벨을 순회할 필요가 없다.
+function subStatTier(enh) { return Math.floor((enh + 2) / 3); }
+function subPassiveTier(enh) { return Math.floor((enh + 1) / 3); }
+function subActiveTierTotal(enh) { return Math.floor(enh / 3); }
+function subActivePctTier(enh) { return Math.ceil(subActiveTierTotal(enh) / 2); }
+function subActiveDurTier(enh) { return Math.floor(subActiveTierTotal(enh) / 2); }
+// 기본 능력치 = 소폭의 공격력% (TODO 미확정 — "높진 않은 스펙업" 취지로 atk를 채택)
+function subweaponBaseAtk(sw) { return 0.02 * subStatTier(sw.enhance) * subGradeMult(sw.grade); }
+// 패시브 = 종류 고유 효과(SUBWEAPON_TYPES[].passive) × 등급 배율 × 강화로 쌓인 증폭
+function subweaponPassiveMult(sw) { return 1 + 0.08 * subPassiveTier(sw.enhance); }
+// ampBonus(=accEff().subAmp)는 호출부에서 넘겨받는다 — accEff() 내부에서 이 함수를 호출할 때
+// 그 안에서 다시 accEff()를 부르면 무한 재귀가 되므로, accEff()는 그 시점까지 이미 누적된
+// eff.subAmp(장신구 등 gear 소스)를 그대로 넘기고, 그 외 호출부는 accEff().subAmp를 넘긴다.
+function subweaponPassiveEff(sw, ampBonus) {
+  if (!sw) return {};
+  const t = SUBWEAPON_TYPES[sw.typeIdx];
+  if (!t) return {};
+  const amp = subGradeMult(sw.grade) * subweaponPassiveMult(sw) * (1 + (ampBonus || 0));
+  const eff = {};
+  for (const [k, v] of Object.entries(t.passive)) eff[k] = v * amp;
+  return eff;
+}
+// 액티브 "결전의 기백" 위력/지속시간 — 위력은 등급 배율, 지속시간은 초 단위라 등급 배율 없이 강화만 반영.
+function subweaponActiveBossDmg(sw, ampBonus) {
+  return SUBWEAPON_ACTIVE.baseBossDmgPct * subGradeMult(sw.grade) * (1 + (ampBonus || 0))
+    + SUBWEAPON_ACTIVE.bossDmgPctPerTier * subActivePctTier(sw.enhance);
+}
+function subweaponActiveDuration(sw) {
+  return SUBWEAPON_ACTIVE.baseDuration + SUBWEAPON_ACTIVE.durationPerTier * subActiveDurTier(sw.enhance);
+}
+function getEquippedSubweapon() { return (S.subweapons || []).find(sw => sw.id === S.subEquipped) || null; }
+// spellProc/smashMultBonus는 accEff()의 공용 스탯 키가 아니라 typeTrait() 자리에서 직접 더해지므로
+// 여기서 개별 조회할 수 있게 노출한다(accEff() 밖에서 호출되므로 accEff().subAmp를 그대로 조회해도 안전).
+// 그 외 스탯(atk/speed/extraAtk/critChance/critDamage/bossDmg)은 accEff()가 subweaponPassiveEff()를
+// 직접 합산하므로 이 함수를 거치지 않는다.
+function subweaponPassiveValue(key) {
+  const sw = getEquippedSubweapon();
+  if (!sw) return 0;
+  return subweaponPassiveEff(sw, accEff().subAmp)[key] || 0;
+}
+function subweaponItemName(sw) {
+  const t = SUBWEAPON_TYPES[sw.typeIdx];
+  const type = t.name;
+  if (sw.grade === 0) return type;
+  if (sw.grade === 1) return `${SUBWEAPON_ADJ[type] || ''} ${type}`.trim();
+  if (sw.grade === 2) return SUBWEAPON_EPIC_NAMES[type] || type;
+  if (sw.grade === 3) return SUBWEAPON_UNIQUE_NAMES[type] || type;
+  if (sw.grade === 4) return (SUBWEAPON_LEGEND_NAMES[type] && SUBWEAPON_LEGEND_NAMES[type].name) || type;
+  if (sw.grade === 5) return (SUBWEAPON_MYTH_NAMES[type] && SUBWEAPON_MYTH_NAMES[type].name) || type;
+  return type; // 고대/태초(6~7)는 아직 이름 테이블 없음(추후 설계)
+}
+function subweaponFlavorText(sw) {
+  const t = SUBWEAPON_TYPES[sw.typeIdx];
+  const type = t.name;
+  if (sw.grade === 4) return (SUBWEAPON_LEGEND_NAMES[type] || {}).flavor || null;
+  if (sw.grade === 5) return (SUBWEAPON_MYTH_NAMES[type] || {}).flavor || null;
+  return null;
+}
+function subweaponGradeTag(sw) {
+  const g = GRADES[sw.grade];
+  return `<span class="grade-${g.name}">${g.name} ${SUBWEAPON_TYPES[sw.typeIdx].icon} [${subweaponItemName(sw)}] +${sw.enhance}</span>`;
+}
+function subweaponPower(sw) { return sw.grade * 1000 + sw.enhance; } // 대충 비교용(가방 정리 시 최약체 판정)
+function makeSubweapon(grade, typeIdx) {
+  return { id: uid++, typeIdx, grade, enhance: 0, activeTiming: 30 };
+}
+const SUBWEAPON_BAG_MAX = 40; // TODO 미확정
+function addSubweapon(sw) {
+  if (!Array.isArray(S.subweapons)) S.subweapons = [];
+  if (S.subweapons.length >= SUBWEAPON_BAG_MAX) {
+    const sellable = S.subweapons.filter(x => x.id !== S.subEquipped);
+    if (sellable.length) {
+      const weakest = [...sellable].sort((a, b) => subweaponPower(a) - subweaponPower(b))[0];
+      S.subweapons = S.subweapons.filter(x => x.id !== weakest.id);
+      log(`🗡️ 보조무기 가방이 가득 차서 가장 약한 보조무기 자동 판매: ${subweaponGradeTag(weakest)}`);
+    } else {
+      return; // 장착 중인 것 하나뿐이면 그냥 못 들어옴(TODO: 정책 재검토)
+    }
+  }
+  S.subweapons.push(sw);
+}
+function equipSubweapon(id) {
+  const sw = (S.subweapons || []).find(x => x.id === id);
+  if (!sw) return;
+  S.subEquipped = id;
+  renderSubweaponTab(); renderTop(); save();
+}
+function unequipSubweapon() {
+  S.subEquipped = null;
+  renderSubweaponTab(); save();
+}
+function sellSubweapon(id) {
+  if (id === S.subEquipped) { log('장착 중인 보조무기는 판매할 수 없습니다. 먼저 해제하세요.', 'lg-bad'); return; }
+  const sw = (S.subweapons || []).find(x => x.id === id);
+  if (!sw) return;
+  const price = Math.round(20 * subGradeMult(sw.grade) * (1 + sw.enhance * 0.3)); // TODO 미확정 판매가
+  S.subweapons = S.subweapons.filter(x => x.id !== id);
+  S.gold += price;
+  log(`판매: ${subweaponGradeTag(sw)} → +${fmt(price)} 골드`);
+  renderSubweaponTab(); renderTop(); save();
+}
+function setSubweaponActiveTiming(sec) {
+  const sw = getEquippedSubweapon();
+  if (!sw) return;
+  const n = Math.round(Number(sec));
+  sw.activeTiming = Math.max(SUBWEAPON_ACTIVE.timingMin, Math.min(SUBWEAPON_ACTIVE.timingMax, isNaN(n) ? 0 : n));
+  save();
+}
+// ---- 강화 ----
+function subEnhanceCost(sw) {
+  // TODO 미확정 — 메인 무기(GRADES[].enhanceCost × costGrowth^enhance)보다 훨씬 저렴하게.
+  return Math.round(GRADES[sw.grade].enhanceCost * 0.3 * Math.pow(1.35, sw.enhance));
+}
+function subSuccessChance(sw) {
+  const base = SUB_ENH.success[sw.enhance] || 0;
+  return Math.min(100, base + (accEff().subEnh || 0) * 100);
+}
+function subDestroyChance(sw) {
+  const base = SUB_ENH.destroy[sw.enhance] || 0;
+  return Math.max(0, base * (1 - (accEff().subDestroyReduce || 0)));
+}
+function trySubEnhance() {
+  const sw = getEquippedSubweapon();
+  if (!sw) { log('장착된 보조무기가 없습니다.', 'lg-bad'); return; }
+  if (sw.enhance >= SUB_ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
+  const cost = subEnhanceCost(sw);
+  if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
+  S.gold -= cost;
+  const chance = subSuccessChance(sw);
+  if (Math.random() * 100 < chance) {
+    sw.enhance++;
+    log(`✨ 보조무기 강화 성공! ${subweaponGradeTag(sw)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
+  } else {
+    const dChance = subDestroyChance(sw);
+    if (Math.random() * 100 < dChance) {
+      log(`💥 보조무기가 파괴되었습니다!! ${subweaponGradeTag(sw)} (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
+      const wasEquipped = sw.id === S.subEquipped;
+      S.subweapons = S.subweapons.filter(x => x.id !== sw.id);
+      if (wasEquipped) S.subEquipped = null;
+    } else if (Math.random() < 0.5) {
+      log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
+    } else {
+      sw.enhance = Math.max(0, sw.enhance - 1);
+      log(`❌ 보조무기 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
+    }
+  }
+  renderSubweaponTab(); renderTop(); save();
+}
+// ---- 뽑기 ----
+// 가격은 고대 룬박스보다 확실히 비싸게(초안: 4.5배) — 골드 소모처를 늘리려는 취지.
+const SUBWEAPON_GACHA = {
+  get cost() { return Math.round(RUNE_BOXES[6].cost * 4.5); }, // TODO 미확정
+  dropTable: [[0, 45], [1, 28], [2, 15], [3, 8], [4, 3], [5, 1]], // 등급별 확률(%), 신화 1%
+};
+function buySubweaponGacha() {
+  const cost = Math.round(SUBWEAPON_GACHA.cost * (1 - (accEff().subGachaDiscount || 0)));
+  if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
+  S.gold -= cost;
+  const grade = wrand(SUBWEAPON_GACHA.dropTable);
+  const sw = makeSubweapon(grade, Math.floor(Math.random() * SUBWEAPON_TYPES.length));
+  addSubweapon(sw);
+  log(`🗡️ [보조무기 뽑기] → ${subweaponGradeTag(sw)} 획득!`, grade >= 4 ? 'lg-prim' : 'lg-good');
+  renderSubweaponTab(); renderTop(); save();
+}
+// ---- 사냥터 드롭(월드2 전용) ----
+// TODO 미확정 — 1~20층 무기 드롭률(0.6%)보다 낮게 잡음(비싼 만큼 희귀해야 한다는 취지).
+const SUBWEAPON_DROP_CHANCE = 0.0015;
+function rollSubweaponDrop(floorIdx, kindMult) {
+  if (floorIdx < WORLD2_START_FLOOR) return; // 월드2 전용
+  const luckMul = (1 + accEff().luck) * (1 + (accEff().subDropRate || 0));
+  if (Math.random() >= SUBWEAPON_DROP_CHANCE * kindMult * luckMul) return;
+  const grade = wrand(SUBWEAPON_GACHA.dropTable);
+  const sw = makeSubweapon(grade, Math.floor(Math.random() * SUBWEAPON_TYPES.length));
+  addSubweapon(sw);
+  log(`🗡️🗡️ <b>보조무기 드롭!</b> ${subweaponGradeTag(sw)}`, grade >= 4 ? 'lg-prim' : 'lg-good');
+  renderTop(); save();
+}
+// ---- 액티브 "결전의 기백" 발동 (bossFight.active 중에만, 전투당 1회) ----
+function updateSubweaponActive() {
+  const sw = getEquippedSubweapon();
+  if (sw && !bossFight.subActiveUsed && bossFight.elapsed >= (sw.activeTiming || 0)) {
+    bossFight.subActiveUsed = true;
+    const dmgPct = subweaponActiveBossDmg(sw, accEff().subAmp);
+    const dur = subweaponActiveDuration(sw);
+    bossFight.dmgBonus = dmgPct;
+    bossFight.subActiveEndAt = Date.now() + dur * 1000;
+    floatText('🗡️ 결전의 기백!');
+    log(`🗡️ <b>결전의 기백</b> 발동! 보스 피해량 +${Math.round(dmgPct * 100)}% (${dur.toFixed(1)}초간)`, 'lg-prim');
+  }
+  if (bossFight.dmgBonus > 0 && Date.now() >= bossFight.subActiveEndAt) {
+    bossFight.dmgBonus = 0;
+  }
+}
+
 // 몬스터가 죽었을 때 공통 처리(연출 + 보스/일반 분기). 'boss'를 반환하면 호출부는
 // 그 즉시 tick()을 종료해야 한다(보스전은 별도 흐름이라 남은 틱을 이어갈 수 없음).
 function handleKill(chainDepth) {
@@ -4151,6 +4392,8 @@ function tick(dt) {
   // 보스전 진행 중: 타이머 감소
   if (bossFight.active) {
     bossFight.timeLeft -= dt;
+    bossFight.elapsed += dt;
+    updateSubweaponActive();
     renderBossBtn();
     if (bossFight.isRaid) renderRaidBattleHP();
     else if (bossFight.isPunch) renderPunchBattleHP();
@@ -4599,7 +4842,7 @@ function attack(w) {
     fx.bluntSmashCount = (fx.bluntSmashCount || 0) + 1;
     if (fx.bluntSmashCount >= BLUNT_SMASH_EVERY) {
       fx.bluntSmashCount = 0;
-      mon.hp -= weaponAtk(w) * BLUNT_SMASH_MULT;
+      mon.hp -= weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus'));
       floatText('🔨 파쇄!');
     }
   }
@@ -4642,7 +4885,7 @@ function attack(w) {
     mon.hp -= dmg;
   }
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
-  const spellProc = typeTrait(w, 'spellProc');
+  const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc');
   if (spellProc > 0 && Math.random() < spellProc) {
     const spellDmg = dmg * (typeTrait(w, 'spellMult') || 1);
     mon.hp -= spellDmg;
@@ -4698,7 +4941,12 @@ function attack(w) {
 }
 
 /* ===================== 보스 전투 ===================== */
-const bossFight = { active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0, isPunch: false, isLibrary: false, libraryDepth: 0 };
+const bossFight = {
+  active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0, isPunch: false, isLibrary: false, libraryDepth: 0,
+  // 보조무기 액티브 "결전의 기백"용: 전투 경과 시간(elapsed)이 장착 보조무기의 activeTiming에
+  // 도달하면 1회(subActiveUsed) 발동해 dmgBonus를 채우고, subActiveEndAt에 도달하면 꺼진다.
+  elapsed: 0, subActiveUsed: false, subActiveEndAt: 0,
+};
 
 // 보스 데미지 보너스: 세트 효과(+30%) + 용살자의 서약(+100%)
 function bossDmgBonus() {
@@ -4714,6 +4962,8 @@ function bossDmgBonus() {
   }
   bonus += trainingValue('bossDmg');
   bonus += accEff().bossDmg;
+  // 보조무기 액티브 "결전의 기백" — bossFight.active인 동안만 유효한 한시적 버프
+  if (bossFight.active) bonus += bossFight.dmgBonus;
   return bonus;
 }
 
@@ -4721,6 +4971,10 @@ function bossDmgBonus() {
 // 초기화한다. 사냥터에서 미리 쌓아온 스택을 그대로 들고 보스전·토벌전에 들어가면 불공평하므로,
 // 보스전·토벌전은 항상 스택 0인 상태에서 새로 시작한다.
 function resetTimedStacks() {
+  bossFight.elapsed = 0;
+  bossFight.subActiveUsed = false;
+  bossFight.dmgBonus = 0;
+  bossFight.subActiveEndAt = 0;
   fx.frenzyStacks = 0;
   fx.accelStacks = 0;
   fx.poisonStacks = 0;
@@ -5805,6 +6059,8 @@ function migrate(d) {
   if (!Array.isArray(d.relics)) d.relics = [];
   if (!Array.isArray(d.subBossCodexSeen)) d.subBossCodexSeen = [];
   if (!Array.isArray(d.subRelics)) d.subRelics = [];
+  if (!Array.isArray(d.subweapons)) d.subweapons = [];
+  if (d.subEquipped === undefined) d.subEquipped = null;
   for (const w of d.weapons || []) {
     if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
   }
@@ -6682,6 +6938,97 @@ function buyBoxesBulk(i, count) {
   renderTop(); renderBoxes();
 }
 
+/* ===================== 보조무기 탭 ===================== */
+function renderSubweaponTab() {
+  renderSubGachaBox();
+  renderSubEquippedBox();
+  renderSubInventory();
+}
+function renderSubGachaBox() {
+  const box = $('subGachaBox');
+  if (!box) return;
+  const cost = Math.round(SUBWEAPON_GACHA.cost * (1 - (accEff().subGachaDiscount || 0)));
+  const dDesc = SUBWEAPON_GACHA.dropTable.map(([g, p]) => `${GRADES[g].name} ${p}%`).join(' / ');
+  box.innerHTML = `
+    <div class="boxrow">
+      <div><div style="font-weight:bold">🗡️ 보조무기 뽑기</div>
+      <div class="bi">🎲 등급 확률: ${dDesc}</div>
+      <div class="bi" style="color:var(--sub)">무작위 종류 1개 + 등급 획득 (8종 중 균등 확률)</div></div>
+      <div class="btns"><button class="primary" id="subGachaBtn">뽑기<br><span style="font-size:11px">💰 ${fmt(cost)}</span></button></div>
+    </div>`;
+  $('subGachaBtn').onclick = buySubweaponGacha;
+}
+function renderSubEquippedBox() {
+  const box = $('subEquippedBox');
+  if (!box) return;
+  const sw = getEquippedSubweapon();
+  if (!sw) {
+    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">장착 중인 보조무기가 없습니다. 아래 보유 목록에서 장착하세요.</div>';
+    return;
+  }
+  const t = SUBWEAPON_TYPES[sw.typeIdx];
+  const passiveEff = subweaponPassiveEff(sw, accEff().subAmp);
+  const passiveText = Object.entries(passiveEff).map(([k, v]) => {
+    if (k === 'spellProc' || k === 'smashMultBonus') return `${k} +${(v * 100).toFixed(1)}%p`;
+    return `${k} +${(v * 100).toFixed(1)}%`;
+  }).join(', ');
+  const flavor = subweaponFlavorText(sw);
+  const cost = subEnhanceCost(sw);
+  const maxed = sw.enhance >= SUB_ENH.maxLevel;
+  box.innerHTML = `
+    <div class="invitem equipped">
+      <div><div class="wn">${subweaponGradeTag(sw)}</div>
+      ${flavor ? `<div class="wi" style="font-style:italic">${flavor}</div>` : ''}
+      <div class="wi">기본 능력치: 공격력 +${(subweaponBaseAtk(sw) * 100).toFixed(1)}%</div>
+      <div class="wi">패시브(${t.name}): ${passiveText || '없음'}</div>
+      <div class="wi">액티브 "${SUBWEAPON_ACTIVE.name}": 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (전투당 1회, 발동 시점 아래에서 설정)</div>
+      <div class="wi" style="margin-top:4px;">
+        발동 시점: <input type="number" min="${SUBWEAPON_ACTIVE.timingMin}" max="${SUBWEAPON_ACTIVE.timingMax}" value="${sw.activeTiming}" id="subActiveTimingInput" style="width:60px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 6px;">초 (0~120, 보스전 계열은 60초 이내 권장)
+      </div></div>
+      <div class="btns">
+        <button class="primary" id="subEnhBtn" ${maxed ? 'disabled' : ''}>강화하기${maxed ? ' (MAX)' : `<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${subSuccessChance(sw).toFixed(1)}% / 파괴 ${subDestroyChance(sw).toFixed(1)}%)</span>`}</button>
+        <button id="subUnequipBtn">해제</button>
+      </div>
+    </div>`;
+  $('subEnhBtn').onclick = () => { if (!maxed) trySubEnhance(); };
+  $('subUnequipBtn').onclick = unequipSubweapon;
+  $('subActiveTimingInput').onchange = (e) => setSubweaponActiveTiming(e.target.value);
+}
+function renderSubInventory() {
+  const list = $('subinvlist');
+  const countEl = $('subinvcount');
+  if (!list) return;
+  const subs = S.subweapons || [];
+  if (countEl) countEl.textContent = `(${subs.length}/${SUBWEAPON_BAG_MAX})`;
+  if (!subs.length) {
+    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 보조무기가 없습니다. 뽑기를 이용하거나 월드2 사냥터에서 파밍하세요.</div>';
+    return;
+  }
+  const sorted = [...subs].sort((a, b) => subweaponPower(b) - subweaponPower(a));
+  list.innerHTML = '';
+  for (const sw of sorted) {
+    const equipped = sw.id === S.subEquipped;
+    const div = document.createElement('div');
+    div.className = 'invitem' + (equipped ? ' equipped' : '');
+    div.innerHTML = `
+      <div><div class="wn">${subweaponGradeTag(sw)}${equipped ? ' <span style="color:var(--unique);font-size:12px">✅ 장착중</span>' : ''}</div></div>
+      <div class="btns"></div>`;
+    const btns = div.querySelector('.btns');
+    if (!equipped) {
+      const eqBtn = document.createElement('button');
+      eqBtn.className = 'primary';
+      eqBtn.textContent = '장착';
+      eqBtn.onclick = () => equipSubweapon(sw.id);
+      btns.appendChild(eqBtn);
+      const sellBtn = document.createElement('button');
+      sellBtn.textContent = '판매';
+      sellBtn.onclick = () => sellSubweapon(sw.id);
+      btns.appendChild(sellBtn);
+    }
+    list.appendChild(div);
+  }
+}
+
 /* ===================== 룬 상점/인벤토리 ===================== */
 function openRuneBox(tier) {
   const b = RUNE_BOXES[tier];
@@ -7093,7 +7440,7 @@ function switchTab(name) {
   currentTab = name;
   setActiveTabGroup(name);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'subweapon', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'preset') renderPresetTab();
@@ -7103,6 +7450,7 @@ function switchTab(name) {
   if (name === 'craft') renderCraft();
   if (name === 'inventory') renderInventory();
   if (name === 'box') renderBoxes();
+  if (name === 'subweapon') renderSubweaponTab();
   if (name === 'rune') renderRuneTab();
   if (name === 'gamble') renderGambleTables();
   if (name === 'codex') renderCodex();

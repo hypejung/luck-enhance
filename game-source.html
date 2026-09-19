@@ -1069,6 +1069,103 @@ const SUB_ENH = {
   ],
 };
 
+// ---------- 보스 보조무기 / 고대 보조무기 (월드2 전용 컬렉션, 아직 드롭 경로 없음) ----------
+// 월드1의 "보스 신화무기"/"고대 에이션트 스피릿"에 해당하는 월드2 콘텐츠는 별도의 메인
+// 무기가 아니라 보조무기로 나간다 — 사냥터 보스가 그 층 전용 "보스 보조무기"를 고정 드롭하고,
+// 고대 등급 보조무기는 "고대 보조무기"라는 별개의 수집형 트랙(1~20층 고대의 유물과 같은 위치)
+// 으로 간다. 둘 다 아직 실제 드롭/획득 로직은 없고(카운트가 항상 0), 나중에 보스전 로직과
+// 고대의 도서관(또는 별도 경로)에 연결할 예정. index = 층 번호(0 = 21층).
+const SUBWEAPON_BOSS_NAMES = [
+  { name: '그레이헐트의 안개표창집', subType: '표창집', flavor: '안개 속에서 던지면 표창이 스스로 목표를 찾아간다.' },
+  { name: '카샨의 허수아비검집',     subType: '검집',   flavor: '지푸라기로 감쌌지만 그 안의 날은 결코 무디지 않다.' },
+  { name: '벨모라의 유민쌍검띠',     subType: '쌍검 벨트', flavor: '떠나지 못한 촌장의 그림자가 허리춤에 여전히 매달려 있다.' },
+  { name: '오스카린의 조문도끼걸이', subType: '도끼걸이', flavor: '장례 행렬이 멈춘 자리에 놓인 채로 녹슬지 않았다.' },
+  { name: '그리젤름의 초소창꽂이',   subType: '창꽂이', flavor: '무엇을 지키던 곳인지 잊었지만 창만은 가지런히 꽂혀있다.' },
+  { name: '카론디스의 뱃사공화살통', subType: '화살통', flavor: '물에 잠겨도 화살은 젖지 않는다.' },
+  { name: '뷜로의 장부마도서',       subType: '마도서', flavor: '팔 것을 잊지 않은 상인의 마지막 장부.' },
+  { name: '벨나스의 종지기건틀릿',   subType: '건틀릿', flavor: '종을 울리던 손의 무게가 그대로 남아있다.' },
+  { name: '그라움의 옥지기표창집',   subType: '표창집', flavor: '탈출할 이유를 잊은 옥지기가 마지막까지 쥐고 있던 것.' },
+  { name: '밀리엔느의 침전검집',     subType: '검집',   flavor: '심해에 가라앉은 여왕의 검이 아직 이 검집을 찾고 있다.' },
+  { name: '코그하트의 설계쌍검띠',   subType: '쌍검 벨트', flavor: '완성하지 못한 설계도의 마지막 페이지가 여기 감겨있다.' },
+  { name: '발보아의 엔진도끼걸이',   subType: '도끼걸이', flavor: '식지 않는 엔진의 열기가 걸쇠까지 데운다.' },
+  { name: '헤르마이오의 판결창꽂이', subType: '창꽂이', flavor: '이미 끝난 재판의 창끝이 여전히 겨누고 있다.' },
+  { name: '자이로스의 예언화살통',   subType: '화살통', flavor: '화살을 뽑을 때마다 다른 예언이 새겨져 있다.' },
+  { name: '프라임의 통제마도서',     subType: '마도서', flavor: '문명 전체를 관리하던 최초 기계의 기록.' },
+  { name: '크로노스의 파열건틀릿',   subType: '건틀릿', flavor: '한 번 내려치면 짧은 시간이 함께 부서진다.' },
+  { name: '이졀다의 잔해표창집',     subType: '표창집', flavor: '중력을 잃은 잔해 사이에서도 표창만은 곧게 날아간다.' },
+  { name: '템포리스의 반복검집',     subType: '검집',   flavor: '뽑을 때마다 같은 순간이 한 번 더 반복된다.' },
+  { name: '아스트리온의 별빛쌍검띠', subType: '쌍검 벨트', flavor: '빛을 잃은 별들이 그래도 이 띠에 희미하게 맺혀있다.' },
+  { name: '베스퍼리아의 황혼도끼걸이', subType: '도끼걸이', flavor: '이 세계의 마지막 황혼이 걸쇠에 스며있다.' },
+];
+// 카운트 1/2/4/6/8/10/12/14/16/18/20 구간 — 1~20층 "보스의 무력"과 같은 구조를 재사용하되
+// 효과는 보조무기 자체(액티브 위력/지속시간, 강화확률/파괴확률, 드롭률·뽑기 할인)에 집중했다.
+// 수치는 전부 밸런스 미확정 임시값(TODO) — subActiveDmg/subActiveDuration/subEnh/
+// subDestroyReduce/subDropRate/subGachaDiscount는 아직 accEff()가 소비하지 않는 예약 스탯이다.
+const SUBWEAPON_BOSS_MILESTONES = [
+  { count: 1,  effs: [['subEnh', 0.03]] },
+  { count: 2,  effs: [['subDropRate', 0.10]] },
+  { count: 4,  effs: [['subActiveDuration', 1]] },
+  { count: 6,  effs: [['subDestroyReduce', 0.03]] },
+  { count: 8,  effs: [['subActiveDmg', 0.10]] },
+  { count: 10, effs: [['subGachaDiscount', 0.05], ['subDropRate', 0.10]] },
+  { count: 12, effs: [['subEnh', 0.05]] },
+  { count: 14, effs: [['subActiveDuration', 1]] },
+  { count: 16, effs: [['subActiveDmg', 0.15]] },
+  { count: 18, effs: [['subDestroyReduce', 0.05]] },
+  { count: 20, effs: [['subActiveDmg', 0.30], ['subGachaDiscount', 0.10]], text: '🗡️ 보조무기 액티브 피해량 +30%, 뽑기 비용 -10%(누적)' },
+];
+function subBossWeaponCodexCount() { return (S.subBossCodexSeen || []).filter(Boolean).length; }
+function subBossMilestoneEff() {
+  const eff = {};
+  const n = subBossWeaponCodexCount();
+  for (const m of SUBWEAPON_BOSS_MILESTONES) {
+    if (n < m.count) continue;
+    for (const [stat, val] of m.effs) eff[stat] = (eff[stat] || 0) + val;
+  }
+  return eff;
+}
+// 고대 보조무기 — 1~20층 "고대의 유물"과 같은 자리(수집형 트린켓)의 월드2 버전.
+const SUBWEAPON_RELICS = [
+  { name: '그림자 목자의 지팡이 조각', flavor: '안개 속에서만 잡을 수 있다는 지팡이의 일부.' },
+  { name: '시들지 않는 허수아비의 단추', flavor: '밭이 다 시들어도 이 단추만은 색이 바래지 않는다.' },
+  { name: '마지막 유민의 등불', flavor: '기름이 다한 지 오래인데도 희미하게 온기가 남아있다.' },
+  { name: '끝나지 않은 조문의 초', flavor: '몇 년째 녹지도, 다 타지도 않는 초.' },
+  { name: '잊혀진 군령서', flavor: '무엇을 지키라는 명령이었는지는 이제 아무도 모른다.' },
+  { name: '가라앉지 않는 뱃삯 동전', flavor: '물속에서도 가라앉지 않고 계속 떠오른다.' },
+  { name: '물에 젖지 않는 장부', flavor: '팔린 것과 팔리지 않은 것이 아직도 또렷하게 적혀있다.' },
+  { name: '울리지 않는 종의 추', flavor: '종은 울리는데 이 추만은 소리를 내지 않는다.' },
+  { name: '녹슬지 않는 감방 열쇠', flavor: '어떤 문을 여는지 몰라도 녹슬 생각이 없어 보인다.' },
+  { name: '가라앉은 왕관의 보석', flavor: '왕관은 부서졌지만 보석만은 여전히 빛난다.' },
+  { name: '미완성 설계도 조각', flavor: '마지막 한 줄만 남기고 완성되지 못했다.' },
+  { name: '식지 않는 밸브 손잡이', flavor: '몇 백 년째 잠기지 않는 밸브의 손잡이.' },
+  { name: '멈추지 않는 판결봉', flavor: '이미 끝난 재판을 계속 내려치고 있다.' },
+  { name: '끝나지 않는 예언 태엽', flavor: '감아도 감아도 새로운 예언을 뽑아낸다.' },
+  { name: '과열되지 않는 코어 파편', flavor: '뜨거운데도 결코 녹아내리지 않는 파편.' },
+  { name: '부서진 모래시계 파편', flavor: '모래가 다 떨어졌는데도 시간이 계속 새어나온다.' },
+  { name: '떠도는 설계도 마지막 장', flavor: '건축가가 마지막까지 놓지 않았다는 도면.' },
+  { name: '멈추지 않는 종소리 파편', flavor: '같은 순간의 종소리가 굳어서 파편이 되었다.' },
+  { name: '꺼지지 않는 별빛 조각', flavor: '빛을 잃은 별들 사이에서 유일하게 빛나는 조각.' },
+  { name: '저물지 않는 황혼의 재', flavor: '다 타버렸는데도 여전히 따뜻한 재.' },
+];
+// 카운트 5/10/15/20 — 1~20층 "고대의 유물"과 같은 구조. 파밍 계열 중에서도 특히
+// 보조무기 파밍/뽑기 개선에 집중했다(말씀하신 "새로운 파밍 요소 획득률 개선" 취지).
+const SUBWEAPON_RELIC_MILESTONES = [
+  { count: 5,  effs: [['subDropRate', 0.15]] },
+  { count: 10, effs: [['subGachaDiscount', 0.10]] },
+  { count: 15, effs: [], text: '🔮 보조무기 강화 시 소모 골드 -20%' },
+  { count: 20, effs: [], text: '🔮 보조무기 뽑기 고급 등급 확률 소폭 상향' },
+];
+function subRelicCollectedCount() { return (S.subRelics || []).filter(Boolean).length; }
+function subRelicMilestoneEff() {
+  const eff = {};
+  const n = subRelicCollectedCount();
+  for (const m of SUBWEAPON_RELIC_MILESTONES) {
+    if (n < m.count) continue;
+    for (const [stat, val] of m.effs) eff[stat] = (eff[stat] || 0) + val;
+  }
+  return eff;
+}
+
 // 등급별 무기 이름(브라켓 태그 안에 들어갈 텍스트) 계산
 function weaponItemName(w) {
   if (isFist(w)) return w.type;
@@ -1221,13 +1318,12 @@ const CODEX_ANCIENT_SETS = [
   { stat: 'bossDmg', value: 0.20 },       // 18 용의둥지·고대드래곤
   { stat: 'offline', value: 0.10 },       // 19 신들의영역·몰락한신
 ];
-// 도감 "보스의 무력" — 40종 보스 신화 무기 중 몇 종을 수집했는지에 따른 누적(계단식) 보너스.
-// 각 구간의 효과는 이전 구간 위에 그대로 더해진다(도달한 구간 전부 동시 적용).
-// 14/20/40구간의 재도전 쿨타임 효과는 accEff 스탯이 아니라 endBossFight()에서 직접 처리한다.
-// 21~40층 보스 신화무기(WEAPON_BOSS_NAMES) 자체는 아직 설계 전이라 22종 이상 구간은
-// 당분간 도달 불가능한 잠재 밸런스로만 존재한다 — 실제 무기 설계 후 다시 검토.
-// 22~40 구간은 이미 쿨타임 감소 소스가 여러 개(보스 러시 룬, 진동파수꾼의 인장, 14/20구간
-// 자체) 있는 점을 감안해 공격 계열 위주로, 기존 1~20 구간보다 확연히 완만하게 늘렸다.
+// 도감 "보스의 무력" — 20종 보스 신화 무기(1~20층 전용) 중 몇 종을 수집했는지에 따른
+// 누적(계단식) 보너스. 각 구간의 효과는 이전 구간 위에 그대로 더해진다(도달한 구간 전부 동시 적용).
+// 14/20구간의 재도전 쿨타임 효과는 accEff 스탯이 아니라 endBossFight()에서 직접 처리한다.
+// (한때 22~40 구간도 여기 추가했었으나, 21~40층 보스 드롭은 메인 무기가 아니라 "보스
+// 보조무기"로 가기로 해서 이 트랙은 다시 1~20 전용으로 되돌리고, 21~40층분은 별도의
+// "보스 보조무기 수집" 트랙(SUBWEAPON_BOSS_MILESTONES)으로 분리했다.)
 const CODEX_BOSS_MILESTONES = [
   { count: 1,  effs: [['atk', 0.10]] },
   { count: 2,  effs: [['gold', 0.08]] },
@@ -1240,16 +1336,6 @@ const CODEX_BOSS_MILESTONES = [
   { count: 16, effs: [['atk', 0.80], ['bossDmg', 0.15]] },
   { count: 18, effs: [['atk', 0.08], ['speed', 0.08], ['critChance', 0.08], ['critDamage', 0.08], ['extraAtk', 0.08], ['bossDmg', 0.08]] },
   { count: 20, effs: [['bossDmg', 0.70]], text: '👹 보스 피해량 +70%, 모든 사냥터 보스 재도전 쿨타임 -40%' },
-  { count: 22, effs: [['atk', 0.07]] },
-  { count: 24, effs: [['bossDmg', 0.10]] },
-  { count: 26, effs: [['speed', 0.07]] },
-  { count: 28, effs: [['critDamage', 0.12]] },
-  { count: 30, effs: [['atk', 0.10], ['bossDmg', 0.07]] },
-  { count: 32, effs: [['speed', 0.07], ['critDamage', 0.10]] },
-  { count: 34, effs: [['atk', 0.12]] },
-  { count: 36, effs: [['bossDmg', 0.15]] },
-  { count: 38, effs: [['atk', 0.15], ['speed', 0.10], ['bossDmg', 0.10]] },
-  { count: 40, effs: [['atk', 0.40], ['bossDmg', 0.20]], text: '⚔️ 공격력 +40%, 👹 보스 피해량 +20%, 모든 사냥터 보스 재도전 쿨타임 -50%' },
 ];
 function bossWeaponCodexCount() {
   let n = 0;
@@ -1716,11 +1802,16 @@ const FLOORS = [
     mats: ['황혼에 물든 재', '저물지 않는 불씨', '베스퍼리아의 마지막 황혼'],
     boss: { name: '베스퍼리아, 황혼을 붙든 자', emoji: '👑' } },
 ];
-// 21~40층(월드2) 데이터는 넣어뒀지만, 보스 신화무기/고대 에이션트 스피릿/장신구 등
-// 세부 밸런스가 아직 하나도 설계되지 않아 실제로 도달하면 컨텐츠가 텅 비어 보인다.
+// 21~40층(월드2) 데이터는 넣어뒀지만, 보스 보조무기/고대 보조무기/장신구 등 세부 밸런스가
+// 아직 하나도 설계되지 않아 실제로 도달하면 컨텐츠가 텅 비어 보인다.
 // 그래서 진행/보상 관련 계산에서는 FLOORS.length 대신 이 캡을 써서 임시로 20층에서 막아둔다.
-// 나머지 설계(보스무기·고대무기·장신구·마일스톤 등)가 끝나면 해금 조건과 함께 이 값을 올릴 것.
+// 나머지 설계(보스 보조무기·고대 보조무기·장신구·마일스톤 등)가 끝나면 해금 조건과 함께 이 값을 올릴 것.
 const FLOOR_CAP = 20;
+// 월드1(1~20층)과 월드2(21~40층)의 경계(0-indexed 층 번호 기준) — FLOOR_CAP과 지금은 값이
+// 같지만 의미가 다르다: FLOOR_CAP은 "진행이 여기서 막혀있다"는 임시 잠금이고, 이 상수는
+// "1~20층 결부형 보너스가 여기부터는 적용되지 않는다"는 월드 격리 기준선이다. 나중에 FLOOR_CAP이
+// 부분적으로만 올라가도(예: 21~25층만 먼저 해금) 이 기준선은 그대로 20에 고정되어야 한다.
+const WORLD2_START_FLOOR = 20;
 
 // ---------- 보스 시스템 ----------
 const BOSS = {
@@ -2956,6 +3047,8 @@ function newState() {
     awakeningEssence: 0,   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
     library: { week: null, count: 0, best: 0 }, // 고대의 도서관: 주간 도전 횟수 + 최고 깊이 기록
     relics: [],            // 고대의 유물 컬렉션: [true/false, ...] 20개, index = 층 번호
+    subBossCodexSeen: [],  // 보스 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
+    subRelics: [],         // 고대 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
   };
 }
 
@@ -3277,38 +3370,55 @@ function playEnhanceFx(outcome, level) {
   }
 }
 // 장신구 효과 합산 (일반 최대 ACC_SLOTS개 + 보스 장신구, 세트 효과 포함)
+// 월드2(21~40층)에서는 "층 결부형"(1~20층 장신구·보스장신구·도감 세트효과·고대의 인장·
+// 고대의 유물 마일스톤) 보너스가 적용되지 않는다 — 그 콘텐츠를 파밍해서 쌓은 보너스로
+// 월드2 경제가 처음부터 트리비얼해지는 걸 막기 위함. 룬/능력치 훈련/무기 특수효과·각인/
+// 태초의 유물/보조무기 자체 효과처럼 "계정 범용형"인 것들은 월드2에서도 그대로 유지된다.
+function isWorld1BonusActive() { return !S || S.floor < WORLD2_START_FLOOR; }
 function accEff() {
   const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, bossDmg: 0, destroyReduce: 0 };
-  if (S && Array.isArray(S.accEquipped)) {
+  const world1 = isWorld1BonusActive();
+  if (world1 && S && Array.isArray(S.accEquipped)) {
     for (const eq of S.accEquipped) {
       const a = ACCESSORIES[eq.floor];
       if (a) for (const [k, v] of Object.entries(a.eff)) eff[k] += v;
     }
   }
-  // 보스 장신구: 슬롯 제한 없이 보유한 전부가 항상 동시 적용됨
-  if (S && Array.isArray(S.bossAccs)) {
+  // 보스 장신구: 슬롯 제한 없이 보유한 전부가 항상 동시 적용됨 (월드1 한정)
+  if (world1 && S && Array.isArray(S.bossAccs)) {
     for (const f of S.bossAccs) {
       const b = BOSS_ACCS[f];
       if (b) for (const [k, v] of Object.entries(b.eff)) eff[k] += v;
     }
   }
   // 세트 효과: 같은 사냥터의 보스무기 + 보스장신구 → 해당 사냥터에서 보너스
+  // (bossAccs가 1~20층 전용이라 S.floor가 월드2면 setFloor와 절대 같아질 수 없어 자연히 배제됨)
   const setFloor = bossSetFloor();
   if (setFloor != null && S && S.floor === setFloor) {
     eff.gold += 0.5;   // 해당 사냥터 골드 +50%
     eff.luck += 0.5;   // 해당 사냥터 드롭률 +50%
     eff.atk  += 0.3;   // 해당 사냥터 공격력 +30%
   }
-  // 능력치 훈련 (장비와 무관하게 항상 적용)
+  // 능력치 훈련 (장비와 무관하게 항상 적용, 월드 구분 없음)
   eff.atk += trainingValue('atk');
   eff.speed += trainingValue('atkSpeed');
-  // 도감 컬렉션 보너스(쌍/타입 풀세트/사냥터 풀세트) — 등록 현황에 따라 항상 자동 적용
-  const cbe = codexBonusEff();
-  for (const k of Object.keys(cbe)) eff[k] = (eff[k] || 0) + cbe[k];
-  // 고대의 유물 컬렉션 마일스톤 보너스
-  const rbe = relicBonusEff();
-  for (const k of Object.keys(rbe)) eff[k] = (eff[k] || 0) + rbe[k];
-  // 무기 각인: 장착 무기에 새겨진 각인 2줄의 효과 합산 (파괴되면 함께 사라짐)
+  // 도감 컬렉션 보너스(쌍/타입 풀세트/사냥터 풀세트/보스의 무력) — 전부 1~20층 결부형이라 월드1 한정
+  if (world1) {
+    const cbe = codexBonusEff();
+    for (const k of Object.keys(cbe)) eff[k] = (eff[k] || 0) + cbe[k];
+  }
+  // 고대의 유물 컬렉션 마일스톤 보너스 (1~20층 결부형, 월드1 한정)
+  if (world1) {
+    const rbe = relicBonusEff();
+    for (const k of Object.keys(rbe)) eff[k] = (eff[k] || 0) + rbe[k];
+  }
+  // 보스 보조무기 / 고대 보조무기 컬렉션 마일스톤 보너스 (월드2 전용 트랙 — 계정 범용으로
+  // 항상 적용. 실제로는 아직 획득 경로가 없어 카운트가 0으로 고정되어 무해하다)
+  const sbe = subBossMilestoneEff();
+  for (const k of Object.keys(sbe)) eff[k] = (eff[k] || 0) + sbe[k];
+  const sre = subRelicMilestoneEff();
+  for (const k of Object.keys(sre)) eff[k] = (eff[k] || 0) + sre[k];
+  // 무기 각인: 장착 무기에 새겨진 각인 2줄의 효과 합산 (파괴되면 함께 사라짐, 월드 구분 없음)
   const enchantW = S && getEquipped();
   if (enchantW && enchantW.enchant) {
     for (const line of enchantW.enchant.lines) {
@@ -3316,11 +3426,11 @@ function accEff() {
       if (opt) eff[opt.stat] += line.value / 100;
     }
   }
-  // 고대의 인장: 장착 중인 것만 적용(최대 ANCIENT_SEAL_SLOTS개)
-  if (sealEquippedHas('transcendence')) {
+  // 고대의 인장: 층 결부형 컨셉(각 인장이 특정 사냥터 보스 테마)이라 월드1 한정
+  if (world1 && sealEquippedHas('transcendence')) {
     for (const k of ['atk', 'speed', 'gold', 'luck', 'critChance', 'critDamage', 'extraAtk', 'bossDmg']) eff[k] += 0.12;
   }
-  if (sealEquippedHas('wolfKing')) eff.speed += wolfKingEnduranceBonus();
+  if (world1 && sealEquippedHas('wolfKing')) eff.speed += wolfKingEnduranceBonus();
   return eff;
 }
 // 늑대왕의 인장: 같은 사냥터에서 쉬지 않고 사냥한 시간에 비례한 공속 보너스(5분당 +5%p, 최대 +25%p)
@@ -4900,12 +5010,11 @@ function endBossFight(win) {
   if (win) {
     onGenesisHungerKill(); // 끝없는 허기(글러트니): 보스 처치도 스택 적립 대상
     S.bossWins++;
-    // 도감 "보스의 무력" 마일스톤: 20종 수집 시 모든 사냥터 보스 쿨타임 -40%, 40종(전체) 수집 시
-    // -50%로 소폭 추가 감소(이미 보스 러시 룬·진동파수꾼의 인장 등 쿨타임 감소 소스가 여러 개
-    // 있어 20→40 사이의 증가폭은 크게 잡지 않았다). 14종 이상 수집 시 처치할 때마다 8% 확률로
-    // 그 사냥터 쿨타임 즉시 초기화.
-    const bossSetCount = bossWeaponCodexCount();
-    const bossSetCdMult = bossSetCount >= 40 ? 0.5 : bossSetCount >= 20 ? 0.6 : 1;
+    // 도감 "보스의 무력" 마일스톤: 20종 수집 시 모든 사냥터 보스 쿨타임 -40%, 14종 이상
+    // 수집 시 처치할 때마다 8% 확률로 그 사냥터 쿨타임 즉시 초기화. "보스의 무력"은 1~20층
+    // 보스 신화무기 전용 컬렉션(층 결부형)이라 월드2(f >= WORLD2_START_FLOOR) 보스에는 적용하지 않는다.
+    const bossSetCount = f < WORLD2_START_FLOOR ? bossWeaponCodexCount() : 0;
+    const bossSetCdMult = bossSetCount >= 20 ? 0.6 : 1;
     S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped()) * (sealEquippedHas('quakeGuardian') ? 0.5 : 1) * bossSetCdMult;
     if (bossSetCount >= 14 && Math.random() < 0.08) {
       S.bossCooldowns[f] = Date.now();
@@ -5645,6 +5754,8 @@ function migrate(d) {
   if (typeof d.awakeningEssence !== 'number') d.awakeningEssence = 0;
   if (!d.library || typeof d.library !== 'object') d.library = { week: null, count: 0, best: 0 };
   if (!Array.isArray(d.relics)) d.relics = [];
+  if (!Array.isArray(d.subBossCodexSeen)) d.subBossCodexSeen = [];
+  if (!Array.isArray(d.subRelics)) d.subRelics = [];
   for (const w of d.weapons || []) {
     if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
   }
@@ -7535,8 +7646,8 @@ function init() {
     }
     const e = w && w.effect ? EFFECTS[w.effect] : null;
     const goldMul = (1 + accEff().gold) * (1 + (e && e.gold ? e.gold : 0));
-    // 신들의 영역(20층) 고대 세트 보너스: 오프라인 효율 +10%p 추가
-    const offlineEff = Math.min(1, 0.7 + codexOfflineBonus());
+    // 신들의 영역(20층) 고대 세트 보너스: 오프라인 효율 +10%p 추가 (1~20층 결부형이라 월드1 한정)
+    const offlineEff = Math.min(1, 0.7 + (isWorld1BonusActive() ? codexOfflineBonus() : 0));
     const gold = Math.floor(floorGold(S.floor) * goldMul * kills * offlineEff);
     S.gold += gold;
     const h = Math.floor(capped / 3600), m = Math.floor((capped % 3600) / 60), s = capped % 60;

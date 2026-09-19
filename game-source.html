@@ -593,6 +593,12 @@
     </div>
     <div class="panel">
       <h3>🎒 보유 보조무기 <span style="font-size:12px;color:var(--sub)" id="subinvcount"></span></h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+        🗑️ 자동판매:
+        <select id="subAutoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
+        이하 + 강화 0인 보조무기 획득 시 즉시 판매
+        <button id="subAutoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
+      </div>
       <div id="subinvlist"></div>
     </div>
   </div>
@@ -3113,6 +3119,7 @@ function newState() {
     training: {},      // 능력치 훈련 레벨: { atk, atkSpeed, critChance, critDamage, extraAtk, bossDmg }
     autoSellGrade: null, // 이 등급 이하 + 강화0 무기는 획득 즉시 자동판매 (null=끔)
     runeAutoSellGrade: null, // 이 등급 이하 룬은 획득 즉시 자동판매 (null=끔)
+    subAutoSellGrade: null, // 이 등급 이하 + 강화0 보조무기는 획득 즉시 자동판매 (null=끔)
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
     weaponEssence: 0,  // 무기의 정수 — 태초 무기 강화 전용 재화 (고대의 도서관 컨텐츠에서 획득 예정)
     eggs: {},          // 달성한 이스터에그: { eggId: true }
@@ -4280,18 +4287,28 @@ function subweaponGradeTag(sw) {
   return `<span class="grade-${g.name}">${g.name} ${SUBWEAPON_TYPES[sw.typeIdx].icon} [${subweaponItemName(sw)}] +${sw.enhance}</span>`;
 }
 function subweaponPower(sw) { return sw.grade * 1000 + sw.enhance; } // 대충 비교용(가방 정리 시 최약체 판정)
+function subSellPrice(sw) { return Math.round(20 * subGradeMult(sw.grade) * (1 + sw.enhance * 0.3)); } // TODO 미확정 판매가
 function makeSubweapon(grade, typeIdx) {
   return { id: uid++, typeIdx, grade, enhance: 0, activeTiming: 30 };
 }
 const SUBWEAPON_BAG_MAX = 40; // TODO 미확정
 function addSubweapon(sw) {
   if (!Array.isArray(S.subweapons)) S.subweapons = [];
+  // 자동판매 필터: 무기 가방과 동일한 패턴 — 지정 등급 이하 + 강화0인 새 보조무기는 획득 즉시 자동 판매
+  if (S.subAutoSellGrade != null && sw.grade <= S.subAutoSellGrade && sw.enhance === 0) {
+    const price = subSellPrice(sw);
+    S.gold += price;
+    log(`🗑️ 자동판매(${GRADES[sw.grade].name} 이하): ${subweaponGradeTag(sw)} → +${fmt(price)} 골드`);
+    return;
+  }
   if (S.subweapons.length >= SUBWEAPON_BAG_MAX) {
     const sellable = S.subweapons.filter(x => x.id !== S.subEquipped);
     if (sellable.length) {
       const weakest = [...sellable].sort((a, b) => subweaponPower(a) - subweaponPower(b))[0];
+      const price = subSellPrice(weakest);
+      S.gold += price;
       S.subweapons = S.subweapons.filter(x => x.id !== weakest.id);
-      log(`🗡️ 보조무기 가방이 가득 차서 가장 약한 보조무기 자동 판매: ${subweaponGradeTag(weakest)}`);
+      log(`🗡️ 보조무기 가방이 가득 차서 가장 약한 보조무기 자동 판매: ${subweaponGradeTag(weakest)} → +${fmt(price)} 골드`);
     } else {
       return; // 장착 중인 것 하나뿐이면 그냥 못 들어옴(TODO: 정책 재검토)
     }
@@ -4312,7 +4329,7 @@ function sellSubweapon(id) {
   if (id === S.subEquipped) { log('장착 중인 보조무기는 판매할 수 없습니다. 먼저 해제하세요.', 'lg-bad'); return; }
   const sw = (S.subweapons || []).find(x => x.id === id);
   if (!sw) return;
-  const price = Math.round(20 * subGradeMult(sw.grade) * (1 + sw.enhance * 0.3)); // TODO 미확정 판매가
+  const price = subSellPrice(sw);
   S.subweapons = S.subweapons.filter(x => x.id !== id);
   S.gold += price;
   log(`판매: ${subweaponGradeTag(sw)} → +${fmt(price)} 골드`);
@@ -7081,10 +7098,37 @@ function renderSubEquippedBox() {
   $('subUnequipBtn').onclick = unequipSubweapon;
   $('subActiveTimingInput').onchange = (e) => setSubweaponActiveTiming(e.target.value);
 }
+// 보조무기 자동판매 등급 선택 UI — 가방 무기의 setupAutoSellControls()와 동일한 패턴.
+function setupSubAutoSellControls() {
+  const sel = $('subAutoSellSelect');
+  if (!sel) return;
+  if (!sel.dataset.built) {
+    sel.innerHTML = '<option value="">끔</option>' + GRADES.slice(0, 6).map((g, i) => `<option value="${i}">${g.name}</option>`).join('');
+    sel.dataset.built = '1';
+    sel.onchange = () => {
+      S.subAutoSellGrade = sel.value === '' ? null : +sel.value;
+      save();
+    };
+    $('subAutoSellCleanBtn').onclick = () => {
+      if (S.subAutoSellGrade == null) { log('먼저 자동판매 등급을 선택하세요.', 'lg-bad'); return; }
+      const targets = (S.subweapons || []).filter(sw => sw.id !== S.subEquipped && sw.grade <= S.subAutoSellGrade && sw.enhance === 0);
+      if (!targets.length) { log('정리할 보조무기가 없습니다.'); return; }
+      let total = 0;
+      for (const sw of targets) total += subSellPrice(sw);
+      S.gold += total;
+      const ids = new Set(targets.map(sw => sw.id));
+      S.subweapons = S.subweapons.filter(sw => !ids.has(sw.id));
+      log(`🗑️ 보조무기 가방 일괄 정리: ${targets.length}개 판매 → +${fmt(total)} 골드`, 'lg-good');
+      renderSubweaponTab(); renderTop(); save();
+    };
+  }
+  sel.value = S.subAutoSellGrade == null ? '' : String(S.subAutoSellGrade);
+}
 function renderSubInventory() {
   const list = $('subinvlist');
   const countEl = $('subinvcount');
   if (!list) return;
+  setupSubAutoSellControls();
   const subs = S.subweapons || [];
   if (countEl) countEl.textContent = `(${subs.length}/${SUBWEAPON_BAG_MAX})`;
   if (!subs.length) {

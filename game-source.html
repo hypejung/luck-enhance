@@ -81,6 +81,16 @@
   .tab:hover { color: var(--text); }
   .tab.on { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
 
+  .subtab {
+    position: relative;
+    flex: 1; text-align: center; padding: 8px 4px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: bold;
+    color: var(--sub); transition: all .15s;
+  }
+  .subtab:hover { color: var(--text); }
+  .subtab.on { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
+
   .tab-badge {
     position: absolute; top: -3px; right: -3px;
     width: 9px; height: 9px; border-radius: 50%;
@@ -404,7 +414,6 @@
         <div class="tab" data-tab="inventory">🎒 가방</div>
         <div class="tab" data-tab="craft">🧪 조합</div>
         <div class="tab" data-tab="box">🎁 랜덤박스</div>
-        <div class="tab" data-tab="subweapon">🗡️ 보조무기</div>
       </div>
     </div>
     <div class="tabgroup" data-group="etc">
@@ -450,6 +459,8 @@
 
   <!-- 강화기 -->
   <div id="tab-enhance" style="display:none">
+    <div id="enhSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+    <div id="enhWeaponPanels">
     <div class="panel">
       <h3>🔨 무기 강화기</h3>
       <div id="enhTargetBar" style="margin-bottom:8px;"></div>
@@ -468,6 +479,21 @@
         <b style="color:var(--unique)">+10 이후</b>부터 강화당 공격력 상승폭이 커집니다 · 등급이 높을수록 +15 이상 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다!
         <br>+15부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다 (일반~레어: 1~6단계 / 에픽~유니크: 7~12단계 / 레전더리~신화: 13~19단계 / 고대: 20단계).
         <br>+15 이상에서는 골드를 <b style="color:var(--unique)">5배</b>, 고급 재료를 <b style="color:var(--unique)">50배</b> 사용하는 <b style="color:var(--unique)">고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
+      </div>
+    </div>
+    </div>
+    <div id="enhSubweaponPanels" style="display:none">
+      <div class="panel">
+        <h3>🗡️ 보조무기란?</h3>
+        <div style="font-size:12px; color:var(--sub);">
+          메인 무기와 별개로 상시 장착하는 두 번째 장비입니다. <b style="color:var(--unique)">월드2(21층 이상)</b> 사냥터/상자에서만 얻을 수 있고,
+          기본 능력치(공격력) + 종류별 고유 패시브 + 공용 액티브 "결전의 기백"(보스 계열 전투에서 지정한 시점에 1회 자동 발동, 일정 시간 보스 피해량 대폭 증가)을 가집니다.
+          +30까지 강화 가능하며, 강화 1턴마다 스탯→패시브→액티브(위력/지속시간 교차)가 3주기로 순환 상승합니다.
+        </div>
+      </div>
+      <div class="panel">
+        <h3>⚔️ 장착 중인 보조무기</h3>
+        <div id="subEquippedBox"></div>
       </div>
     </div>
   </div>
@@ -534,6 +560,8 @@
 
   <!-- 가방 -->
   <div id="tab-inventory" style="display:none">
+    <div id="invSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+    <div id="invWeaponPanels">
     <div class="panel">
       <h3>🎒 가방 <span style="font-size:12px;color:var(--sub)" id="invcount"></span></h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
@@ -561,45 +589,37 @@
       </div>
       <div id="ancientSealList"></div>
     </div>
+    </div>
+    <div id="invSubweaponPanels" style="display:none">
+      <div class="panel">
+        <h3>🎒 보유 보조무기 <span style="font-size:12px;color:var(--sub)" id="subinvcount"></span></h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          🗑️ 자동판매:
+          <select id="subAutoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
+          이하 + 강화 0인 보조무기 획득 시 즉시 판매
+          <button id="subAutoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
+        </div>
+        <div id="subinvlist"></div>
+      </div>
+    </div>
   </div>
 
   <!-- 랜덤박스 -->
   <div id="tab-box" style="display:none">
+    <div id="boxSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+    <div id="boxWeaponPanels">
     <div class="panel">
       <h3>🎁 랜덤박스 상점</h3>
       <div id="boxlist"></div>
       <div id="gachaslot"></div>
     </div>
-  </div>
-
-  <!-- 보조무기 (월드2 전용) -->
-  <div id="tab-subweapon" style="display:none">
-    <div class="panel">
-      <h3>🗡️ 보조무기란?</h3>
-      <div style="font-size:12px; color:var(--sub);">
-        메인 무기와 별개로 상시 장착하는 두 번째 장비입니다. <b style="color:var(--unique)">월드2(21층 이상)</b> 사냥터/뽑기에서만 얻을 수 있고,
-        기본 능력치(공격력) + 종류별 고유 패시브 + 공용 액티브 "결전의 기백"(보스 계열 전투에서 지정한 시점에 1회 자동 발동, 일정 시간 보스 피해량 대폭 증가)을 가집니다.
-        +30까지 강화 가능하며, 강화 1턴마다 스탯→패시브→액티브(위력/지속시간 교차)가 3주기로 순환 상승합니다.
+    </div>
+    <div id="boxSubweaponPanels" style="display:none">
+      <div class="panel">
+        <h3>🗡️ 보조무기 상자 상점</h3>
+        <div id="subBoxlist"></div>
+        <div id="subBoxSlot"></div>
       </div>
-    </div>
-    <div class="panel">
-      <h3>🎰 보조무기 뽑기</h3>
-      <div id="subGachaBox"></div>
-      <div id="subGachaSlot"></div>
-    </div>
-    <div class="panel">
-      <h3>⚔️ 장착 중인 보조무기</h3>
-      <div id="subEquippedBox"></div>
-    </div>
-    <div class="panel">
-      <h3>🎒 보유 보조무기 <span style="font-size:12px;color:var(--sub)" id="subinvcount"></span></h3>
-      <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-        🗑️ 자동판매:
-        <select id="subAutoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
-        이하 + 강화 0인 보조무기 획득 시 즉시 판매
-        <button id="subAutoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
-      </div>
-      <div id="subinvlist"></div>
     </div>
   </div>
 
@@ -4365,7 +4385,8 @@ function setSubweaponActiveTiming(sec) {
 // ---- 강화 ----
 function subEnhanceCost(sw) {
   // 보조무기는 메인 무기보다 상위 콘텐츠라는 컨셉에 맞춰, 최고 등급(신화) 풀강 누적 비용이
-  // 보조무기 뽑기 가격(SUBWEAPON_GACHA.cost)과 비슷한 자릿수가 되도록 배율을 잡았다(TODO 미확정).
+  // 보조무기 상자 가격과 비슷한 자릿수가 되도록 배율을 잡았다(TODO 미확정). 골드 소비처
+  // 확보 목적으로 메인 무기 완전강화보다 비싼 채로 유지하기로 함(3차 수치 패스에서 재확인).
   return Math.round(GRADES[sw.grade].enhanceCost * 9 * Math.pow(1.35, sw.enhance));
 }
 function subSuccessChance(sw) {
@@ -4403,37 +4424,77 @@ function trySubEnhance() {
   }
   renderSubweaponTab(); renderTop(); save();
 }
-// ---- 뽑기 ----
-// 가격은 고대 룬박스보다 확실히 비싸게(초안: 4.5배) — 골드 소모처를 늘리려는 취지.
-const SUBWEAPON_GACHA = {
-  get cost() { return Math.round(RUNE_BOXES[6].cost * 4.5); }, // 가격 자체는 확정값
-  dropTable: [[0, 45], [1, 28], [2, 15], [3, 8], [4, 3], [5, 1]], // 등급별 확률(%), 신화 1%
-};
-// 뽑기는 일단 닫아둔다 — 강화 비용 등 주변 밸런스가 더 잡힐 때까지 오픈 보류.
-const SUBWEAPON_GACHA_LOCKED = false;
-function buySubweaponGacha() {
-  if (SUBWEAPON_GACHA_LOCKED) { log('🗡️ 보조무기 뽑기는 아직 준비 중입니다.', 'lg-bad'); return; }
-  const cost = Math.round(SUBWEAPON_GACHA.cost * (1 - (accEff().subGachaDiscount || 0)));
-  if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
-  S.gold -= cost;
-  const grade = wrand(SUBWEAPON_GACHA.dropTable);
-  const sw = makeSubweapon(grade, Math.floor(Math.random() * SUBWEAPON_TYPES.length));
-  addSubweapon(sw);
-  log(`🗡️ [보조무기 뽑기] → ${subweaponGradeTag(sw)} 획득!`, grade >= 4 ? 'lg-prim' : 'lg-good');
-  renderSubweaponTab(); renderTop(); save();
-}
-// ---- 사냥터 드롭(월드2 전용) ----
+// ---- 사냥터 드롭(월드2 전용, 상자 상점과는 별개의 무료 획득 경로) ----
 // TODO 미확정 — 1~20층 무기 드롭률(0.6%)보다 낮게 잡음(비싼 만큼 희귀해야 한다는 취지).
 const SUBWEAPON_DROP_CHANCE = 0.0015;
+const SUBWEAPON_DROP_TABLE = [[0, 45], [1, 28], [2, 15], [3, 8], [4, 3], [5, 1]]; // 등급별 확률(%), 신화 1%
 function rollSubweaponDrop(floorIdx, kindMult) {
   if (floorIdx < WORLD2_START_FLOOR) return; // 월드2 전용
   const luckMul = (1 + accEff().luck) * (1 + (accEff().subDropRate || 0));
   if (Math.random() >= SUBWEAPON_DROP_CHANCE * kindMult * luckMul) return;
-  const grade = wrand(SUBWEAPON_GACHA.dropTable);
+  const grade = wrand(SUBWEAPON_DROP_TABLE);
   const sw = makeSubweapon(grade, Math.floor(Math.random() * SUBWEAPON_TYPES.length));
   addSubweapon(sw);
   log(`🗡️🗡️ <b>보조무기 드롭!</b> ${subweaponGradeTag(sw)}`, grade >= 4 ? 'lg-prim' : 'lg-good');
   renderTop(); save();
+}
+// ---- 보조무기 상자 상점 (월드2 해금과 동시에 오픈, 무기 랜덤박스와 동일한 구조/확률) ----
+// 월드2(21층) 해금 수준(토벌전 9단계)의 골드/뽑기값이 하위 토벌전 골드로도 쉽게 살 수 있을 만큼
+// 낮았던 문제를 반영해 가장 저렴한 상자를 "고대 룬박스의 3배"로 재조정. 나머지 4개 등급은
+// 무기 랜덤박스(BOXES) 간 가격 배율(x5, x24, x120, x54,667)을 그대로 적용해서 산출.
+function world2Unlocked() { return S.unlocked > WORLD2_START_FLOOR; }
+const SUBWEAPON_BOXES = [
+  { name: '일반 보조무기 상자', icon: '📦', cost: Math.round(RUNE_BOXES[6].cost * 3),
+    subweapon: [[0, 35], [1, 12.5], [2, 2.5]], gold: 0.49, box: [[1, 1]] },
+  { name: '고급 보조무기 상자', icon: '🎁', cost: Math.round(RUNE_BOXES[6].cost * 3 * 5),
+    subweapon: [[0, 15], [1, 25], [2, 12], [3, 3]], gold: 0.437, box: [[2, 1], [3, 0.3]] },
+  { name: '희귀 보조무기 상자', icon: '🎊', cost: Math.round(RUNE_BOXES[6].cost * 3 * 24),
+    subweapon: [[1, 20], [2, 28], [3, 3], [4, 0.05]], gold: 0.4795, box: [[3, 1]] },
+  { name: '전설 보조무기 상자', icon: '🏆', cost: Math.round(RUNE_BOXES[6].cost * 3 * 120),
+    subweapon: [[2, 25], [3, 28], [4, 0.1], [5, 0.01]], gold: 0.4499, box: [[3, 2]] },
+  { name: '신화 보조무기 상자', icon: '💫', cost: Math.round(RUNE_BOXES[6].cost * 3 * 82000000 / 1500),
+    subweapon: [[2, 25], [3, 55], [4, 7], [5, 3.5]], gold: 0.095 },
+];
+function subweaponBoxCost(b) { return Math.round(b.cost * (1 - (accEff().subGachaDiscount || 0))); }
+function openSubweaponBox(idx, src) {
+  const b = SUBWEAPON_BOXES[idx];
+  const roll = Math.random();
+  const wChance = b.subweapon ? b.subweapon.reduce((s, p) => s + p[1], 0) / 100 : 0;
+  const bChance = (b.box ? b.box.reduce((s, p) => s + p[1], 0) / 100 : 0) * (sealEquippedHas('mazeHorn') ? 1.5 : 1);
+  if (roll < wChance) {
+    const grade = wrand(b.subweapon);
+    const sw = makeSubweapon(grade, Math.floor(Math.random() * SUBWEAPON_TYPES.length));
+    addSubweapon(sw);
+    log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 보조무기! ${subweaponGradeTag(sw)}`, grade >= 4 ? 'lg-prim' : 'lg-good');
+    if (grade >= 4) log(`🌟 축하합니다! ${GRADES[grade].name} 등급 보조무기를 획득했습니다!`, 'lg-prim');
+    if (currentTab === 'box' && boxSubTab === 'subweapon') $('subBoxSlot').innerHTML = `${b.icon} <b>${b.name}</b> 결과:<br>${subweaponGradeTag(sw)}`;
+  } else if (roll < wChance + bChance) {
+    const ni = wrand(b.box);
+    log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 상자 등장! ${SUBWEAPON_BOXES[ni].icon} <b>${SUBWEAPON_BOXES[ni].name}</b> 획득!`, 'lg-gold');
+    openSubweaponBox(ni, '연쇄 개봉');
+    if (currentTab === 'box' && boxSubTab === 'subweapon') $('subBoxSlot').innerHTML = `🎉 <b>${SUBWEAPON_BOXES[ni].name}</b> 연쇄 개봉! 로그를 확인하세요!`;
+  } else {
+    const g = Math.floor(b.cost * (0.3 + Math.random() * 1.7));
+    S.gold += g;
+    log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 골드 +${fmt(g)}`, g > b.cost ? 'lg-gold' : '');
+    if (currentTab === 'box' && boxSubTab === 'subweapon') $('subBoxSlot').innerHTML = `${b.icon} <b>${b.name}</b> 결과:<br>💰 +${fmt(g)} 골드 ${g > b.cost ? '(이득!)' : '(아...'}`;
+  }
+  renderTop();
+  save();
+}
+function buySubweaponBoxesBulk(i, count) {
+  const b = SUBWEAPON_BOXES[i];
+  const cost = subweaponBoxCost(b);
+  let bought = 0;
+  for (let n = 0; n < count; n++) {
+    if (S.gold < cost) break;
+    S.gold -= cost;
+    openSubweaponBox(i, '');
+    bought++;
+  }
+  if (bought === 0) { log('골드가 부족합니다!', 'lg-bad'); return; }
+  if (bought < count) log(`골드가 부족해서 ${bought}개만 개봉했습니다.`, 'lg-bad');
+  renderTop(); renderSubweaponBoxes();
 }
 // ---- 액티브 "결전의 기백" 발동 (bossFight.active 중에만, 전투당 1회) ----
 function updateSubweaponActive() {
@@ -6638,7 +6699,23 @@ function renderFloorBtns() {
   }
 }
 
+// 가방/강화기/랜덤박스 3개 탭에서 공용으로 쓰는 "⚔️ 무기 / 🗡️ 보조무기" 서브탭 토글.
+// 탭별로 독립된 선택 상태(예: 강화기는 보조무기를 보고 있어도 가방은 무기를 보고 있을 수
+// 있음)를 유지하기 위해 저장하지 않는 전역 변수 3개로 따로 관리한다(순수 UI 상태라 세이브 불필요).
+let invSubTab = 'weapon', enhSubTab = 'weapon', boxSubTab = 'weapon';
+function renderEquipSubTabBar(containerId, current, setter) {
+  const box = $(containerId);
+  if (!box) return;
+  box.innerHTML = `
+    <div class="subtab ${current === 'weapon' ? 'on' : ''}" data-v="weapon">⚔️ 무기</div>
+    <div class="subtab ${current === 'subweapon' ? 'on' : ''}" data-v="subweapon">🗡️ 보조무기</div>`;
+  box.querySelectorAll('.subtab').forEach(el => el.onclick = () => setter(el.dataset.v));
+}
 function renderEnhance() {
+  renderEquipSubTabBar('enhSubTabBar', enhSubTab, (v) => { enhSubTab = v; renderEnhance(); });
+  $('enhWeaponPanels').style.display = enhSubTab === 'weapon' ? '' : 'none';
+  $('enhSubweaponPanels').style.display = enhSubTab === 'subweapon' ? '' : 'none';
+  if (enhSubTab === 'subweapon') { renderSubEquippedBox(); return; }
   const w = getEnhanceTarget();
   renderEnhTargetBar();
   const box = $('enhweapon');
@@ -6915,6 +6992,10 @@ function renderAncientSealList() {
   }
 }
 function renderInventory() {
+  renderEquipSubTabBar('invSubTabBar', invSubTab, (v) => { invSubTab = v; renderInventory(); });
+  $('invWeaponPanels').style.display = invSubTab === 'weapon' ? '' : 'none';
+  $('invSubweaponPanels').style.display = invSubTab === 'subweapon' ? '' : 'none';
+  if (invSubTab === 'subweapon') { renderSubInventory(); return; }
   const list = $('invlist');
   $('invcount').textContent = `(${S.weapons.length}/${S.unlimitedBag ? 500 : 60})`;
   setupAutoSellControls();
@@ -7019,6 +7100,10 @@ function renderInventory() {
 }
 
 function renderBoxes() {
+  renderEquipSubTabBar('boxSubTabBar', boxSubTab, (v) => { boxSubTab = v; renderBoxes(); });
+  $('boxWeaponPanels').style.display = boxSubTab === 'weapon' ? '' : 'none';
+  $('boxSubweaponPanels').style.display = boxSubTab === 'subweapon' ? '' : 'none';
+  if (boxSubTab === 'subweapon') { renderSubweaponBoxes(); return; }
   const list = $('boxlist');
   list.innerHTML = '';
   for (let i = 0; i < BOXES.length; i++) {
@@ -7063,24 +7148,47 @@ function buyBoxesBulk(i, count) {
 }
 
 /* ===================== 보조무기 탭 ===================== */
+// 보조무기 관련 상태가 바뀌는 액션(장착/해제/판매/강화)들이 공통으로 호출하는 새로고침 —
+// 장착 중인 보조무기 상세는 강화기 탭, 보유 목록은 가방 탭으로 분리됐지만 두 탭 DOM은
+// 항상 존재하므로(display:none일 뿐) 어느 탭이 떠 있든 그냥 둘 다 다시 그린다.
 function renderSubweaponTab() {
-  renderSubGachaBox();
   renderSubEquippedBox();
   renderSubInventory();
 }
-function renderSubGachaBox() {
-  const box = $('subGachaBox');
-  if (!box) return;
-  const cost = Math.round(SUBWEAPON_GACHA.cost * (1 - (accEff().subGachaDiscount || 0)));
-  const dDesc = SUBWEAPON_GACHA.dropTable.map(([g, p]) => `${GRADES[g].name} ${p}%`).join(' / ');
-  box.innerHTML = `
-    <div class="boxrow">
-      <div><div style="font-weight:bold">🗡️ 보조무기 뽑기 ${SUBWEAPON_GACHA_LOCKED ? '<span style="color:var(--sub);font-size:12px">(준비 중)</span>' : ''}</div>
-      <div class="bi">🎲 등급 확률: ${dDesc}</div>
-      <div class="bi" style="color:var(--sub)">무작위 종류 1개 + 등급 획득 (8종 중 균등 확률)</div></div>
-      <div class="btns"><button class="primary" id="subGachaBtn" ${SUBWEAPON_GACHA_LOCKED ? 'disabled' : ''}>${SUBWEAPON_GACHA_LOCKED ? '준비 중' : `뽑기<br><span style="font-size:11px">💰 ${fmt(cost)}</span>`}</button></div>
-    </div>`;
-  $('subGachaBtn').onclick = buySubweaponGacha;
+function renderSubweaponBoxes() {
+  const list = $('subBoxlist');
+  if (!list) return;
+  if (!world2Unlocked()) {
+    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">🔒 월드2(21층) 해금 후 이용할 수 있습니다.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  for (let i = 0; i < SUBWEAPON_BOXES.length; i++) {
+    const b = SUBWEAPON_BOXES[i];
+    const cost = subweaponBoxCost(b);
+    const div = document.createElement('div');
+    div.className = 'boxrow';
+    const wDesc = b.subweapon.map(([g, wt]) => `${GRADES[g].name} ${wt}%`).join(' / ');
+    const bDesc = b.box ? b.box.map(([bi, wt]) => `${SUBWEAPON_BOXES[bi].name} ${wt}%`).join(' / ') : '';
+    div.innerHTML = `
+      <div><div style="font-weight:bold">${b.icon} ${b.name} <span style="font-size:12px;color:var(--sub)">(개봉 ${fmt(b.cost)}골드 상당)</span></div>
+      <div class="bi">🗡️ 보조무기: ${wDesc}</div>
+      <div class="bi">💰 골드: 박스값의 30%~200%${bDesc ? ` · 🎁 상자: ${bDesc}` : ''}</div></div>
+      <div class="btns">
+        <button class="primary" data-idx="${i}">구매 & 개봉<br><span style="font-size:11px">💰 ${fmt(cost)}</span></button>
+        <button class="primary" data-idx10="${i}">×10 개봉<br><span style="font-size:11px">💰 ${fmt(cost * 10)}</span></button>
+        <button class="primary" data-idx100="${i}">×100 개봉<br><span style="font-size:11px">💰 ${fmt(cost * 100)}</span></button>
+      </div>`;
+    div.querySelector('button[data-idx]').onclick = () => {
+      if (S.gold < cost) { log('골드가 부족합니다!', 'lg-bad'); return; }
+      S.gold -= cost;
+      renderTop();
+      openSubweaponBox(i, '');
+    };
+    div.querySelector('button[data-idx10]').onclick = () => buySubweaponBoxesBulk(i, 10);
+    div.querySelector('button[data-idx100]').onclick = () => buySubweaponBoxesBulk(i, 100);
+    list.appendChild(div);
+  }
 }
 function renderSubEquippedBox() {
   const box = $('subEquippedBox');
@@ -7591,7 +7699,7 @@ function switchTab(name) {
   currentTab = name;
   setActiveTabGroup(name);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'subweapon', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'preset') renderPresetTab();
@@ -7601,7 +7709,6 @@ function switchTab(name) {
   if (name === 'craft') renderCraft();
   if (name === 'inventory') renderInventory();
   if (name === 'box') renderBoxes();
-  if (name === 'subweapon') renderSubweaponTab();
   if (name === 'rune') renderRuneTab();
   if (name === 'gamble') renderGambleTables();
   if (name === 'codex') renderCodex();

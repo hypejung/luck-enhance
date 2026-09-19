@@ -1114,9 +1114,13 @@ const CODEX_ANCIENT_SETS = [
   { stat: 'bossDmg', value: 0.20 },       // 18 용의둥지·고대드래곤
   { stat: 'offline', value: 0.10 },       // 19 신들의영역·몰락한신
 ];
-// 도감 "보스의 무력" — 20종 보스 신화 무기 중 몇 종을 수집했는지에 따른 누적(계단식) 보너스.
+// 도감 "보스의 무력" — 40종 보스 신화 무기 중 몇 종을 수집했는지에 따른 누적(계단식) 보너스.
 // 각 구간의 효과는 이전 구간 위에 그대로 더해진다(도달한 구간 전부 동시 적용).
-// 14/20구간의 재도전 쿨타임 효과는 accEff 스탯이 아니라 endBossFight()에서 직접 처리한다.
+// 14/20/40구간의 재도전 쿨타임 효과는 accEff 스탯이 아니라 endBossFight()에서 직접 처리한다.
+// 21~40층 보스 신화무기(WEAPON_BOSS_NAMES) 자체는 아직 설계 전이라 22종 이상 구간은
+// 당분간 도달 불가능한 잠재 밸런스로만 존재한다 — 실제 무기 설계 후 다시 검토.
+// 22~40 구간은 이미 쿨타임 감소 소스가 여러 개(보스 러시 룬, 진동파수꾼의 인장, 14/20구간
+// 자체) 있는 점을 감안해 공격 계열 위주로, 기존 1~20 구간보다 확연히 완만하게 늘렸다.
 const CODEX_BOSS_MILESTONES = [
   { count: 1,  effs: [['atk', 0.10]] },
   { count: 2,  effs: [['gold', 0.08]] },
@@ -1129,6 +1133,16 @@ const CODEX_BOSS_MILESTONES = [
   { count: 16, effs: [['atk', 0.80], ['bossDmg', 0.15]] },
   { count: 18, effs: [['atk', 0.08], ['speed', 0.08], ['critChance', 0.08], ['critDamage', 0.08], ['extraAtk', 0.08], ['bossDmg', 0.08]] },
   { count: 20, effs: [['bossDmg', 0.70]], text: '👹 보스 피해량 +70%, 모든 사냥터 보스 재도전 쿨타임 -40%' },
+  { count: 22, effs: [['atk', 0.07]] },
+  { count: 24, effs: [['bossDmg', 0.10]] },
+  { count: 26, effs: [['speed', 0.07]] },
+  { count: 28, effs: [['critDamage', 0.12]] },
+  { count: 30, effs: [['atk', 0.10], ['bossDmg', 0.07]] },
+  { count: 32, effs: [['speed', 0.07], ['critDamage', 0.10]] },
+  { count: 34, effs: [['atk', 0.12]] },
+  { count: 36, effs: [['bossDmg', 0.15]] },
+  { count: 38, effs: [['atk', 0.15], ['speed', 0.10], ['bossDmg', 0.10]] },
+  { count: 40, effs: [['atk', 0.40], ['bossDmg', 0.20]], text: '⚔️ 공격력 +40%, 👹 보스 피해량 +20%, 모든 사냥터 보스 재도전 쿨타임 -50%' },
 ];
 function bossWeaponCodexCount() {
   let n = 0;
@@ -4779,10 +4793,12 @@ function endBossFight(win) {
   if (win) {
     onGenesisHungerKill(); // 끝없는 허기(글러트니): 보스 처치도 스택 적립 대상
     S.bossWins++;
-    // 도감 "보스의 무력" 마일스톤: 20종 완전 수집 시 모든 사냥터 보스 쿨타임 -40%,
-    // 14종 이상 수집 시 처치할 때마다 8% 확률로 그 사냥터 쿨타임 즉시 초기화
+    // 도감 "보스의 무력" 마일스톤: 20종 수집 시 모든 사냥터 보스 쿨타임 -40%, 40종(전체) 수집 시
+    // -50%로 소폭 추가 감소(이미 보스 러시 룬·진동파수꾼의 인장 등 쿨타임 감소 소스가 여러 개
+    // 있어 20→40 사이의 증가폭은 크게 잡지 않았다). 14종 이상 수집 시 처치할 때마다 8% 확률로
+    // 그 사냥터 쿨타임 즉시 초기화.
     const bossSetCount = bossWeaponCodexCount();
-    const bossSetCdMult = bossSetCount >= 20 ? 0.6 : 1;
+    const bossSetCdMult = bossSetCount >= 40 ? 0.5 : bossSetCount >= 20 ? 0.6 : 1;
     S.bossCooldowns[f] = Date.now() + BOSS.cooldown * weaponCooldownMult(getEquipped()) * (sealEquippedHas('quakeGuardian') ? 0.5 : 1) * bossSetCdMult;
     if (bossSetCount >= 14 && Math.random() < 0.08) {
       S.bossCooldowns[f] = Date.now();

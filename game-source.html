@@ -1768,81 +1768,81 @@ const FLOORS = [
     boss: { name: '루멘 아르카, 광휘를 버린 신왕', emoji: '💫' } },
 
   // ---------- 월드 2: 황혼국 (21~40단계) ----------
-  // HP는 1~20층과 동일한 성장 패턴을 그대로 이어붙인 임시값(밸런스 미확정) — FLOOR_CAP으로
-  // 잠겨있는 동안은 실제로 도달할 수 없으므로 정밀 튜닝은 해금 시점에 다시 진행한다.
+  // HP 시작점을 1~20층 바로 위(단순 연장)가 아니라 "토벌전 중반(9단계, raidHp(9)≈5.5조)"
+  // 언저리로 재설계했다 — 월드2는 이미 1~20층을 끝낸 사람이 아니라 토벌전/고대의 도서관
+  // 벽에 막힌 사람이 보조무기로 뚫어보라고 여는 콘텐츠라는 컨셉. 성장 배율(층마다 대략
+  // 2배, 10층마다 자릿수 정리)은 기존 1~20층 곡선 모양을 그대로 유지하고 시작점만 5.5조로
+  // 올렸다. 정확한 앵커(9단계 기준)는 감으로 잡은 값이라 실제 밸런스는 조정 필요.
   // A. 황혼의 변경 (21~25)
-  { name: '안개 낀 변경 마을', monster: '안개늑대',     emoji: '🐺', hp: 60000000,
+  { name: '안개 낀 변경 마을', monster: '안개늑대',     emoji: '🐺', hp: 5500000000000,
     mats: ['안개늑대의 털', '서리 묻은 이빨', '그레이헐트의 발톱'],
     boss: { name: '그레이헐트, 안개 속 목자', emoji: '🌫️' } },
-  { name: '버려진 밭',       monster: '허수아비 병사', emoji: '🌾', hp: 120000000,
+  { name: '버려진 밭',       monster: '허수아비 병사', emoji: '🌾', hp: 11000000000000,
     mats: ['지푸라기 조각', '녹슨 낫날', '카샨의 지푸라기 심장'],
     boss: { name: '카샨, 시든 밭의 파수꾼', emoji: '🥀' } },
-  { name: '유민들의 골목',   monster: '굶주린 유민',   emoji: '👤', hp: 240000000,
+  { name: '유민들의 골목',   monster: '굶주린 유민',   emoji: '👤', hp: 22000000000000,
     mats: ['낡은 천 조각', '부러진 지팡이', '벨모라의 마지막 유품'],
     boss: { name: '벨모라, 마지막 촌장', emoji: '🕯️' } },
-  { name: '저문 묘지',       monster: '뒤늦은 조문객', emoji: '⚰️', hp: 480000000,
+  { name: '저문 묘지',       monster: '뒤늦은 조문객', emoji: '⚰️', hp: 44000000000000,
     mats: ['촛농 조각', '낡은 상장', '오스카린의 마지막 기도문'],
     boss: { name: '오스카린, 멈춘 장례의 사제', emoji: '🕯️' } },
-  { name: '국경 초소',       monster: '탈영병 무리',   emoji: '🏴', hp: 950000000,
+  { name: '국경 초소',       monster: '탈영병 무리',   emoji: '🏴', hp: 87000000000000,
     mats: ['녹슨 군표', '부러진 창날', '그리젤름의 부러진 검'],
     boss: { name: '그리젤름, 명령을 잊은 초병', emoji: '🌫️' } },
 
   // B. 침수된 회랑 (26~30)
-  { name: '잠긴 나루터',       monster: '익사한 뱃사공', emoji: '🚣', hp: 1900000000,
+  { name: '잠긴 나루터',       monster: '익사한 뱃사공', emoji: '🚣', hp: 175000000000000,
     mats: ['젖은 뱃널 조각', '녹슨 노', '카론디스의 뱃사공 방울'],
     boss: { name: '카론디스, 가라앉은 뱃사공', emoji: '💧' } },
-  { name: '수몰된 시장',       monster: '물에 불은 상인', emoji: '🐟', hp: 3800000000,
+  { name: '수몰된 시장',       monster: '물에 불은 상인', emoji: '🐟', hp: 350000000000000,
     mats: ['불어터진 좌판 조각', '녹슨 저울', '뷜로의 마지막 장부'],
     boss: { name: '뷜로, 시장을 지키는 유령', emoji: '🛍️' } },
-  { name: '익사한 대성당',     monster: '익사한 성직자', emoji: '🌊', hp: 7500000000,
+  { name: '익사한 대성당',     monster: '익사한 성직자', emoji: '🌊', hp: 700000000000000,
     mats: ['젖은 성가집 조각', '부서진 성물', '벨나스의 침묵하는 종'],
     boss: { name: '벨나스, 잠긴 종의 사제', emoji: '🔔' } },
-  { name: '물의 감옥',         monster: '사슬에 묶인 죄수', emoji: '⛓️', hp: 15000000000,
+  { name: '물의 감옥',         monster: '사슬에 묶인 죄수', emoji: '⛓️', hp: 1375000000000000,
     mats: ['녹슨 사슬 조각', '부서진 죄수복', '그라움의 잃어버린 열쇠'],
     boss: { name: '그라움, 열쇠 잃은 옥지기', emoji: '🔑' } },
-  { name: '심해로 가라앉은 궁전', monster: '익사한 근위병', emoji: '🏰', hp: 30000000000,
+  { name: '심해로 가라앉은 궁전', monster: '익사한 근위병', emoji: '🏰', hp: 2750000000000000,
     mats: ['녹슨 근위갑주 조각', '물에 잠긴 문장기', '밀리엔느의 가라앉은 왕관'],
     boss: { name: '밀리엔느, 가라앉은 여왕', emoji: '👑' } },
 
   // C. 톱니의 잔재 (31~35)
-  { name: '폐공방 지구',   monster: '고장난 인형병', emoji: '🤖', hp: 60000000000,
+  { name: '폐공방 지구',   monster: '고장난 인형병', emoji: '🤖', hp: 5500000000000000,
     mats: ['부서진 톱니', '녹슨 태엽', '코그하트의 미완성 설계도'],
     boss: { name: '코그하트, 미완성의 제작자', emoji: '🔧' } },
-  { name: '증기 배관로',   monster: '폭주 증기괴', emoji: '💨', hp: 120000000000,
+  { name: '증기 배관로',   monster: '폭주 증기괴', emoji: '💨', hp: 11000000000000000,
     mats: ['녹슨 밸브 조각', '뜨거운 증기 결정', '발보아의 심장 엔진'],
     boss: { name: '발보아, 멈추지 않는 엔진', emoji: '🔥' } },
-  { name: '태엽 감옥',     monster: '태엽 처형인', emoji: '⛓️', hp: 240000000000,
+  { name: '태엽 감옥',     monster: '태엽 처형인', emoji: '⛓️', hp: 22000000000000000,
     mats: ['끊어진 태엽 사슬', '부서진 판결봉', '헤르마이오의 판결기록'],
     boss: { name: '헤르마이오, 반복되는 재판관', emoji: '⚖️' } },
-  { name: '톱니의 대성전', monster: '기계 사제',   emoji: '🕍', hp: 480000000000,
+  { name: '톱니의 대성전', monster: '기계 사제',   emoji: '🕍', hp: 44000000000000000,
     mats: ['부서진 신탁판', '녹슨 성가 태엽', '자이로스의 마지막 예언'],
     boss: { name: '자이로스, 끝없는 예언기계', emoji: '🔮' } },
-  { name: '폭주 코어 지하', monster: '폭주 수호골렘', emoji: '🗿', hp: 950000000000,
+  { name: '폭주 코어 지하', monster: '폭주 수호골렘', emoji: '🗿', hp: 87000000000000000,
     mats: ['과열된 코어 조각', '부서진 골렘 장갑', '프라임의 통제 코어'],
     boss: { name: '프라임, 깨어난 최초의 인형', emoji: '⚡' } },
 
   // D. 종언의 하늘 (36~40)
-  { name: '갈라진 하늘',       monster: '균열의 파편', emoji: '🌌', hp: 1900000000000,
+  { name: '갈라진 하늘',       monster: '균열의 파편', emoji: '🌌', hp: 175000000000000000,
     mats: ['갈라진 하늘 조각', '얼어붙은 시간 파편', '크로노스의 부서진 모래시계'],
     boss: { name: '크로노스, 시간을 부순 자', emoji: '⏳' } },
-  { name: '떠도는 잔해 지대', monster: '부유하는 폐허', emoji: '🏛️', hp: 3800000000000,
+  { name: '떠도는 잔해 지대', monster: '부유하는 폐허', emoji: '🏛️', hp: 350000000000000000,
     mats: ['부유하는 돌조각', '무너진 기둥 파편', '이졀다의 마지막 설계도'],
     boss: { name: '이졀다, 떠도는 건축가', emoji: '✨' } },
-  { name: '부서진 시계탑',     monster: '시간의 파편', emoji: '⏳', hp: 7500000000000,
+  { name: '부서진 시계탑',     monster: '시간의 파편', emoji: '⏳', hp: 700000000000000000,
     mats: ['멈춘 태엽 조각', '갈라진 종 파편', '템포리스의 되풀이되는 종'],
     boss: { name: '템포리스, 멈추지 않는 종', emoji: '⏰' } },
-  { name: '침묵하는 별무리',   monster: '별의 파수꾼', emoji: '⭐', hp: 15000000000000,
+  { name: '침묵하는 별무리',   monster: '별의 파수꾼', emoji: '⭐', hp: 1375000000000000000,
     mats: ['빛을 잃은 별조각', '얼어붙은 별빛 결정', '아스트리온의 마지막 빛'],
     boss: { name: '아스트리온, 꺼지지 않는 별', emoji: '⭐' } },
-  { name: '황혼의 끝',         monster: '종언의 사도', emoji: '🌆', hp: 30000000000000,
+  { name: '황혼의 끝',         monster: '종언의 사도', emoji: '🌆', hp: 2750000000000000000,
     mats: ['황혼에 물든 재', '저물지 않는 불씨', '베스퍼리아의 마지막 황혼'],
     boss: { name: '베스퍼리아, 황혼을 붙든 자', emoji: '👑' } },
 ];
-// 21~40층(월드2) 데이터는 넣어뒀지만, 보스 보조무기/고대 보조무기/장신구 등 세부 밸런스가
-// 아직 하나도 설계되지 않아 실제로 도달하면 컨텐츠가 텅 비어 보인다.
-// 그래서 진행/보상 관련 계산에서는 FLOORS.length 대신 이 캡을 써서 임시로 20층에서 막아둔다.
-// 나머지 설계(보스 보조무기·고대 보조무기·장신구·마일스톤 등)가 끝나면 해금 조건과 함께 이 값을 올릴 것.
-const FLOOR_CAP = 20;
+// 21~40층(월드2)에 필요한 보조무기/장신구/드롭 로직이 다 갖춰져서 40까지 전면 오픈한다.
+const FLOOR_CAP = 40;
 // 월드1(1~20층)과 월드2(21~40층)의 경계(0-indexed 층 번호 기준) — FLOOR_CAP과 지금은 값이
 // 같지만 의미가 다르다: FLOOR_CAP은 "진행이 여기서 막혀있다"는 임시 잠금이고, 이 상수는
 // "1~20층 결부형 보너스가 여기부터는 적용되지 않는다"는 월드 격리 기준선이다. 나중에 FLOOR_CAP이
@@ -1854,8 +1854,10 @@ const BOSS = {
   timeLimit: 60,          // 1분 제한
   cooldown: 3600 * 1000,  // 1시간
   hpMult: 100,            // 체력 = 사냥터 몬스터 × 100
-  weaponDrop: 0.007,      // 신화 보스무기 드롭 (0.7%)
-  accDrop: 0.009,         // 신화 보스장신구 드롭 (0.9%)
+  weaponDrop: 0.007,      // 신화 보스무기 드롭 (0.7%) — 1~20층 전용
+  accDrop: 0.009,         // 신화 보스장신구 드롭 (0.9%) — 1~20/21~40 공용
+  subweaponDrop: 0.004,   // 보스 보조무기 드롭 (0.4%) — 21~40층 전용. weaponDrop보다 낮게
+                          // 잡아서 "보조무기는 좀 더 상위 컨텐츠"라는 인식을 준다.
   // 승리 보상 골드 = 해당 층 몬스터를 "원킷" 기준으로 1시간 사냥했을 때 벌 수 있는 골드
   // (장착 무기의 실질 공속 × 3600초 × 층 처치골드), 골드 보너스 배율도 동일하게 적용.
   // 자세한 산출 근거는 endBossFight()의 winGold 계산부 참고.
@@ -2433,7 +2435,8 @@ function grantGenesisArtifact(artifact) {
 // 태초/고대 공통: 드롭률 보너스(장신구/도감/각인 등 accEff().luck에 합산되는 전부)를 반영하고,
 // 그 사냥터의 보스 세트(보스 장신구 보유 + 그 층 보스무기 장착, bossSetFloor())를 갖췄으면 3배.
 function genesisAncientDropMult(floorIdx) {
-  return (1 + accEff().luck) * (bossSetFloor() === floorIdx ? 3 : 1);
+  const setMatch = bossSetFloor() === floorIdx || subBossSetFloor() === floorIdx;
+  return (1 + accEff().luck) * (setMatch ? 3 : 1);
 }
 function rollGenesisArtifact(floorIdx, kindMult) {
   const artifact = GENESIS_ARTIFACTS[floorIdx];
@@ -2733,6 +2736,20 @@ function rollAncientWeapon(floorIdx, kindMult) {
   addWeapon(nw);
   log(`🏺🏺🏺 <b class="grade-고대">[고대 무기] ${v.name}</b>을(를) 획득했습니다!!! 사냥터의 태고 몬스터가 남긴 유산입니다.`, 'lg-prim');
   renderInventory(); renderTop(); save();
+}
+// 고대 보조무기(SUBWEAPON_RELICS) — 도서관이 아니라 "고대 무기의 연장선". rollAncientWeapon과
+// 완전히 같은 방식(사냥터 몬스터 처치 시 초저확률 고정 드롭)으로 얻는다. ANCIENT_BASE_CHANCE보다
+// 살짝 더 희박하게 잡아서 "고대 보조무기가 고대 무기보다도 더 상위"라는 인상을 준다(TODO 미확정).
+const SUBWEAPON_RELIC_BASE_CHANCE = 1 / 16200000;
+function rollSubweaponRelic(floorIdx, kindMult) {
+  if (floorIdx < WORLD2_START_FLOOR) return;
+  const idx = floorIdx - WORLD2_START_FLOOR;
+  if (S.subRelics[idx]) return; // 이미 보유
+  if (Math.random() >= SUBWEAPON_RELIC_BASE_CHANCE * kindMult * genesisAncientDropMult(floorIdx)) return;
+  S.subRelics[idx] = true;
+  const r = SUBWEAPON_RELICS[idx];
+  log(`🏺🗡️ <b class="grade-고대">[고대 보조무기] ${r.name}</b>을(를) 획득했습니다!!! ${r.flavor}`, 'lg-prim');
+  renderTop(); save();
 }
 
 // ---------- 대장장이 (파괴된 고대 무기 복구) ----------
@@ -3486,6 +3503,13 @@ function accEff() {
     eff.luck += 0.5;   // 해당 사냥터 드롭률 +50%
     eff.atk  += 0.3;   // 해당 사냥터 공격력 +30%
   }
+  // 세트 효과(월드2): 보스 보조무기 + 그 층 보스장신구 — 수치는 위 메인 무기 버전과 동일
+  const subSetFloor = subBossSetFloor();
+  if (subSetFloor != null && S && S.floor === subSetFloor) {
+    eff.gold += 0.5;
+    eff.luck += 0.5;
+    eff.atk  += 0.3;
+  }
   // 능력치 훈련 (장비와 무관하게 항상 적용, 월드 구분 없음)
   eff.atk += trainingValue('atk');
   eff.speed += trainingValue('atkSpeed');
@@ -3546,6 +3570,14 @@ function bossSetFloor() {
   // 그 층 보스장신구를 보유하고 있기만 하면 어디서든 세트효과가 발동한다.
   if (w.bossFloor === 'all') return S.bossAccs.includes(S.floor) ? S.floor : null;
   return S.bossAccs.includes(w.bossFloor) ? w.bossFloor : null;
+}
+// 월드2 버전 세트 효과 판정 — 메인 무기 대신 장착 중인 보조무기의 bossFloor로 판정한다
+// (21~40층은 보스가 메인 무기를 안 주므로 bossSetFloor()가 절대 성립하지 않는다).
+function subBossSetFloor() {
+  if (!S || !Array.isArray(S.bossAccs) || !S.bossAccs.length) return null;
+  const sw = getEquippedSubweapon();
+  if (!sw || sw.bossFloor === undefined) return null;
+  return S.bossAccs.includes(sw.bossFloor) ? sw.bossFloor : null;
 }
 // 보스 무기/보스 장신구 여부
 function isBossWeapon(w) { return w && w.bossFloor !== undefined; }
@@ -3937,6 +3969,8 @@ function dropRoll() {
   rollAncientWeapon(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 보조무기: 월드2(21~40층) 전용 드롭 시도 (엘리트는 5배, rollSubweaponDrop 내부에서 층 체크)
   rollSubweaponDrop(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
+  // 고대 보조무기: 고대 무기와 같은 방식의 초저확률 고정 드롭 (월드2 전용, 엘리트는 5배)
+  rollSubweaponRelic(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
 
   // 연쇄 처치(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공 시 처치 보상을 한 번 더 획득
   // 발동 알림은 화면 텍스트로만 — 실제 보상은 재귀 호출된 dropRoll()의 일반 로그로 남음
@@ -4155,10 +4189,12 @@ function addWeapon(w) {
   if (WEAPON_TYPES.every(t => S.weapons.some(x => x.type === t.name))) unlockEgg('collector');
 }
 
-/* ===================== 보조무기 (월드2 전용, 아직 UI 없음 — 로직만) ===================== */
-// 등급별 파워 배율. 메인 무기 GRADES[].atk와 별개의 자체 곡선 — %p류 패시브가 태초에서
-// 터무니없이 커지지 않도록 완만하게 잡았다. 전부 밸런스 미확정 임시값(TODO).
-const SUBWEAPON_GRADE_MULT = [1, 1.4, 2, 2.8, 4, 5.5, 8, 12]; // 일반~태초(0~7)
+/* ===================== 보조무기 (월드2 전용) ===================== */
+// 등급별 파워 배율(기본 능력치/패시브에 적용). 액티브 "결전의 기백" 기준값(일반50%~신화400%,
+// 비율로 1:3:4:5:6.5:8)과 정확히 같은 비율로 통일해서, 등급이 오르면 보조무기의 모든 힘이
+// 일관되게 커지도록 했다(예전엔 이 배율표만 따로 완만해서 액티브만 세지고 패시브/기본
+// 능력치는 상대적으로 초라했음). 고대/태초는 그 비율을 이어서 추정한 placeholder.
+const SUBWEAPON_GRADE_MULT = [1, 3, 4, 5, 6.5, 8, 13, 20]; // 일반~태초(0~7)
 function subGradeMult(grade) { return SUBWEAPON_GRADE_MULT[grade] || 1; }
 // 강화 1~30강 중 지금까지 각 항목이 몇 번 올랐는지 — subEnhRiseType()과 같은 3주기 규칙을
 // 역산한 공식이라 매 레벨을 순회할 필요가 없다.
@@ -4170,7 +4206,7 @@ function subActiveDurTier(enh) { return Math.floor(subActiveTierTotal(enh) / 2);
 // 기본 능력치 = 소폭의 공격력% (TODO 미확정 — "높진 않은 스펙업" 취지로 atk를 채택)
 function subweaponBaseAtk(sw) { return 0.02 * subStatTier(sw.enhance) * subGradeMult(sw.grade); }
 // 패시브 = 종류 고유 효과(SUBWEAPON_TYPES[].passive) × 등급 배율 × 강화로 쌓인 증폭
-function subweaponPassiveMult(sw) { return 1 + 0.08 * subPassiveTier(sw.enhance); }
+function subweaponPassiveMult(sw) { return 1 + 0.10 * subPassiveTier(sw.enhance); } // +30강 기준 최대 2배
 // ampBonus(=accEff().subAmp)는 호출부에서 넘겨받는다 — accEff() 내부에서 이 함수를 호출할 때
 // 그 안에서 다시 accEff()를 부르면 무한 재귀가 되므로, accEff()는 그 시점까지 이미 누적된
 // eff.subAmp(장신구 등 gear 소스)를 그대로 넘기고, 그 외 호출부는 accEff().subAmp를 넘긴다.
@@ -4203,6 +4239,12 @@ function subweaponPassiveValue(key) {
   return subweaponPassiveEff(sw, accEff().subAmp)[key] || 0;
 }
 function subweaponItemName(sw) {
+  // 보스 보조무기(sw.bossFloor 있음)는 등급 공용 이름표 대신 그 층 전용 고정 이름을 쓴다
+  // (메인 무기의 WEAPON_BOSS_NAMES와 동일한 패턴).
+  if (sw.bossFloor !== undefined) {
+    const bs = SUBWEAPON_BOSS_NAMES[sw.bossFloor - WORLD2_START_FLOOR];
+    if (bs) return bs.name;
+  }
   const t = SUBWEAPON_TYPES[sw.typeIdx];
   const type = t.name;
   if (sw.grade === 0) return type;
@@ -4214,6 +4256,10 @@ function subweaponItemName(sw) {
   return type; // 고대/태초(6~7)는 아직 이름 테이블 없음(추후 설계)
 }
 function subweaponFlavorText(sw) {
+  if (sw.bossFloor !== undefined) {
+    const bs = SUBWEAPON_BOSS_NAMES[sw.bossFloor - WORLD2_START_FLOOR];
+    if (bs) return bs.flavor;
+  }
   const t = SUBWEAPON_TYPES[sw.typeIdx];
   const type = t.name;
   if (sw.grade === 4) return (SUBWEAPON_LEGEND_NAMES[type] || {}).flavor || null;
@@ -5372,21 +5418,38 @@ function endBossFight(win) {
     // 승리 연출
     $('monemoji').classList.add('boss-appear');
     setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
-    // 신화 보스무기 드롭 — 그 사냥터 보스 전용 고정 무기(WEAPON_BOSS_NAMES)가 항상 나온다
-    if (Math.random() < BOSS.weaponDrop * (1 + accEff().luck)) {
-      const bw = WEAPON_BOSS_NAMES[f];
-      const t = WEAPON_TYPES.find(x => x.name === bw.type);
-      const pool = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === 5);
-      const nw = {
-        id: uid++, grade: 5, type: bw.type, icon: t.icon, enhance: 0,
-        effect: pool[Math.floor(Math.random() * pool.length)],
-        runes: [],
-        bossFloor: f,   // 보스무기 표식
-      };
-      addWeapon(nw);
-      log(`💎 <b>신화 보스무기 드롭!</b> ${gradeTag(nw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
+    // 보스 무기/보조무기 드롭 — 1~20층은 기존처럼 고정 신화 무기(WEAPON_BOSS_NAMES),
+    // 21~40층(월드2)은 메인 무기가 아니라 그 층 전용 "보스 보조무기"(SUBWEAPON_BOSS_NAMES)가 나온다.
+    if (f < WORLD2_START_FLOOR) {
+      if (Math.random() < BOSS.weaponDrop * (1 + accEff().luck)) {
+        const bw = WEAPON_BOSS_NAMES[f];
+        const t = WEAPON_TYPES.find(x => x.name === bw.type);
+        const pool = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === 5);
+        const nw = {
+          id: uid++, grade: 5, type: bw.type, icon: t.icon, enhance: 0,
+          effect: pool[Math.floor(Math.random() * pool.length)],
+          runes: [],
+          bossFloor: f,   // 보스무기 표식
+        };
+        addWeapon(nw);
+        log(`💎 <b>신화 보스무기 드롭!</b> ${gradeTag(nw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
+      }
+    } else if (Math.random() < BOSS.subweaponDrop * (1 + accEff().luck)) {
+      const idx = f - WORLD2_START_FLOOR;
+      if (S.subBossCodexSeen[idx]) {
+        log(`보스 보조무기는 이미 보유 중이라 골드로 대체 지급됩니다.`);
+        S.gold += Math.floor(floorGold(f) * 10);
+      } else {
+        const bs = SUBWEAPON_BOSS_NAMES[idx];
+        const typeIdx = SUBWEAPON_TYPES.findIndex(t => t.name === bs.subType);
+        const sw = makeSubweapon(5, typeIdx); // 보스 보조무기는 메인 보스무기와 동급으로 신화 고정
+        sw.bossFloor = f; // 보스 보조무기 표식(세트 효과 판정용)
+        addSubweapon(sw);
+        S.subBossCodexSeen[idx] = true;
+        log(`🗡️ <b>보스 보조무기 드롭!</b> ${subweaponGradeTag(sw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
+      }
     }
-    // 신화 보스장신구 드롭
+    // 신화 보스장신구 드롭 (1~20/21~40 공용 — BOSS_ACCS는 이미 40개로 확장됨)
     if (Math.random() < BOSS.accDrop * (1 + accEff().luck)) {
       if (S.bossAccs.some(bf => bf === f)) {
         log(`보스 장신구는 이미 보유 중이라 골드로 대체 지급됩니다.`);

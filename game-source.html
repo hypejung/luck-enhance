@@ -1878,6 +1878,20 @@ const FLOOR_CAP = 40;
 // "1~20층 결부형 보너스가 여기부터는 적용되지 않는다"는 월드 격리 기준선이다. 나중에 FLOOR_CAP이
 // 부분적으로만 올라가도(예: 21~25층만 먼저 해금) 이 기준선은 그대로 20에 고정되어야 한다.
 const WORLD2_START_FLOOR = 20;
+// 월드2(21층) 해금 조건은 사냥 진행(20층 처치 수)이 아니라 "토벌전 9단계 클리어"다.
+// S.raidMaxCleared는 표시상 1-indexed 단계 수를 저장하므로 그대로 9와 비교하면 된다.
+const WORLD2_RAID_UNLOCK_STAGE = 9;
+function world2RaidGateCleared() { return (S.raidMaxCleared || 0) >= WORLD2_RAID_UNLOCK_STAGE; }
+// 20층 처치 조건과 토벌전 게이트를 둘 다 만족해야 21층이 열린다. 어느 쪽이 나중에
+// 충족되든(사냥 먼저 vs 토벌전 먼저) 그 시점에 이 함수를 호출해서 즉시 해금되게 한다.
+function tryUnlockWorld2() {
+  if (S.unlocked > WORLD2_START_FLOOR) return; // 이미 열림
+  if ((S.kills[WORLD2_START_FLOOR - 1] || 0) < FLOOR.unlockKills) return;
+  if (!world2RaidGateCleared()) return;
+  S.unlocked = Math.max(S.unlocked, WORLD2_START_FLOOR + 1);
+  log(`🔓 사냥터 [${FLOORS[WORLD2_START_FLOOR].name}] 해금! (토벌전 ${WORLD2_RAID_UNLOCK_STAGE}단계 클리어)`, 'lg-gold');
+  if (S.unlocked >= FLOOR_CAP && S.boxCount === 0) unlockEgg('noBox');
+}
 
 // ---------- 보스 시스템 ----------
 const BOSS = {
@@ -4004,9 +4018,13 @@ function dropRoll() {
   S.totalKills++;
   if (isU) { S.uniqueKills++; }
   if (S.floor + 1 < FLOOR_CAP && (S.kills[S.floor] || 0) >= FLOOR.unlockKills && S.unlocked < S.floor + 2) {
-    S.unlocked = Math.max(S.unlocked, S.floor + 2);
-    log(`🔓 사냥터 [${FLOORS[S.floor + 1].name}] 해금!`, 'lg-gold');
-    if (S.unlocked >= FLOOR_CAP && S.boxCount === 0) unlockEgg('noBox');
+    if (S.floor + 2 === WORLD2_START_FLOOR + 1) {
+      tryUnlockWorld2(); // 21층은 사냥 진행이 아니라 토벌전 9단계 클리어가 추가로 필요
+    } else {
+      S.unlocked = Math.max(S.unlocked, S.floor + 2);
+      log(`🔓 사냥터 [${FLOORS[S.floor + 1].name}] 해금!`, 'lg-gold');
+      if (S.unlocked >= FLOOR_CAP && S.boxCount === 0) unlockEgg('noBox');
+    }
   }
   renderTop(); renderFloorUI();
 
@@ -5293,6 +5311,7 @@ function endRaidFight(win) {
     rollAncientSeal(stage);
     // 고대의 도서관 해금 조건(토벌전 특정 단계 클리어)을 위한 영구 최고 기록
     S.raidMaxCleared = Math.max(S.raidMaxCleared || 0, stage + 1);
+    tryUnlockWorld2(); // 20층 처치 조건은 이미 채워둔 상태로 토벌전 9단계를 지금 막 깼을 수도 있으니 즉시 재확인
   } else {
     log(`⏰ 토벌전 실패... <span class="grade-고대">${rm.name}</span>에게 패배했습니다. (오늘 이 단계는 재도전 불가)`, 'lg-bad');
   }
@@ -6246,6 +6265,13 @@ function migrate(d) {
   if (!Array.isArray(d.subRelics)) d.subRelics = [];
   if (!Array.isArray(d.subweapons)) d.subweapons = [];
   if (d.subEquipped === undefined) d.subEquipped = null;
+  // 월드2(21층) 해금 조건 버그 수정 — 원래 "토벌전 9단계 클리어"가 조건이어야 했는데,
+  // FLOOR_CAP을 40으로 올릴 때 실수로 일반 사냥 진행(20층 처치 수)만으로 열리고 있었다.
+  // 이미 이 버그로 21층 이상이 열려버린 세이브는 토벌전 9단계를 실제로 못 깼다면 재잠금한다.
+  if (d.unlocked > WORLD2_START_FLOOR && (d.raidMaxCleared || 0) < WORLD2_RAID_UNLOCK_STAGE) {
+    d.unlocked = WORLD2_START_FLOOR;
+    if (d.floor >= WORLD2_START_FLOOR) d.floor = WORLD2_START_FLOOR - 1; // 21층 이상에 서 있었다면 20층으로 되돌림
+  }
   for (const w of d.weapons || []) {
     if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
   }
@@ -6670,8 +6696,11 @@ function renderFloorUI() {
   const need = S.floor + 1 < FLOOR_CAP ? FLOOR.unlockKills : null;
   $('killcount').textContent = `처치 ${fmt(k)}회 (누적 ${fmt(S.totalKills)})`;
   $('floorreward').textContent = `처치당 약 ${fmt(floorGold(S.floor))} 골드`;
-  const nextUnlock = (S.floor + 1 < FLOOR_CAP && (S.kills[S.floor] || 0) >= FLOOR.unlockKills)
-    ? '' : (S.floor + 1 < FLOOR_CAP ? ` | 다음 단계까지 ${FLOOR.unlockKills - k}마리` : '');
+  const world2Pending = S.floor === WORLD2_START_FLOOR - 1 && k >= FLOOR.unlockKills && !world2RaidGateCleared();
+  const nextUnlock = world2Pending
+    ? ` | 다음 사냥터(${FLOORS[WORLD2_START_FLOOR].name})는 토벌전 ${WORLD2_RAID_UNLOCK_STAGE}단계 클리어 시 해금`
+    : (S.floor + 1 < FLOOR_CAP && (S.kills[S.floor] || 0) >= FLOOR.unlockKills)
+      ? '' : (S.floor + 1 < FLOOR_CAP ? ` | 다음 단계까지 ${FLOOR.unlockKills - k}마리` : '');
   const bossSetActive = bossSetFloor() === S.floor;
   $('dropinfo').innerHTML = `드롭: 🎁 랜덤박스 ${(FLOOR.boxDrop * 100).toFixed(1)}% · ⚔️ 무기 ${(FLOOR.weaponDrop * 100).toFixed(1)}%${nextUnlock}${bossSetActive ? ' <span style="color:var(--unique);font-weight:bold">✨ [보스세트효과 발동중]</span>' : ''}`;
   renderFloorBtns();

@@ -4,7 +4,7 @@
 
 ## 🎯 밸런스/수치 조정
 - [x] 만렙 확장 — "사냥터 20→40 확장"으로 재해석. 21~40층(월드2: 황혼국) 컨셉/데이터 반영 완료, 다만 보스 보조무기·고대 보조무기·태초 보조무기 등 세부 콘텐츠가 끝날 때까지 `FLOOR_CAP=20`으로 실제 진행은 잠가둔 상태 (2026-09-19 반영, commit 69061fc)
-- [x] 보조무기 추가 — 컨셉 확정 + 데이터 골격 + 보스/고대 보조무기 수집 트랙 + 21~40층 장신구까지 반영 완료 (commit e2c6772, fdd16ff, c77dce1). 아직 게임플레이(장착/드롭/뽑기/전투)에는 미연결. 하위 작업은 "🗡️ 보조무기 시스템 구현" 섹션 참고
+- [x] 보조무기 추가 — 컨셉/데이터/보너스 체계에 이어 실제 게임플레이(장착·드롭·뽑기·강화·전투 훅·전용 탭 UI)까지 전부 연결 완료 (commit e2c6772, fdd16ff, c77dce1, 2c5dfe6). 남은 건 세부 밸런스 조정과 태초 등급 콘텐츠뿐 — "🗡️ 보조무기 시스템 구현" 섹션 참고
 - [x] 강화 파괴확률 감소 수치 조정 및 버그 수정 — %p 차감으로 수정 + 소스 수치 재설계(신화까지 합계 8%p, +16강까지만 0%) (2026-09-16 배포, commit bd443ec)
 - [x] 무기 기본 판매값 상향 — 랜덤박스 기대값(최적 박스 기준)의 50%로 재산정, 고대는 태초처럼 판매 불가 전환. 강화 판매가 곡선은 공격력 배율 대신 실제 성공확률/비용 기반 기대비용의 50%로 재설계 (2026-09-16 배포, commit 85f0b3a)
 - [x] 둔기 무기특성 개선 — "파쇄의 리듬"(매 5타 강타, 무기 공격력 250% 고정피해)으로 교체, 도감 5층 세트효과 신화/고대 역전도 같이 수정 (2026-09-16 배포, commit af818fc)
@@ -26,16 +26,18 @@
 - [x] `SUBWEAPON_TYPES` 8종(무기 타입별 시너지 컨셉) + 등급별 작명 테이블(레어~신화) + `SUBWEAPON_ACTIVE`("결전의 기백") + `SUB_ENH` 강화 곡선 + 강화 순환 규칙(`subEnhRiseType`) 데이터 반영 (commit e2c6772)
 - [x] "보스 보조무기"/"고대 보조무기" 수집 트랙 데이터 + 마일스톤 + `S.subBossCodexSeen`/`S.subRelics` 세이브 필드(+migrate 기본값) 반영 (commit fdd16ff)
 - [x] 21~40층 장신구에 보조무기 효과 증폭(subAmp)/강화확률(subEnh) 스탯 옵션 추가 (commit c77dce1)
-- [ ] 장착 슬롯 상태 필드(`S.subweapon` 등) + 보유/장착 UI 탭 신설
-- [ ] 사냥터 드롭 로직 — 21~40층 몬스터 처치 시 낮은 확률(초안 0.15%, 1~20층 무기 드롭률 0.6%보다 낮게)로 드롭
-- [ ] "보조무기 뽑기" 박스 UI/구매 로직 — 가격 초안: 고대 룬박스 가격의 4~5배
-- [ ] 강화 UI + 강화 실행 로직 (`SUB_ENH` 곡선 사용, `subEnhRiseType()` 결과에 따라 스탯/패시브/액티브% /액티브 지속시간 중 하나만 상승)
-- [ ] 8종 패시브 효과를 실제 전투 계산식에 반영 (extraAtk/atk/critChance·critDamage/bossDmg/speed/spellProc/smashMultBonus 각각 훅 연결)
-- [ ] 액티브 "결전의 기백" 실전 로직 — `bossFight` 시작 시 타이머 세팅 → 플레이어가 지정한 시점(0~120초) 도달 시 1회 발동 + 보스 피해량 버프 적용, 전투 종료 시 리셋(보스전 1회 제한)
-- [ ] 액티브 발동 시점(0~120초) 설정 UI (슬라이더/숫자 입력)
-- [ ] `accEff()`가 이미 집계하는 subAmp/subEnh/subDestroyReduce/subActiveDmg/subActiveDuration/subDropRate/subGachaDiscount 예약 스탯을 실제 보조무기 로직(강화/드롭/뽑기/전투)에서 소비하도록 연결
+- [x] 장착 슬롯(`S.subweapon`/`S.subEquipped`) + 보유/장착/판매 + 전용 탭("🗡️ 보조무기") UI 신설 (commit 2c5dfe6)
+- [x] 사냥터 드롭 로직 — `rollSubweaponDrop()`, 월드2(21층 이상) 전용, 초안 0.15% (commit 2c5dfe6)
+- [x] "보조무기 뽑기" UI/구매 로직 — `buySubweaponGacha()`, 가격 초안 고대 룬박스의 4.5배 (commit 2c5dfe6)
+- [x] 강화 UI + 실행 로직 — `trySubEnhance()`, `SUB_ENH` 곡선 + `subEnhRiseType()` 기반 스탯/패시브/액티브%·지속시간 순환 상승 (commit 2c5dfe6)
+- [x] 8종 패시브 효과 전투 반영 — `accEff()`가 공용 스탯(atk/speed/critChance/critDamage/extraAtk/bossDmg)을 직접 합산, spellProc/smashMultBonus는 `subweaponPassiveValue()`로 개별 훅 (commit 2c5dfe6)
+- [x] 액티브 "결전의 기백" 실전 로직 — `bossFight.active` 중 경과시간(`elapsed`)이 지정 시점(0~120초)에 도달하면 1회 발동, `bossFight.dmgBonus`로 `bossDmgBonus()`에 반영, 전투 시작마다(`resetTimedStacks()`) 리셋 (commit 2c5dfe6)
+- [x] 액티브 발동 시점(0~120초) 설정 UI (숫자 입력) (commit 2c5dfe6)
+- [x] `accEff()`의 subAmp/subEnh/subDestroyReduce/subDropRate/subGachaDiscount 예약 스탯을 실제 강화/드롭/뽑기 로직이 전부 소비하도록 연결 (subActiveDmg/subActiveDuration은 `SUBWEAPON_BOSS_MILESTONES`가 나중에 실제 보스 보조무기를 통해서만 채워지는 값이라 아직 카운트 0 — 무해)
+- [ ] 세부 수치 밸런스 패스 — 지금까지의 모든 보조무기 수치(강화 비용/곡선, 등급 배율, 뽑기·드롭 확률/가격, 액티브 위력)는 전부 TODO 표시된 임시값. 실제 플레이 데이터 없이 감으로 잡은 값이라 조정 필요
 - [ ] 고대·태초(6~7등급) 보조무기 콘텐츠 — 1~20층 태초의 유물 로스터 완성 후 착수
-- [ ] 보스 보조무기/고대 보조무기 실제 획득 경로(보스 드롭, 고대의 도서관 등) 구현 — 현재는 카운트가 항상 0으로 고정된 빈 트랙
+- [ ] 보스 보조무기/고대 보조무기 실제 획득 경로(보스 드롭, 고대의 도서관 등) 구현 — 현재는 두 컬렉션 다 카운트가 항상 0으로 고정된 빈 트랙(그 자체 효과는 무해하지만 채울 방법이 없음)
+- [ ] 보조무기 가방 용량 초과 시 정책 재검토 — 지금은 장착 중인 것 하나뿐이면 그냥 드롭/뽑기 결과를 버림(TODO 표시됨)
 
 ## 🐛 버그 수정
 - [x] 재료 자동판매 버그 — 보스 처치 고급재료 보상이 S.mats를 직접 건드려 자동판매 필터를 무시하던 문제 (2026-09-16 배포, commit 4b131ae)

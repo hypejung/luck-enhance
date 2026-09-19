@@ -3751,25 +3751,33 @@ function rollSellPrice(basePrice) {
 
 /* ===================== 유틸 ===================== */
 const $ = id => document.getElementById(id);
-// 만 단위(10^4)마다 새 한자 단위로 올라가는 큰 수 표기법. 강화 곡선/판매가 등이 억 단위를
-// 훌쩍 넘어가는 경우(조 단위 이상)가 흔해져서, 10000억을 그냥 "10000.00억"으로 뭉개지 않고
-// 조/경/해 등으로 계속 이어서 표기한다.
+// 만/억/조까지는 익숙한 한글 단위를 그대로 쓰고, 그 이상(1,000조=10^15)부터는 경/해/자/양/
+// 구/간/정/재/극처럼 일상에서 안 쓰는 한자 단위 대신 알파벳 접미사(a,b,c...)로 표기한다.
+// 하드코딩된 표가 아니라 공식으로 계산해서 z 다음엔 스프레드시트 열 이름처럼 aa,ab...로
+// 계속 이어지므로(bigLetterLabel), 이 게임처럼 숫자가 끝없이 커져도 상한이 없다.
 const NUM_UNITS = [
-  { value: 1e48, label: '극' },
-  { value: 1e44, label: '재' },
-  { value: 1e40, label: '정' },
-  { value: 1e36, label: '간' },
-  { value: 1e32, label: '구' },
-  { value: 1e28, label: '양' },
-  { value: 1e24, label: '자' },
-  { value: 1e20, label: '해' },
-  { value: 1e16, label: '경' },
   { value: 1e12, label: '조' },
   { value: 1e8,  label: '억' },
   { value: 1e4,  label: '만' },
 ];
+const BIG_LETTER_BASE = 1e15; // a = 1,000조
+function bigLetterLabel(tier) {
+  let n = tier + 1; // 스프레드시트 열 이름과 같은 방식(1→a, 26→z, 27→aa, ...)
+  let s = '';
+  while (n > 0) {
+    n--;
+    s = String.fromCharCode(97 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+}
 function fmt(n) {
   n = Math.floor(n);
+  if (n >= BIG_LETTER_BASE) {
+    let unitValue = BIG_LETTER_BASE, tier = 0;
+    while (n >= unitValue * 1000) { unitValue *= 1000; tier++; }
+    return (n / unitValue).toFixed(2).replace(/\.?0+$/, '') + bigLetterLabel(tier);
+  }
   for (const u of NUM_UNITS) {
     if (n >= u.value) return (n / u.value).toFixed(2).replace(/\.?0+$/, '') + u.label;
   }

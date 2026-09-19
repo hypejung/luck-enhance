@@ -1060,13 +1060,23 @@ const SUBWEAPON_MYTH_NAMES = {
 // 수치는 전부 밸런스 미확정 임시값(TODO).
 const SUBWEAPON_ACTIVE = {
   name: '결전의 기백',
-  desc: '설정한 시점에 보스 계열 전투에서 자동으로 1회 발동, 일정 시간 동안 보스 피해량이 크게 증가한다.',
+  desc: '설정한 시점에 보스 계열 전투에서 자동으로 1회 발동, 일정 시간 동안 보스 피해량이 폭발적으로 증가한다.',
   timingMin: 0, timingMax: 120,     // 발동 시점 설정 가능 범위(초)
-  baseBossDmgPct: 0.30,             // 기본 보스 피해량 증가폭(임시값)
-  baseDuration: 5,                  // 기본 지속시간(초, 임시값)
-  bossDmgPctPerTier: 0.05,          // 강화 3,9,15,21,27강마다 증가폭(임시값)
-  durationPerTier: 1,               // 강화 6,12,18,24,30강마다 증가(초, 임시값)
 };
+// 등급별 0강 기준값 — 일반 50% / 레어 150% / 유니크 250% / 신화 400%(사용자 지정)이고
+// 에픽/레전더리는 그 사이를 보간, 고대/태초(미공개)는 추세만 이어붙인 placeholder.
+const SUBWEAPON_ACTIVE_BASE_DMG = [0.50, 1.50, 2.00, 2.50, 3.25, 4.00, 6.50, 10.00];
+// 등급별 0강 기준 지속시간 — 신화가 +30강에서 20초에 도달하도록 역산(아래 성장곡선 기준).
+const SUBWEAPON_ACTIVE_BASE_DURATION = [2.5, 3.7, 4.3, 5.6, 6.2, 6.8, 8.7, 12.4];
+// 액티브 tier(0~5)별 누적 배율 — 메인 무기 강화 곡선처럼 뒤로 갈수록 기울기가 급해지는
+// 가속형 곱연산(1탱마다 곱해지는 증가율 자체가 커짐). tier0(강화 전)은 배율 1(=기준값 그대로).
+// 전부 밸런스 미확정 임시값(TODO).
+const SUBWEAPON_ACTIVE_TIER_GROWTH = [0.10, 0.15, 0.22, 0.32, 0.45];
+function subweaponActiveTierMult(tier) {
+  let m = 1;
+  for (let i = 0; i < tier; i++) m *= (1 + (SUBWEAPON_ACTIVE_TIER_GROWTH[i] || 0));
+  return m;
+}
 // 강화 단계(1~30)별로 무엇이 오르는지 — 3단계 주기로 스탯→패시브→액티브가 순환하고,
 // 액티브 차례(3의 배수)에서는 %(홀수 번째)와 지속시간(짝수 번째)이 번갈아 오른다.
 function subEnhRiseType(level) {
@@ -4175,11 +4185,12 @@ function subweaponPassiveEff(sw, ampBonus) {
 }
 // 액티브 "결전의 기백" 위력/지속시간 — 위력은 등급 배율, 지속시간은 초 단위라 등급 배율 없이 강화만 반영.
 function subweaponActiveBossDmg(sw, ampBonus) {
-  return SUBWEAPON_ACTIVE.baseBossDmgPct * subGradeMult(sw.grade) * (1 + (ampBonus || 0))
-    + SUBWEAPON_ACTIVE.bossDmgPctPerTier * subActivePctTier(sw.enhance);
+  const base = SUBWEAPON_ACTIVE_BASE_DMG[sw.grade] || SUBWEAPON_ACTIVE_BASE_DMG[0];
+  return base * subweaponActiveTierMult(subActivePctTier(sw.enhance)) * (1 + (ampBonus || 0));
 }
 function subweaponActiveDuration(sw) {
-  return SUBWEAPON_ACTIVE.baseDuration + SUBWEAPON_ACTIVE.durationPerTier * subActiveDurTier(sw.enhance);
+  const base = SUBWEAPON_ACTIVE_BASE_DURATION[sw.grade] || SUBWEAPON_ACTIVE_BASE_DURATION[0];
+  return base * subweaponActiveTierMult(subActiveDurTier(sw.enhance));
 }
 function getEquippedSubweapon() { return (S.subweapons || []).find(sw => sw.id === S.subEquipped) || null; }
 // spellProc/smashMultBonus는 accEff()의 공용 스탯 키가 아니라 typeTrait() 자리에서 직접 더해지므로
@@ -4261,8 +4272,9 @@ function setSubweaponActiveTiming(sec) {
 }
 // ---- 강화 ----
 function subEnhanceCost(sw) {
-  // TODO 미확정 — 메인 무기(GRADES[].enhanceCost × costGrowth^enhance)보다 훨씬 저렴하게.
-  return Math.round(GRADES[sw.grade].enhanceCost * 0.3 * Math.pow(1.35, sw.enhance));
+  // 보조무기는 메인 무기보다 상위 콘텐츠라는 컨셉에 맞춰, 최고 등급(신화) 풀강 누적 비용이
+  // 보조무기 뽑기 가격(SUBWEAPON_GACHA.cost)과 비슷한 자릿수가 되도록 배율을 잡았다(TODO 미확정).
+  return Math.round(GRADES[sw.grade].enhanceCost * 9 * Math.pow(1.35, sw.enhance));
 }
 function subSuccessChance(sw) {
   const base = SUB_ENH.success[sw.enhance] || 0;
@@ -4302,10 +4314,13 @@ function trySubEnhance() {
 // ---- 뽑기 ----
 // 가격은 고대 룬박스보다 확실히 비싸게(초안: 4.5배) — 골드 소모처를 늘리려는 취지.
 const SUBWEAPON_GACHA = {
-  get cost() { return Math.round(RUNE_BOXES[6].cost * 4.5); }, // TODO 미확정
+  get cost() { return Math.round(RUNE_BOXES[6].cost * 4.5); }, // 가격 자체는 확정값
   dropTable: [[0, 45], [1, 28], [2, 15], [3, 8], [4, 3], [5, 1]], // 등급별 확률(%), 신화 1%
 };
+// 뽑기는 일단 닫아둔다 — 강화 비용 등 주변 밸런스가 더 잡힐 때까지 오픈 보류.
+const SUBWEAPON_GACHA_LOCKED = true;
 function buySubweaponGacha() {
+  if (SUBWEAPON_GACHA_LOCKED) { log('🗡️ 보조무기 뽑기는 아직 준비 중입니다.', 'lg-bad'); return; }
   const cost = Math.round(SUBWEAPON_GACHA.cost * (1 - (accEff().subGachaDiscount || 0)));
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
   S.gold -= cost;
@@ -6951,10 +6966,10 @@ function renderSubGachaBox() {
   const dDesc = SUBWEAPON_GACHA.dropTable.map(([g, p]) => `${GRADES[g].name} ${p}%`).join(' / ');
   box.innerHTML = `
     <div class="boxrow">
-      <div><div style="font-weight:bold">🗡️ 보조무기 뽑기</div>
+      <div><div style="font-weight:bold">🗡️ 보조무기 뽑기 ${SUBWEAPON_GACHA_LOCKED ? '<span style="color:var(--sub);font-size:12px">(준비 중)</span>' : ''}</div>
       <div class="bi">🎲 등급 확률: ${dDesc}</div>
       <div class="bi" style="color:var(--sub)">무작위 종류 1개 + 등급 획득 (8종 중 균등 확률)</div></div>
-      <div class="btns"><button class="primary" id="subGachaBtn">뽑기<br><span style="font-size:11px">💰 ${fmt(cost)}</span></button></div>
+      <div class="btns"><button class="primary" id="subGachaBtn" ${SUBWEAPON_GACHA_LOCKED ? 'disabled' : ''}>${SUBWEAPON_GACHA_LOCKED ? '준비 중' : `뽑기<br><span style="font-size:11px">💰 ${fmt(cost)}</span>`}</button></div>
     </div>`;
   $('subGachaBtn').onclick = buySubweaponGacha;
 }

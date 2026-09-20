@@ -7322,6 +7322,16 @@ function renderSubweaponBoxes() {
     list.appendChild(div);
   }
 }
+// 다음 강화 시도(현재 강화값+1)에서 무엇이 오르는지 안내 문구. 공격력(기본 능력치)은
+// subweaponAtk()가 매 강화마다 항상 올리므로 여기선 "추가로" 패시브/액티브 중 뭐가
+// 같이 오르는지만 subEnhRiseType()의 3주기 규칙으로 판정한다.
+function subNextRiseLabel(sw) {
+  const type = subEnhRiseType(sw.enhance + 1);
+  if (type === 'passive') return `공격력 + 패시브(${SUBWEAPON_TYPES[sw.typeIdx].name})`;
+  if (type === 'activePct') return '공격력 + 액티브 피해량';
+  if (type === 'activeDuration') return '공격력 + 액티브 지속시간';
+  return '공격력';
+}
 function renderSubEquippedBox() {
   const box = $('subEquippedBox');
   if (!box) return;
@@ -7348,7 +7358,9 @@ function renderSubEquippedBox() {
       <div class="wi">액티브 "${SUBWEAPON_ACTIVE.name}": 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (전투당 1회, 발동 시점 아래에서 설정)</div>
       <div class="wi" style="margin-top:4px;">
         발동 시점: <input type="number" min="${SUBWEAPON_ACTIVE.timingMin}" max="${SUBWEAPON_ACTIVE.timingMax}" value="${sw.activeTiming}" id="subActiveTimingInput" style="width:60px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 6px;">초 (0~120, 보스전 계열은 60초 이내 권장)
-      </div></div>
+      </div>
+      ${!maxed ? `<div class="wi" style="color:var(--gold);margin-top:2px;">🔜 다음 강화(+${sw.enhance + 1}) 시 상승: ${subNextRiseLabel(sw)}</div>` : ''}
+      </div>
       <div class="btns">
         <button class="primary" id="subEnhBtn" ${maxed ? 'disabled' : ''}>강화하기${maxed ? ' (MAX)' : `<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${subSuccessChance(sw).toFixed(1)}% / 파괴 ${subDestroyChance(sw).toFixed(1)}%)</span>`}</button>
         <button id="subUnequipBtn">해제</button>

@@ -1093,6 +1093,19 @@ const SUBWEAPON_TYPES = [
   { mainType: '둔기',   name: '건틀릿', icon: '🧤',
     passive: { smashMultBonus: 0.10 },         passiveDesc: '파쇄의 리듬 강타 배율 +10%p' },
 ];
+// 보조무기 패시브(subweaponPassiveEff)가 실제 강화/증폭 반영된 값을 화면에 표시할 때
+// 원본 키(critChance 등)를 그대로 노출하지 않도록 한글 라벨/단위를 매핑한다.
+const SUB_PASSIVE_STAT_LABELS = {
+  atk: { label: '공격력', unit: '%' },
+  speed: { label: '공격속도', unit: '%' },
+  critChance: { label: '치명타 확률', unit: '%p' },
+  critDamage: { label: '치명타 피해', unit: '%p' },
+  extraAtk: { label: '연타(추가공격) 확률', unit: '%p' },
+  extraAtkDmg: { label: '연타 피해', unit: '%p' },
+  bossDmg: { label: '보스 피해량', unit: '%' },
+  spellProc: { label: '주문 작렬 확률', unit: '%p' },
+  smashMultBonus: { label: '파쇄의 리듬 강타 배율', unit: '%p' },
+};
 // 등급별 작명 규칙 — 메인 무기와 완전히 동일한 체계를 재사용하되, 레전더리/신화는
 // (메인 무기와 달리) 타입당 3변형이 아니라 1개만 둔다. 신화는 그 종류와 짝을 이루는
 // 메인 무기 신화 변형과 같은 신화 속 인물을 공유해서("함께 쓰면 좋은 조합") 세계관을 통일했다.
@@ -7568,8 +7581,8 @@ function renderSubEquippedBox() {
   const t = SUBWEAPON_TYPES[sw.typeIdx];
   const passiveEff = subweaponPassiveEff(sw, accEff().subAmp);
   const passiveText = Object.entries(passiveEff).map(([k, v]) => {
-    if (k === 'spellProc' || k === 'smashMultBonus') return `${k} +${(v * 100).toFixed(1)}%p`;
-    return `${k} +${(v * 100).toFixed(1)}%`;
+    const def = SUB_PASSIVE_STAT_LABELS[k];
+    return `${def ? def.label : k} +${(v * 100).toFixed(1)}${def ? def.unit : '%'}`;
   }).join(', ');
   const flavor = subweaponFlavorText(sw);
   const maxed = sw.enhance >= SUB_ENH.maxLevel;

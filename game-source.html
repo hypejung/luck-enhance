@@ -898,9 +898,9 @@ function isAncientWeapon(w) { return !!w && w.grade === 6; }
 const BLUNT_SMASH_EVERY = 5;
 const BLUNT_SMASH_MULT = 2.5;
 const WEAPON_TYPES = [
-  { name: '단검',   icon: '🗡️', speed: 1.8,  dmgMult: 0.68, trait: { extra: 0.08 },                    traitDesc: '연타 확률 +8%' },
+  { name: '단검',   icon: '🗡️', speed: 1.8,  dmgMult: 0.68, trait: { extra: 0.10, extraAtkDmg: 0.40 }, traitDesc: '연타 확률 +10%p, 연타 피해 +40%p' },
   { name: '검',     icon: '⚔️', speed: 1.2,  dmgMult: 0.90, trait: { atk: 0.15 },                       traitDesc: '공격력 +15%' },
-  { name: '쌍검',   icon: '🤺', speed: 1.5,  dmgMult: 0.85, trait: { extra: 0.10, extraAtkDmg: 0.40 }, traitDesc: '연타 확률 +10%p, 연타 피해 +40%p' },
+  { name: '쌍검',   icon: '🤺', speed: 1.5,  dmgMult: 0.85, trait: { critChance: 0.10, critDamage: 0.40 }, traitDesc: '치명타 확률 +10%p, 치명타 피해 +40%p' },
   { name: '도끼',   icon: '🪓', speed: 0.8,  dmgMult: 1.35, trait: { bossDmg: 0.25 },                   traitDesc: '보스 피해량 +25%' },
   { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critDamage: 0.30 },                traitDesc: '치명타 피해 +30%p' },
   { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedAmp: 0.20 },                  traitDesc: '모든 공격속도 증가량 +20%' },
@@ -1409,9 +1409,9 @@ const CODEX_PAIRS = [
 // 레전더리는 세 변형(이름/플레이버)의 공통 테마를, 신화는 서로 다른 신화 속 무기를
 // 모두 모았다는 컨셉을 반영해서 지었다 (WEAPON_LEGEND_NAMES/WEAPON_MYTH_NAMES 참고).
 const CODEX_TYPE_SETS = {
-  단검:   { stat: 'extraAtk',      legend: 0.03, myth: 0.06, legendSetName: '그림자 속의 세 자객', mythSetName: '만신전의 자객들' },
+  단검:   { stat: 'extraAtkDmg',   legend: 0.03, myth: 0.06, legendSetName: '그림자 속의 세 자객', mythSetName: '만신전의 자객들' },
   검:     { stat: 'atk',           legend: 0.04, myth: 0.08, legendSetName: '하늘이 벼린 세 자루', mythSetName: '신화를 가른 세 자루' },
-  쌍검:   { stat: 'extraAtkDmg',   legend: 0.03, myth: 0.06, legendSetName: '얽힌 운명의 쌍검', mythSetName: '쌍둥이 신화의 칼날' },
+  쌍검:   { stat: 'critChance',    legend: 0.03, myth: 0.06, legendSetName: '얽힌 운명의 쌍검', mythSetName: '쌍둥이 신화의 칼날' },
   도끼:   { stat: 'bossDmg',       legend: 0.04, myth: 0.08, legendSetName: '대지를 가른 거인의 도끼', mythSetName: '대장장이 신들의 유산' },
   창:     { stat: 'critDamage',    legend: 0.03, myth: 0.06, legendSetName: '천공을 꿰뚫는 창끝', mythSetName: '신창의 계보' },
   활:     { stat: 'speed',         legend: 0.04, myth: 0.08, legendSetName: '밤하늘의 명궁', mythSetName: '궁신들의 유산' },

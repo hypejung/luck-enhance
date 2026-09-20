@@ -1655,8 +1655,8 @@ const EFFECTS = {
               grade: 4, crit: { chance: 0.12 }, bleedProc: 0.10, bleedDur: 5, bleedDmg: 0.2 },
   stigma:   { name: '처형자의 낙인', desc: '치명타 확률 +12%p. 치명타 시 낙인 1스택 부여(스택당 무기 공격력 30%만큼 추가 피해). 5스택 도달 시 일반 몬스터는 즉시 처형, 보스는 대신 무기 공격력의 800%만큼 큰 고정 피해를 추가로 입는다',
               grade: 5, crit: { chance: 0.12 }, stackMax: 5, stackDmg: 0.3, bossBurstMult: 8 },
-  judgment: { name: '심판의 전조',  desc: '공격 시 70% 확률로 치명타 발동(다른 원천의 치명타 확률과 무관하게 고정). 다른 원천 치명타 확률의 20%만큼이 치명타 피해로 전환. 8% 확률로 5초간 치명타 피해 1.6배 추가 버프 획득',
-              grade: 6, fixedCrit: 0.70, crit: { mult: 1.4 }, overflowRatio: 0.20, buffProc: 0.08, buffDur: 5, buffMult: 1.6 },
+  judgment: { name: '심판의 전조',  desc: '치명타 확률 +70%p(다른 치명타 확률 원천과 합산, 상한 100%). 8% 확률로 5초간 치명타 피해 1.6배 추가 버프 획득',
+              grade: 6, crit: { chance: 0.70, mult: 1.4 }, buffProc: 0.08, buffDur: 5, buffMult: 1.6 },
 
   // ===== 재화 & 드롭 계열 =====
   fortune:   { name: '사냥의 감각', desc: '골드 획득 +20%, 아이템 드롭률 +15%', grade: 3, gold: 0.20, drop: 0.15 },
@@ -5096,16 +5096,11 @@ function attack(w) {
   const fireFistCritChance = fireFistCount * (RUNE_SPECIALS.fireFist.critChance || 0);
   const fireFistCritDamage = fireFistCount * (RUNE_SPECIALS.fireFist.critDamage || 0);
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCritChance;
-  // fixedCrit: 다른 원천의 치명타 확률과 무관하게 고정된 확률로 치명타가 발동하는 효과
-  // (심판의 전조=70%, 심판의 시간류는 100%). 고정이라 못 쓰는 "다른 원천" 치명타 확률의
-  // 일부를 치명타 피해로 전환해준다(overflowRatio).
-  const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
-  const critChance = fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
+  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
     (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage);
-  if (fixedCrit !== null) critMult += otherCritChance * (e.overflowRatio || 0);
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -7971,16 +7966,14 @@ function computeStats() {
   const spd = w ? weaponSpeed(w) : 0;
   const now = Date.now();
   // 아래 세 스탯은 attack()의 실제 전투 계산식과 동일하게 맞춘다 — 폭풍의 검(공속→치명타 전환),
-  // 심판의 전조(고정 치명타+오버플로우), 포자 폭발("포자 만개" 중 연타 상한 상향) 등 일시적/
-  // 파생 보너스도 전투 중 실시간으로 그대로 반영되어야 하기 때문.
+  // 포자 폭발("포자 만개" 중 연타 확률/피해 가산) 등 일시적/파생 보너스도 전투 중 실시간으로
+  // 그대로 반영되어야 하기 때문.
   const stormBonus = (w && w.effect === 'stormblade') ? spd * ((e && e.critFromSpeed) || 0) : 0;
   const fireFistCount2 = weaponSpecialCount(w, 'fireFist');
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0);
-  const fixedCrit = (e && typeof e.fixedCrit === 'number') ? e.fixedCrit : null;
-  const critChance = (fixedCrit !== null ? fixedCrit : Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance)) * 100;
+  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * 100;
   const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0));
-  if (fixedCrit !== null) critMult += otherCritChance * ((e && e.overflowRatio) || 0);
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;

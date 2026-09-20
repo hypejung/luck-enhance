@@ -4484,10 +4484,13 @@ function setSubweaponActiveTiming(sec) {
 }
 // ---- 강화 ----
 function subEnhanceCost(sw) {
-  // 보조무기는 메인 무기보다 상위 콘텐츠라는 컨셉에 맞춰, 최고 등급(신화) 풀강 누적 비용이
-  // 보조무기 상자 가격과 비슷한 자릿수가 되도록 배율을 잡았다(TODO 미확정). 골드 소비처
-  // 확보 목적으로 메인 무기 완전강화보다 비싼 채로 유지하기로 함(3차 수치 패스에서 재확인).
-  const cost = GRADES[sw.grade].enhanceCost * 9 * Math.pow(1.35, sw.enhance);
+  // 메인 무기는 초반(일반+0) 강화비용이 1-1층(슬라임) 킬당 골드의 5배(GRADES[0].enhanceCost/
+  // floorGold(0))인데, 예전 보조무기 배율(×9)은 이 비율이 사실상 0에 가까웠다(2700골드 vs
+  // 2-1층(구 21층) 킬당 약 8600만 골드 = 3만분의 1 수준이라 사실상 공짜). 그 세계의 1층
+  // 골드 기준으로 메인 무기와 똑같은 비율이 되도록 앵커를 다시 잡는다(등급별 배율은
+  // GRADES[].enhanceCost 비율을 그대로 물려받음). 성장률(1.35^강화)은 기존 그대로 유지.
+  const anchor = GRADES[sw.grade].enhanceCost / floorGold(0) * floorGold(WORLD2_START_FLOOR);
+  const cost = anchor * Math.pow(1.35, sw.enhance);
   return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
 function subSuccessChance(sw) {
@@ -6742,7 +6745,7 @@ function renderMonster() {
   const F = FLOORS[S.floor];
   $('monemoji').textContent = F.emoji;
   $('monname').textContent = F.monster;
-  $('floortitle').innerHTML = `🗺️ ${S.floor + 1}단계. ${F.name}`;
+  $('floortitle').innerHTML = `🗺️ ${(S.floor % WORLD2_START_FLOOR) + 1}단계. ${F.name}`;
   renderFloorUI();
 }
 
@@ -6810,7 +6813,7 @@ function renderFloorBtns() {
   for (let i = rangeLo; i < rangeHi; i++) {
     const b = document.createElement('button');
     b.className = 'fbtn' + (i === S.floor ? ' on' : '') + (i >= S.unlocked ? ' locked' : '');
-    b.textContent = i + 1;
+    b.textContent = (i % WORLD2_START_FLOOR) + 1; // 월드별 서브탭이 생겨서 표시 번호도 세계 안에서 1부터(예: 21층="2월드 1층")
     b.title = FLOORS[i].name;
     if (i < S.unlocked) {
       b.onclick = () => {

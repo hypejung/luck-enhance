@@ -184,21 +184,21 @@
   #huntinfo { display: flex; justify-content: space-between; font-size: 13px; color: var(--sub); margin-top: 8px; flex-wrap: wrap; gap: 4px; }
   #dropinfo { font-size: 12px; color: var(--sub); margin-top: 6px; text-align: center; }
 
-  /* ===== 강화 ===== */
-  #enhweapon { text-align: center; margin-bottom: 14px; }
-  #enhweptitle { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
+  /* ===== 강화 (무기/보조무기 공용 — 보조무기 강화기도 같은 클래스를 재사용) ===== */
+  .enhWeaponBox { text-align: center; margin-bottom: 14px; }
+  .enhWepTitle { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
   .enhnum { color: var(--gold); }
   #enhwepeffect { font-size: 13px; margin: 6px 0; }
-  #enhstat { display: flex; justify-content: space-around; margin: 10px 0; font-size: 14px; }
-  #enhstat div { text-align: center; }
-  #enhstat b { display: block; font-size: 18px; margin-top: 2px; }
+  .enhStatGrid { display: flex; justify-content: space-around; margin: 10px 0; font-size: 14px; }
+  .enhStatGrid div { text-align: center; }
+  .enhStatGrid b { display: block; font-size: 18px; margin-top: 2px; }
   .enhrates { font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0; }
   .enhrates b { color: var(--text); }
   .warn { color: #ff8a8a; }
 
   /* ===== 강화기 연출 (+15부터, +20/+25에서 더 극적으로) ===== */
-  #enhFxZone { position: relative; }
-  #enhFxOverlay { position: absolute; inset: -20px; pointer-events: none; z-index: 20; overflow: visible; }
+  .enhFxZone { position: relative; }
+  .enhFxOverlay { position: absolute; inset: -20px; pointer-events: none; z-index: 20; overflow: visible; }
   .enh-particle { position: absolute; left: 50%; top: 50%; font-size: 20px; opacity: 0; white-space: nowrap; }
   .enh-particle.big { font-size: 30px; }
   .enh-particle.huge { font-size: 42px; }
@@ -206,22 +206,22 @@
   .enh-particle.fly { animation: enhRise 1.1s ease-out forwards; }
   @keyframes enhFlashGold { 0%{box-shadow:0 0 0 0 rgba(255,214,64,0);} 15%{box-shadow:0 0 40px 14px rgba(255,214,64,.85);} 100%{box-shadow:0 0 0 0 rgba(255,214,64,0);} }
   @keyframes enhFlashGoldBig { 0%{box-shadow:0 0 0 0 rgba(255,214,64,0);} 12%{box-shadow:0 0 70px 26px rgba(255,225,100,1);} 100%{box-shadow:0 0 0 0 rgba(255,214,64,0);} }
-  #enhBtn.fx-success { animation: enhFlashGold .9s ease-out; }
-  #enhBtn.fx-success-2 { animation: enhFlashGoldBig 1.2s ease-out; }
-  #enhBtn.fx-success-3 { animation: enhFlashGoldBig 1.6s ease-out; }
+  .enhFxBtn.fx-success { animation: enhFlashGold .9s ease-out; }
+  .enhFxBtn.fx-success-2 { animation: enhFlashGoldBig 1.2s ease-out; }
+  .enhFxBtn.fx-success-3 { animation: enhFlashGoldBig 1.6s ease-out; }
   @keyframes enhSag { 0%{filter:brightness(1) saturate(1);} 30%{filter:brightness(.55) saturate(.3);} 100%{filter:brightness(1) saturate(1);} }
-  #enhBtn.fx-fail { animation: enhSag .8s ease-in-out; }
-  #enhBtn.fx-fail-2 { animation: enhSag 1.1s ease-in-out; }
-  #enhBtn.fx-fail-3 { animation: enhSag 1.5s ease-in-out; }
+  .enhFxBtn.fx-fail { animation: enhSag .8s ease-in-out; }
+  .enhFxBtn.fx-fail-2 { animation: enhSag 1.1s ease-in-out; }
+  .enhFxBtn.fx-fail-3 { animation: enhSag 1.5s ease-in-out; }
   @keyframes enhDoom { 0%{filter:brightness(1) hue-rotate(0deg);} 10%{filter:brightness(1.8) hue-rotate(-30deg);} 25%{filter:brightness(.35) saturate(.2);} 100%{filter:brightness(1) hue-rotate(0deg) saturate(1);} }
   @keyframes enhShakeBig { 0%,100%{transform:translateX(0) rotate(0);} 15%{transform:translateX(-14px) rotate(-3deg);} 35%{transform:translateX(12px) rotate(2deg);} 55%{transform:translateX(-10px) rotate(-2deg);} 75%{transform:translateX(8px) rotate(1deg);} }
-  #enhBtn.fx-destroy { animation: enhDoom 1s ease-in-out, enhShakeBig .6s ease-in-out; }
-  #enhBtn.fx-destroy-2 { animation: enhDoom 1.3s ease-in-out, enhShakeBig .8s ease-in-out 2; }
-  #enhBtn.fx-destroy-3 { animation: enhDoom 1.8s ease-in-out, enhShakeBig 1s ease-in-out 3; }
+  .enhFxBtn.fx-destroy { animation: enhDoom 1s ease-in-out, enhShakeBig .6s ease-in-out; }
+  .enhFxBtn.fx-destroy-2 { animation: enhDoom 1.3s ease-in-out, enhShakeBig .8s ease-in-out 2; }
+  .enhFxBtn.fx-destroy-3 { animation: enhDoom 1.8s ease-in-out, enhShakeBig 1s ease-in-out 3; }
   @keyframes enhShieldFlash { 0%{box-shadow:0 0 0 0 rgba(79,195,247,0); filter:brightness(1);} 15%{box-shadow:0 0 45px 16px rgba(79,195,247,.9); filter:brightness(1.3);} 100%{box-shadow:0 0 0 0 rgba(79,195,247,0); filter:brightness(1);} }
-  #enhBtn.fx-protect { animation: enhShieldFlash 1s ease-out; }
-  #enhBtn.fx-protect-2 { animation: enhShieldFlash 1.3s ease-out; }
-  #enhBtn.fx-protect-3 { animation: enhShieldFlash 1.6s ease-out; }
+  .enhFxBtn.fx-protect { animation: enhShieldFlash 1s ease-out; }
+  .enhFxBtn.fx-protect-2 { animation: enhShieldFlash 1.3s ease-out; }
+  .enhFxBtn.fx-protect-3 { animation: enhShieldFlash 1.6s ease-out; }
   .enh-particle.protect-text { font-size: 15px; font-weight: bold; color: #4fc3f7; letter-spacing: 1px; }
   .enh-particle.protect-text.big { font-size: 19px; }
   .enh-particle.protect-text.huge { font-size: 23px; }
@@ -485,12 +485,12 @@
     <div class="panel">
       <h3>🔨 무기 강화기</h3>
       <div id="enhTargetBar" style="margin-bottom:8px;"></div>
-      <div id="enhweapon"></div>
-      <div id="enhstat"></div>
+      <div id="enhweapon" class="enhWeaponBox"></div>
+      <div id="enhstat" class="enhStatGrid"></div>
       <div class="enhrates" id="enhrates"></div>
-      <div id="enhFxZone">
-        <button class="primary big" id="enhBtn">강화하기</button>
-        <div id="enhFxOverlay"></div>
+      <div id="enhFxZone" class="enhFxZone">
+        <button class="primary big enhFxBtn" id="enhBtn">강화하기</button>
+        <div id="enhFxOverlay" class="enhFxOverlay"></div>
       </div>
       <div id="advancedEnhanceBox" style="margin-top:8px;"></div>
       <div id="awakeningBox" style="margin-top:8px;"></div>
@@ -505,16 +505,22 @@
     </div>
     <div id="enhSubweaponPanels" style="display:none">
       <div class="panel">
-        <h3>🗡️ 보조무기란?</h3>
-        <div style="font-size:12px; color:var(--sub);">
-          메인 무기와 별개로 상시 장착하는 두 번째 장비입니다. <b style="color:var(--unique)">월드2(21층 이상)</b> 사냥터/상자에서만 얻을 수 있고,
-          기본 능력치(공격력) + 종류별 고유 패시브 + 공용 액티브 "결전의 기백"(보스 계열 전투에서 지정한 시점에 1회 자동 발동, 일정 시간 보스 피해량 대폭 증가)을 가집니다.
-          +30까지 강화 가능하며, 강화 1턴마다 스탯→패시브→액티브(위력/지속시간 교차)가 3주기로 순환 상승합니다.
+        <h3>🗡️ 보조무기 강화기</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
+          메인 무기와 별개로 상시 적용되는 두 번째 장비 (<b style="color:var(--unique)">월드2 전용</b>)
         </div>
-      </div>
-      <div class="panel">
-        <h3>⚔️ 장착 중인 보조무기</h3>
-        <div id="subEquippedBox"></div>
+        <div id="subEnhTargetBar" style="margin-bottom:8px;"></div>
+        <div id="subenhweapon" class="enhWeaponBox"></div>
+        <div id="subenhstat" class="enhStatGrid"></div>
+        <div class="enhrates" id="subenhrates"></div>
+        <div id="subEnhFxZone" class="enhFxZone">
+          <button class="primary big enhFxBtn" id="subEnhBtn">강화하기</button>
+          <div id="subEnhFxOverlay" class="enhFxOverlay"></div>
+        </div>
+        <div id="subAutoEnhanceBox" style="margin-top:8px;"></div>
+        <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
+          강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">파괴</span> 위험 있음 · 세세한 상승 규칙은 강화하며 직접 확인하세요.
+        </div>
       </div>
     </div>
   </div>
@@ -3555,11 +3561,11 @@ function enhFxTier(level) {
   if (level >= 15) return 1;
   return 0;
 }
-function playEnhanceFx(outcome, level) {
+function playEnhanceFx(outcome, level, btnId, overlayId) {
   const tier = enhFxTier(level);
   if (tier === 0) return; // +15 미만은 연출 없음
-  const btn = $('enhBtn');
-  const overlay = $('enhFxOverlay');
+  const btn = $(btnId || 'enhBtn');
+  const overlay = $(overlayId || 'enhFxOverlay');
   if (!btn || !overlay) return;
   const cls = tier >= 3 ? `fx-${outcome}-3` : tier >= 2 ? `fx-${outcome}-2` : `fx-${outcome}`;
   ['fx-success', 'fx-success-2', 'fx-success-3', 'fx-fail', 'fx-fail-2', 'fx-fail-3', 'fx-destroy', 'fx-destroy-2', 'fx-destroy-3', 'fx-protect', 'fx-protect-2', 'fx-protect-3']
@@ -4394,6 +4400,18 @@ function subweaponActiveDuration(sw) {
   return base * subweaponActiveTierMult(subActiveDurTier(sw.enhance));
 }
 function getEquippedSubweapon() { return (S.subweapons || []).find(sw => sw.id === S.subEquipped) || null; }
+// 강화기의 강화 대상: 메인 무기 강화기(getEnhanceTarget/enhanceTargetId)와 동일한 패턴 —
+// 기본은 장착 보조무기지만, 가방의 다른 보조무기를 장착하지 않고도 골라서 강화할 수 있다.
+let subEnhanceTargetId = null;
+let subEnhTargetPickerOpen = false;
+function getSubEnhanceTarget() {
+  if (subEnhanceTargetId != null) {
+    const sw = (S.subweapons || []).find(x => x.id === subEnhanceTargetId);
+    if (sw) return sw;
+    subEnhanceTargetId = null; // 대상이 판매·파괴 등으로 사라짐 → 장착 보조무기로 복귀
+  }
+  return getEquippedSubweapon();
+}
 // spellProc/smashMultBonus는 accEff()의 공용 스탯 키가 아니라 typeTrait() 자리에서 직접 더해지므로
 // 여기서 개별 조회할 수 있게 노출한다(accEff() 밖에서 호출되므로 accEff().subAmp를 그대로 조회해도 안전).
 // 그 외 스탯(atk/speed/extraAtk/critChance/critDamage/bossDmg)은 accEff()가 subweaponPassiveEff()를
@@ -4520,32 +4538,95 @@ function subDestroyChance(sw) {
   if (enhanceEventActive()) chance *= ENHANCE_EVENT.destroyMult; // 강화데이: 파괴확률 절반
   return chance;
 }
-function trySubEnhance() {
-  const sw = getEquippedSubweapon();
+function trySubEnhance(targetSubweapon) {
+  // targetSubweapon: 자동 강화(autoSubEnhanceTick)가 명시적으로 넘겨주는 대상 — 메인 무기
+  // 자동강화(tryEnhance/autoEnhanceTick)와 동일한 패턴. 수동 강화는 인자 없이 호출되어
+  // 항상 현재 강화 대상(getSubEnhanceTarget)을 다시 조회한다.
+  const sw = targetSubweapon || getSubEnhanceTarget();
   if (!sw) { log('장착된 보조무기가 없습니다.', 'lg-bad'); return; }
   if (sw.enhance >= SUB_ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
   const cost = subEnhanceCost(sw);
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
   S.gold -= cost;
+  const attemptLevel = sw.enhance; // FX 연출 강도 판단용(변경 전 단계)
   const chance = subSuccessChance(sw);
   if (Math.random() * 100 < chance) {
     sw.enhance++;
+    playEnhanceFx('success', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
     log(`✨ 보조무기 강화 성공! ${subweaponGradeTag(sw)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
   } else {
     const dChance = subDestroyChance(sw);
     if (Math.random() * 100 < dChance) {
+      playEnhanceFx('destroy', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       log(`💥 보조무기가 파괴되었습니다!! ${subweaponGradeTag(sw)} (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
       const wasEquipped = sw.id === S.subEquipped;
       S.subweapons = S.subweapons.filter(x => x.id !== sw.id);
       if (wasEquipped) S.subEquipped = null;
+      if (sw.id === subEnhanceTargetId) subEnhanceTargetId = null;
     } else if (Math.random() < 1 - 0.5 * enhanceEventDowngradeMult(sw.enhance)) {
+      playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
     } else {
       sw.enhance = Math.max(0, sw.enhance - 1);
+      playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       log(`❌ 보조무기 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
     }
   }
-  renderSubweaponTab(); renderTop(); save();
+  renderEnhance(); renderSubInventory(); renderTop();
+  save();
+}
+/* ===================== 보조무기 자동 강화 (메인 무기 자동강화와 동일한 패턴) ===================== */
+// 보조무기는 고급 재료/무기의 정수 소모가 없어 메인 무기 자동강화보다 정지 조건이 단순하다
+// (목표 단계 도달 / 골드 소진 / 강화 대상 소실 중 하나).
+const AUTO_SUB_ENHANCE_MAX_TARGET = 20;
+const AUTO_SUB_ENHANCE_INTERVAL_MS = 300;
+let autoSubEnhanceTimer = null;
+let autoSubEnhanceTarget = null;
+let autoSubEnhanceWeaponId = null;
+function isAutoSubEnhanceRunning() { return autoSubEnhanceTimer != null; }
+function startAutoSubEnhance(target) {
+  const sw = getSubEnhanceTarget();
+  if (!sw) { log('장착된 보조무기가 없습니다.', 'lg-bad'); return; }
+  target = Math.floor(Number(target));
+  if (!Number.isFinite(target) || target < 1) { log('자동 강화 목표 단계를 올바르게 입력하세요.', 'lg-bad'); return; }
+  if (target > AUTO_SUB_ENHANCE_MAX_TARGET) { log(`자동 강화는 +${AUTO_SUB_ENHANCE_MAX_TARGET}까지만 지원합니다.`, 'lg-bad'); return; }
+  if (target <= sw.enhance) { log(`자동 강화 목표(+${target})는 현재 강화 단계(+${sw.enhance})보다 높아야 합니다.`, 'lg-bad'); return; }
+  stopAutoSubEnhance();
+  autoSubEnhanceTarget = target;
+  autoSubEnhanceWeaponId = sw.id;
+  log(`⚙️ 보조무기 자동 강화 시작: +${sw.enhance} → +${target} 목표`, 'lg-prim');
+  autoSubEnhanceTimer = setInterval(autoSubEnhanceTick, AUTO_SUB_ENHANCE_INTERVAL_MS);
+  renderEnhance();
+}
+function stopAutoSubEnhance() {
+  if (autoSubEnhanceTimer) clearInterval(autoSubEnhanceTimer);
+  autoSubEnhanceTimer = null;
+  autoSubEnhanceTarget = null;
+  autoSubEnhanceWeaponId = null;
+  renderEnhance();
+}
+function autoSubEnhanceTick() {
+  const cur = (S.subweapons || []).find(x => x.id === autoSubEnhanceWeaponId);
+  if (!cur) {
+    const target = autoSubEnhanceTarget;
+    stopAutoSubEnhance();
+    log(`⚙️ 강화 대상 보조무기가 사라져(파괴 포함) 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
+    return;
+  }
+  if (cur.enhance >= autoSubEnhanceTarget) {
+    const target = autoSubEnhanceTarget;
+    stopAutoSubEnhance();
+    log(`⚙️ 보조무기 자동 강화 완료! 목표 +${target} 달성`, 'lg-good');
+    return;
+  }
+  const cost = subEnhanceCost(cur);
+  if (S.gold < cost) {
+    const target = autoSubEnhanceTarget;
+    stopAutoSubEnhance();
+    log(`⚙️ 골드가 부족해 보조무기 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
+    return;
+  }
+  trySubEnhance(cur);
 }
 // ---- 사냥터 드롭(월드2 전용, 상자 상점과는 별개의 무료 획득 경로) ----
 // TODO 미확정 — 1~20층 무기 드롭률(0.6%)보다 낮게 잡음(비싼 만큼 희귀해야 한다는 취지).
@@ -7374,14 +7455,77 @@ function subNextRiseLabel(sw) {
   if (type === 'activeDuration') return '공격력 + 액티브 지속시간';
   return '공격력';
 }
-function renderSubEquippedBox() {
-  const box = $('subEquippedBox');
+// 강화기 상단의 "강화 대상 선택" 바 — 메인 무기의 renderEnhTargetBar()와 동일한 패턴.
+function renderSubEnhTargetBar() {
+  const bar = $('subEnhTargetBar');
+  if (!bar) return;
+  const usingBag = subEnhanceTargetId != null;
+  const curId = usingBag ? subEnhanceTargetId : S.subEquipped;
+  let html = '';
+  if (usingBag) {
+    html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <div style="flex:1;font-size:12px;color:var(--sub)">🎒 가방의 보조무기를 강화 중입니다 (미장착)</div>
+      <button id="subEnhBackToEquippedBtn" style="font-size:12px;">⚔️ 장착 보조무기로</button>
+    </div>`;
+  }
+  html += `<button id="subEnhPickTargetBtn" style="width:100%;font-size:12px;">${subEnhTargetPickerOpen ? '▴ 닫기' : '🎒 가방에서 다른 보조무기 강화하기'}</button>`;
+  if (subEnhTargetPickerOpen) {
+    const list = (S.subweapons || []).filter(x => x.id !== curId);
+    html += `<div id="subEnhTargetList" style="margin-top:6px;max-height:220px;overflow-y:auto;">`;
+    html += list.length
+      ? list.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);">
+          <div style="flex:1;font-size:12px;">${subweaponGradeTag(x)}<div style="color:var(--sub)">공격력 ${fmt(subweaponAtk(x))}</div></div>
+          <button class="primary" data-subpick="${x.id}" style="font-size:12px;">선택</button>
+        </div>`).join('')
+      : `<div style="font-size:12px;color:var(--sub);text-align:center;padding:8px;">강화할 다른 보조무기가 없습니다.</div>`;
+    html += `</div>`;
+  }
+  bar.innerHTML = html;
+  $('subEnhPickTargetBtn').onclick = () => { subEnhTargetPickerOpen = !subEnhTargetPickerOpen; renderSubEnhTargetBar(); };
+  if (usingBag) $('subEnhBackToEquippedBtn').onclick = () => { subEnhanceTargetId = null; subEnhTargetPickerOpen = false; renderEnhance(); };
+  bar.querySelectorAll('[data-subpick]').forEach(btn => {
+    btn.onclick = () => { subEnhanceTargetId = +btn.dataset.subpick; subEnhTargetPickerOpen = false; renderEnhance(); };
+  });
+}
+function renderSubAutoEnhance(sw, maxed) {
+  const box = $('subAutoEnhanceBox');
   if (!box) return;
-  const sw = getEquippedSubweapon();
-  if (!sw) {
-    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">장착 중인 보조무기가 없습니다. 아래 보유 목록에서 장착하세요.</div>';
+  if (isAutoSubEnhanceRunning()) {
+    box.innerHTML = `
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div style="flex:1; font-size:13px;">⚙️ 자동 강화 진행 중... 현재 <b>+${sw.enhance}</b> → 목표 <b>+${autoSubEnhanceTarget}</b></div>
+        <button class="danger" id="subAutoEnhanceStopBtn">중지</button>
+      </div>`;
+    $('subAutoEnhanceStopBtn').onclick = stopAutoSubEnhance;
     return;
   }
+  if (maxed || sw.enhance >= AUTO_SUB_ENHANCE_MAX_TARGET) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--sub);text-align:center;">⚙️ 자동 강화는 <b style="color:var(--unique)">+${AUTO_SUB_ENHANCE_MAX_TARGET}</b>까지만 지원합니다.</div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div style="flex:1; font-size:13px;">⚙️ 자동 강화 목표</div>
+      <input type="number" id="subAutoEnhanceInput" min="${sw.enhance + 1}" max="${AUTO_SUB_ENHANCE_MAX_TARGET}" value="${AUTO_SUB_ENHANCE_MAX_TARGET}" style="width:60px;">
+      <button class="primary" id="subAutoEnhanceStartBtn">자동 강화 시작</button>
+    </div>`;
+  $('subAutoEnhanceStartBtn').onclick = () => startAutoSubEnhance($('subAutoEnhanceInput').value);
+}
+// 보조무기 강화기 — 메인 무기 강화기(renderEnhance)와 동일한 레이아웃(아이템 정보 / 능력치
+// 그리드 / 실패 규칙 / 강화 버튼+연출 / 자동강화)을 그대로 재사용한다.
+function renderSubEquippedBox() {
+  renderSubEnhTargetBar();
+  const sw = getSubEnhanceTarget();
+  const box = $('subenhweapon');
+  if (!box) return;
+  if (!sw) {
+    box.innerHTML = `<div style="color:var(--sub)">장착된 보조무기가 없습니다. 월드2(황혼국) 사냥터/상자에서 획득 후 장착하세요.</div>`;
+    $('subenhstat').innerHTML = ''; $('subenhrates').innerHTML = ''; $('subEnhBtn').disabled = true;
+    $('subAutoEnhanceBox').innerHTML = '';
+    return;
+  }
+  $('subEnhBtn').disabled = false;
   const t = SUBWEAPON_TYPES[sw.typeIdx];
   const passiveEff = subweaponPassiveEff(sw, accEff().subAmp);
   const passiveText = Object.entries(passiveEff).map(([k, v]) => {
@@ -7389,28 +7533,37 @@ function renderSubEquippedBox() {
     return `${k} +${(v * 100).toFixed(1)}%`;
   }).join(', ');
   const flavor = subweaponFlavorText(sw);
-  const cost = subEnhanceCost(sw);
   const maxed = sw.enhance >= SUB_ENH.maxLevel;
-  box.innerHTML = `
-    <div class="invitem equipped">
-      <div><div class="wn">${subweaponGradeTag(sw)}</div>
-      ${flavor ? `<div class="wi" style="font-style:italic">${flavor}</div>` : ''}
-      <div class="wi">기본 능력치: 공격력 +${fmt(subweaponAtk(sw))} (메인 무기 공격력에 그대로 합산)</div>
-      <div class="wi">패시브(${t.name}): ${passiveText || '없음'}</div>
-      <div class="wi">액티브 "${SUBWEAPON_ACTIVE.name}": 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (전투당 1회, 발동 시점 아래에서 설정)</div>
-      <div class="wi" style="margin-top:4px;">
-        발동 시점: <input type="number" min="${SUBWEAPON_ACTIVE.timingMin}" max="${SUBWEAPON_ACTIVE.timingMax}" value="${sw.activeTiming}" id="subActiveTimingInput" style="width:60px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 6px;">초 (0~120, 보스전 계열은 60초 이내 권장)
-      </div>
-      ${!maxed ? `<div class="wi" style="color:var(--gold);margin-top:2px;">🔜 다음 강화(+${sw.enhance + 1}) 시 상승: ${subNextRiseLabel(sw)}</div>` : ''}
-      </div>
-      <div class="btns">
-        <button class="primary" id="subEnhBtn" ${maxed ? 'disabled' : ''}>강화하기${maxed ? ' (MAX)' : `<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${subSuccessChance(sw).toFixed(1)}% / 파괴 ${subDestroyChance(sw).toFixed(1)}%)</span>`}</button>
-        <button id="subUnequipBtn">해제</button>
-      </div>
-    </div>`;
+  const atk = subweaponAtk(sw);
+  const nextAtk = maxed ? 0 : subweaponAtk({ ...sw, enhance: sw.enhance + 1 });
+  const cost = maxed ? 0 : subEnhanceCost(sw);
+  const chance = maxed ? 0 : subSuccessChance(sw);
+  const dChance = maxed ? 0 : subDestroyChance(sw);
+  const isEquipped = sw.id === S.subEquipped;
+  box.innerHTML = `<div class="enhWepTitle">${subweaponGradeTag(sw)}</div>
+    ${flavor ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px;font-style:italic">${flavor}</div>` : ''}
+    <div style="font-size:12px;color:var(--sub)">🗡️ ${t.name} 패시브: ${passiveText || '없음'}</div>
+    <div style="font-size:12px;color:var(--sub)">⚡ 액티브 "${SUBWEAPON_ACTIVE.name}": 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (전투당 1회)</div>
+    <div style="font-size:12px;color:var(--sub);margin-top:2px;">
+      발동 시점: <input type="number" min="${SUBWEAPON_ACTIVE.timingMin}" max="${SUBWEAPON_ACTIVE.timingMax}" value="${sw.activeTiming}" id="subActiveTimingInput" style="width:60px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 6px;">초 (0~120)
+    </div>
+    ${!maxed ? `<div style="color:var(--gold);font-size:12px;margin-top:2px;">🔜 다음 강화(+${sw.enhance + 1}) 시 상승: ${subNextRiseLabel(sw)}</div>` : ''}
+    ${isEquipped ? `<div style="margin-top:6px;"><button id="subUnequipBtn" style="font-size:11px;">🗑️ 장착 해제</button></div>` : ''}`;
+  $('subenhstat').innerHTML = `
+    <div>공격력<b>${fmt(atk)}</b></div>
+    <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
+    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
+    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>`;
+  $('subenhrates').innerHTML = maxed
+    ? `🏆 최대 강화 달성! <b>+${sw.enhance}</b>`
+    : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 현재 <b>+${sw.enhance}</b>`;
+  $('subEnhBtn').innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${chance.toFixed(1)}% / 파괴 ${dChance.toFixed(1)}%)</span>`;
+  $('subEnhBtn').disabled = maxed;
   $('subEnhBtn').onclick = () => { if (!maxed) trySubEnhance(); };
-  $('subUnequipBtn').onclick = unequipSubweapon;
   $('subActiveTimingInput').onchange = (e) => setSubweaponActiveTiming(e.target.value);
+  const unequipBtn = $('subUnequipBtn');
+  if (unequipBtn) unequipBtn.onclick = unequipSubweapon;
+  renderSubAutoEnhance(sw, maxed);
 }
 // 보조무기 자동판매 등급 선택 UI — 가방 무기의 setupAutoSellControls()와 동일한 패턴.
 function setupSubAutoSellControls() {

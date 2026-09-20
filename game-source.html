@@ -226,6 +226,61 @@
   .enh-particle.protect-text.big { font-size: 19px; }
   .enh-particle.protect-text.huge { font-size: 23px; }
 
+  /* ===== 강화 "뜸들이기" + 결과 리빌 연출 (패널 전체) ===== */
+  .enhSuspensePanel { position: relative; overflow: hidden; }
+  .panelFxOverlay { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 30; }
+  @keyframes enhChargeFlicker {
+    0%, 100% { filter: brightness(1) saturate(1); }
+    15% { filter: brightness(1.35) saturate(1.3); }
+    30% { filter: brightness(.92) saturate(.9); }
+    45% { filter: brightness(1.45) saturate(1.4); }
+    60% { filter: brightness(.95); }
+    78% { filter: brightness(1.3) saturate(1.2); }
+    90% { filter: brightness(1.05); }
+  }
+  .enhChargeFx { animation: enhChargeFlicker .55s ease-in-out infinite; }
+  .enhChargeFx::before {
+    content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 29;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,214,64,.35) 50%, transparent 70%);
+    background-size: 250% 250%;
+    animation: enhChargeSweep 1.1s linear infinite;
+    mix-blend-mode: screen;
+  }
+  @keyframes enhChargeSweep { 0% { background-position: 200% 0; } 100% { background-position: -50% 0; } }
+  @keyframes enhPanelFlashGold {
+    0% { box-shadow: inset 0 0 0 0 rgba(255,214,64,0); }
+    20% { box-shadow: inset 0 0 60px 10px rgba(255,214,64,.9); }
+    100% { box-shadow: inset 0 0 0 0 rgba(255,214,64,0); }
+  }
+  .enhRevealSuccess { animation: enhPanelFlashGold .9s ease-out; }
+  @keyframes enhPanelSag { 0% { filter: brightness(1) saturate(1); } 40% { filter: brightness(.7) saturate(.5); } 100% { filter: brightness(1) saturate(1); } }
+  .enhRevealDust { animation: enhPanelSag .9s ease-in-out; }
+  @keyframes dustDrift {
+    0% { opacity: 0; transform: translate(0,0) scale(.6); }
+    15% { opacity: .9; }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.1); }
+  }
+  .dust-particle { position: absolute; border-radius: 50%; background: #9c8b6e; pointer-events: none; animation: dustDrift 1.1s ease-out forwards; }
+  @keyframes enhPanelShake2 {
+    0%, 100% { transform: translate(0,0) rotate(0); }
+    10% { transform: translate(-6px,2px) rotate(-1deg); }
+    25% { transform: translate(5px,-3px) rotate(1deg); }
+    40% { transform: translate(-4px,3px) rotate(-1deg); }
+    55% { transform: translate(6px,-2px) rotate(1deg); }
+    70% { transform: translate(-3px,2px) rotate(-.5deg); }
+    85% { transform: translate(2px,-2px) rotate(.5deg); }
+  }
+  .enhRevealCrack { animation: enhPanelShake2 .6s ease-in-out; }
+  @keyframes crackFadeIn { 0% { opacity: 0; } 30% { opacity: 1; } 100% { opacity: 1; } }
+  .crack-svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; animation: crackFadeIn .25s ease-out forwards; pointer-events: none; }
+  @keyframes crackFlashWhite { 0% { background: rgba(255,255,255,0); } 15% { background: rgba(255,255,255,.85); } 100% { background: rgba(255,255,255,0); } }
+  .crack-flash { position: absolute; inset: 0; pointer-events: none; animation: crackFlashWhite .5s ease-out; }
+  @keyframes shardFall {
+    0% { opacity: 1; transform: translate(0,0) rotate(0deg); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); }
+  }
+  .shard-particle { position: absolute; background: #444; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); pointer-events: none; animation: shardFall .9s ease-in forwards; }
+
   /* ===== 능력치 ===== */
   .statgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; }
   .statcell { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
@@ -482,7 +537,7 @@
   <div id="tab-enhance" style="display:none">
     <div id="enhSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
     <div id="enhWeaponPanels">
-    <div class="panel">
+    <div class="panel enhSuspensePanel" id="enhMainPanel">
       <h3>🔨 무기 강화기</h3>
       <div id="enhTargetBar" style="margin-bottom:8px;"></div>
       <div id="enhweapon" class="enhWeaponBox"></div>
@@ -501,10 +556,11 @@
         <br>+15부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다 (일반~레어: 1~6단계 / 에픽~유니크: 7~12단계 / 레전더리~신화: 13~19단계 / 고대: 20단계).
         <br>+15 이상에서는 골드를 <b style="color:var(--unique)">5배</b>, 고급 재료를 <b style="color:var(--unique)">50배</b> 사용하는 <b style="color:var(--unique)">고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
       </div>
+      <div class="panelFxOverlay"></div>
     </div>
     </div>
     <div id="enhSubweaponPanels" style="display:none">
-      <div class="panel">
+      <div class="panel enhSuspensePanel" id="subEnhPanel">
         <h3>🗡️ 보조무기 강화기</h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
           메인 무기와 별개로 상시 적용되는 두 번째 장비 (<b style="color:var(--unique)">월드2 전용</b>)
@@ -521,6 +577,7 @@
         <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
           강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">파괴</span> 위험 있음 · 세세한 상승 규칙은 강화하며 직접 확인하세요.
         </div>
+        <div class="panelFxOverlay"></div>
       </div>
     </div>
   </div>
@@ -3627,6 +3684,111 @@ function playEnhanceFx(outcome, level, btnId, overlayId) {
     setTimeout(() => el.remove(), 1600);
   }
 }
+
+/* ===================== 강화 "뜸들이기" + 결과 리빌 연출 (패널 전체) =====================
+   강화 버튼을 누르면 즉시 결과가 나오는 대신, 무기/보조무기 강화기 패널 전체가 잠깐
+   반짝이며 긴장감을 준 뒤(약 1.3~1.8초) 결과에 맞는 연출과 함께 반영된다:
+   성공=반짝임, 실패(유지/하락)=먼지, 파괴(또는 맨손·고대의 초기화)=금 가며 깨지는 연출. */
+const ENHANCE_SUSPENSE_MS_MIN = 1300;
+const ENHANCE_SUSPENSE_MS_MAX = 1800;
+function enhanceSuspenseDelay() { return ENHANCE_SUSPENSE_MS_MIN + Math.random() * (ENHANCE_SUSPENSE_MS_MAX - ENHANCE_SUSPENSE_MS_MIN); }
+function startEnhanceCharge(panelId) {
+  const panel = $(panelId);
+  if (panel) panel.classList.add('enhChargeFx');
+}
+function stopEnhanceCharge(panelId) {
+  const panel = $(panelId);
+  if (panel) panel.classList.remove('enhChargeFx');
+}
+function playEnhancePanelReveal(panelId, outcome) {
+  const panel = $(panelId);
+  if (!panel) return;
+  const overlay = panel.querySelector('.panelFxOverlay');
+  const cls = outcome === 'success' ? 'enhRevealSuccess' : outcome === 'crack' ? 'enhRevealCrack' : 'enhRevealDust';
+  panel.classList.remove('enhRevealSuccess', 'enhRevealDust', 'enhRevealCrack');
+  void panel.offsetWidth; // 리플로우 강제 — 같은 연출이 연달아 나와도 재생되게
+  panel.classList.add(cls);
+  setTimeout(() => panel.classList.remove(cls), 1000);
+  if (!overlay) return;
+  overlay.innerHTML = '';
+  if (outcome === 'success') spawnEnhSuccessParticles(overlay);
+  else if (outcome === 'dust') spawnEnhDustParticles(overlay);
+  else if (outcome === 'crack') spawnEnhCrackEffect(overlay);
+}
+function spawnEnhSuccessParticles(overlay) {
+  const emojis = ['✨', '💫', '⭐', '🌟'];
+  for (let i = 0; i < 18; i++) {
+    const el = document.createElement('span');
+    el.className = 'enh-particle fly';
+    el.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    el.style.left = (10 + Math.random() * 80) + '%';
+    el.style.top = (20 + Math.random() * 60) + '%';
+    el.style.animationDelay = (Math.random() * 0.3) + 's';
+    overlay.appendChild(el);
+  }
+  setTimeout(() => { overlay.innerHTML = ''; }, 1300);
+}
+function spawnEnhDustParticles(overlay) {
+  for (let i = 0; i < 16; i++) {
+    const el = document.createElement('div');
+    el.className = 'dust-particle';
+    const size = 3 + Math.random() * 5;
+    el.style.width = size + 'px'; el.style.height = size + 'px';
+    el.style.left = (15 + Math.random() * 70) + '%';
+    el.style.top = (30 + Math.random() * 50) + '%';
+    el.style.setProperty('--dx', ((Math.random() - 0.5) * 120) + 'px');
+    el.style.setProperty('--dy', (40 + Math.random() * 80) + 'px');
+    el.style.animationDelay = (Math.random() * 0.2) + 's';
+    overlay.appendChild(el);
+  }
+  setTimeout(() => { overlay.innerHTML = ''; }, 1400);
+}
+function spawnEnhCrackEffect(overlay) {
+  const flash = document.createElement('div');
+  flash.className = 'crack-flash';
+  overlay.appendChild(flash);
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('class', 'crack-svg');
+  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('preserveAspectRatio', 'none');
+  const cx = 50, cy = 50;
+  for (let i = 0; i < 6; i++) {
+    const angle = (Math.PI * 2 / 6) * i + (Math.random() - 0.5);
+    let x = cx, y = cy;
+    let d = `M ${x} ${y}`;
+    const segs = 3 + Math.floor(Math.random() * 2);
+    for (let s = 0; s < segs; s++) {
+      x += Math.cos(angle + (Math.random() - 0.5) * 0.8) * (12 + Math.random() * 10);
+      y += Math.sin(angle + (Math.random() - 0.5) * 0.8) * (12 + Math.random() * 10);
+      d += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('stroke', 'rgba(255,255,255,0.85)');
+    path.setAttribute('stroke-width', '0.8');
+    path.setAttribute('fill', 'none');
+    svg.appendChild(path);
+  }
+  overlay.appendChild(svg);
+  for (let i = 0; i < 14; i++) {
+    const el = document.createElement('div');
+    el.className = 'shard-particle';
+    const size = 6 + Math.random() * 10;
+    el.style.width = size + 'px'; el.style.height = size + 'px';
+    el.style.left = (30 + Math.random() * 40) + '%';
+    el.style.top = (30 + Math.random() * 40) + '%';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 40 + Math.random() * 90;
+    el.style.setProperty('--dx', (Math.cos(angle) * dist) + 'px');
+    el.style.setProperty('--dy', (Math.sin(angle) * dist + 40) + 'px');
+    el.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
+    el.style.animationDelay = (Math.random() * 0.15) + 's';
+    overlay.appendChild(el);
+  }
+  setTimeout(() => { overlay.innerHTML = ''; }, 1200);
+}
+
 // 장신구 효과 합산 (일반 최대 ACC_SLOTS개 + 보스 장신구, 세트 효과 포함)
 // 월드2(21~40층)에서는 "층 결부형"(1~20층 장신구·보스장신구·도감 세트효과·고대의 인장·
 // 고대의 유물 마일스톤) 보너스가 적용되지 않는다 — 그 콘텐츠를 파밍해서 쌓은 보너스로
@@ -4574,7 +4736,9 @@ function subDestroyChance(sw) {
   if (enhanceEventActive()) chance *= ENHANCE_EVENT.destroyMult; // 강화데이: 파괴확률 절반
   return chance;
 }
+let subEnhanceRevealPending = false; // 메인 무기와 동일한 "뜸들이기~리빌" 연출 가드
 function trySubEnhance(targetSubweapon) {
+  if (subEnhanceRevealPending) return;
   // targetSubweapon: 자동 강화(autoSubEnhanceTick)가 명시적으로 넘겨주는 대상 — 메인 무기
   // 자동강화(tryEnhance/autoEnhanceTick)와 동일한 패턴. 수동 강화는 인자 없이 호출되어
   // 항상 현재 강화 대상(getSubEnhanceTarget)을 다시 조회한다.
@@ -4584,16 +4748,27 @@ function trySubEnhance(targetSubweapon) {
   const cost = subEnhanceCost(sw);
   if (S.gold < cost) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
   S.gold -= cost;
+  renderTop();
+  subEnhanceRevealPending = true;
+  startEnhanceCharge('subEnhPanel');
+  const btn = $('subEnhBtn'); if (btn) btn.disabled = true;
+  setTimeout(() => resolveSubEnhance(sw), enhanceSuspenseDelay());
+}
+function resolveSubEnhance(sw) {
+  subEnhanceRevealPending = false;
+  stopEnhanceCharge('subEnhPanel');
   const attemptLevel = sw.enhance; // FX 연출 강도 판단용(변경 전 단계)
   const chance = subSuccessChance(sw);
   if (Math.random() * 100 < chance) {
     sw.enhance++;
     playEnhanceFx('success', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
+    playEnhancePanelReveal('subEnhPanel', 'success');
     log(`✨ 보조무기 강화 성공! ${subweaponGradeTag(sw)} (확률 ${chance.toFixed(2)}%)`, 'lg-good');
   } else {
     const dChance = subDestroyChance(sw);
     if (Math.random() * 100 < dChance) {
       playEnhanceFx('destroy', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
+      playEnhancePanelReveal('subEnhPanel', 'crack');
       log(`💥 보조무기가 파괴되었습니다!! ${subweaponGradeTag(sw)} (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
       const wasEquipped = sw.id === S.subEquipped;
       S.subweapons = S.subweapons.filter(x => x.id !== sw.id);
@@ -4601,10 +4776,12 @@ function trySubEnhance(targetSubweapon) {
       if (sw.id === subEnhanceTargetId) subEnhanceTargetId = null;
     } else if (Math.random() < 1 - 0.5 * enhanceEventDowngradeMult(sw.enhance)) {
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
+      playEnhancePanelReveal('subEnhPanel', 'dust');
       log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
     } else {
       sw.enhance = Math.max(0, sw.enhance - 1);
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
+      playEnhancePanelReveal('subEnhPanel', 'dust');
       log(`❌ 보조무기 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance.toFixed(1)}%)`, 'lg-bad');
     }
   }
@@ -6072,7 +6249,9 @@ function renderRaidTab() {
   }
 }
 
+let enhanceRevealPending = false; // 강화 결과 연출(뜸들이기~리빌)이 진행 중이면 새 시도를 막는다
 function tryEnhance(advanced, targetWeapon) {
+  if (enhanceRevealPending) return; // 이전 강화의 연출이 끝나기 전엔 새 시도를 받지 않는다
   // targetWeapon: 자동 강화(autoEnhanceTick)가 명시적으로 넘겨주는 대상 — 그 사이 사용자가
   // 다른 무기를 장착/선택해도 원래 강화하던 무기가 계속 강화되도록 고정해준다.
   // 수동 강화(강화하기 버튼)는 인자 없이 호출되어 항상 현재 강화 대상을 다시 조회한다.
@@ -6106,6 +6285,15 @@ function tryEnhance(advanced, targetWeapon) {
     consumeHighMatsWithTokens(w.grade, matNeed);
     if (matSt.shortfall > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
   }
+  renderTop(); // 골드/재료 차감은 즉시 반영 — 강화 판정 자체만 연출 시간만큼 미룬다
+  enhanceRevealPending = true;
+  startEnhanceCharge('enhMainPanel');
+  const btn = $('enhBtn'); if (btn) btn.disabled = true;
+  setTimeout(() => resolveEnhance(w, advanced), enhanceSuspenseDelay());
+}
+function resolveEnhance(w, advanced) {
+  enhanceRevealPending = false;
+  stopEnhanceCharge('enhMainPanel');
   const advTag = advanced ? ' <span style="color:var(--unique)">[고급 강화]</span>' : '';
 
   const attemptLevel = w.enhance; // FX 연출 강도 판단용 (변경 전 단계)
@@ -6114,6 +6302,7 @@ function tryEnhance(advanced, targetWeapon) {
   if (Math.random() * 100 < chance) {
     w.enhance++;
     playEnhanceFx('success', attemptLevel);
+    playEnhancePanelReveal('enhMainPanel', 'success');
     log(`✨ 강화 성공! ${gradeTag(w)} (확률 ${chance.toFixed(2)}%)${advTag}`, 'lg-good');
     // 맨손 +30 달성: 기존 장착 룬을 전부 반납하고 태초 룬 "불주먹"을 자동 장착한다.
     if (isFist(w) && w.enhance >= ENH.maxLevel) {
@@ -6143,6 +6332,7 @@ function tryEnhance(advanced, targetWeapon) {
     if ((isFist(w) || isAncientWeapon(w)) && destroyRoll < dChance) {
       w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
+      playEnhancePanelReveal('enhMainPanel', 'crack');
       if (isFist(w)) {
         log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (초기화 확률이었음: ${dChance}%)`, 'lg-bad');
       } else {
@@ -6150,6 +6340,7 @@ function tryEnhance(advanced, targetWeapon) {
       }
     } else if (!isFist(w) && !isAncientWeapon(w) && destroyRoll < dChance) {
       playEnhanceFx('destroy', attemptLevel);
+      playEnhancePanelReveal('enhMainPanel', 'crack');
       const destroyedTag = gradeTag(w);
       log(`💥 무기가 파괴되었습니다!! ${destroyedTag}${advTag}`, 'lg-bad');
       S.destroyedCount++;
@@ -6181,22 +6372,25 @@ function tryEnhance(advanced, targetWeapon) {
       }
       renderEnhance(); renderInventory(); renderTop();
       save();
-      showWeaponDestroyModal(destroyedTag);
+      setTimeout(() => showWeaponDestroyModal(destroyedTag), 700); // 파괴 연출이 잠깐 보인 뒤 모달 표시
       return;
     } else {
       if (Math.random() < stayChance) {
         // 유지: 실패해도 단계가 그대로 유지됨 (파괴/초기화도, 하락도 아닌 세 번째 결과)
         playEnhanceFx('fail', attemptLevel);
+        playEnhancePanelReveal('enhMainPanel', 'dust');
         log(`😮‍💨 강화 실패... 다행히 단계는 유지됨${riskTag}${advTag}`, 'lg-bad');
       } else if (sealEquippedHas('fallenWarrior') && Math.random() < 0.3) {
         // 파계전사의 인장: 단계 하락 상황을 30% 확률로 소량 골드 획득으로 대체
         const refund = Math.floor(sellPrice(w) * 0.1);
         S.gold += refund;
         playEnhanceFx('fail', attemptLevel);
+        playEnhancePanelReveal('enhMainPanel', 'dust');
         log(`😈 <b>파계전사의 인장</b> 발동! 단계 하락 대신 +${fmt(refund)} 골드를 얻었습니다.${riskTag}${advTag}`, 'lg-prim');
       } else {
         w.enhance = Math.max(0, w.enhance - 1);
         playEnhanceFx('fail', attemptLevel);
+        playEnhancePanelReveal('enhMainPanel', 'dust');
         log(`❌ 강화 실패... 단계 하락${riskTag}${advTag}`, 'lg-bad');
       }
       // 끝나지 않은 맹세(고대): 파괴가 아닌 실패 시 낮은 확률로 다음 강화 무료 예약
@@ -7032,7 +7226,7 @@ function renderEnhance() {
     $('advancedEnhanceBox').innerHTML = ''; $('autoEnhanceBox').innerHTML = ''; $('awakeningBox').innerHTML = '';
     return;
   }
-  $('enhBtn').disabled = false;
+  $('enhBtn').disabled = enhanceRevealPending;
   const atk = weaponAtk(w);
   const maxed = w.enhance >= ENH.maxLevel;
   const nextAtk = maxed ? 0 : weaponAtk({ ...w, enhance: w.enhance + 1 });
@@ -7132,7 +7326,7 @@ function renderAdvancedEnhance(w, maxed) {
   const matNeed = advancedEnhMatCost(w);
   const matSt = highMatStatus(w.grade, matNeed);
   const goldNeed = advancedEnhGoldCost(w);
-  const affordable = matSt.ok && S.gold >= goldNeed;
+  const affordable = matSt.ok && S.gold >= goldNeed && !enhanceRevealPending;
   const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🎫${matSt.tokensNeed}개로 대체` : '';
   // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대는 "초기화" 확률을,
   // 그 외 등급은 "파괴" 확률을 절반으로 낮춘다는 걸 정확히 표기한다.
@@ -7610,7 +7804,7 @@ function renderSubEquippedBox() {
     ? `🏆 최대 강화 달성! <b>+${sw.enhance}</b>`
     : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 현재 <b>+${sw.enhance}</b>`;
   $('subEnhBtn').innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${chance.toFixed(1)}% / 파괴 ${dChance.toFixed(1)}%)</span>`;
-  $('subEnhBtn').disabled = maxed;
+  $('subEnhBtn').disabled = maxed || subEnhanceRevealPending;
   $('subEnhBtn').onclick = () => { if (!maxed) trySubEnhance(); };
   $('subActiveTimingInput').onchange = (e) => setSubweaponActiveTiming(e.target.value);
   const unequipBtn = $('subUnequipBtn');

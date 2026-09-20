@@ -7947,6 +7947,13 @@ function accEffText(eff) {
   if (eff.extraAtk) parts.push(`⚡ 연타 확률 +${(eff.extraAtk * 100).toFixed(1)}%p`);
   if (eff.bossDmg) parts.push(`👹 보스 피해량 +${Math.round(eff.bossDmg * 100)}%`);
   if (eff.destroyReduce) parts.push(`🛡️ 강화 파괴 확률 -${Math.round(eff.destroyReduce * 100)}%p`);
+  if (eff.subAmp) parts.push(`🗡️ 보조무기 효과 증폭 +${Math.round(eff.subAmp * 100)}%`);
+  if (eff.subEnh) parts.push(`🔨 보조무기 강화 확률 +${Math.round(eff.subEnh * 100)}%p`);
+  if (eff.subDestroyReduce) parts.push(`🛡️ 보조무기 강화 파괴 확률 -${Math.round(eff.subDestroyReduce * 100)}%`);
+  if (eff.subDropRate) parts.push(`🍀 보조무기 드롭률 +${Math.round(eff.subDropRate * 100)}%`);
+  if (eff.subGachaDiscount) parts.push(`🎁 보조무기 상자 가격 -${Math.round(eff.subGachaDiscount * 100)}%`);
+  if (eff.subActiveDmg) parts.push(`⚡ 보조무기 액티브 피해량 +${Math.round(eff.subActiveDmg * 100)}%`);
+  if (eff.subActiveDuration) parts.push(`⏱️ 보조무기 액티브 지속시간 +${eff.subActiveDuration}초`);
   return parts.join(' · ');
 }
 

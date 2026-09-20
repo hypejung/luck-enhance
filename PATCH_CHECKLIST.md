@@ -73,6 +73,7 @@
 ## 🐛 버그 수정
 - [x] "심판의 전조" 고정 치명타 확률이 상한 해제 후 함정이 되던 문제 — 치명타 확률 상한을 100%로 풀면서, 고정 70%였던 이 효과가 자기 스탯으로 70% 이상 쌓은 유저에겐 오히려 손해(초과분의 20%만 치명타 피해로 전환)가 되고 있었음. fixedCrit/overflowRatio 제거하고 다른 치명타 확률 효과처럼 +70%p 가산으로 단순화(다른 원천과 합산되어 상한 100%까지 쌓임) (commit 72c925b)
 - [x] 월드2 일부 장신구/보스장신구 효과 설명 누락 — `accEffText()`가 subAmp/subEnh/subDestroyReduce/subDropRate/subGachaDiscount/subActiveDmg/subActiveDuration 키를 몰라서 이 스탯만 가진 항목(유민의 마지막 목걸이, 헤르마이오의 판결기록 등)의 "효과:" 란이 비어 보이던 문제. 라벨 7개 추가해서 ACCESSORIES/BOSS_ACCS 80개 전체 빈 설명 0건 확인 (commit dea49fd)
+- [x] 보조무기 강화기 패시브 설명에 원본 스탯 키(critChance 등) 그대로 노출되던 문제 — `renderSubEquippedBox()`가 `subweaponPassiveEff()` 결과 객체의 키를 그대로 화면에 찍고 있었음. `SUB_PASSIVE_STAT_LABELS` 매핑을 추가해 8종 보조무기 패시브가 쓰는 모든 키를 한글 라벨+올바른 단위(%/%p)로 표시 (commit 88c0259)
 - [x] 월드2(21층) 해금 조건 버그 — 원래 의도는 "토벌전 9단계 클리어"인데, `FLOOR_CAP`을 40으로 올릴 때 다른 층과 같은 "처치 수 채우면 자동 해금" 로직을 그대로 물려받아서 20층 사냥만으로 21층이 열려버리고 있었음. `tryUnlockWorld2()`로 20층 처치 조건 + 토벌전 9단계 클리어를 모두 요구하도록 수정, 이미 버그로 열려버린 기존 세이브는 `migrate()`에서 토벌전 9단계 미클리어 시 20층으로 강제 재잠금 (commit cbdcd3e)
 - [x] 재료 자동판매 버그 — 보스 처치 고급재료 보상이 S.mats를 직접 건드려 자동판매 필터를 무시하던 문제 (2026-09-16 배포, commit 4b131ae)
 - [ ] 아이폰 사파리/네이버 브라우저에서 오프라인 보상이 제대로 안 걸리는 문제 — `S.lastSeen`이 `visibilitychange`/`beforeunload`/`pagehide` 이벤트에만 의존해서 갱신되는데, 이 이벤트들이 모바일(특히 화면 잠금·인앱 웹뷰 백그라운드)에서 안 잡히면 오프라인 보상 계산 자체가 스킵됨. 수정 방향: 10초 주기 자동저장 때도 `S.lastSeen` 같이 갱신 + `pageshow` 리스너 추가 (원인 진단만 완료, 아직 미수정)

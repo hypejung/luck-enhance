@@ -580,7 +580,7 @@
     <div class="panel">
       <h3>📿 장신구 <span style="font-size:12px;color:var(--sub)" id="accSlotCount"></span></h3>
       <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">
-        최대 <b>5개</b>까지 동시 장착 가능(장착 중인 장신구 효과는 항상 합산 적용, 골드로 슬롯 확장 가능). 월드1(푸른세계) 장신구의 공격 관련 효과는 황혼국에서도 그대로 적용되지만, 골드·드롭률·강화확률 같은 파밍/강화 효과는 그 세계에서만 적용됩니다.
+        세계별로 각각 <b>5개</b>까지 동시 장착 가능(월드1/월드2 슬롯은 서로 독립, 골드로 슬롯 확장 가능). 장착 중인 장신구 효과는 항상 합산 적용되며, 월드1(푸른세계) 장신구의 공격 관련 효과는 황혼국에서도 그대로 적용되지만 골드·드롭률·강화확률 같은 파밍/강화 효과는 그 세계에서만 적용됩니다.
       </div>
       <div id="accEqBox"></div>
     </div>
@@ -3212,7 +3212,7 @@ function newState() {
     equipped: null,    // 무기 id
     mats: {},          // 재료: { "사냥터|재료등급": count }
     accs: [],          // 보유 장신구: [{ floor, grade }]
-    accEquipped: [],   // 장착 장신구(최대 ACC_SLOTS개): [{ floor, grade }, ...]
+    accEquipped: [],   // 장착 장신구(세계별로 각각 최대 ACC_SLOTS개): [{ floor, grade }, ...]
     bossAccs: [],      // 보스 장신구: [floor, ...] (신화 등급) — 슬롯 제한 없이 보유한 전부가 항상 장착 상태로 취급됨
     bossCooldowns: {}, // 사냥터별 보스 쿨타임 종료 시각 (timestamp)
     uniqueKills: 0,
@@ -6371,7 +6371,13 @@ function migrate(d) {
   if (!Array.isArray(d.accs)) d.accs = [];
   // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
-  if (d.accEquipped.length > ACC_SLOTS) d.accEquipped = d.accEquipped.slice(0, ACC_SLOTS);
+  // 장착 슬롯이 전체 공유 ACC_SLOTS개에서 월드별 ACC_SLOTS개(=합쳐서 최대 2*ACC_SLOTS)로
+  // 바뀌었으므로, 세이브 안전장치도 월드별로 따로 자른다.
+  {
+    const w1 = d.accEquipped.filter(e => e.floor < WORLD2_START_FLOOR).slice(0, ACC_SLOTS);
+    const w2 = d.accEquipped.filter(e => e.floor >= WORLD2_START_FLOOR).slice(0, ACC_SLOTS);
+    d.accEquipped = [...w1, ...w2];
+  }
   if (!Array.isArray(d.bossAccs)) d.bossAccs = [];
   delete d.bossAccEquipped; // 보스 장신구 슬롯 제한 폐지 — 보유한 전부가 항상 장착됨
   if (typeof d.bossCooldowns !== 'object' || d.bossCooldowns === null) d.bossCooldowns = {};
@@ -7894,9 +7900,15 @@ function unequipAcc(floor) {
   S.accEquipped = S.accEquipped.filter(eq => eq.floor !== floor);
   renderAccTab(); renderTop(); save();
 }
+// 장착 슬롯은 세계별로 독립(각 ACC_SLOTS개, 총 최대 2*ACC_SLOTS) — 월드1/월드2 장신구가
+// 서로의 슬롯을 갉아먹지 않는다.
+function accEquippedCountInWorld(floor) {
+  const world1 = floor < WORLD2_START_FLOOR;
+  return S.accEquipped.filter(e => (e.floor < WORLD2_START_FLOOR) === world1).length;
+}
 function equipAcc(floor, grade) {
   const slots = effectiveAccSlots();
-  if (S.accEquipped.length >= slots) { log(`장신구는 최대 ${slots}개까지 장착할 수 있습니다.`, 'lg-bad'); return; }
+  if (accEquippedCountInWorld(floor) >= slots) { log(`장신구는 이 세계에서 최대 ${slots}개까지 장착할 수 있습니다.`, 'lg-bad'); return; }
   S.accEquipped.push({ floor, grade });
   renderAccTab(); renderTop(); save();
 }
@@ -7939,8 +7951,9 @@ function renderCraft() {
 function renderAccTab() {
   renderEquipSubTabBar('accSubTabBar', accSubTab, (v) => { accSubTab = v; renderAccTab(); }, WORLD_SUBTAB_OPTIONS);
   const accSlots = effectiveAccSlots();
-  $('accSlotCount').textContent = `(장착 슬롯 ${S.accEquipped.length}/${accSlots})`;
   const [rangeLo, rangeHi] = accSubTab === 'world1' ? [0, WORLD2_START_FLOOR] : [WORLD2_START_FLOOR, FLOORS.length];
+  const equippedInThisWorld = S.accEquipped.filter(e => e.floor >= rangeLo && e.floor < rangeHi).length;
+  $('accSlotCount').textContent = `(이 세계 장착 슬롯 ${equippedInThisWorld}/${accSlots})`;
 
   const eq = $('accEqBox');
   eq.innerHTML = '';
@@ -7966,9 +7979,9 @@ function renderAccTab() {
         b.className = 'danger';
         b.onclick = () => unequipAcc(f);
       } else {
-        b.textContent = S.accEquipped.length >= accSlots ? `장착 (꽉참)` : '장착';
+        b.textContent = equippedInThisWorld >= accSlots ? `장착 (꽉참)` : '장착';
         b.className = 'primary';
-        b.disabled = S.accEquipped.length >= accSlots;
+        b.disabled = equippedInThisWorld >= accSlots;
         b.onclick = () => equipAcc(f, acc.grade);
       }
       btns.appendChild(b);

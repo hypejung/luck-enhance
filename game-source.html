@@ -555,22 +555,31 @@
 
   <!-- 조합 -->
   <div id="tab-craft" style="display:none">
-    <div class="panel">
-      <h3>🧪 재료 → 장신구 조합</h3>
-      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료: <b>일반 재료 12개 + 레어 재료 4개</b><br>
-        장신구 등급은 사냥터 구간이 높을수록 올라갑니다. 만든 장신구의 보유·장착 관리는 "📿 장신구" 탭에서 합니다.<br>
-        💡 <b>+15 이상 강화</b>에는 고급(에픽+) 재료가 소모됩니다. 판매할지 강화에 쓸지 선택하세요!
+    <div id="craftSectionTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+
+    <div id="craftSectionRecipe">
+      <div id="craftRecipeSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+      <div class="panel">
+        <h3>🧪 재료 → 장신구 조합</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+          사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료: <b>일반 재료 12개 + 레어 재료 4개</b><br>
+          장신구 등급은 사냥터 구간이 높을수록 올라갑니다. 만든 장신구의 보유·장착 관리는 "📿 장신구" 탭에서 합니다.<br>
+          💡 <b>+15 이상 강화</b>에는 고급(에픽+) 재료가 소모됩니다. 판매할지 강화에 쓸지 선택하세요!
+        </div>
+        <div id="craftlist"></div>
       </div>
-      <div id="craftlist"></div>
     </div>
-    <div class="panel">
-      <h3>🌿 보유 재료 & 판매</h3>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">
-        사냥터별로 자동판매를 켜두면 그 재료는 드롭되는 즉시 골드로 자동 판매됩니다. "펼치기"로 재료 종류별 개별 설정도 가능합니다.
+
+    <div id="craftSectionMats" style="display:none">
+      <div id="craftMatsSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+      <div class="panel">
+        <h3>🌿 보유 재료 & 판매</h3>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">
+          사냥터별로 자동판매를 켜두면 그 재료는 드롭되는 즉시 골드로 자동 판매됩니다. "펼치기"로 재료 종류별 개별 설정도 가능합니다.
+        </div>
+        <div id="matFilterList" style="margin-bottom:10px;"></div>
+        <div id="matselllist"></div>
       </div>
-      <div id="matFilterList" style="margin-bottom:10px;"></div>
-      <div id="matselllist"></div>
     </div>
   </div>
 
@@ -6856,6 +6865,14 @@ const WORLD_SUBTAB_OPTIONS = [
   { v: 'world1', label: '🌊 푸른세계' },
   { v: 'world2', label: '🌆 황혼국' },
 ];
+// 조합 탭: 상위(장신구 조합/보유 재료) + 각 섹션 내부 월드1·2 서브탭. 순수 UI 상태라 세이브 불필요.
+let craftSection = 'recipe';
+let craftRecipeSubTab = 'world1';
+let craftMatsSubTab = 'world1';
+const CRAFT_SECTION_OPTIONS = [
+  { v: 'recipe', label: '🧪 장신구 조합' },
+  { v: 'mats', label: '🌿 보유 재료' },
+];
 function renderEquipSubTabBar(containerId, current, setter, options) {
   options = options || [{ v: 'weapon', label: '⚔️ 무기' }, { v: 'subweapon', label: '🗡️ 보조무기' }];
   const box = $(containerId);
@@ -7945,11 +7962,18 @@ function equipAcc(floor, grade) {
   renderAccTab(); renderTop(); save();
 }
 function renderCraft() {
-  renderMatSell();
+  renderEquipSubTabBar('craftSectionTabBar', craftSection, (v) => { craftSection = v; renderCraft(); }, CRAFT_SECTION_OPTIONS);
+  const showRecipe = craftSection === 'recipe';
+  $('craftSectionRecipe').style.display = showRecipe ? '' : 'none';
+  $('craftSectionMats').style.display = showRecipe ? 'none' : '';
+  if (!showRecipe) { renderMatSell(); return; }
+
+  renderEquipSubTabBar('craftRecipeSubTabBar', craftRecipeSubTab, (v) => { craftRecipeSubTab = v; renderCraft(); }, WORLD_SUBTAB_OPTIONS);
+  const [rangeLo, rangeHi] = craftRecipeSubTab === 'world1' ? [0, WORLD2_START_FLOOR] : [WORLD2_START_FLOOR, FLOORS.length];
   // 조합 가능 목록 (해금된 사냥터만) — 보유/장착 관리는 "📿 장신구" 탭에서 한다.
   const list = $('craftlist');
   list.innerHTML = '';
-  for (let f = 0; f < FLOORS.length; f++) {
+  for (let f = rangeLo; f < rangeHi; f++) {
     if (f >= S.unlocked) break;
     const F = FLOORS[f];
     const tierIdx = Math.min(3, Math.floor((f % 20) / 5));
@@ -8175,8 +8199,9 @@ function bulkSellFloorMats(f) {
 function renderMatFilter() {
   const box = $('matFilterList');
   if (!box) return;
+  const [rangeLo, rangeHi] = craftMatsSubTab === 'world1' ? [0, WORLD2_START_FLOOR] : [WORLD2_START_FLOOR, FLOORS.length];
   box.innerHTML = '';
-  for (let f = 0; f < S.unlocked && f < FLOORS.length; f++) {
+  for (let f = rangeLo; f < rangeHi && f < S.unlocked && f < FLOORS.length; f++) {
     const F = FLOORS[f];
     const allOn = matAutoSellAllOn(f);
     const expanded = !!matFilterExpanded[f];
@@ -8184,7 +8209,7 @@ function renderMatFilter() {
     div.className = 'matfilterrow';
     div.innerHTML = `
       <div class="matfilter-main">
-        <label class="matfilter-check"><input type="checkbox" ${allOn ? 'checked' : ''} data-mf-all="${f}"> ${f + 1}단계 ${F.name} 전체 자동판매</label>
+        <label class="matfilter-check"><input type="checkbox" ${allOn ? 'checked' : ''} data-mf-all="${f}"> ${(f % WORLD2_START_FLOOR) + 1}단계 ${F.name} 전체 자동판매</label>
         <button data-mf-sell="${f}">일괄판매</button>
         <button data-mf-toggle="${f}">${expanded ? '접기 ▴' : '펼치기 ▾'}</button>
       </div>
@@ -8234,11 +8259,13 @@ function sellPearl(n) {
 }
 // 재료 판매 목록
 function renderMatSell() {
+  renderEquipSubTabBar('craftMatsSubTabBar', craftMatsSubTab, (v) => { craftMatsSubTab = v; renderMatSell(); }, WORLD_SUBTAB_OPTIONS);
   renderMatFilter();
+  const [rangeLo, rangeHi] = craftMatsSubTab === 'world1' ? [0, WORLD2_START_FLOOR] : [WORLD2_START_FLOOR, FLOORS.length];
   const list = $('matselllist');
   if (!list) return;
   list.innerHTML = '';
-  // 늪의 진주는 사냥터 슬롯 재료가 아닌 별도 고정가 재료라 먼저 따로 렌더링
+  // 늪의 진주는 사냥터 슬롯 재료가 아닌 별도 고정가 재료라 먼저 따로 렌더링 (월드 구분 없이 항상 표시)
   if (S.mats.pearl > 0) {
     const pdiv = document.createElement('div');
     pdiv.className = 'invitem';
@@ -8258,7 +8285,10 @@ function renderMatSell() {
     pbtns.appendChild(pAll);
     list.appendChild(pdiv);
   }
-  const keys = Object.keys(S.mats).filter(k => S.mats[k] > 0 && k !== 'pearl');
+  const keys = Object.keys(S.mats).filter(k => S.mats[k] > 0 && k !== 'pearl').filter(k => {
+    const f = Number(k.split('|')[0]);
+    return f >= rangeLo && f < rangeHi;
+  });
   if (!keys.length && !(S.mats.pearl > 0)) {
     list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 재료가 없습니다. 사냥터에서 재료를 모으세요.</div>';
     return;

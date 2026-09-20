@@ -4440,7 +4440,7 @@ function subSellPrice(sw) { return Math.round(20 * subGradeMult(sw.grade) * (1 +
 function makeSubweapon(grade, typeIdx) {
   return { id: uid++, typeIdx, grade, enhance: 0, activeTiming: 30 };
 }
-const SUBWEAPON_BAG_MAX = 40; // TODO 미확정
+const SUBWEAPON_BAG_MAX = 60; // 무기 가방(60)과 동일하게 상향
 function addSubweapon(sw) {
   if (!Array.isArray(S.subweapons)) S.subweapons = [];
   // 자동판매 필터: 무기 가방과 동일한 패턴 — 지정 등급 이하 + 강화0인 새 보조무기는 획득 즉시 자동 판매
@@ -4459,7 +4459,12 @@ function addSubweapon(sw) {
       S.subweapons = S.subweapons.filter(x => x.id !== weakest.id);
       log(`🗡️ 보조무기 가방이 가득 차서 가장 약한 보조무기 자동 판매: ${subweaponGradeTag(weakest)} → +${fmt(price)} 골드`);
     } else {
-      return; // 장착 중인 것 하나뿐이면 그냥 못 들어옴(TODO: 정책 재검토)
+      // 장착 중인 것 하나뿐이면 팔 수 있는 게 없으니, 무기 가방과 동일하게 방금 들어온
+      // 보조무기 자체를 대신 자동 판매한다(완전 소실 대신 골드로라도 보상).
+      const price = subSellPrice(sw);
+      S.gold += price;
+      log(`🗡️ 보조무기 가방이 가득 차서 자동 판매: +${fmt(price)} 골드`);
+      return;
     }
   }
   S.subweapons.push(sw);

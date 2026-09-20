@@ -902,7 +902,7 @@ const WEAPON_TYPES = [
   { name: '검',     icon: '⚔️', speed: 1.2,  dmgMult: 0.90, trait: { atk: 0.15 },                       traitDesc: '공격력 +15%' },
   { name: '쌍검',   icon: '🤺', speed: 1.5,  dmgMult: 0.85, trait: { critChance: 0.10, critDamage: 0.40 }, traitDesc: '치명타 확률 +10%p, 치명타 피해 +40%p' },
   { name: '도끼',   icon: '🪓', speed: 0.8,  dmgMult: 1.35, trait: { bossDmg: 0.25 },                   traitDesc: '보스 피해량 +25%' },
-  { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critDamage: 0.30 },                traitDesc: '치명타 피해 +30%p' },
+  { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critChance: 0.10, critDamage: 0.30 }, traitDesc: '치명타 확률 +10%p, 치명타 피해 +30%p' },
   { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedAmp: 0.20 },                  traitDesc: '모든 공격속도 증가량 +20%' },
   { name: '지팡이', icon: '🪄', speed: 0.9,  dmgMult: 1.25, trait: { spellProc: 0.25, spellMult: 3 },   traitDesc: '공격력은 "마력"으로 작용, 25% 확률로 주문 작렬(피해 3배)' },
   { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65, trait: {},                                  traitDesc: `파쇄의 리듬: 매 ${BLUNT_SMASH_EVERY}번째 공격이 강타로 적중해 무기 공격력의 ${Math.round(BLUNT_SMASH_MULT * 100)}% 고정 피해 추가` },

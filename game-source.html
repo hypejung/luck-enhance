@@ -900,7 +900,7 @@ const BLUNT_SMASH_MULT = 2.5;
 const WEAPON_TYPES = [
   { name: '단검',   icon: '🗡️', speed: 1.8,  dmgMult: 0.68, trait: { extra: 0.08 },                    traitDesc: '연타 확률 +8%' },
   { name: '검',     icon: '⚔️', speed: 1.2,  dmgMult: 0.90, trait: { atk: 0.15 },                       traitDesc: '공격력 +15%' },
-  { name: '쌍검',   icon: '🤺', speed: 1.5,  dmgMult: 0.85, trait: { critChance: 0.10, critDamage: 0.40 }, traitDesc: '치명타 확률 +10%p, 치명타 피해 +40%p' },
+  { name: '쌍검',   icon: '🤺', speed: 1.5,  dmgMult: 0.85, trait: { extra: 0.10, extraAtkDmg: 0.40 }, traitDesc: '연타 확률 +10%p, 연타 피해 +40%p' },
   { name: '도끼',   icon: '🪓', speed: 0.8,  dmgMult: 1.35, trait: { bossDmg: 0.25 },                   traitDesc: '보스 피해량 +25%' },
   { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critDamage: 0.30 },                traitDesc: '치명타 피해 +30%p' },
   { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedAmp: 0.20 },                  traitDesc: '모든 공격속도 증가량 +20%' },
@@ -1411,7 +1411,7 @@ const CODEX_PAIRS = [
 const CODEX_TYPE_SETS = {
   단검:   { stat: 'extraAtk',      legend: 0.03, myth: 0.06, legendSetName: '그림자 속의 세 자객', mythSetName: '만신전의 자객들' },
   검:     { stat: 'atk',           legend: 0.04, myth: 0.08, legendSetName: '하늘이 벼린 세 자루', mythSetName: '신화를 가른 세 자루' },
-  쌍검:   { stat: 'critChance',    legend: 0.03, myth: 0.06, legendSetName: '얽힌 운명의 쌍검', mythSetName: '쌍둥이 신화의 칼날' },
+  쌍검:   { stat: 'extraAtkDmg',   legend: 0.03, myth: 0.06, legendSetName: '얽힌 운명의 쌍검', mythSetName: '쌍둥이 신화의 칼날' },
   도끼:   { stat: 'bossDmg',       legend: 0.04, myth: 0.08, legendSetName: '대지를 가른 거인의 도끼', mythSetName: '대장장이 신들의 유산' },
   창:     { stat: 'critDamage',    legend: 0.03, myth: 0.06, legendSetName: '천공을 꿰뚫는 창끝', mythSetName: '신창의 계보' },
   활:     { stat: 'speed',         legend: 0.04, myth: 0.08, legendSetName: '밤하늘의 명궁', mythSetName: '궁신들의 유산' },
@@ -1528,7 +1528,7 @@ function codexAncientSetProgress(floorIdx) {
 }
 // 현재 활성화된 모든 도감 컬렉션 보너스를 하나의 eff 객체로 합산 (accEff()에서 합산해 사용)
 function codexBonusEff() {
-  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, bossDmg: 0, destroyReduce: 0 };
+  const eff = { gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, extraAtkDmg: 0, bossDmg: 0, destroyReduce: 0 };
   for (const pair of CODEX_PAIRS) {
     for (let grade = 0; grade <= 3; grade++) {
       if (codexPairProgress(pair, grade) >= 2) eff[pair.stat] += pair.values[grade];
@@ -1752,13 +1752,14 @@ const fx = {
 // 능력치(장신구+룬+훈련+무기특성 등 "스탯"으로만 쌓이는 값)의 최종 상한.
 // 무기 등급/강화 자체의 배율은 여기 포함되지 않음 — 순수 확률/배율형 스탯만 제한.
 const DMG_CAPS = {
-  critChance: 0.5,   // 치명타 확률 최대 50%
-  critMult: 5.0,      // 치명타 피해 최대 5.0배 — 풀 장비(룬 중복 2개 제한 포함)만으로는 약 4.51배까지만
-                       // 닿고, 나머지는 무제한 투자 가능한 치명 훈련으로 채워야 진짜 상한에 도달
-  extraChance: 0.25,  // 연타(추가공격) 확률 최대 25%
+  critChance: 1.0,   // 치명타 확률 최대 100%(캡 해제)
+  critMult: Infinity, // 치명타 피해 무제한(캡 해제)
+  extraChance: 1.0,  // 연타(추가공격) 확률 최대 100%(캡 해제)
 };
 // 연타(추가공격)는 치명타 배율을 적용하기 전 기본 데미지의 이 비율만큼만 별도로 적용된다
 // (원래는 치명타가 터진 타격이면 연타도 그 배율을 그대로 물려받아 사실상 "치명타 2연타"가 되던 문제 수정)
+// "연타 피해"(extraAtkDmg) 스탯은 이 기준값에 곱연산으로 추가 배율을 얹는다: 최종 배율 =
+// EXTRA_ATK_DMG_MULT(또는 포자 폭발 활성 중엔 그 전용값) × (1 + extraAtkDmg 스탯 합계).
 const EXTRA_ATK_DMG_MULT = 0.75;
 const ENH = {
   maxLevel: 30,
@@ -2333,12 +2334,13 @@ const AWAKENING_COMMON_POOL = [
   { key: 'gold',  label: '골드 획득', min: 0.10, max: 0.20 },
   { key: 'luck',  label: '드롭률',   min: 0.08, max: 0.15 },
 ];
-const AWAKENING_RARE_POOL = ['keenEye', 'critBoost', 'treasureHunt', 'swiftStep'];
+const AWAKENING_RARE_POOL = ['keenEye', 'critBoost', 'treasureHunt', 'swiftStep', 'comboBoost'];
 const AWAKENING_EPIC_POOL = ['libraryEcho', 'resonance', 'unbreakable', 'critFollowup'];
 const AWAKENING_LEGENDARY_POOL = ['fullBloom', 'awakenWave', 'harmony'];
 const AWAKENING_EFFECTS = {
   keenEye:      { name: '심안의 각성',   desc: '치명타 확률 +8%p',   critChance: 0.08 },
   critBoost:    { name: '파괴의 각성',   desc: '치명타 피해 +25%p',  critDamage: 0.25 },
+  comboBoost:   { name: '연격의 각성',   desc: '연타 피해 +25%p',   extraAtkDmg: 0.25 },
   treasureHunt: { name: '탐욕의 각성',   desc: '드롭률 +15%p',      luck: 0.15 },
   swiftStep:    { name: '가속의 각성',   desc: '공격속도 +12%p',    speed: 0.12 },
   libraryEcho:  { name: '서고의 메아리', desc: '무기의 정수·각성의 정수 획득량 +50%', essenceMult: 0.5 },
@@ -2393,6 +2395,7 @@ function awakenStat(w, statKey) {
     if (def.allStats && ['atk', 'speed', 'critChance', 'critDamage', 'gold', 'luck'].includes(statKey)) total += def.allStats;
     if (statKey === 'critChance' && def.critChance) total += def.critChance;
     if (statKey === 'critDamage' && def.critDamage) total += def.critDamage;
+    if (statKey === 'extraAtkDmg' && def.extraAtkDmg) total += def.extraAtkDmg;
     if (statKey === 'luck' && def.luck) total += def.luck;
     if (statKey === 'speed' && def.speed) total += def.speed;
     if (statKey === 'atk' && def.atk) total += def.atk;
@@ -2644,8 +2647,10 @@ const ANCIENT_SPIRITS = {
   bloodtribute: { name: '피의 갈증', desc: '공격 시 35% 확률로 대상에게 5초간 출혈을 건다(재발동 시 갱신). 출혈 지속 동안 매초 무기 공격력의 240%만큼 도트 피해를 입히며, 그 동안 사용자는 공격력과 공격속도가 각각 170% 상승하고, 연타 시 타격 횟수가 5번이 됩니다.',
                   proc: 0.35, dur: 5, dmgPerSec: 2.4, selfAtkBonus: 1.7, selfSpeedBonus: 1.7, extraAtkHits: 5 },
   // 10초마다 7초간 "포자 만개"가 발동해 적이 받는 피해를 늘리고 사용자의 연격 확률을 높인다.
-  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 300% 증가하고, 연타(추가공격) 확률이 +40%p 상승하며 연타 확률 상한 자체가 25% → 70%로 풀린다. 연타 데미지가 기본 피해의 75%에서 110%로 오르며, 이 무기는 연타에도 별도로 치명타가 적용된다.',
-                interval: 10, dur: 7, enemyDmgTakenBonus: 3.0, extraAtkBonus: 0.40, extraAtkCap: 0.70, extraAtkDmgMult: 1.1 },
+  // 연타 확률/피해 상한이 해제되면서 "상한 자체를 25%→70%로 푸는" 기믹은 의미가 없어져(기본
+  // 상한이 이미 100%) +70%p 고정 가산 보너스로 통합했다. 연타 데미지 배율도 75%→150%로 상향.
+  sporeburst: { name: '포자 폭발', desc: '10초마다 7초간 "포자 만개"가 발동한다. 그 동안 적이 받는 모든 피해가 300% 증가하고, 연타(추가공격) 확률이 +70%p 상승한다. 연타 데미지가 기본 피해의 75%에서 150%로 오르며, 이 무기는 연타에도 별도로 치명타가 적용된다.',
+                interval: 10, dur: 7, enemyDmgTakenBonus: 3.0, extraAtkBonus: 0.70, extraAtkDmgMult: 1.5 },
   // 기본 공속을 큰 폭으로 올리고, 공격할수록 쌓이는 스택으로 공속이 계속 더 상승한다.
   // 쉬지 않고 공격할 때만 유지되는 스택 — 3초 이상 공격이 없으면 스택이 서서히 줄어든다.
   wolfsprint: { name: '늑대의 질주', desc: '기본 공격속도가 60% 증가한다. 추가로 공격할 때마다 질주 스택이 1씩 쌓이며(최대 1000), 스택당 공격속도가 0.3%p씩 더 오른다(만스택 시 스택분만 +300%p, 총 +360%). 3초 이상 공격이 없으면 스택이 서서히 줄어든다. 공격속도가 빠를수록 공격력도 함께 오른다(공격속도 1당 공격력 +40%).',
@@ -2990,6 +2995,7 @@ const TRAINING = {
   critChance: { name: '치명 훈련', desc: '치명타 확률 +0.15%p/레벨', perLevel: 0.0015, baseCost: 200, costExp: 1.4 },
   critDamage: { name: '파괴 훈련', desc: '치명타 피해 +0.5%p/레벨',  perLevel: 0.005,  baseCost: 200, costExp: 1.4 },
   extraAtk:   { name: '연격 훈련', desc: '연타 확률 +0.15%p/레벨',   perLevel: 0.0015, baseCost: 200, costExp: 1.4 },
+  extraAtkDmg: { name: '연격 강화 훈련', desc: '연타 피해 +0.5%p/레벨', perLevel: 0.005, baseCost: 200, costExp: 1.4 },
   bossDmg:    { name: '살육 훈련', desc: '보스 피해량 +1.2%/레벨',   perLevel: 0.012,  baseCost: 170, costExp: 1.32 },
 };
 const TRAINING_TIER_STEP = 10;     // 이 레벨 단위마다 비용이 큰 폭으로 튐
@@ -3100,6 +3106,7 @@ const RUNE_STATS = {
   critChance: { name: '정밀의 룬', values: [2, 5, 10, 18],   desc: v => `치명타 확률 +${v}%p` },
   critDamage: { name: '파괴의 룬', values: [10, 25, 50, 90], desc: v => `치명타 피해 +${v}%p` },
   extraAtk:   { name: '연격의 룬', values: [2, 5, 10, 18],   desc: v => `연타(추가공격) 확률 +${v}%` },
+  extraAtkDmg: { name: '연격 증폭의 룬', values: [10, 25, 50, 90], desc: v => `연타 피해 +${v}%p` },
   bossDmg:    { name: '살육의 룬', values: [4, 10, 20, 35],  desc: v => `보스 피해량 +${v}%` },
   // 수확의 룬: 개수는 유니크까지 항상 +1 고정, 확률만 등급에 따라 커짐. 하급/중급 재료에 각각 독립 적용.
   matBonus:   { name: '수확의 룬', values: [3, 6, 10, 15],   desc: v => `하급·중급 재료 획득 시 각각 ${v}% 확률로 +1개 추가` },
@@ -3615,7 +3622,7 @@ function playEnhanceFx(outcome, level, btnId, overlayId) {
 function isWorld1BonusActive() { return !S || S.floor < WORLD2_START_FLOOR; }
 function accEff() {
   const eff = {
-    gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, bossDmg: 0, destroyReduce: 0,
+    gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, extraAtkDmg: 0, bossDmg: 0, destroyReduce: 0,
     // 보조무기 전용 예약 스탯(월드2 장신구/컬렉션에서 지급) — 아직 어떤 로직도 소비하지 않는다.
     // subAmp: 보조무기 패시브/액티브 효과 전체 증폭(%), subEnh/subDestroyReduce: 보조무기
     // 강화확률/파괴확률 보정, subActiveDmg/subActiveDuration: 액티브 위력/지속시간,
@@ -5293,18 +5300,18 @@ function attack(w) {
     mon.hp -= spellDmg;
     floatText('🔮 주문 작렬!');
   }
-  // 연타 효과 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
-  // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 연타 확률 상한 자체를 25% → 70%로
-  // 뚫어준다 — 그냥 더해주기만 하면 다른 원천만으로도 이미 상한(25%)에 닿아있는 경우가 많아
-  // 사실상 무의미해지기 때문.
+  // 연타 확률 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
+  // (포자 폭발 활성 중엔 +70%p 고정 가산 — 상한 자체가 100%로 풀려서 별도 상한 해제는 불필요)
   const sporeActive = w.spirit === 'sporeburst' && now < fx.sporeburstUntil;
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
-  const extraChanceCap = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkCap || 0.70) : DMG_CAPS.extraChance;
-  const extraChance = Math.min(extraChanceCap,
+  const extraChance = Math.min(DMG_CAPS.extraChance,
     (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus);
+  // 연타 피해 = 기준 배율(평소 75%, 포자 폭발 활성 중엔 150%) × (1 + 연타 피해 스탯 합계)
+  // — 치명타 피해와 마찬가지로 장신구/룬/훈련/인챈트/무기 특성/각성에서 상한 없이 누적된다.
+  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg');
   if (extraChance > 0 && Math.random() < extraChance) {
-    // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 연타 데미지 배율 자체가 75% -> 125%로 오른다
-    let extraDmg = preCritDmg * (sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT);
+    const extraDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
+    let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus);
     // 포자 폭발(고대 에이션트 스피릿): 다른 무기와 달리 연타(추가공격)도 별도로 치명타 판정을 받는다
     if (w.spirit === 'sporeburst' && critChance > 0 && Math.random() < critChance) {
       extraDmg *= critMult;
@@ -5917,6 +5924,7 @@ const ENCHANT_OPTIONS = {
   critChance: { name: '치명타 확률', stat: 'critChance',  unit: '%p', ranges: [[0.5, 1.5], [1, 2.5], [1.8, 4.5], [3.2, 8], [5.6, 14], [9.8, 24.5], [17.2, 43]] },
   critDamage: { name: '치명타 피해', stat: 'critDamage',  unit: '%p', ranges: [[2, 5], [3.5, 9], [6, 15], [10.5, 26], [18, 45], [31.5, 79], [55, 137.5]] },
   extraAtk:   { name: '연타 확률',   stat: 'extraAtk',    unit: '%p', ranges: [[0.5, 1.5], [1, 2.5], [1.8, 4.5], [3.2, 8], [5.6, 14], [9.8, 24.5], [17.2, 43]] },
+  extraAtkDmg: { name: '연타 피해', stat: 'extraAtkDmg', unit: '%p', ranges: [[2, 5], [3.5, 9], [6, 15], [10.5, 26], [18, 45], [31.5, 79], [55, 137.5]] },
 };
 const ENCHANT_OPTION_KEYS = Object.keys(ENCHANT_OPTIONS);
 // 등급 내에서 최댓값에 가까울수록 확률이 낮아지도록 저치 편향 분포로 값을 뽑는다.
@@ -7976,8 +7984,10 @@ function computeStats() {
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
-  const extraChanceCap = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkCap || 0.70) : DMG_CAPS.extraChance;
-  const extraChance = Math.min(extraChanceCap, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * 100;
+  const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * 100;
+  const extraAtkDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
+  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae.extraAtkDmg + awakenStat(w, 'extraAtkDmg');
+  const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * 100;
   // 골드/드랍률은 dropRoll()의 실제 계산식(곱연산)과 맞춘다 — 약탈자의 격노(고대 에이션트
   // 스피릿)의 고정 +50%/스택 보너스가 예전엔 이 화면에 전혀 반영되지 않았음.
   let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
@@ -7991,7 +8001,7 @@ function computeStats() {
   }
   return {
     atk, spd, dps: atk * spd,
-    critChance, critMultPct, extraChance,
+    critChance, critMultPct, extraChance, extraAtkDmgPct,
     bossBonus: bossDmgBonus() * 100,
     goldBonus: (goldMul - 1) * 100,
     dropBonus: (dropMul - 1) * 100,
@@ -8014,6 +8024,7 @@ function renderStats() {
       <div class="statcell"><div class="sl">치명타 확률</div><div class="sv">${s.critChance.toFixed(1)}%</div></div>
       <div class="statcell"><div class="sl">치명타 피해</div><div class="sv">${s.critMultPct.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">연타(추가공격) 확률</div><div class="sv">${s.extraChance.toFixed(1)}%</div></div>
+      <div class="statcell"><div class="sl">연타 피해</div><div class="sv">${s.extraAtkDmgPct.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">보스 피해량 보너스</div><div class="sv">+${s.bossBonus.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">골드 획득 보너스</div><div class="sv">+${s.goldBonus.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">아이템 드롭률 보너스</div><div class="sv">+${s.dropBonus.toFixed(0)}%</div></div>
@@ -8134,6 +8145,7 @@ function accEffText(eff) {
   if (eff.critChance) parts.push(`💥 치명타 확률 +${(eff.critChance * 100).toFixed(1)}%p`);
   if (eff.critDamage) parts.push(`💢 치명타 피해 +${Math.round(eff.critDamage * 100)}%p`);
   if (eff.extraAtk) parts.push(`⚡ 연타 확률 +${(eff.extraAtk * 100).toFixed(1)}%p`);
+  if (eff.extraAtkDmg) parts.push(`⚡ 연타 피해 +${(eff.extraAtkDmg * 100).toFixed(1)}%p`);
   if (eff.bossDmg) parts.push(`👹 보스 피해량 +${Math.round(eff.bossDmg * 100)}%`);
   if (eff.destroyReduce) parts.push(`🛡️ 강화 파괴 확률 -${Math.round(eff.destroyReduce * 100)}%p`);
   if (eff.subAmp) parts.push(`🗡️ 보조무기 효과 증폭 +${Math.round(eff.subAmp * 100)}%`);

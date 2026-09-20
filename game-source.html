@@ -536,6 +536,9 @@
   <!-- 강화기 -->
   <div id="tab-enhance" style="display:none">
     <div id="enhSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+    <div style="text-align:right; margin-bottom:8px; font-size:12px; color:var(--sub);">
+      <label style="cursor:pointer;"><input type="checkbox" id="enhFxToggle" onchange="toggleEnhanceFx(this.checked)"> 강화 연출(뜸들이기) 켜기</label>
+    </div>
     <div id="enhWeaponPanels">
     <div class="panel enhSuspensePanel" id="enhMainPanel">
       <h3>🔨 무기 강화기</h3>
@@ -3349,6 +3352,7 @@ function newState() {
     sealEquipped: [],  // 장착 중인 고대의 인장 id 목록 (최대 ANCIENT_SEAL_SLOTS개)
     bossFreeRetryReady: false, // 무한진군의 인장: 충전된 무료 보스 재도전 여부
     matAutoSell: {},   // 재료 자동판매 필터: 'f|g' 키가 true면 그 재료는 획득 즉시 자동 판매됨
+    enhanceFxEnabled: true, // 강화 뜸들이기~리빌 연출 on/off (꺼두면 강화가 즉시 판정됨)
     lastSeenPatchVersion: latestPatchVersion(), // 신규 플레이어는 처음부터 전부 "읽은" 상태로 시작
     // 전투 프리셋: 무기는 id로 참조, 장신구와 룬 구성(runeIds)은 스냅샷으로 저장한다.
     // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서 id 참조만으론 "그때 그 구성"이 보장 안 됨.
@@ -3693,6 +3697,7 @@ const ENHANCE_SUSPENSE_MS_MIN = 1300;
 const ENHANCE_SUSPENSE_MS_MAX = 1800;
 function enhanceSuspenseDelay() { return ENHANCE_SUSPENSE_MS_MIN + Math.random() * (ENHANCE_SUSPENSE_MS_MAX - ENHANCE_SUSPENSE_MS_MIN); }
 function startEnhanceCharge(panelId) {
+  if (!S.enhanceFxEnabled) return; // 연출 off면 점멸 애니메이션 자체를 시작하지 않는다
   const panel = $(panelId);
   if (panel) panel.classList.add('enhChargeFx');
 }
@@ -3701,6 +3706,7 @@ function stopEnhanceCharge(panelId) {
   if (panel) panel.classList.remove('enhChargeFx');
 }
 function playEnhancePanelReveal(panelId, outcome) {
+  if (!S.enhanceFxEnabled) return; // 연출 off면 리빌 애니메이션(반짝임/먼지/균열) 없이 조용히 결과만 반영
   const panel = $(panelId);
   if (!panel) return;
   const overlay = panel.querySelector('.panelFxOverlay');
@@ -4752,7 +4758,8 @@ function trySubEnhance(targetSubweapon) {
   subEnhanceRevealPending = true;
   startEnhanceCharge('subEnhPanel');
   const btn = $('subEnhBtn'); if (btn) btn.disabled = true;
-  setTimeout(() => resolveSubEnhance(sw), enhanceSuspenseDelay());
+  if (S.enhanceFxEnabled) setTimeout(() => resolveSubEnhance(sw), enhanceSuspenseDelay());
+  else resolveSubEnhance(sw); // 연출 off: 뜸들이기 없이 즉시 판정
 }
 function resolveSubEnhance(sw) {
   subEnhanceRevealPending = false;
@@ -6289,7 +6296,8 @@ function tryEnhance(advanced, targetWeapon) {
   enhanceRevealPending = true;
   startEnhanceCharge('enhMainPanel');
   const btn = $('enhBtn'); if (btn) btn.disabled = true;
-  setTimeout(() => resolveEnhance(w, advanced), enhanceSuspenseDelay());
+  if (S.enhanceFxEnabled) setTimeout(() => resolveEnhance(w, advanced), enhanceSuspenseDelay());
+  else resolveEnhance(w, advanced); // 연출 off: 뜸들이기 없이 즉시 판정
 }
 function resolveEnhance(w, advanced) {
   enhanceRevealPending = false;
@@ -6729,6 +6737,7 @@ function migrate(d) {
   if (typeof d.presetSlots !== 'number' || d.presetSlots < 3) d.presetSlots = 3;
   if (!Array.isArray(d.sealEquipped)) d.sealEquipped = [];
   if (typeof d.matAutoSell !== 'object' || d.matAutoSell === null || Array.isArray(d.matAutoSell)) d.matAutoSell = {};
+  if (typeof d.enhanceFxEnabled !== 'boolean') d.enhanceFxEnabled = true;
   if (!Array.isArray(d.accs)) d.accs = [];
   // 장신구 다중 장착(최대 ACC_SLOTS) 도입 이전 세이브는 accEquipped가 단일 객체였음 → 배열로 변환
   if (!Array.isArray(d.accEquipped)) d.accEquipped = d.accEquipped ? [d.accEquipped] : [];
@@ -7212,8 +7221,13 @@ function renderEquipSubTabBar(containerId, current, setter, options) {
   box.innerHTML = options.map(o => `<div class="subtab ${current === o.v ? 'on' : ''}" data-v="${o.v}">${o.label}</div>`).join('');
   box.querySelectorAll('.subtab').forEach(el => el.onclick = () => setter(el.dataset.v));
 }
+function toggleEnhanceFx(checked) {
+  S.enhanceFxEnabled = !!checked;
+  save();
+}
 function renderEnhance() {
   renderEquipSubTabBar('enhSubTabBar', enhSubTab, (v) => { enhSubTab = v; renderEnhance(); });
+  const fxToggle = $('enhFxToggle'); if (fxToggle) fxToggle.checked = S.enhanceFxEnabled;
   $('enhWeaponPanels').style.display = enhSubTab === 'weapon' ? '' : 'none';
   $('enhSubweaponPanels').style.display = enhSubTab === 'subweapon' ? '' : 'none';
   if (enhSubTab === 'subweapon') { renderSubEquippedBox(); return; }

@@ -2329,9 +2329,11 @@ const AWAKENING_EFFECTS = {
   swiftStep:    { name: '가속의 각성',   desc: '공격속도 +12%p',    speed: 0.12 },
   libraryEcho:  { name: '서고의 메아리', desc: '무기의 정수·각성의 정수 획득량 +50%', essenceMult: 0.5 },
   resonance:    { name: '각성 공명',     desc: '다른 각성 슬롯 하나당 공격력 +5%p', atkPerOtherSlot: 0.05 },
-  unbreakable:  { name: '필멸자의 저항', desc: '강화 파괴·초기화 확률 -20%p', destroyReduce: 0.20 },
+  // 기존 20%p는 +20강 파괴확률 절벽(13%→32%)을 이 슬롯 하나로 거의 무력화할 만큼 강력해서
+  // (도감 파괴감소 전부 합쳐도 최대 17%p인데 이걸 단독으로 넘어섬) 8%p로 하향.
+  unbreakable:  { name: '필멸자의 저항', desc: '강화 파괴·초기화 확률 -8%p', destroyReduce: 0.08 },
   critFollowup: { name: '회심의 연격',   desc: '치명타 발생 시 20% 확률로 무료 추가타 1회 발동', proc: 0.20 },
-  fullBloom:    { name: '완전한 개화',   desc: '공격력 +30%p의 강력한 고정 보너스', atk: 0.30 },
+  fullBloom:    { name: '완전한 개화',   desc: '공격력 +100%p의 강력한 고정 보너스', atk: 1.00 },
   awakenWave:   { name: '각성의 파도',   desc: '재료 소모 없이 아직 열리지 않은 다른 슬롯 하나가 즉시 무료로 각성된다', special: 'freeSlot' },
   harmony:      { name: '만물의 조화',   desc: '공격력·공속·치명타확률·치명타피해·골드·드롭이 모두 +5%p', allStats: 0.05 },
 };

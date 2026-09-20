@@ -1144,13 +1144,23 @@ const SUBWEAPON_ACTIVE = {
 const SUBWEAPON_ACTIVE_BASE_DMG = [0.50, 1.50, 2.00, 2.50, 3.25, 4.00, 6.50, 10.00];
 // 등급별 0강 기준 지속시간 — 신화가 +30강에서 20초에 도달하도록 역산(아래 성장곡선 기준).
 const SUBWEAPON_ACTIVE_BASE_DURATION = [2.5, 3.7, 4.3, 5.6, 6.2, 6.8, 8.7, 12.4];
-// 액티브 tier(0~5)별 누적 배율 — 메인 무기 강화 곡선처럼 뒤로 갈수록 기울기가 급해지는
-// 가속형 곱연산(1탱마다 곱해지는 증가율 자체가 커짐). tier0(강화 전)은 배율 1(=기준값 그대로).
-// 전부 밸런스 미확정 임시값(TODO).
+// 액티브 tier(0~5)별 누적 배율(지속시간용) — 메인 무기 강화 곡선처럼 뒤로 갈수록 기울기가
+// 급해지는 가속형 곱연산(1탱마다 곱해지는 증가율 자체가 커짐). tier0(강화 전)은 배율
+// 1(=기준값 그대로). 전부 밸런스 미확정 임시값(TODO).
 const SUBWEAPON_ACTIVE_TIER_GROWTH = [0.10, 0.15, 0.22, 0.32, 0.45];
 function subweaponActiveTierMult(tier) {
   let m = 1;
   for (let i = 0; i < tier; i++) m *= (1 + (SUBWEAPON_ACTIVE_TIER_GROWTH[i] || 0));
+  return m;
+}
+// 피해량 전용 tier 성장 곡선 — 초반(1단계)은 지속시간과 동일하게 두되(+0.10, "초반은 그대로"),
+// 그 뒤로는 지속시간보다 훨씬 가파르게 키워서 신화 +30(tier5) 기준 배율이 약 5.11배
+// (기준값 400% × 5.11 ≈ 2044%)에 도달하도록 재설계했다. 지속시간 곡선(SUBWEAPON_ACTIVE_TIER_GROWTH)은
+// 건드리지 않는다.
+const SUBWEAPON_ACTIVE_DMG_TIER_GROWTH = [0.10, 0.20, 0.35, 0.55, 0.85];
+function subweaponActiveDmgTierMult(tier) {
+  let m = 1;
+  for (let i = 0; i < tier; i++) m *= (1 + (SUBWEAPON_ACTIVE_DMG_TIER_GROWTH[i] || 0));
   return m;
 }
 // 강화 단계(1~30)별로 "추가 보너스"가 무엇인지 — 기본 능력치(공격력)는 무기처럼 매 강화마다
@@ -4395,7 +4405,7 @@ function subweaponPassiveEff(sw, ampBonus) {
 // 액티브 "결전의 기백" 위력/지속시간 — 위력은 등급 배율, 지속시간은 초 단위라 등급 배율 없이 강화만 반영.
 function subweaponActiveBossDmg(sw, ampBonus) {
   const base = SUBWEAPON_ACTIVE_BASE_DMG[sw.grade] || SUBWEAPON_ACTIVE_BASE_DMG[0];
-  return base * subweaponActiveTierMult(subActivePctTier(sw.enhance)) * (1 + (ampBonus || 0));
+  return base * subweaponActiveDmgTierMult(subActivePctTier(sw.enhance)) * (1 + (ampBonus || 0));
 }
 function subweaponActiveDuration(sw) {
   const base = SUBWEAPON_ACTIVE_BASE_DURATION[sw.grade] || SUBWEAPON_ACTIVE_BASE_DURATION[0];

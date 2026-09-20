@@ -432,6 +432,7 @@
       <div class="tabgroup-body" hidden>
         <div class="tab" data-tab="inventory">🎒 가방</div>
         <div class="tab" data-tab="craft">🧪 조합</div>
+        <div class="tab" data-tab="acc">📿 장신구</div>
         <div class="tab" data-tab="box">🎁 랜덤박스</div>
       </div>
     </div>
@@ -448,6 +449,7 @@
   <!-- 사냥터 -->
   <div id="tab-hunt">
     <div class="panel">
+      <div id="huntSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
       <div id="floorbar">
         <div id="floortitle"></div>
         <div id="floorbtns"></div>
@@ -554,13 +556,12 @@
   <!-- 조합 -->
   <div id="tab-craft" style="display:none">
     <div class="panel">
-      <h3>🧪 재료 & 장신구 조합</h3>
+      <h3>🧪 재료 → 장신구 조합</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료: <b>일반 재료 12개 + 레어 재료 4개</b><br>
-        장신구 등급은 사냥터 구간이 높을수록 올라갑니다. 최대 <b>5개</b>까지 동시 장착 가능(장착 중인 장신구 효과는 항상 합산 적용)<br>
+        장신구 등급은 사냥터 구간이 높을수록 올라갑니다. 만든 장신구의 보유·장착 관리는 "📿 장신구" 탭에서 합니다.<br>
         💡 <b>+15 이상 강화</b>에는 고급(에픽+) 재료가 소모됩니다. 판매할지 강화에 쓸지 선택하세요!
       </div>
-      <div id="accEqBox" style="margin-bottom:12px;"></div>
       <div id="craftlist"></div>
     </div>
     <div class="panel">
@@ -570,6 +571,18 @@
       </div>
       <div id="matFilterList" style="margin-bottom:10px;"></div>
       <div id="matselllist"></div>
+    </div>
+  </div>
+
+  <!-- 장신구 -->
+  <div id="tab-acc" style="display:none">
+    <div id="accSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+    <div class="panel">
+      <h3>📿 장신구 <span style="font-size:12px;color:var(--sub)" id="accSlotCount"></span></h3>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">
+        최대 <b>5개</b>까지 동시 장착 가능(장착 중인 장신구 효과는 항상 합산 적용, 골드로 슬롯 확장 가능). 월드1(푸른세계) 장신구의 공격 관련 효과는 황혼국에서도 그대로 적용되지만, 골드·드롭률·강화확률 같은 파밍/강화 효과는 그 세계에서만 적용됩니다.
+      </div>
+      <div id="accEqBox"></div>
     </div>
     <div class="panel">
       <h3>👹 보스 장신구 <span style="font-size:12px;color:var(--sub)">— 보스 격파 시 낮은 확률로 획득 (신화 등급). 슬롯 제한 없이 보유한 전부가 항상 동시 적용됩니다.</span></h3>
@@ -3582,12 +3595,20 @@ function accEff() {
   // 장신구/보스장신구는 "그 장신구가 몇 층 것인가"(eq.floor)로 개별 판정한다 — 21~40층
   // 자체 장신구가 생기면 그건 월드2에서도 정상 적용되어야 하므로, 여기서 막는 건 어디까지나
   // "1~20층 장신구 효과가 월드2 사냥 중엔 꺼진다"는 것뿐이다(월드1에서는 항상 전부 적용).
+  // 다만 전부 막으면 너무 가혹하다는 피드백을 반영해, 스탯을 두 갈래로 나눈다 —
+  // 공격 계열(atk/speed/critChance/critDamage/extraAtk/bossDmg)은 월드 무관 항상 적용,
+  // 파밍/강화 계열(gold/luck/enh)만 1~20층 소스일 때 월드2에서 격리한다(luck이 격리되면
+  // 보조무기 드롭률에 1~20층 장신구발 luck이 새는 것도 자동으로 막힘).
+  const WORLD1_UTILITY_KEYS = ['gold', 'luck', 'enh'];
   if (S && Array.isArray(S.accEquipped)) {
     for (const eq of S.accEquipped) {
       const a = ACCESSORIES[eq.floor];
       if (!a) continue;
-      if (!world1 && eq.floor < WORLD2_START_FLOOR) continue;
-      for (const [k, v] of Object.entries(a.eff)) eff[k] += v;
+      const world1Sourced = eq.floor < WORLD2_START_FLOOR;
+      for (const [k, v] of Object.entries(a.eff)) {
+        if (!world1 && world1Sourced && WORLD1_UTILITY_KEYS.includes(k)) continue;
+        eff[k] += v;
+      }
     }
   }
   // 보스 장신구: 슬롯 제한 없이 보유한 전부가 항상 동시 적용됨 (판정 기준은 위와 동일)
@@ -3595,8 +3616,11 @@ function accEff() {
     for (const f of S.bossAccs) {
       const b = BOSS_ACCS[f];
       if (!b) continue;
-      if (!world1 && f < WORLD2_START_FLOOR) continue;
-      for (const [k, v] of Object.entries(b.eff)) eff[k] += v;
+      const world1Sourced = f < WORLD2_START_FLOOR;
+      for (const [k, v] of Object.entries(b.eff)) {
+        if (!world1 && world1Sourced && WORLD1_UTILITY_KEYS.includes(k)) continue;
+        eff[k] += v;
+      }
     }
   }
   // 세트 효과: 같은 사냥터의 보스무기 + 보스장신구 → 해당 사냥터에서 보너스
@@ -6772,9 +6796,12 @@ function renderFloorUI() {
 }
 
 function renderFloorBtns() {
+  if (huntSubTab === null) huntSubTab = S.floor < WORLD2_START_FLOOR ? 'world1' : 'world2';
+  renderEquipSubTabBar('huntSubTabBar', huntSubTab, (v) => { huntSubTab = v; renderFloorBtns(); }, WORLD_SUBTAB_OPTIONS);
   const fb = $('floorbtns');
   fb.innerHTML = '';
-  for (let i = 0; i < FLOOR_CAP; i++) {
+  const [rangeLo, rangeHi] = huntSubTab === 'world1' ? [0, WORLD2_START_FLOOR] : [WORLD2_START_FLOOR, FLOOR_CAP];
+  for (let i = rangeLo; i < rangeHi; i++) {
     const b = document.createElement('button');
     b.className = 'fbtn' + (i === S.floor ? ' on' : '') + (i >= S.unlocked ? ' locked' : '');
     b.textContent = i + 1;
@@ -6797,12 +6824,17 @@ function renderFloorBtns() {
 // 탭별로 독립된 선택 상태(예: 강화기는 보조무기를 보고 있어도 가방은 무기를 보고 있을 수
 // 있음)를 유지하기 위해 저장하지 않는 전역 변수 3개로 따로 관리한다(순수 UI 상태라 세이브 불필요).
 let invSubTab = 'weapon', enhSubTab = 'weapon', boxSubTab = 'weapon';
-function renderEquipSubTabBar(containerId, current, setter) {
+let huntSubTab = null; // null이면 renderFloorBtns()가 현재 층 기준으로 최초 1회 자동 결정
+let accSubTab = 'world1';
+const WORLD_SUBTAB_OPTIONS = [
+  { v: 'world1', label: '🌊 푸른세계' },
+  { v: 'world2', label: '🌆 황혼국' },
+];
+function renderEquipSubTabBar(containerId, current, setter, options) {
+  options = options || [{ v: 'weapon', label: '⚔️ 무기' }, { v: 'subweapon', label: '🗡️ 보조무기' }];
   const box = $(containerId);
   if (!box) return;
-  box.innerHTML = `
-    <div class="subtab ${current === 'weapon' ? 'on' : ''}" data-v="weapon">⚔️ 무기</div>
-    <div class="subtab ${current === 'subweapon' ? 'on' : ''}" data-v="subweapon">🗡️ 보조무기</div>`;
+  box.innerHTML = options.map(o => `<div class="subtab ${current === o.v ? 'on' : ''}" data-v="${o.v}">${o.label}</div>`).join('');
   box.querySelectorAll('.subtab').forEach(el => el.onclick = () => setter(el.dataset.v));
 }
 function renderEnhance() {
@@ -7769,7 +7801,7 @@ function renderGamble() {
 
 function renderAll() {
   renderTop(); renderFloorUI(); renderMonster();
-  renderEnhance(); renderCraft(); renderInventory(); renderBoxes(); renderRuneTab(); renderStats();
+  renderEnhance(); renderCraft(); renderAccTab(); renderInventory(); renderBoxes(); renderRuneTab(); renderStats();
   renderEggBadges();
 }
 
@@ -7777,7 +7809,7 @@ function renderAll() {
 const TAB_GROUPS = [
   { id: 'combat', tabs: ['hunt', 'raid', 'library'] },
   { id: 'growth', tabs: ['enhance', 'stats', 'rune', 'blacksmith'] },
-  { id: 'items', tabs: ['inventory', 'craft', 'box'] },
+  { id: 'items', tabs: ['inventory', 'craft', 'acc', 'box'] },
   { id: 'etc', tabs: ['gamble', 'codex', 'patchnotes'] },
 ];
 // 활성 탭이 속한 카테고리는 펼치되, 다른 카테고리가 펼쳐져 있어도 그대로 둔다(여러 개 동시 펼침 가능)
@@ -7793,7 +7825,7 @@ function switchTab(name) {
   currentTab = name;
   setActiveTabGroup(name);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'acc', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'preset') renderPresetTab();
@@ -7801,6 +7833,7 @@ function switchTab(name) {
   if (name === 'enhance') renderEnhance();
   if (name === 'stats') renderStats();
   if (name === 'craft') renderCraft();
+  if (name === 'acc') renderAccTab();
   if (name === 'inventory') renderInventory();
   if (name === 'box') renderBoxes();
   if (name === 'rune') renderRuneTab();
@@ -7859,37 +7892,17 @@ function accEffText(eff) {
 
 function unequipAcc(floor) {
   S.accEquipped = S.accEquipped.filter(eq => eq.floor !== floor);
-  renderCraft(); renderTop(); save();
+  renderAccTab(); renderTop(); save();
 }
 function equipAcc(floor, grade) {
   const slots = effectiveAccSlots();
   if (S.accEquipped.length >= slots) { log(`장신구는 최대 ${slots}개까지 장착할 수 있습니다.`, 'lg-bad'); return; }
   S.accEquipped.push({ floor, grade });
-  renderCraft(); renderTop(); save();
+  renderAccTab(); renderTop(); save();
 }
 function renderCraft() {
   renderMatSell();
-  // 장착 장신구 표시 (최대 ACC_SLOTS개)
-  const eq = $('accEqBox');
-  const accSlots = effectiveAccSlots();
-  eq.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">장착 슬롯 ${S.accEquipped.length}/${accSlots}</div>`;
-  if (S.accEquipped.length) {
-    for (const slot of S.accEquipped) {
-      const a = ACCESSORIES[slot.floor];
-      const gname = GRADES[slot.grade].name;
-      const div = document.createElement('div');
-      div.className = 'invitem equipped';
-      div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} [${a.name}]</span></div>
-        <div class="wi">${accEffText(a.eff)}</div></div>
-        <div class="btns"><button class="danger">해제</button></div>`;
-      div.querySelector('button').onclick = () => unequipAcc(slot.floor);
-      eq.appendChild(div);
-    }
-  } else {
-    eq.insertAdjacentHTML('beforeend', `<div style="font-size:13px;color:var(--sub);padding:6px 0;">장착 중인 장신구가 없습니다.</div>`);
-  }
-
-  // 조합 가능 목록 (해금된 사냥터만)
+  // 조합 가능 목록 (해금된 사냥터만) — 보유/장착 관리는 "📿 장신구" 탭에서 한다.
   const list = $('craftlist');
   list.innerHTML = '';
   for (let f = 0; f < FLOORS.length; f++) {
@@ -7903,29 +7916,15 @@ function renderCraft() {
     const c2 = S.mats[f + '|2'] || 0;
     const ok = canCraft(f);
     const owned = S.accs.some(a => a.floor === f);
-    const equipped = owned && S.accEquipped.some(eq => eq.floor === f);
     const div = document.createElement('div');
-    div.className = 'invitem' + (equipped ? ' equipped' : '');
+    div.className = 'invitem' + (owned ? ' equipped' : '');
     div.innerHTML = `
-      <div><div class="wn"><span class="grade-${gname}">${GRADES[accGrade].name}</span> 📿 ${ACCESSORIES[f].name}${equipped ? ' <span style="color:var(--unique);font-size:12px">(장착중)</span>' : ''}</div>
+      <div><div class="wn"><span class="grade-${gname}">${GRADES[accGrade].name}</span> 📿 ${ACCESSORIES[f].name}${owned ? ' <span style="color:var(--unique);font-size:12px">(보유중)</span>' : ''}</div>
       <div class="wi">효과: ${accEffText(ACCESSORIES[f].eff)}</div>
       <div class="wi">재료: ${F.mats[0]} <b class="${c0 >= CRAFT_COST.n0 ? 'lg-good' : ''}">${c0}/${CRAFT_COST.n0}</b> · ${F.mats[1]} <b class="${c1 >= CRAFT_COST.n1 ? 'lg-good' : ''}">${c1}/${CRAFT_COST.n1}</b>${c2 ? ` · <span class="grade-${GRADES[grades[2]].name}">${F.mats[2]}</span> ${c2}개` : ''}</div></div>
       <div class="btns"></div>`;
     const btns = div.querySelector('.btns');
-    if (owned) {
-      const b = document.createElement('button');
-      if (equipped) {
-        b.textContent = '장착해제';
-        b.className = 'danger';
-        b.onclick = () => unequipAcc(f);
-      } else {
-        b.textContent = S.accEquipped.length >= accSlots ? `장착 (${accSlots}/${accSlots} 꽉참)` : '장착';
-        b.className = 'primary';
-        b.disabled = S.accEquipped.length >= accSlots;
-        b.onclick = () => equipAcc(f, accGrade);
-      }
-      btns.appendChild(b);
-    } else {
+    if (!owned) {
       const b = document.createElement('button');
       b.textContent = '조합';
       b.className = 'primary';
@@ -7935,6 +7934,48 @@ function renderCraft() {
     }
     list.appendChild(div);
   }
+}
+// 📿 장신구 탭 — 월드1(푸른세계)/월드2(황혼국) 서브탭으로 보유·장착 관리 + 보스 장신구 목록
+function renderAccTab() {
+  renderEquipSubTabBar('accSubTabBar', accSubTab, (v) => { accSubTab = v; renderAccTab(); }, WORLD_SUBTAB_OPTIONS);
+  const accSlots = effectiveAccSlots();
+  $('accSlotCount').textContent = `(장착 슬롯 ${S.accEquipped.length}/${accSlots})`;
+  const [rangeLo, rangeHi] = accSubTab === 'world1' ? [0, WORLD2_START_FLOOR] : [WORLD2_START_FLOOR, FLOORS.length];
+
+  const eq = $('accEqBox');
+  eq.innerHTML = '';
+  const ownedInWorld = S.accs.filter(a => a.floor >= rangeLo && a.floor < rangeHi).sort((a, b) => a.floor - b.floor);
+  if (!ownedInWorld.length) {
+    eq.innerHTML = `<div style="font-size:13px;color:var(--sub);padding:6px 0;">보유한 장신구가 없습니다. "조합" 탭에서 재료로 만드세요.</div>`;
+  } else {
+    for (const acc of ownedInWorld) {
+      const f = acc.floor;
+      const a = ACCESSORIES[f];
+      const gname = GRADES[acc.grade].name;
+      const equipped = S.accEquipped.some(e => e.floor === f);
+      const div = document.createElement('div');
+      div.className = 'invitem' + (equipped ? ' equipped' : '');
+      div.innerHTML = `
+        <div><div class="wn"><span class="grade-${gname}">${gname}</span> 📿 ${a.name}${equipped ? ' <span style="color:var(--unique);font-size:12px">(장착중)</span>' : ''}</div>
+        <div class="wi">효과: ${accEffText(a.eff)}</div></div>
+        <div class="btns"></div>`;
+      const btns = div.querySelector('.btns');
+      const b = document.createElement('button');
+      if (equipped) {
+        b.textContent = '장착해제';
+        b.className = 'danger';
+        b.onclick = () => unequipAcc(f);
+      } else {
+        b.textContent = S.accEquipped.length >= accSlots ? `장착 (꽉참)` : '장착';
+        b.className = 'primary';
+        b.disabled = S.accEquipped.length >= accSlots;
+        b.onclick = () => equipAcc(f, acc.grade);
+      }
+      btns.appendChild(b);
+      eq.appendChild(div);
+    }
+  }
+  renderBossAccs();
 }
 
 /* ===================== 전투 프리셋 ===================== */
@@ -8148,7 +8189,6 @@ function sellPearl(n) {
 }
 // 재료 판매 목록
 function renderMatSell() {
-  renderBossAccs();
   renderMatFilter();
   const list = $('matselllist');
   if (!list) return;
@@ -8232,16 +8272,20 @@ function sellMat(key, n) {
 function renderBossAccs() {
   const box = $('bossaccbox');
   if (!box) return;
-  if (!S.bossAccs.length) {
+  const [rangeLo, rangeHi] = accSubTab === 'world1' ? [0, WORLD2_START_FLOOR] : [WORLD2_START_FLOOR, FLOORS.length];
+  const owned = S.bossAccs.filter(f => f >= rangeLo && f < rangeHi).sort((a, b) => a - b);
+  if (!owned.length) {
     box.innerHTML = '<div style="color:var(--sub);font-size:13px;">아직 보스 장신구가 없습니다. 각 사냥터의 보스를 격파해 획득하세요! (0.9%)</div>';
     return;
   }
+  // 세트 효과 파트너는 월드1=메인 보스무기(bossSetFloor), 월드2=보스 보조무기(subBossSetFloor)로 다르다.
+  const activeSetFloor = accSubTab === 'world1' ? bossSetFloor() : subBossSetFloor();
   box.innerHTML = '';
-  for (const f of S.bossAccs) {
+  for (const f of owned) {
     const b = BOSS_ACCS[f];
     if (!b) continue;
     // 세트 효과는 장비 조건(보스무기+보스장신구)뿐 아니라 실제로 그 사냥터에서 사냥 중이어야 발동한다.
-    const setOn = bossSetFloor() === f && S.floor === f;
+    const setOn = activeSetFloor === f && S.floor === f;
     const div = document.createElement('div');
     div.className = 'invitem equipped';
     div.innerHTML = `

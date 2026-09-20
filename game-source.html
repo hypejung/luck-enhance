@@ -4489,7 +4489,10 @@ function subEnhanceCost(sw) {
   // 2-1층(구 21층) 킬당 약 8600만 골드 = 3만분의 1 수준이라 사실상 공짜). 그 세계의 1층
   // 골드 기준으로 메인 무기와 똑같은 비율이 되도록 앵커를 다시 잡는다(등급별 배율은
   // GRADES[].enhanceCost 비율을 그대로 물려받음). 성장률(1.35^강화)은 기존 그대로 유지.
-  const anchor = GRADES[sw.grade].enhanceCost / floorGold(0) * floorGold(WORLD2_START_FLOOR);
+  // 여기에 SUB_ENH_COST_EXTRA_MULT를 더 곱해서, 완전강화 누적비용 대 상자가격 비율이
+  // 메인 무기와 같은 수준(약 332배)으로 수렴하도록 재조정했다(보조무기 강화 시점엔 골드
+  // 수급처가 더 늘어난 상태라는 점을 반영).
+  const anchor = GRADES[sw.grade].enhanceCost / floorGold(0) * floorGold(WORLD2_START_FLOOR) * SUB_ENH_COST_EXTRA_MULT;
   const cost = anchor * Math.pow(1.35, sw.enhance);
   return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
@@ -4561,6 +4564,20 @@ const SUBWEAPON_BOXES = [
   { name: '신화 보조무기 상자', icon: '💫', cost: Math.round(RUNE_BOXES[6].cost * 3 * 82000000 / 1500),
     subweapon: [[2, 25], [3, 55], [4, 7], [5, 3.5]], gold: 0.095 },
 ];
+// 보조무기를 강화할 시점엔 메인 무기 강화 때보다 골드 수급처가 더 늘어난 상태(장신구/보스
+// 장신구/도감 마일스톤 등)이므로, "완전강화 누적비용 ÷ 그 등급 상자 가격" 비율이 메인
+// 무기(신화 기준 약 332배)와 같은 수준으로 수렴하도록 강화비용에 추가 배율을 얹는다.
+// 이벤트(강화데이) 할인이 이 기준 계산에 섞이지 않도록 원시 공식으로 직접 계산한다.
+const SUB_ENH_COST_EXTRA_MULT = (function () {
+  let mainCumRaw = 0;
+  for (let e = 0; e < ENH.maxLevel; e++) mainCumRaw += GRADES[5].enhanceCost * Math.pow(ENH.costGrowth, e);
+  const mainToBoxRatio = mainCumRaw / BOXES[4].cost; // 신화 랜덤박스 기준
+  let growthSum = 0;
+  for (let e = 0; e < SUB_ENH.maxLevel; e++) growthSum += Math.pow(1.35, e);
+  const targetCum5 = mainToBoxRatio * SUBWEAPON_BOXES[4].cost; // 신화 보조무기 상자 기준
+  const currentAnchor5 = GRADES[5].enhanceCost / floorGold(0) * floorGold(WORLD2_START_FLOOR);
+  return (targetCum5 / growthSum) / currentAnchor5;
+})();
 function subweaponBoxCost(b) { return Math.round(b.cost * (1 - (accEff().subGachaDiscount || 0))); }
 function openSubweaponBox(idx, src) {
   const b = SUBWEAPON_BOXES[idx];

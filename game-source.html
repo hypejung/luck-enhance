@@ -2271,12 +2271,16 @@ function raidGoldReward(stage) {
   return Math.floor(base * raidAccelMult(stage, RAID.goldGrowthBase, RAID.goldGrowthLinear));
 }
 
-// ---------- 고대의 도서관 (토벌전보다 상위 컨텐츠, 주간 도전 · 깊이 기록형) ----------
+// ---------- 고대의 도서관 (토벌전보다 상위 컨텐츠, 주간 도전 · 서고 선택형) ----------
 // 1단계(깊이 0) 난이도 = 토벌전 12단계(stage index 11)와 동급으로 시작하되, 단계 성장률은
 // 토벌전보다 훨씬 가파르게(2.8배) 잡아서 몇 단계만 더 들어가도 토벌전을 추월한다.
-// 스테이지 선택형이 아니라 "최고 기록"을 갱신해나가는 방식 — 도전은 항상 현재 기록의 다음
-// 깊이에서 시작되고, 승패 무관하게 주간 도전 횟수를 소모한다(토벌전과 동일한 "도전 자체가
-// 소모" 철학).
+// 기존엔 "최고 기록"만 갱신 가능한 구조라 실력이 막히면 그 순간부터 영구적으로 보상이
+// 0이 되는 문제가 있었다. 토벌전처럼 재도전(파밍)이 가능하도록, 현재 기록(S.library.best)
+// 이하의 서고 중 원하는 곳을 선택해서 도전할 수 있게 바꿨다 — 단, 자원 공급량이 과하게
+// 늘어나지 않도록 리셋 주기는 그대로 주간(3회) 유지하고, 이번 주에 이미 "클리어"한 서고는
+// 다음 주까지 다시 돌 수 없게 잠근다(S.library.done). 실패한 시도는 잠기지 않아 같은 주에
+// 다시 도전 가능하지만, 승패 무관하게 주간 도전 횟수는 소모한다(토벌전과 동일한 "도전
+// 자체가 소모" 철학).
 const LIBRARY = {
   timeLimit: 120,
   unlockRaidStage: 11,   // 토벌전 12단계(0-indexed 11) 클리어 시 해금
@@ -2304,7 +2308,7 @@ function weekKey() {
 }
 function libraryEnsureWeek() {
   const wk = weekKey();
-  if (S.library.week !== wk) { S.library.week = wk; S.library.count = 0; }
+  if (S.library.week !== wk) { S.library.week = wk; S.library.count = 0; S.library.done = {}; }
 }
 function libraryUnlocked() { return (S.raidMaxCleared || 0) > LIBRARY.unlockRaidStage; }
 
@@ -3276,7 +3280,7 @@ function newState() {
     presetSlots: 3,
     raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
     awakeningEssence: 0,   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
-    library: { week: null, count: 0, best: 0 }, // 고대의 도서관: 주간 도전 횟수 + 최고 깊이 기록
+    library: { week: null, count: 0, best: 0, done: {} }, // 고대의 도서관: 주간 도전 횟수 + 최고 깊이 기록 + 이번 주 클리어한 서고(재도전 잠금)
     relics: [],            // 고대의 유물 컬렉션: [true/false, ...] 20개, index = 층 번호
     subBossCodexSeen: [],  // 보스 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
     subRelics: [],         // 고대 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
@@ -5591,22 +5595,25 @@ function renderPunchBox() {
 }
 
 // ---------- 고대의 도서관 전투 흐름 ----------
-function startLibraryFight() {
+function startLibraryFight(depth) {
   if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   if (!libraryUnlocked()) { log(`고대의 도서관은 토벌전 ${LIBRARY.unlockRaidStage + 1}단계를 클리어해야 해금됩니다.`, 'lg-bad'); return; }
   libraryEnsureWeek();
+  // depth: 현재 기록(S.library.best) 이하의 서고 중 선택 — 그 이상(아직 못 뚫은 곳)은 선택 불가
+  if (!Number.isInteger(depth) || depth < 0 || depth > S.library.best) { log('도전할 수 없는 서고입니다.', 'lg-bad'); return; }
   // unlimitedAttempts: 테스트 계정 전용 필드(정상 플레이로는 절대 붙지 않음) — 주간 제한 무시
+  if (!S.unlimitedAttempts && S.library.done[depth]) { log('이 서고는 이번 주에 이미 클리어했습니다. 다음 주에 다시 도전할 수 있습니다.', 'lg-bad'); return; }
   if (!S.unlimitedAttempts && S.library.count >= LIBRARY.weeklyTotal) { log(`이번 주 도서관 도전 횟수를 모두 사용했습니다. (주간 ${LIBRARY.weeklyTotal}회)`, 'lg-bad'); return; }
   // 도전 시작 시점에 즉시 소모(승패 무관 — 토벌전과 동일한 "도전 자체가 소모" 철학)
   S.library.count++;
   resetTimedStacks();
   bossFight.active = true;
   bossFight.isLibrary = true;
-  bossFight.libraryDepth = S.library.best;
+  bossFight.libraryDepth = depth;
   bossFight.timeLeft = LIBRARY.timeLimit + weaponBossTimeBonus(getEquipped());
   mon.unique = false;
-  mon.maxHp = libraryHp(S.library.best);
+  mon.maxHp = libraryHp(depth);
   mon.hp = mon.maxHp;
   mon.dead = false;
   mon.atkTimer = 0;
@@ -5614,8 +5621,8 @@ function startLibraryFight() {
   triggerFightStartSpirits();
   $('libraryMonEmoji').textContent = '📖';
   $('libraryMonEmoji').classList.add('boss-appear');
-  $('libraryMonName').innerHTML = `<span class="grade-태초" style="font-size:19px">📖 제${S.library.best + 1}서고의 수호자</span> <span style="font-size:12px;color:#ff7cf0;">★ 고대의 도서관 ★</span>`;
-  log(`📖 <b>고대의 도서관 진입!</b> 제${S.library.best + 1}서고 — 2분 안에 처치하세요! (HP: ${fmt(mon.maxHp)})`, 'lg-prim');
+  $('libraryMonName').innerHTML = `<span class="grade-태초" style="font-size:19px">📖 제${depth + 1}서고의 수호자</span> <span style="font-size:12px;color:#ff7cf0;">★ 고대의 도서관 ★</span>`;
+  log(`📖 <b>고대의 도서관 진입!</b> 제${depth + 1}서고 — 2분 안에 처치하세요! (HP: ${fmt(mon.maxHp)})`, 'lg-prim');
   setTimeout(() => $('libraryMonEmoji').classList.remove('boss-appear'), 700);
   $('libraryMonEmoji').classList.add('boss-glow');
   renderBossBtn(); renderHP(); renderLibraryTab(); save();
@@ -5626,7 +5633,8 @@ function endLibraryFight(win) {
   $('libraryMonEmoji').classList.remove('boss-glow');
   if (win) {
     onGenesisHungerKill();
-    S.library.best = depth + 1;
+    S.library.done[depth] = true; // 이 서고는 다음 주까지 재도전 불가
+    S.library.best = Math.max(S.library.best, depth + 1); // 새 기록 갱신(이미 깬 서고 재도전이면 그대로)
     const w = getEquipped();
     const essence = Math.round(libraryEssenceReward(depth) * essenceRewardMult(w) * relicEssenceMult());
     const awaken = Math.round(libraryAwakenReward(depth) * essenceRewardMult(w) * relicAwakenMult());
@@ -5678,15 +5686,24 @@ function renderLibraryBox() {
     box.innerHTML = `<div style="font-size:13px;color:var(--sub);">🔒 토벌전 ${LIBRARY.unlockRaidStage + 1}단계를 클리어하면 해금됩니다. (현재 최고 클리어: ${S.raidMaxCleared || 0}단계)</div>`;
     return;
   }
-  const available = !bossFight.active && (S.unlimitedAttempts || S.library.count < LIBRARY.weeklyTotal);
-  const nextHp = libraryHp(S.library.best);
-  const nextEssence = libraryEssenceReward(S.library.best);
-  const nextAwaken = libraryAwakenReward(S.library.best);
+  const weeklyLeft = LIBRARY.weeklyTotal - S.library.count;
+  const rows = [];
+  for (let depth = 0; depth <= S.library.best; depth++) {
+    const cleared = !!S.library.done[depth];
+    const hp = libraryHp(depth);
+    const essence = libraryEssenceReward(depth);
+    const awaken = libraryAwakenReward(depth);
+    rows.push(`
+      <div class="invitem">
+        <div><div class="wn">📖 <span class="grade-태초">제${depth + 1}서고</span>${depth === S.library.best ? ' <span style="color:var(--unique);font-size:12px">(신규 기록)</span>' : ''}</div>
+        <div class="wi">HP ${fmt(hp)} · 보상: 📜 ${fmt(essence)} / 💠 ${fmt(awaken)}${cleared ? ' <span style="color:var(--sub)">(이번 주 클리어함)</span>' : ''}</div></div>
+        <div class="btns"><button class="lib-challenge-btn" data-depth="${depth}"></button></div>
+      </div>`);
+  }
   box.innerHTML = `
     <div style="font-size:13px;margin-bottom:8px;">최고 기록: <b style="color:var(--gold)">제${S.library.best}서고 돌파</b> · 이번 주 도전: <b>${S.library.count}/${LIBRARY.weeklyTotal}</b></div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">다음 도전: 제${S.library.best + 1}서고 (HP ${fmt(nextHp)}) — 보상 📜${nextEssence} / 💠${nextAwaken}</div>
-    <button class="primary" id="libraryBtn" ${available ? '' : 'disabled'}>📖 고대의 도서관 도전</button>
-    <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : S.library.count >= LIBRARY.weeklyTotal ? '이번 주 도전 횟수를 모두 사용했습니다.' : '승패 무관하게 도전 횟수가 소모됩니다.'}</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">현재 기록 이하의 서고 중 원하는 곳을 골라 도전하세요. 승패 무관하게 도전 횟수가 소모되고, 클리어한 서고는 다음 주까지 재도전할 수 없습니다.</div>
+    ${rows.reverse().join('')}
     <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
       <div style="font-size:13px;margin-bottom:6px;">📖 고대의 유물 (${relicCollectedCount()}/${RELICS.length})</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">
@@ -5696,8 +5713,14 @@ function renderLibraryBox() {
         ).join('')}
       </div>
     </div>`;
-  const btn = $('libraryBtn');
-  if (btn) btn.onclick = startLibraryFight;
+  box.querySelectorAll('.lib-challenge-btn').forEach(btn => {
+    const depth = +btn.dataset.depth;
+    const cleared = !!S.library.done[depth];
+    if (bossFight.active) { btn.textContent = '전투 중'; btn.disabled = true; }
+    else if (cleared && !S.unlimitedAttempts) { btn.textContent = '이번 주 클리어함'; btn.disabled = true; }
+    else if (weeklyLeft <= 0 && !S.unlimitedAttempts) { btn.textContent = '주간 횟수 소진'; btn.disabled = true; }
+    else { btn.textContent = '도전'; btn.className = 'lib-challenge-btn primary'; btn.onclick = () => startLibraryFight(depth); }
+  });
 }
 function renderLibraryTab() { renderLibraryBox(); }
 
@@ -6474,6 +6497,7 @@ function migrate(d) {
   if (typeof d.raidMaxCleared !== 'number') d.raidMaxCleared = 0;
   if (typeof d.awakeningEssence !== 'number') d.awakeningEssence = 0;
   if (!d.library || typeof d.library !== 'object') d.library = { week: null, count: 0, best: 0 };
+  if (typeof d.library.done !== 'object' || d.library.done === null) d.library.done = {};
   if (!Array.isArray(d.relics)) d.relics = [];
   if (!Array.isArray(d.subBossCodexSeen)) d.subBossCodexSeen = [];
   if (!Array.isArray(d.subRelics)) d.subRelics = [];

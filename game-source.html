@@ -9328,23 +9328,39 @@ function renderStats() {
   renderTraining();
 }
 
+// 매 틱(0.1초)마다 골드 변화를 반영해야 해서 renderStats()가 이 함수도 매번 호출하는데,
+// 예전처럼 innerHTML을 통째로 갈아엎으면 마우스로 클릭(누르고 떼기)하는 도중에 버튼 DOM
+// 자체가 통째로 교체돼버려 클릭이 씹히는 문제가 있었다(PC 마우스 클릭 미반응 제보).
+// 그래서 버튼 DOM은 최초 1회만 만들고, 이후로는 텍스트/disabled만 갱신한다.
 function renderTraining() {
   const box = $('trainingBox');
   if (!box) return;
-  box.innerHTML = '';
-  for (const key of Object.keys(TRAINING)) {
+  const keys = Object.keys(TRAINING);
+  if (box.dataset.built !== 'training') {
+    box.innerHTML = '';
+    for (const key of keys) {
+      const div = document.createElement('div');
+      div.className = 'invitem';
+      div.innerHTML = `<div><div class="wn"><span class="tr-name"></span> <span style="font-size:12px;color:var(--sub)" class="tr-lvl"></span></div>
+        <div class="wi"><span class="tr-desc"></span> · 누적 보너스 <span class="tr-bonus"></span></div></div>
+        <div class="btns"><button class="primary">훈련<br><span style="font-size:11px" class="tr-cost"></span></button></div>`;
+      div.querySelector('button').onclick = () => trainStat(key);
+      div.dataset.key = key;
+      box.appendChild(div);
+    }
+    box.dataset.built = 'training';
+  }
+  for (const key of keys) {
     const t = TRAINING[key];
     const lvl = trainingLevel(key);
     const cost = trainingCost(key);
-    const div = document.createElement('div');
-    div.className = 'invitem';
-    div.innerHTML = `<div><div class="wn">${t.name} <span style="font-size:12px;color:var(--sub)">Lv.${lvl}</span></div>
-      <div class="wi">${t.desc} · 누적 보너스 ${(trainingValue(key) * 100).toFixed(1)}${key === 'critChance' || key === 'extraAtk' ? '%p' : key === 'critDamage' ? '%p' : '%'}</div></div>
-      <div class="btns"><button class="primary">훈련<br><span style="font-size:11px">💰 ${fmt(cost)}</span></button></div>`;
-    const bt = div.querySelector('button');
-    bt.disabled = BN.lt(S.gold, cost);
-    bt.onclick = () => trainStat(key);
-    box.appendChild(div);
+    const div = box.querySelector(`[data-key="${key}"]`);
+    div.querySelector('.tr-name').textContent = t.name;
+    div.querySelector('.tr-lvl').textContent = `Lv.${lvl}`;
+    div.querySelector('.tr-desc').textContent = t.desc;
+    div.querySelector('.tr-bonus').textContent = `${(trainingValue(key) * 100).toFixed(1)}${key === 'critChance' || key === 'extraAtk' ? '%p' : key === 'critDamage' ? '%p' : '%'}`;
+    div.querySelector('.tr-cost').textContent = `💰 ${fmt(cost)}`;
+    div.querySelector('button').disabled = BN.lt(S.gold, cost);
   }
 }
 

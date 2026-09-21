@@ -5063,8 +5063,11 @@ function subSuccessChance(sw) {
 }
 function subDestroyChance(sw) {
   const base = SUB_ENH.destroy[sw.enhance] || 0;
-  let chance = Math.max(0, base * (1 - (accEff().subDestroyReduce || 0)));
-  if (enhanceEventActive()) chance *= ENHANCE_EVENT.destroyMult; // 강화데이: 파괴확률 절반
+  // 메인 무기(effectiveDestroyChance)와 동일하게 "%p 차감" 방식으로 통일 — 예전엔 비율
+  // 곱연산(base*(1-reduce))이라 다른 %p 스탯들과 감산 방식이 어긋나 있었다.
+  const reduce = Math.min(0.95, accEff().subDestroyReduce || 0);
+  let chance = Math.max(0, Math.round((base - reduce * 100) * 10) / 10);
+  if (enhanceEventActive()) chance = Math.round(chance * ENHANCE_EVENT.destroyMult * 10) / 10; // 강화데이: 파괴확률 절반
   return chance;
 }
 let subEnhanceRevealPending = false; // 메인 무기와 동일한 "뜸들이기~리빌" 연출 가드

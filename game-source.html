@@ -2406,7 +2406,7 @@ function raidEnsureDay() {
   const today = todayKey();
   if (S.raid.day !== today) { S.raid.day = today; S.raid.count = 0; S.raid.done = {}; }
 }
-function raidHp(stage) { return Math.round(RAID.baseHp * Math.pow(RAID.hpGrowth, stage)); }
+function raidHp(stage) { return BN.floor(BN.mul(BN.pow(RAID.hpGrowth, stage), RAID.baseHp)); }
 // 화룡의 인장: 하루 총 도전 횟수 +1
 function effectiveRaidDailyTotal() { return RAID.dailyTotal + (sealEquippedHas('dragonKing') ? 1 : 0); }
 function raidTokenReward(stage) { return Math.round(RAID.tokenBase * raidAccelMult(stage, RAID.tokenGrowthBase, RAID.tokenGrowthLinear)); }
@@ -2453,7 +2453,7 @@ const LIBRARY = {
   runeDropChance: 0.15,
   relicDropChance: 0.10,
 };
-function libraryHp(depth) { return Math.round(raidHp(LIBRARY.baseHpStage) * Math.pow(LIBRARY.hpGrowth, depth)); }
+function libraryHp(depth) { return BN.floor(BN.mul(raidHp(LIBRARY.baseHpStage), BN.pow(LIBRARY.hpGrowth, depth))); }
 function libraryEssenceReward(depth) { return Math.round(LIBRARY.baseEssence * Math.pow(LIBRARY.rewardGrowth, depth)); }
 function libraryAwakenReward(depth) { return Math.round(LIBRARY.baseAwaken * Math.pow(LIBRARY.rewardGrowth, depth)); }
 function weekKey() {
@@ -2826,7 +2826,7 @@ function camazotzEcho(baseDmg) {
   if (!hasGenesisEquipped('camazotz')) return;
   let echoDmg = baseDmg * CAMAZOTZ.echoStart;
   for (let i = 0; i < CAMAZOTZ.echoCount; i++) {
-    mon.hp -= echoDmg;
+    mon.hp = BN.sub(mon.hp, echoDmg);
     echoDmg *= CAMAZOTZ.echoDecay;
   }
   floatText('🔔 메아리!');
@@ -2837,9 +2837,9 @@ function camazotzResonance(w) {
   if (fx.camazotzStacks < CAMAZOTZ.shatterStacks) return;
   fx.camazotzStacks = 0;
   if (bossFight.active) {
-    mon.hp -= weaponAtk(w) * CAMAZOTZ.shatterBossMult;
+    mon.hp = BN.sub(mon.hp, BN.mul(weaponAtk(w), CAMAZOTZ.shatterBossMult));
   } else {
-    mon.hp = 0;
+    mon.hp = BN.from(0);
   }
   floatText('🔊 공진 파쇄!');
 }
@@ -3746,7 +3746,7 @@ function rawWeaponSpeed(w) {
   // 활공(고대 에이션트 스피릿): 사냥터 이동 직후 한시적 공속 대폭 상승
   if (w && w.spirit === 'glide' && now < fx.glideUntil) stackBonus += ANCIENT_SPIRITS.glide.bonus || 0;
   // 분노의 폭주(고대 에이션트 스피릿): 보스 체력이 30% 이하로 떨어지면 "최후의 광기" 발동
-  if (w && w.spirit === 'berserkerblood' && bossFight.active && mon.hp <= mon.maxHp * (ANCIENT_SPIRITS.berserkerblood.bossHpThreshold || 0.3)) {
+  if (w && w.spirit === 'berserkerblood' && bossFight.active && BN.lte(mon.hp, BN.mul(mon.maxHp, ANCIENT_SPIRITS.berserkerblood.bossHpThreshold || 0.3))) {
     stackBonus += ANCIENT_SPIRITS.berserkerblood.bossSpeedBonus || 0;
   }
   // 돌파의 질주(고대 에이션트 스피릿): 보스전·토벌전 시작 후 한시적으로 "돌파 상태" 발동
@@ -4472,7 +4472,7 @@ function log(msg, cls) {
 }
 
 /* ===================== 사냥 로직 ===================== */
-const mon = { hp: 0, maxHp: 0, atkTimer: 0, spawnTimer: 0, dead: false, unique: false };
+const mon = { hp: BN.from(0), maxHp: BN.from(0), atkTimer: 0, spawnTimer: 0, dead: false, unique: false };
 
 function floorGold(f) {
   if (f < WORLD2_START_FLOOR) return Math.floor(FLOOR.goldBase * Math.pow(FLOOR.goldGrowth, f) * FLOOR.goldMult);
@@ -4486,7 +4486,7 @@ function floorGold(f) {
 function floorHp(f) { return FLOORS[f].hp; }
 
 function spawnMonster() {
-  mon.maxHp = floorHp(S.floor);
+  mon.maxHp = BN.from(floorHp(S.floor));
   mon.hp = mon.maxHp;
   mon.dead = false;
   // atkTimer는 초기화하지 않는다 — 처치 시 남은 공격 타이머(0~1 미만의 여분)가
@@ -4505,7 +4505,7 @@ function spawnMonster() {
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
   if (mon.unique) {
     const boss = FLOORS[S.floor].boss;
-    mon.maxHp = Math.floor(floorHp(S.floor) * 4);
+    mon.maxHp = BN.from(Math.floor(floorHp(S.floor) * 4));
     mon.hp = mon.maxHp;
     $('monemoji').textContent = boss.emoji;
     $('monname').innerHTML = `<span class="grade-태초">⭐ 유니크 ${boss.name}</span>`;
@@ -4513,7 +4513,7 @@ function spawnMonster() {
   } else {
     renderMonster();
   }
-  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
+  mon.hp = BN.max(0, BN.min(mon.hp, mon.maxHp));
   renderHP();
 }
 
@@ -5266,8 +5266,8 @@ function handleKill(chainDepth) {
   // 못하고 측정이 조기 종료된다. 초과분을 punchDealtOverflow에 누적하고 체력을 다시 채운 뒤
   // 'boss'가 아닌 값을 반환해 호출부의 `=== 'boss'` 체크를 자연스럽게 통과시킨다.
   if (bossFight.active && bossFight.isPunch) {
-    punchDealtOverflow += -mon.hp;
-    mon.hp = PUNCH_DUMMY_HP;
+    punchDealtOverflow = BN.sub(punchDealtOverflow, mon.hp);
+    mon.hp = BN.from(PUNCH_DUMMY_HP);
     return 'punch';
   }
   if (bossFight.active) {
@@ -5374,10 +5374,10 @@ function tick(dt) {
       fx.stormNext = nowDecay + (spirit.interval || 8) * 1000;
       fx.glideUntil = nowDecay + (spirit.aftermathDur || 3) * 1000;
       fx.stormShockUntil = nowDecay + (spirit.bossShockDur || 3) * 1000;
-      mon.hp -= weaponAtk(w) * (spirit.mult || 0);
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.mult || 0));
       attacked = true;
       floatText('⚡ 낙뢰!');
-      if (mon.hp <= 0) {
+      if (BN.lte(mon.hp, 0)) {
         if (handleKill() === 'boss') return;
         killedAny = true;
       }
@@ -5418,24 +5418,24 @@ function tick(dt) {
     if (!fx.breathNext) fx.breathNext = nowDecay + (spirit.interval || 9) * 1000;
     if (nowDecay >= fx.breathNext) {
       fx.breathNext = nowDecay + (spirit.interval || 9) * 1000;
-      mon.hp -= weaponAtk(w) * (spirit.mult || 0);
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.mult || 0));
       attacked = true;
       floatText('🔥 브레스!');
       if (bossFight.active) {
         fx.dragonBurnDot = { dmgPerSec: weaponAtk(w) * (spirit.burnDmgPerSec || 0), remain: spirit.burnDur || 4 };
       }
-      if (mon.hp <= 0) {
+      if (BN.lte(mon.hp, 0)) {
         if (handleKill() === 'boss') return;
         killedAny = true;
       }
     }
   }
   if (fx.dragonBurnDot) {
-    mon.hp -= fx.dragonBurnDot.dmgPerSec * dt;
+    mon.hp = BN.sub(mon.hp, fx.dragonBurnDot.dmgPerSec * dt);
     fx.dragonBurnDot.remain -= dt;
     attacked = true;
     if (fx.dragonBurnDot.remain <= 0) fx.dragonBurnDot = null;
-    if (mon.hp <= 0) {
+    if (BN.lte(mon.hp, 0)) {
       if (handleKill() === 'boss') return;
       killedAny = true;
     }
@@ -5451,9 +5451,9 @@ function tick(dt) {
       floatText('🧪 부식 심화!');
     }
     if (w.acidStacks > 0) {
-      mon.hp -= weaponAtk(w) * (spirit.dmgPerStackPerSec || 0) * w.acidStacks * dt;
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.dmgPerStackPerSec || 0) * w.acidStacks * dt);
       attacked = true;
-      if (mon.hp <= 0) {
+      if (BN.lte(mon.hp, 0)) {
         if (handleKill() === 'boss') return;
         killedAny = true;
       }
@@ -5461,30 +5461,30 @@ function tick(dt) {
   }
   // 피의 갈증(고대 에이션트 스피릿): 출혈 지속 피해 처리(단일 슬롯, 재발동 시 갱신)
   if (fx.bloodThirstDot) {
-    mon.hp -= fx.bloodThirstDot.dmgPerSec * dt;
+    mon.hp = BN.sub(mon.hp, fx.bloodThirstDot.dmgPerSec * dt);
     fx.bloodThirstDot.remain -= dt;
     attacked = true;
     if (fx.bloodThirstDot.remain <= 0) fx.bloodThirstDot = null;
-    if (mon.hp <= 0) {
+    if (BN.lte(mon.hp, 0)) {
       if (handleKill() === 'boss') return;
       killedAny = true;
     }
   }
   // 출혈(레전더리 치명타) 지속 피해 처리
   if (fx.bleeds && fx.bleeds.length) {
-    for (const b of fx.bleeds) { mon.hp -= b.dmgPerSec * dt; b.remain -= dt; }
+    for (const b of fx.bleeds) { mon.hp = BN.sub(mon.hp, b.dmgPerSec * dt); b.remain -= dt; }
     fx.bleeds = fx.bleeds.filter(b => b.remain > 0);
     attacked = true;
-    if (mon.hp <= 0) {
+    if (BN.lte(mon.hp, 0)) {
       if (handleKill() === 'boss') return;
       killedAny = true;
     }
   }
   // 용살자의 서약(신화 보스): 보스전 중 무기 공격력 비례 고정 피해(도트)
   if (bossFight.active && w.effect === 'dragonslayer') {
-    mon.hp -= weaponAtk(w) * (EFFECTS.dragonslayer.bossDotAtkMult || 0) * dt;
+    mon.hp = BN.sub(mon.hp, weaponAtk(w) * (EFFECTS.dragonslayer.bossDotAtkMult || 0) * dt);
     attacked = true;
-    if (mon.hp <= 0) {
+    if (BN.lte(mon.hp, 0)) {
       if (handleKill() === 'boss') return;
       killedAny = true;
     }
@@ -5492,9 +5492,9 @@ function tick(dt) {
   // 누적 맹독(고대 에이션트 스피릿): 만료되지 않았다면 스택 수만큼 도트 피해, 만료되면 스택 초기화
   if (fx.poisonStacks > 0) {
     if (nowDecay < fx.poisonUntil) {
-      mon.hp -= weaponAtk(w) * (ANCIENT_SPIRITS.stackpoison.dmgPerSecPerStack || 0) * fx.poisonStacks * dt;
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (ANCIENT_SPIRITS.stackpoison.dmgPerSecPerStack || 0) * fx.poisonStacks * dt);
       attacked = true;
-      if (mon.hp <= 0) {
+      if (BN.lte(mon.hp, 0)) {
         if (handleKill() === 'boss') return;
         killedAny = true;
       }
@@ -5508,10 +5508,10 @@ function tick(dt) {
     fx.floodDotTimer = (fx.floodDotTimer || 0) + dt;
     if (fx.floodDotTimer >= (spirit.bossDotInterval || 5)) {
       fx.floodDotTimer -= (spirit.bossDotInterval || 5);
-      mon.hp -= weaponAtk(w) * (spirit.bossDotMult || 0);
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.bossDotMult || 0));
       attacked = true;
       floatText('🌀 수렁 침식!');
-      if (mon.hp <= 0) {
+      if (BN.lte(mon.hp, 0)) {
         if (handleKill() === 'boss') return;
         killedAny = true;
       }
@@ -5522,13 +5522,13 @@ function tick(dt) {
     mon.atkTimer -= 1;
     attack(w);
     attacked = true;
-    if (mon.hp <= 0) {
+    if (BN.lte(mon.hp, 0)) {
       if (handleKill() === 'boss') return; // 보스전 종료 — 남은 공격 타이머는 다음 틱의 일반 사냥에서 사용됨
       killedAny = true;
     }
   }
   if (attacked) {
-    mon.hp = Math.max(0, mon.hp);
+    mon.hp = BN.max(0, mon.hp);
     renderHP();
     if (killedAny) renderFloorUI();
   }
@@ -5538,7 +5538,7 @@ function attack(w) {
   const now = Date.now();
   // 인과율의 룬(도서관 전용): 이전 공격에서 남겨둔 "잔향" 피해를 이번 공격 시작 시 그대로 적용
   if (fx.causalityEcho) {
-    mon.hp -= fx.causalityEcho;
+    mon.hp = BN.sub(mon.hp, fx.causalityEcho);
     fx.causalityEcho = null;
     floatText('🔁 잔향!');
   }
@@ -5587,10 +5587,10 @@ function attack(w) {
   const divineCount = weaponSpecialCount(w, 'divinestrike');
   if (divineCount > 0 && Math.random() < 1 - Math.pow(1 - RUNE_SPECIALS.divinestrike.proc, divineCount)) {
     if (bossFight.active) {
-      mon.hp -= mon.maxHp * (RUNE_SPECIALS.divinestrike.bossDmgPct || 0);
+      mon.hp = BN.sub(mon.hp, BN.mul(mon.maxHp, RUNE_SPECIALS.divinestrike.bossDmgPct || 0));
       floatText('⚡ 신벌!');
     } else {
-      mon.hp = 0;
+      mon.hp = BN.from(0);
       floatText('⚡ 신벌!');
       return;
     }
@@ -5634,7 +5634,7 @@ function attack(w) {
   // 치명타가 적중하면 표식을 터뜨려 고정 피해를 추가로 입힌다.
   if (didCrit && weaponSpecialCount(w, 'brandRune') > 0) {
     if (now < fx.brandUntil) {
-      mon.hp -= weaponAtk(w) * (RUNE_SPECIALS.brandRune.burstMult || 0);
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (RUNE_SPECIALS.brandRune.burstMult || 0));
       fx.brandUntil = 0;
       floatText('🩸 낙인 폭발!');
     } else {
@@ -5649,7 +5649,7 @@ function attack(w) {
   }
   // 회심의 연격(각성 에픽 효과): 치명타 발생 시 확률적으로 무료 추가타 1회 발동
   if (didCrit && hasAwakenEffect(w, 'critFollowup') && Math.random() < (AWAKENING_EFFECTS.critFollowup.proc || 0)) {
-    mon.hp -= preCritDmg * EXTRA_ATK_DMG_MULT;
+    mon.hp = BN.sub(mon.hp, preCritDmg * EXTRA_ATK_DMG_MULT);
     floatText('⚡ 회심의 연격!');
   }
   // 불주먹(맨손 전용 태초 룬): 공격 시 확률적으로 "염왕" 발동 — 무기 공격력의 10000% 고정 피해.
@@ -5658,7 +5658,7 @@ function attack(w) {
     let skillDmg = weaponAtk(w) * (RUNE_SPECIALS.fireFist.skillMult || 0);
     let skillCrit = false;
     if (critChance > 0 && Math.random() < critChance) { skillDmg *= critMult; skillCrit = true; }
-    mon.hp -= skillDmg;
+    mon.hp = BN.sub(mon.hp, skillDmg);
     floatText(skillCrit ? '🔥 염왕 치명타!' : '🔥 염왕!');
   }
   if (ambushCrit) {
@@ -5672,14 +5672,14 @@ function attack(w) {
   }
   if (didCrit && w.effect === 'stigma') {
     fx.stigma = (fx.stigma || 0) + 1;
-    mon.hp -= weaponAtk(w) * (e.stackDmg || 0) * fx.stigma;
+    mon.hp = BN.sub(mon.hp, weaponAtk(w) * (e.stackDmg || 0) * fx.stigma);
     if (fx.stigma >= (e.stackMax || 5)) {
       fx.stigma = 0;
       if (bossFight.active) {
-        mon.hp -= weaponAtk(w) * (e.bossBurstMult || 0);
+        mon.hp = BN.sub(mon.hp, weaponAtk(w) * (e.bossBurstMult || 0));
         floatText('🩸 낙인 폭발!');
       } else {
-        mon.hp = 0; floatText('☠️ 처형!');
+        mon.hp = BN.from(0); floatText('☠️ 처형!');
       }
     } else {
       floatText(`🩸 낙인 x${fx.stigma}`);
@@ -5711,7 +5711,7 @@ function attack(w) {
   if (w.spirit === 'stackpoison') {
     const spirit = ANCIENT_SPIRITS.stackpoison;
     if ((fx.poisonStacks || 0) >= (spirit.stackMax || 10)) {
-      mon.hp -= weaponAtk(w) * (spirit.burstMult || 0);
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.burstMult || 0));
       fx.poisonStacks = 0;
       fx.poisonUntil = 0;
       floatText('☠️ 맹독 폭발!');
@@ -5738,15 +5738,15 @@ function attack(w) {
       floatText('💥 지진파!');
       fx.quakeDebuffStacks = Math.min(ANCIENT_SPIRITS.quake.debuffStackMax || 3, (fx.quakeDebuffStacks || 0) + 1);
       fx.quakeDebuffUntil = now + (ANCIENT_SPIRITS.quake.debuffDur || 3) * 1000;
-      if (!bossFight.active && quakeDmg >= mon.hp) {
-        const monHpFull = mon.maxHp || 1;
-        const overkill = quakeDmg - mon.hp;
+      if (!bossFight.active && BN.gte(quakeDmg, mon.hp)) {
+        const monHpFull = BN.eq(mon.maxHp, 0) ? BN.from(1) : mon.maxHp;
+        const overkill = BN.sub(quakeDmg, mon.hp);
         // 무기가 극도로 강해지면 초과 처치 수가 천문학적으로 커질 수 있어 상한을 둔다
         // (성능 보호 목적 — 200마리면 이미 충분히 극적인 연쇄 처치)
-        const totalKills = Math.min(200, 1 + Math.floor(overkill / monHpFull));
+        const totalKills = Math.min(200, 1 + Math.floor(BN.toNumber(BN.div(overkill, monHpFull))));
         for (let i = 0; i < totalKills; i++) handleKill();
       } else {
-        mon.hp -= quakeDmg;
+        mon.hp = BN.sub(mon.hp, quakeDmg);
       }
     }
   }
@@ -5755,7 +5755,7 @@ function attack(w) {
     fx.bluntSmashCount = (fx.bluntSmashCount || 0) + 1;
     if (fx.bluntSmashCount >= BLUNT_SMASH_EVERY) {
       fx.bluntSmashCount = 0;
-      mon.hp -= weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus'));
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus')));
       floatText('🔨 파쇄!');
     }
   }
@@ -5766,10 +5766,10 @@ function attack(w) {
     w.stompStacks = (w.stompStacks || 0) + 1;
     if (w.stompStacks >= (spirit.stackMax || 20)) {
       w.stompStacks = 0;
-      mon.hp -= weaponAtk(w) * (spirit.collapseMult || 8);
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.collapseMult || 8));
       floatText('💥 붕괴!');
     } else {
-      mon.hp -= weaponAtk(w) * (spirit.dmgPerStack || 0) * w.stompStacks;
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.dmgPerStack || 0) * w.stompStacks);
       floatText('🦶 짓밟기!');
     }
   }
@@ -5781,21 +5781,21 @@ function attack(w) {
     w.wrathGauge = (w.wrathGauge || 0) + gain;
     if (w.wrathGauge >= 100) {
       w.wrathGauge -= 100;
-      mon.hp -= weaponAtk(w) * (spirit.judgmentMult || 0);
+      mon.hp = BN.sub(mon.hp, weaponAtk(w) * (spirit.judgmentMult || 0));
       floatText('⚡ 심판의 강타!');
     }
   }
   // 불멸의 진격(고대 에이션트 스피릿): 사냥터 일반/엘리트 몬스터 한정(보스·토벌전 제외),
   // 오버킬(처치 후 남는 피해량 ÷ 몬스터 최대체력)만큼 실제 처치 판정을 추가로 돌린다
   // (보상 배수 지급이 아니라 dropRoll 등 정식 처치 로직을 그 횟수만큼 진짜로 실행).
-  if (w.spirit === 'undyingbone' && !bossFight.active && dmg >= mon.hp) {
-    const monHpFull = mon.maxHp || 1;
-    const overkill = dmg - mon.hp;
+  if (w.spirit === 'undyingbone' && !bossFight.active && BN.gte(dmg, mon.hp)) {
+    const monHpFull = BN.eq(mon.maxHp, 0) ? BN.from(1) : mon.maxHp;
+    const overkill = BN.sub(dmg, mon.hp);
     // 무기가 극도로 강해지면 처치 수가 천문학적으로 커질 수 있어 상한을 둔다(성능 보호 목적)
-    const totalKills = Math.min(500, 1 + Math.floor(overkill / monHpFull));
+    const totalKills = Math.min(500, 1 + Math.floor(BN.toNumber(BN.div(overkill, monHpFull))));
     for (let i = 0; i < totalKills; i++) handleKill();
   } else {
-    mon.hp -= dmg;
+    mon.hp = BN.sub(mon.hp, dmg);
   }
   // 카마소츠의 조종(태초의 유물): 매 공격 확정 메아리 연쇄 + 15타마다 공진 파쇄
   camazotzEcho(dmg);
@@ -5804,7 +5804,7 @@ function attack(w) {
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc');
   if (spellProc > 0 && Math.random() < spellProc) {
     const spellDmg = dmg * (typeTrait(w, 'spellMult') || 1);
-    mon.hp -= spellDmg;
+    mon.hp = BN.sub(mon.hp, spellDmg);
     floatText('🔮 주문 작렬!');
   }
   // 연타 확률 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
@@ -5828,11 +5828,11 @@ function attack(w) {
     // 5연타(기본+4타)로 적용된다 — 추가타 횟수만 늘어날 뿐 타당 피해량은 동일하다.
     const bloodThirstActive = w.spirit === 'bloodtribute' && now < fx.bloodThirstUntil;
     const extraHits = bloodThirstActive ? (ANCIENT_SPIRITS.bloodtribute.extraAtkHits - 1) : 1;
-    mon.hp -= extraDmg * extraHits;
+    mon.hp = BN.sub(mon.hp, extraDmg * extraHits);
     floatText(bloodThirstActive ? '🦇 광란!' : '⚡ 연타!');
     // 여운 증폭의 룬(도서관 전용): 연타 발동 시 확률적으로 연타가 한 번 더 즉시 발동
     if (weaponSpecialCount(w, 'echoRune') > 0 && Math.random() < RUNE_SPECIALS.echoRune.proc) {
-      mon.hp -= extraDmg * extraHits;
+      mon.hp = BN.sub(mon.hp, extraDmg * extraHits);
       floatText('🔁 여운!');
     }
     if (w.effect === 'sprint') fx.sprintUntil = now + (e.sprintDur || 3) * 1000;
@@ -5850,7 +5850,7 @@ function attack(w) {
   // 더블 스트라이크(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공할 때마다 이번 타격 피해를 한 번 더 적용
   for (let i = 0; i < weaponSpecialCount(w, 'doublestrike'); i++) {
     if (Math.random() < RUNE_SPECIALS.doublestrike.proc) {
-      mon.hp -= dmg;
+      mon.hp = BN.sub(mon.hp, dmg);
       floatText('🌀 더블 스트라이크!');
     }
   }
@@ -5933,12 +5933,12 @@ function triggerFightStartSpirits() {
   }
   if (w.spirit === 'unbrokenoath' && (w.oathStacks || 0) > 0) {
     const dmg = weaponAtk(w) * w.oathStacks * (ANCIENT_SPIRITS.unbrokenoath.burstPerStack || 0);
-    mon.hp = Math.max(1, mon.hp - dmg);
+    mon.hp = BN.max(1, BN.sub(mon.hp, dmg));
     floatText('⚔️ 맹세의 일격!');
   }
   if (w.spirit === 'soul' && (w.soulStacks || 0) > 0) {
     const dmg = weaponAtk(w) * w.soulStacks * (ANCIENT_SPIRITS.soul.burstPerStack || 0);
-    mon.hp = Math.max(1, mon.hp - dmg);
+    mon.hp = BN.max(1, BN.sub(mon.hp, dmg));
     floatText('💀 사신의 낫!');
   }
 }
@@ -5963,7 +5963,7 @@ function startBossFight() {
   bossFight.floor = f;
   bossFight.timeLeft = BOSS.timeLimit + weaponBossTimeBonus(getEquipped());
   mon.unique = false;
-  mon.maxHp = floorHp(f) * BOSS.hpMult;
+  mon.maxHp = BN.from(floorHp(f) * BOSS.hpMult);
   mon.hp = mon.maxHp;
   mon.dead = false;
   mon.atkTimer = 0;
@@ -5977,7 +5977,7 @@ function startBossFight() {
   const eqEffect = eq && eq.effect ? EFFECTS[eq.effect] : null;
   if (eqEffect && eqEffect.openBurstAtkMult) {
     const cut = Math.floor(weaponAtk(eq) * eqEffect.openBurstAtkMult);
-    mon.hp = Math.max(1, mon.hp - cut);
+    mon.hp = BN.max(1, BN.sub(mon.hp, cut));
     log(`⚔️ <b>신살자</b>의 일격! 보스 체력 ${fmt(cut)} 즉시 삭감!`, 'lg-prim');
   }
   $('monemoji').textContent = b.emoji;
@@ -6061,7 +6061,7 @@ function endRaidFight(win) {
 // PUNCH_DUMMY_HP만큼 다시 채우고 초과분을 punchDealtOverflow에 누적하는 방식으로 처리한다.
 const PUNCH_TIME_LIMIT = 120;
 const PUNCH_DUMMY_HP = 1e90; // fmt() 표기로 "1z" — 1e309부터는 JS 배정도 실수 범위를 넘어 Infinity가 되므로(fmt()의 자릿수 계산이 무한루프에 빠짐), 안전하게 표현 가능한 선에서 최대한 크게 잡은 값
-let punchDealtOverflow = 0;
+let punchDealtOverflow = BN.from(0);
 function startPunchFight() {
   if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
@@ -6070,11 +6070,11 @@ function startPunchFight() {
   bossFight.isPunch = true;
   bossFight.timeLeft = PUNCH_TIME_LIMIT + weaponBossTimeBonus(getEquipped());
   mon.unique = false;
-  mon.maxHp = PUNCH_DUMMY_HP;
-  mon.hp = PUNCH_DUMMY_HP;
+  mon.maxHp = BN.from(PUNCH_DUMMY_HP);
+  mon.hp = BN.from(PUNCH_DUMMY_HP);
   mon.dead = false;
   mon.atkTimer = 0;
-  punchDealtOverflow = 0;
+  punchDealtOverflow = BN.from(0);
   fx.executionerReady = true;
   triggerFightStartSpirits();
   $('punchMonEmoji').textContent = '🥊';
@@ -6086,7 +6086,7 @@ function startPunchFight() {
   renderBossBtn(); renderHP(); renderPunchBox(); save();
 }
 function endPunchFight() {
-  const dealt = punchDealtOverflow + Math.max(0, PUNCH_DUMMY_HP - mon.hp);
+  const dealt = BN.add(punchDealtOverflow, BN.max(0, BN.sub(PUNCH_DUMMY_HP, mon.hp)));
   const isRecord = BN.gt(dealt, S.punch.best);
   S.punch.last = BN.from(dealt);
   if (isRecord) S.punch.best = BN.from(dealt);
@@ -7762,22 +7762,25 @@ function renderUniqueName() {
   }
 }
 
+function hpBarPct() {
+  return BN.eq(mon.maxHp, 0) ? 0 : BN.toNumber(BN.div(mon.hp, mon.maxHp)) * 100;
+}
 function renderRaidBattleHP() {
-  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
-  $('raidHpBar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  mon.hp = BN.max(0, BN.min(mon.hp, mon.maxHp));
+  $('raidHpBar').style.width = hpBarPct() + '%';
   $('raidHpText').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
   $('raidTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
 }
 function renderPunchBattleHP() {
-  const dealt = Math.max(0, PUNCH_DUMMY_HP - mon.hp);
+  const dealt = BN.max(0, BN.sub(PUNCH_DUMMY_HP, mon.hp));
   const elapsed = Math.max(0, PUNCH_TIME_LIMIT - bossFight.timeLeft);
   $('punchHpBar').style.width = Math.min(100, (elapsed / PUNCH_TIME_LIMIT) * 100) + '%';
   $('punchHpText').textContent = `누적 데미지 ${fmt(dealt)}`;
   $('punchTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
 }
 function renderLibraryBattleHP() {
-  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
-  $('libraryHpBar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  mon.hp = BN.max(0, BN.min(mon.hp, mon.maxHp));
+  $('libraryHpBar').style.width = hpBarPct() + '%';
   $('libraryHpText').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
   $('libraryTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
 }
@@ -7785,15 +7788,15 @@ function renderHP() {
   if (bossFight.active && bossFight.isRaid) { renderRaidBattleHP(); return; }
   if (bossFight.active && bossFight.isPunch) { renderPunchBattleHP(); return; }
   if (bossFight.active && bossFight.isLibrary) { renderLibraryBattleHP(); return; }
-  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
-  $('hpbar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  mon.hp = BN.max(0, BN.min(mon.hp, mon.maxHp));
+  $('hpbar').style.width = hpBarPct() + '%';
   $('hptext').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
 }
 
 function renderFloorUI() {
   const F = FLOORS[S.floor];
-  mon.hp = Math.max(0, Math.min(mon.hp, mon.maxHp));
-  $('hpbar').style.width = (mon.maxHp ? (mon.hp / mon.maxHp * 100) : 0) + '%';
+  mon.hp = BN.max(0, BN.min(mon.hp, mon.maxHp));
+  $('hpbar').style.width = hpBarPct() + '%';
   $('hptext').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
   const k = S.kills[S.floor] || 0;
   const need = S.floor + 1 < FLOOR_CAP ? FLOOR.unlockKills : null;

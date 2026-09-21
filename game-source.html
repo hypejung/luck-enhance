@@ -5153,6 +5153,15 @@ function handleKill(chainDepth) {
   const flashId = bossFight.isRaid ? 'raidMonEmoji' : bossFight.isPunch ? 'punchMonEmoji' : bossFight.isLibrary ? 'libraryMonEmoji' : 'monemoji';
   const flashEl = $(flashId);
   if (flashEl) { flashEl.classList.add('flash'); setTimeout(() => flashEl.classList.remove('flash'), 400); }
+  // 펀치기계 더미는 "처치"되면 안 된다 — 태초 무기 등 극단적으로 강한 세팅이면 실제로
+  // PUNCH_DUMMY_HP를 다 깎을 수 있는데, 그걸 일반 보스 처치로 처리해버리면 120초를 다 채우지
+  // 못하고 측정이 조기 종료된다. 초과분을 punchDealtOverflow에 누적하고 체력을 다시 채운 뒤
+  // 'boss'가 아닌 값을 반환해 호출부의 `=== 'boss'` 체크를 자연스럽게 통과시킨다.
+  if (bossFight.active && bossFight.isPunch) {
+    punchDealtOverflow += -mon.hp;
+    mon.hp = PUNCH_DUMMY_HP;
+    return 'punch';
+  }
   if (bossFight.active) {
     endBossFight(true);
     return 'boss';
@@ -5935,11 +5944,16 @@ function endRaidFight(win) {
 
 // ---------- 펀치기계 (연습용 딜 측정) ----------
 // 무한(사실상) 체력의 더미를 상대로 120초간 실제로 들어간 누적 데미지를 측정한다.
-// "보스" 취급이라 보스 데미지 보정이 그대로 반영되며, 체력이 절대 0이 되지 않으므로
-// handleKill()이 호출되지 않아 골드/재료/드롭 등 파밍 요소는 발생하지 않는다(순수 측정용).
-// 토벌전 도전 전 딜 점검용으로도 쓸 수 있도록 횟수 제한 없이 언제든 반복 가능하다.
+// "보스" 취급이라 보스 데미지 보정이 그대로 반영되며, 골드/재료/드롭 등 파밍 요소는
+// 발생하지 않는다(순수 측정용). 토벌전 도전 전 딜 점검용으로도 쓸 수 있도록 횟수 제한
+// 없이 언제든 반복 가능하다.
+// 태초 무기 등 극단적으로 강한 세팅에서는 실제로 PUNCH_DUMMY_HP를 다 깎아버릴 수 있는데,
+// 이때 handleKill()이 일반 "보스 처치" 취급을 해버리면(endBossFight) 120초를 다 채우지
+// 못하고 측정이 조기 종료돼버린다 — handleKill()에서 isPunch만 별도로 걸러내 더미 체력을
+// PUNCH_DUMMY_HP만큼 다시 채우고 초과분을 punchDealtOverflow에 누적하는 방식으로 처리한다.
 const PUNCH_TIME_LIMIT = 120;
 const PUNCH_DUMMY_HP = 1e18;
+let punchDealtOverflow = 0;
 function startPunchFight() {
   if (bossFight.active) { log('이미 전투가 진행 중입니다.', 'lg-bad'); return; }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
@@ -5952,6 +5966,7 @@ function startPunchFight() {
   mon.hp = PUNCH_DUMMY_HP;
   mon.dead = false;
   mon.atkTimer = 0;
+  punchDealtOverflow = 0;
   fx.executionerReady = true;
   triggerFightStartSpirits();
   $('punchMonEmoji').textContent = '🥊';
@@ -5963,7 +5978,7 @@ function startPunchFight() {
   renderBossBtn(); renderHP(); renderPunchBox(); save();
 }
 function endPunchFight() {
-  const dealt = Math.max(0, PUNCH_DUMMY_HP - mon.hp);
+  const dealt = punchDealtOverflow + Math.max(0, PUNCH_DUMMY_HP - mon.hp);
   const isRecord = dealt > S.punch.best;
   S.punch.last = dealt;
   if (isRecord) S.punch.best = dealt;

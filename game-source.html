@@ -448,7 +448,7 @@
       <span class="stat" id="dpsshow">DPS 0</span>
     </div>
   </div>
-  <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! 9/20 09:00~9/21 09:00 단 하루, 강화 성공률 UP · 파괴/하락 확률 DOWN · 비용 대폭 할인! 🌟✨</div>
+  <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! 9/20 하루(자정~자정), 강화 성공률 UP · 파괴/하락 확률 DOWN · 비용 대폭 할인! 🌟✨</div>
 
   <div id="tabs">
     <div class="tabgroup" data-group="combat">
@@ -2268,19 +2268,18 @@ function rollAncientSeal(stage) {
   }
 }
 function todayKey() {
-  // 토벌전 초기화 시각을 자정이 아닌 오전 9시로 고정 — 9시간을 당겨서 날짜를 계산하면
-  // 09:00 이전은 "전날"로, 09:00 이후는 "오늘"로 자연스럽게 떨어진다.
-  const d = new Date(Date.now() - 9 * 3600 * 1000);
+  // 일일 콘텐츠 초기화 시각 = 기기 로컬 자정(00:00). 보정 없이 로컬 날짜를 그대로 키로 쓴다.
+  const d = new Date();
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
 
-// ---------- 이벤트: 강화데이 (샤이닝스타포스데이 컨셉, 09시~다음날 09시 하루) ----------
-// 서버 없는 정적 사이트라 실시간 토글은 불가능 — todayKey()(위와 같은 "오전 9시 기준
+// ---------- 이벤트: 강화데이 (샤이닝스타포스데이 컨셉, 로컬 자정~다음날 자정 하루) ----------
+// 서버 없는 정적 사이트라 실시간 토글은 불가능 — todayKey()(위와 같은 "로컬 자정 기준
 // 하루" 계산)와 비교할 날짜를 미리 코드에 박아넣고 배포하는 방식. 이벤트를 또 열 때는
 // 이 배열에 날짜(YYYYMMDD)만 추가해서 재배포하면 된다.
 // (RUNE_BOXES 등 일부 데이터가 모듈 로드 시점에 enhanceCost()를 미리 호출하므로, 이 블록은
 // todayKey() 바로 다음, 그런 이른 호출들보다 반드시 앞에 위치해야 한다.)
-const ENHANCE_EVENT_DATES = [20260920]; // 2026-09-20 09:00 ~ 09-21 09:00
+const ENHANCE_EVENT_DATES = [20260920]; // 2026-09-20 00:00 ~ 09-21 00:00 (로컬)
 function enhanceEventActive() { return ENHANCE_EVENT_DATES.includes(todayKey()); }
 const ENHANCE_EVENT = {
   mainSuccessCap: 23, mainSuccessValue: 5,  // 메인: ENH_BONUS_SOURCES와 같은 방식(23강 기준 +5%p)
@@ -2361,10 +2360,10 @@ function libraryHp(depth) { return Math.round(raidHp(LIBRARY.baseHpStage) * Math
 function libraryEssenceReward(depth) { return Math.round(LIBRARY.baseEssence * Math.pow(LIBRARY.rewardGrowth, depth)); }
 function libraryAwakenReward(depth) { return Math.round(LIBRARY.baseAwaken * Math.pow(LIBRARY.rewardGrowth, depth)); }
 function weekKey() {
-  // 토벌전과 같은 09:00 기준 날짜 계산 후, 일수를 7로 나눠 "주" 단위로 묶는다(정확한 달력
-  // 주 정렬보다는 "7일마다 바뀌는 안정적인 정수"면 충분).
-  const d = new Date(Date.now() - 9 * 3600 * 1000);
-  const dayIndex = Math.floor(d.getTime() / 86400000);
+  // 로컬 자정 기준 날짜를 일수로 환산한 뒤, 7로 나눠 "주" 단위로 묶는다(정확한 달력
+  // 주 정렬보다는 "7일마다 로컬 자정에 바뀌는 안정적인 정수"면 충분).
+  const d = new Date();
+  const dayIndex = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
   return Math.floor(dayIndex / 7);
 }
 function libraryEnsureWeek() {

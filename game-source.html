@@ -2788,7 +2788,42 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: 0.7,
     uniqueSkill: { key: 'wapaq', name: '왓팍의 자손과 군락의 일격' },
   },
-  null, null, null, null, null, null, null,
+  { // floor 3 — 숲깊은곳 — 들늑대
+    id: 'tiangou',
+    floor: 3,
+    type: 'weapon',
+    name: '천구의 월아(月牙)',
+    subtitle: 'Tiangou, Herald of the Waning Moon',
+    icon: '🌘',
+    art: 'assets/artifacts/tiangou_fang.svg',
+    lore: `보름달이 뜨는 밤이면, 하늘에 붉은 이빨자국이 새겨진다고 했다.
+
+사람들은 그것을 그저 달무리라 여겼다. 아무도 그 이빨의 주인을 본 적이 없었으므로.
+
+늑대 무리는 달이 가장 밝은 밤을 두려워했다. 자신들보다 먼저 사냥을 시작하는 것이 있다는 걸 알았기 때문이다.
+
+그것은 배가 고파서 사냥하지 않았다. 그저 그 밤 동안, 얼마나 많은 피를 흘리게 할 수 있는지 헤아릴 뿐이었다.
+
+밤이 깊어질수록 그 헤아림은 쌓여갔다. 상처는 상처를 부르고, 비명은 비명을 덧그렸다.
+
+그리고 달이 기울기 시작하는 순간, 쌓아온 모든 것이 한꺼번에 돌아왔다.
+
+그 밤 흘린 피가 전부, 단 한 번의 아가리에 되삼켜졌다.
+
+살아남은 자들은 하늘을 올려다보며 그 존재를 불렀다. 달을 갉아먹는 것.
+
+천구(天狗).
+
+밤마다 헤아리고, 달이 기울 때 거두어가는 자.`,
+    effectsText: [
+      '만월의 사냥: 달이 차오르는 밤이면, 잠시 짐승의 본능이 폭발한다.',
+      '되삼킨 상처: 그 밤 새긴 모든 상처는, 달이 기울 때 한꺼번에 되돌아온다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'tiangou', name: '만월의 사냥과 되삼킨 상처' },
+  },
+  null, null, null, null, null, null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -2925,6 +2960,43 @@ function wapaqStrike(w) {
   if (stacks <= 0) return;
   dealMonDamage(weaponAtk(w) * WAPAQ.hitPct * stacks);
   floatText(`🍄 군락의 일격 x${stacks}`);
+}
+
+// ---------- 천구(태초 무기) 전용 전투 효과 ----------
+// 만월의 사냥: 일정 주기마다 "만월"이 뜬다 — 그 동안 공격력이 대폭 상승한다(weaponAtk()의
+// tiangouAtkBonusPct() 배율로 반영). 되삼킨 상처: 만월이 지속되는 동안 입힌 모든 피해를
+// dealMonDamage() 훅에서 누적했다가, 만월이 끝나는 순간 누적된 피해량 전부를 추가 고정
+// 피해로 한 번에 터뜨린다. 사냥터에서는 대상이 바뀌어도 리셋되지 않고(사냥 전체에 걸쳐
+// 독립적으로 도는 주기), 보스전·토벌전·도서관·펀치기계처럼 완전히 새로운 전투가 시작될
+// 때만 처음부터 다시 돈다(resetTimedStacks() 참고).
+const TIANGOU = {
+  interval: 12,  // 만월 발동 주기(초)
+  duration: 5,   // 만월 지속시간(초)
+  atkMult: 6.3,  // 만월 동안 공격력 배율(기본 대비 +530%) — 펀치기계 측정 기준 카마소츠 대비 약 104%
+  burstPct: 2.1, // 만월 종료 시 누적 피해량의 몇 배를 폭발 피해로 전환
+};
+function tiangouAtkBonusPct() {
+  if (!hasGenesisEquipped('tiangou')) return 0;
+  return (fx.tiangouUntil && Date.now() < fx.tiangouUntil) ? (TIANGOU.atkMult - 1) : 0;
+}
+function tiangouTick(now) {
+  if (!hasGenesisEquipped('tiangou')) return;
+  if (!fx.tiangouNext) fx.tiangouNext = now + TIANGOU.interval * 1000;
+  if (now >= fx.tiangouNext) {
+    fx.tiangouNext = now + TIANGOU.interval * 1000;
+    fx.tiangouUntil = now + TIANGOU.duration * 1000;
+    fx.tiangouAccum = 0;
+    floatText('🌕 만월!');
+  }
+  if (fx.tiangouUntil && now >= fx.tiangouUntil) {
+    const accum = fx.tiangouAccum || 0;
+    fx.tiangouUntil = 0;
+    fx.tiangouAccum = 0;
+    if (accum > 0) {
+      dealMonDamage(accum * TIANGOU.burstPct);
+      floatText('🌑 되삼킨 상처!');
+    }
+  }
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -3718,7 +3790,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct());
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct());
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -4568,6 +4640,10 @@ const mon = { hp: BN.from(0), maxHp: BN.from(0), atkTimer: 0, spawnTimer: 0, dea
 // 총합을 갖는다.
 function dealMonDamage(amount) {
   if (bossFight.active && bossFight.isPunch) punchDealtOverflow = BN.add(punchDealtOverflow, amount);
+  // 천구(태초의 유물): 만월이 떠있는 동안 입힌 모든 피해를 누적(다른 무기로 바꾸면 더 이상 쌓이지 않음)
+  if (fx.tiangouUntil && Date.now() < fx.tiangouUntil && hasGenesisEquipped('tiangou')) {
+    fx.tiangouAccum = (fx.tiangouAccum || 0) + amount;
+  }
   mon.hp = BN.sub(mon.hp, amount);
 }
 
@@ -5506,6 +5582,8 @@ function tick(dt) {
   }
   // 왓팍의 기생낭(태초의 유물): 전투가 이어지는 동안 주기적으로 분신 스택 증가(상한 없음)
   wapaqGrow(nowDecay);
+  // 천구의 월아(태초의 유물): 주기적으로 만월 발동/종료 체크
+  tiangouTick(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -6028,6 +6106,9 @@ function resetTimedStacks() {
   fx.camazotzStacks = 0;
   fx.wapaqStacks = 0;
   fx.wapaqNext = 0;
+  fx.tiangouNext = 0;
+  fx.tiangouUntil = 0;
+  fx.tiangouAccum = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

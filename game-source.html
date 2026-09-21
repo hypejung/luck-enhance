@@ -2740,7 +2740,46 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'camazotz', name: '천 개의 메아리와 공진 파쇄' },
   },
-  null, null, null, null, null, null, null, null,
+  { // floor 2 — 숲길 — 독버섯
+    id: 'wapaq',
+    floor: 2,
+    type: 'weapon',
+    name: '왓팍의 기생낭',
+    subtitle: 'Wapaq, the Unburied',
+    icon: '🍄',
+    art: 'assets/artifacts/wapaq_pouch.svg',
+    lore: `북녘 설원 끝자락, 아무도 다시 돌아오지 않는 땅이 있었다.
+
+그곳엔 붉은 갓을 인 버섯이 자란다고 했다.
+
+사냥꾼들은 그 버섯을 몰랐던 것이 아니다. 다만 배가 고팠을 뿐이다.
+
+버섯을 삼킨 자는 허기를 잊었다. 대신 살갗 아래에서 무언가 자라나는 소리를 들었다.
+
+포자는 피를 타고 흘러 뼈에 뿌리를 내렸다. 심장이 멎어도 자라나는 것은 멈추지 않았다.
+
+죽은 몸은 눕지 못했다. 갈라진 등에서 새로운 갓이 부풀어 올라, 그 몸을 다시 일으켜 세웠기 때문이다.
+
+하나였던 사냥꾼이 눈을 뜨자, 그 곁에는 이미 자신과 같은 얼굴을 한 것들이 서 있었다.
+
+둘이, 셋이, 결국 셀 수 없이.
+
+살아있는 것은 아무도 없었다. 다만 버섯이, 죽은 이들의 몸을 빌려 계속 움직이고 있을 뿐.
+
+사람들은 그 무리를 이끄는 것에 이름을 붙였다. 삼킨 것을 결코 놓아주지 않는 자.
+
+왓팍(Wapaq).
+
+하나로 죽고, 여럿으로 일어서는 자.`,
+    effectsText: [
+      '왓팍의 자손: 한 번 삼켜진 것은 홀로 눕지 못하고, 곁에서 다시 일어선다.',
+      '군락의 일격: 죽어서도 멈추지 않는 모든 손이, 단 한 번의 휘두름에도 함께 검을 든다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: 0.7,
+    uniqueSkill: { key: 'wapaq', name: '왓팍의 자손과 군락의 일격' },
+  },
+  null, null, null, null, null, null, null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -2847,6 +2886,36 @@ function camazotzResonance(w) {
     mon.hp = BN.from(0);
   }
   floatText('🔊 공진 파쇄!');
+}
+
+// ---------- 왓팍(태초 무기) 전용 전투 효과 ----------
+// 왓팍의 자손: 전투가 이어지는 동안 일정 주기마다 분신 스택이 1씩 늘어난다(상한 없음).
+// 이 스택은 "지금 이 전투" 한정이라 대상이 바뀌거나 새 전투(보스전·토벌전·도서관·펀치기계)가
+// 시작되면 0부터 다시 쌓인다. 군락의 일격: 공격할 때마다 그 시점의 분신 수만큼 확정 연타가
+// 함께 발동한다(치명타/연타 판정과 무관하게 항상 적중). 무기 자체의 기본 공격력은 다른
+// 태초 대비 낮게 잡혀 있다(dmgMultOverride 0.7) — 분신이 쌓이기 전까지는 약하지만, 전투가
+// 길어질수록 급격히 강해지는 트레이드오프.
+// 펀치기계(120초, +26강) 측정으로 조정: growInterval=3/hitPct=0.5가 카마소츠와 거의 동률
+// (약 101.5%)이 나와 최종값으로 확정. 카마소츠는 매 공격 확정으로 강한 반면, 왓팍은 짧은
+// 전투에선 약하다가 120초 풀타임을 채우면 같은 급으로 따라잡는 구조.
+const WAPAQ = {
+  growInterval: 3,  // 분신 증식 주기(초)
+  hitPct: 0.5,      // 분신 1개당 확정 연타 피해 = 무기 공격력의 50%
+};
+function wapaqGrow(now) {
+  if (!hasGenesisEquipped('wapaq')) return;
+  if (!fx.wapaqNext) fx.wapaqNext = now + WAPAQ.growInterval * 1000;
+  if (now >= fx.wapaqNext) {
+    fx.wapaqNext = now + WAPAQ.growInterval * 1000;
+    fx.wapaqStacks = (fx.wapaqStacks || 0) + 1;
+  }
+}
+function wapaqStrike(w) {
+  if (!hasGenesisEquipped('wapaq')) return;
+  const stacks = fx.wapaqStacks || 0;
+  if (stacks <= 0) return;
+  dealMonDamage(weaponAtk(w) * WAPAQ.hitPct * stacks);
+  floatText(`🍄 군락의 일격 x${stacks}`);
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4515,6 +4584,8 @@ function spawnMonster() {
   if (eqw && weaponSpecialCount(eqw, 'mortalRune') > 0) { fx.mortalStacks = 0; fx.mortalNext = 0; }
   // 카마소츠의 조종(태초의 유물): 대상이 바뀌면 공진 스택 초기화
   if (eqw && hasGenesisEquipped('camazotz')) fx.camazotzStacks = 0;
+  // 왓팍의 기생낭(태초의 유물): 대상이 바뀌면 분신 스택 초기화
+  if (eqw && hasGenesisEquipped('wapaq')) { fx.wapaqStacks = 0; fx.wapaqNext = 0; }
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -5420,6 +5491,8 @@ function tick(dt) {
       floatText('😈 위험한 서약!');
     }
   }
+  // 왓팍의 기생낭(태초의 유물): 전투가 이어지는 동안 주기적으로 분신 스택 증가(상한 없음)
+  wapaqGrow(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -5826,6 +5899,8 @@ function attack(w) {
   // 카마소츠의 조종(태초의 유물): 매 공격 확정 메아리 연쇄 + 15타마다 공진 파쇄
   camazotzEcho(dmg);
   camazotzResonance(w);
+  // 왓팍의 기생낭(태초의 유물): 매 공격 시 분신 수만큼 확정 연타
+  wapaqStrike(w);
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc');
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -5938,6 +6013,8 @@ function resetTimedStacks() {
   fx.brandUntil = 0;
   fx.causalityEcho = null;
   fx.camazotzStacks = 0;
+  fx.wapaqStacks = 0;
+  fx.wapaqNext = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

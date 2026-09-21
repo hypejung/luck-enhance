@@ -1069,9 +1069,14 @@ function atkLabel(w) { return (w && w.type === '지팡이') ? '마력' : '공격
 // 파괴 확률 테이블 자체를 큰 폭으로 낮춘다(1/4로 축소 — 예전엔 고강화 구간에서 파괴 확률이
 // 82%까지 치솟아 오히려 유지/하락보다 파괴가 더 흔한 결과가 돼버리는 역전 현상이 있었음).
 const ENH_DESTROY_SCALE = 0.25;
+// +20강 이상은 "그 정도 도전할 실력이면 파괴 위험도 그만큼 커져야 한다"는 피드백을 반영해,
+// 위 1/4 축소 대신 +20(8%, 축소판과 동일한 값에서 이어짐)에서 +29(30%)까지 선형으로 올린다.
+const ENH_DESTROY_HIGH_START = 20, ENH_DESTROY_HIGH_START_PCT = 8, ENH_DESTROY_HIGH_END_PCT = 30;
 function effectiveDestroyChance(w) {
   if (isGenesisWeapon(w)) return 0; // 태초 무기는 파괴되지 않는다 (실패 시 유지 또는 하락뿐)
-  const base = (ENH.destroy[w.enhance] || 0) * ENH_DESTROY_SCALE;
+  const base = w.enhance >= ENH_DESTROY_HIGH_START
+    ? ENH_DESTROY_HIGH_START_PCT + (w.enhance - ENH_DESTROY_HIGH_START) * (ENH_DESTROY_HIGH_END_PCT - ENH_DESTROY_HIGH_START_PCT) / (ENH.maxLevel - 1 - ENH_DESTROY_HIGH_START)
+    : (ENH.destroy[w.enhance] || 0) * ENH_DESTROY_SCALE;
   // destroyReduce는 다른 %p 스탯(enh/critChance/critDamage 등)과 동일하게 "%p 차감"이어야
   // 하는데, 예전엔 비율 곱연산(base*(1-reduce))으로 새고 있었다. %p 차감으로 고치되, 저강화
   // 구간이 통째로 0%가 되지 않도록 소스 수치 자체를 낮게 재설계했다(신화까지 합계 8%p로,
@@ -8010,11 +8015,14 @@ function renderEnhance() {
   const cost = maxed ? 0 : enhanceCost(w);
   const chance = maxed ? 0 : Math.min(100, (isGenesisWeapon(w) ? genesisSuccessChance(w.enhance) : gradeAdjustedSuccess(w.grade, w.enhance)) + enhTierBonus(w.enhance));
   const dChance = maxed ? 0 : effectiveDestroyChance(w);
-  // 하락 확률(실패했는데 파괴/초기화에도 안 걸렸을 때, 단계가 유지되지 않고 -1될 확률) — 기존엔
-  // "성공 확률"만 크게 보이고 이 수치가 화면에 없어서, 실패 시 체감 손실이 왜 이렇게 큰지
-  // 플레이어가 가늠하기 어렵다는 피드백을 반영해 표시한다. resolveEnhance()의 baseStayChance(0.65,
-  // 일반 강화 기준)와 동일한 공식을 그대로 재사용(유지 65% / 하락 35%).
-  const downgradeChance = maxed ? 0 : Math.round(35 * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
+  // 하락 확률(실패한 시도 전체 중, 단계가 유지되지 않고 -1될 확률) — 기존엔 "성공 확률"만 크게
+  // 보이고 이 수치가 화면에 없어서, 실패 시 체감 손실이 왜 이렇게 큰지 플레이어가 가늠하기
+  // 어렵다는 피드백을 반영해 표시한다. resolveEnhance()와 동일하게 "파괴/초기화가 아닌 실패"
+  // 몫((100-dChance)%)에 유지/하락 비율(0.65/0.35)을 곱해야 한다 — dChance가 커지는 고강화
+  // 구간(+20강 이상)에서 파괴 확률이 하락 확률의 분모(=파괴가 아닌 실패 몫)를 갉아먹는 걸
+  // 반영하지 않고 그냥 35%를 고정 표시하면, 파괴 확률과 서로 다른 기준(분모)이라 두 수치를
+  // 나란히 비교할 수 없어 오해를 준다(둘 다 "실패 전체 대비 %"로 통일).
+  const downgradeChance = maxed ? 0 : Math.round((100 - dChance) * 0.35 * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
   const matSt = highMatStatus(w.grade, matNeed);
   const matOk = matSt.ok;

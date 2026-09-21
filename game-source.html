@@ -755,7 +755,9 @@
 
   <!-- 도박장 -->
   <div id="tab-gamble" style="display:none">
-    <div class="panel">
+    <div id="gambleSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;"></div>
+
+    <div id="gambleRouletteBox" class="panel">
       <h3>🎲 골드 도박장</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
         테이블마다 최소 금액이 다릅니다. 걸은 골드가 <b style="color:#ff7a7a">전부 날아가거나</b> <b style="color:var(--gold)">순삭을 넘어 대박</b>이 날 수 있습니다.
@@ -770,6 +772,57 @@
         <button data-bet="1">올인 🔥</button>
       </div>
       <div id="gamblog" style="font-size:13px; color:var(--sub); min-height:20px; text-align:center;"></div>
+    </div>
+
+    <div id="gambleHiloBox" class="panel" style="display:none">
+      <h3>🪜 하이로우 사다리</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
+        라운드마다 성공하면 배당이 곱연산으로 불어납니다. 실패하면 건 돈을 전부 잃습니다 — 언제든 회수할 수 있어요.
+      </div>
+      <div id="hiloLadderView" style="margin-bottom:8px;"></div>
+      <div id="hiloStartBtns">
+        <button data-bet="0.1">10% 걸고 시작</button>
+        <button data-bet="0.25">25% 걸고 시작</button>
+        <button data-bet="0.5">50% 걸고 시작</button>
+        <button data-bet="1">올인 🔥</button>
+      </div>
+      <div id="hiloActionBtns" style="display:none; gap:8px;">
+        <button id="hiloContinueBtn" class="primary" style="flex:1;">⬆️ 계속 도전</button>
+        <button id="hiloCashoutBtn" class="danger" style="flex:1;">💰 회수하기</button>
+      </div>
+    </div>
+
+    <div id="gambleSlotBox" class="panel" style="display:none">
+      <h3>🎰 등급 슬롯머신</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
+        3개의 릴에 같은 등급 심볼이 몇 개 모이는지에 따라 배당이 달라집니다. 태초 심볼 3연속은 초레어 잭팟!
+      </div>
+      <div id="slotReelsView" style="margin-bottom:8px;"></div>
+      <div id="slotResult" style="margin-bottom:8px;"></div>
+      <div id="slotBetBtns">
+        <button data-bet="0.1">10% 걸기</button>
+        <button data-bet="0.25">25% 걸기</button>
+        <button data-bet="0.5">50% 걸기</button>
+        <button data-bet="1">올인 🔥</button>
+      </div>
+      <div id="slotPayoutTable" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="gambleDiceBox" class="panel" style="display:none">
+      <h3>🎲 주사위 베팅</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
+        주사위 3개를 굴려 선택한 베팅 종류로 판정합니다. 트리플이 나오면 홀/짝 베팅은 무조건 실패 처리됩니다.
+      </div>
+      <div id="diceView" style="margin-bottom:8px;"></div>
+      <div id="diceBetTypeBtns" style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
+      <div id="diceTripleNumBtns" style="display:none; gap:6px; flex-wrap:wrap; margin-bottom:8px;"></div>
+      <div id="diceResult" style="margin-bottom:8px;"></div>
+      <div id="diceBetBtns">
+        <button data-bet="0.1">10% 걸기</button>
+        <button data-bet="0.25">25% 걸기</button>
+        <button data-bet="0.5">50% 걸기</button>
+        <button data-bet="1">올인 🔥</button>
+      </div>
     </div>
   </div>
 
@@ -3292,6 +3345,42 @@ function gambleMaxLabel(i) {
   const m = gambleMax(i);
   return m === Infinity ? '무제한' : `${fmt(m)} 골드`;
 }
+
+// ---------- 도박장: 하이로우 사다리 배팅 ----------
+// 라운드가 진행될수록 성공확률은 낮아지고 배당은 커지는데, 매 라운드의 기대값(성공확률×배당)이
+// 항상 1보다 작게 설계되어 있어(0.91→0.88→0.80→0.75→0.60) 어느 시점에 회수하든 기대값은 마이너스.
+const HILO_LADDER = [
+  { chance: 0.70, mult: 1.3 },
+  { chance: 0.55, mult: 1.6 },
+  { chance: 0.40, mult: 2.0 },
+  { chance: 0.25, mult: 3.0 },
+  { chance: 0.10, mult: 6.0 },
+];
+
+// ---------- 도박장: 등급 심볼 슬롯머신 ----------
+// 3릴 독립 추첨(릴당 확률 동일). 위 8개 확률(합 100)과 배당을 기준으로 계산한 전체 기대수익률은
+// 약 91%(하우스엣지 약 -9%)로, 기존 배율 베팅 테이블(-7.5%)과 비슷한 수준.
+const SLOT_SYMBOLS = [
+  { key: 'normal',  label: '일반',     icon: '⚪', weight: 45,   mult3: 3 },
+  { key: 'rare',    label: '레어',     icon: '🔵', weight: 25,   mult3: 5 },
+  { key: 'epic',    label: '에픽',     icon: '🟣', weight: 15,   mult3: 10 },
+  { key: 'unique',  label: '유니크',   icon: '🟠', weight: 8,    mult3: 25 },
+  { key: 'legend',  label: '레전더리', icon: '🟡', weight: 4.5,  mult3: 60 },
+  { key: 'myth',    label: '신화',     icon: '🔴', weight: 2,    mult3: 150 },
+  { key: 'ancient', label: '고대',     icon: '🟢', weight: 0.45, mult3: 500 },
+  { key: 'genesis', label: '태초',     icon: '🌈', weight: 0.05, mult3: 3000 },
+];
+const SLOT_TWO_MATCH_MULT = 0.9; // 2개만 일치해도 배팅액의 90%는 돌려받는 "아쉬운 결과"
+
+// ---------- 도박장: 주사위 베팅(식보식) ----------
+// 트리플이 나오면 홀/짝 베팅은 무조건 패배 처리(실제 식보 하우스엣지 확보 규칙과 동일)
+const DICE_BET_TYPES = {
+  odd:    { label: '홀',        mult: 1.9,  desc: '합계가 홀수 (트리플 시 무조건 패배)' },
+  even:   { label: '짝',        mult: 1.9,  desc: '합계가 짝수 (트리플 시 무조건 패배)' },
+  sum10:  { label: '합계 10',   mult: 6,    desc: '세 주사위 합이 정확히 10' },
+  sum11:  { label: '합계 11',   mult: 6,    desc: '세 주사위 합이 정확히 11' },
+  triple: { label: '트리플',    mult: 180,  desc: '지정한 숫자로 3개 모두 같은 눈' },
+};
 
 /* ===================== 게임 상태 ===================== */
 let S = null;   // state
@@ -6536,8 +6625,26 @@ function gamble(ratio) {
   save();
 }
 
+// 도박장 서브탭(배율 베팅/하이로우/슬롯머신/주사위) 전환
+const GAMBLE_SUBTABS = [
+  { v: 'roulette', label: '🎲 배율 베팅' },
+  { v: 'hilo', label: '🪜 하이로우' },
+  { v: 'slot', label: '🎰 슬롯머신' },
+  { v: 'dice', label: '🎲 주사위' },
+];
+function renderGambleSubTabs() {
+  renderEquipSubTabBar('gambleSubTabBar', gambleSubTab, (v) => { gambleSubTab = v; renderGambleSubTabs(); }, GAMBLE_SUBTABS);
+  $('gambleRouletteBox').style.display = gambleSubTab === 'roulette' ? '' : 'none';
+  $('gambleHiloBox').style.display = gambleSubTab === 'hilo' ? '' : 'none';
+  $('gambleSlotBox').style.display = gambleSubTab === 'slot' ? '' : 'none';
+  $('gambleDiceBox').style.display = gambleSubTab === 'dice' ? '' : 'none';
+}
 // 도박장 테이블 렌더링
 function renderGambleTables() {
+  renderGambleSubTabs();
+  renderHiloBox();
+  renderSlotBox();
+  renderDiceBox();
   const tb = $('tablebtns');
   if (!tb) return;
   tb.innerHTML = '';
@@ -6560,6 +6667,156 @@ function renderGambleTables() {
   });
   const t = GAMBLE_TABLES[S.gambleTable] || GAMBLE_TABLES[0];
   $('tabledesc').innerHTML = `${t.icon} <b>${t.name}</b> — ${t.desc} (최소 도박: <b style="color:var(--gold)">${fmt(t.min)} 골드</b> · 최대 도박: <b style="color:var(--gold)">${gambleMaxLabel(S.gambleTable)}</b>)`;
+}
+
+/* ===================== 도박장: 하이로우 사다리 배팅 ===================== */
+function startHilo(ratio) {
+  if (hiloSession) return; // 이미 진행 중인 세션이 있으면 새로 시작 불가
+  let bet = Math.floor(S.gold * ratio);
+  if (bet > S.gold) bet = S.gold;
+  if (bet < 100) { log('하이로우는 최소 100 골드부터 도전할 수 있습니다.', 'lg-bad'); return; }
+  S.gold -= bet;
+  hiloSession = { bet, pot: bet, round: 0 };
+  log(`🪜 하이로우 시작! ${fmt(bet)} 골드를 걸었습니다.`, 'lg-prim');
+  renderTop(); renderHiloBox(); save();
+}
+function hiloContinue() {
+  if (!hiloSession) return;
+  const r = HILO_LADDER[hiloSession.round];
+  if (!r) return;
+  if (Math.random() < r.chance) {
+    hiloSession.pot *= r.mult;
+    hiloSession.round++;
+    log(`🪜 ${hiloSession.round}라운드 성공! 현재 회수 가능 금액 ${fmt(Math.floor(hiloSession.pot))} 골드`, 'lg-good');
+    if (hiloSession.round >= HILO_LADDER.length) { hiloCashout(); return; } // 전 라운드 성공 시 자동 회수
+    renderHiloBox(); save();
+  } else {
+    log(`💥 하이로우 실패... 걸었던 ${fmt(hiloSession.bet)} 골드를 전부 잃었습니다.`, 'lg-bad');
+    hiloSession = null;
+    renderHiloBox(); save();
+  }
+}
+function hiloCashout() {
+  if (!hiloSession) return;
+  const payout = Math.floor(hiloSession.pot);
+  const isFullClear = hiloSession.round >= HILO_LADDER.length;
+  S.gold += payout;
+  log(`💰 하이로우 회수! ${fmt(hiloSession.bet)} 골드 → <b style="color:var(--gold)">${fmt(payout)}</b> 골드${isFullClear ? ' (전 라운드 클리어!)' : ''}`, isFullClear ? 'lg-gold' : 'lg-good');
+  hiloSession = null;
+  renderTop(); renderHiloBox(); save();
+}
+function renderHiloBox() {
+  const view = $('hiloLadderView');
+  const startBtns = $('hiloStartBtns');
+  const actionBtns = $('hiloActionBtns');
+  if (!view) return;
+  const rows = HILO_LADDER.map((r, i) => {
+    const state = !hiloSession ? 'todo' : i < hiloSession.round ? 'done' : i === hiloSession.round ? 'next' : 'todo';
+    const style = state === 'done' ? 'color:var(--gold)' : state === 'next' ? 'color:var(--text);font-weight:bold' : 'color:var(--sub)';
+    const mark = state === 'done' ? ' ✅' : state === 'next' ? ' ⬅️ 다음 도전' : '';
+    return `<div style="${style};font-size:13px;padding:4px 0;">${i + 1}라운드 · 성공 ${Math.round(r.chance * 100)}% · 배당 ×${r.mult}${mark}</div>`;
+  }).join('');
+  if (!hiloSession) {
+    startBtns.style.display = '';
+    actionBtns.style.display = 'none';
+    view.innerHTML = rows;
+    return;
+  }
+  startBtns.style.display = 'none';
+  actionBtns.style.display = 'flex';
+  view.innerHTML = rows + `<div style="margin-top:8px;font-size:14px;">배팅액 <b>${fmt(hiloSession.bet)}</b> → 현재 회수 가능 금액 <b style="color:var(--gold)">${fmt(Math.floor(hiloSession.pot))}</b></div>`;
+  const next = HILO_LADDER[hiloSession.round];
+  $('hiloContinueBtn').textContent = next ? `⬆️ 계속 도전 (성공 ${Math.round(next.chance * 100)}%, ×${next.mult})` : '⬆️ 계속 도전';
+}
+
+/* ===================== 도박장: 등급 심볼 슬롯머신 ===================== */
+function spinSlot(ratio) {
+  let bet = Math.floor(S.gold * ratio);
+  if (bet > S.gold) bet = S.gold;
+  if (bet < 100) { log('슬롯머신은 최소 100 골드부터 배팅할 수 있습니다.', 'lg-bad'); return; }
+  S.gold -= bet;
+  const pick = () => wrand(SLOT_SYMBOLS.map(s => [s.key, s.weight]));
+  const rolled = [pick(), pick(), pick()];
+  const counts = {};
+  rolled.forEach(k => counts[k] = (counts[k] || 0) + 1);
+  const tripleKey = Object.keys(counts).find(k => counts[k] === 3);
+  const pairKey = Object.keys(counts).find(k => counts[k] === 2);
+  let payout = 0, resultHtml = '';
+  if (tripleKey) {
+    const sym = SLOT_SYMBOLS.find(s => s.key === tripleKey);
+    payout = Math.floor(bet * sym.mult3);
+    resultHtml = `<span style="color:var(--gold)">🎉 ${sym.icon} ${sym.label} 3연속! ×${sym.mult3} (+${fmt(payout)})</span>`;
+    log(`🎰 슬롯 대박! ${sym.label} 3연속 — ${fmt(bet)} 걸고 +${fmt(payout)} 획득`, 'lg-gold');
+  } else if (pairKey) {
+    payout = Math.floor(bet * SLOT_TWO_MATCH_MULT);
+    const diff = payout - bet;
+    resultHtml = `<span style="color:#7de08a">🔸 2개 일치 — ×${SLOT_TWO_MATCH_MULT} (${diff >= 0 ? '+' : ''}${fmt(diff)})</span>`;
+    log(`🎰 슬롯 결과: 2개 일치, ${fmt(bet)} 걸고 ${fmt(payout)} 회수`);
+  } else {
+    resultHtml = `<span style="color:#ff4444">💀 전부 불일치 — 전액 손실 (-${fmt(bet)})</span>`;
+    log(`🎰 슬롯 실패... ${fmt(bet)} 골드가 증발했습니다`, 'lg-bad');
+  }
+  S.gold += payout;
+  $('slotReelsView').innerHTML = `<div style="font-size:40px;text-align:center;">${rolled.map(k => SLOT_SYMBOLS.find(s => s.key === k).icon).join(' ')}</div>`;
+  $('slotResult').innerHTML = resultHtml;
+  renderTop(); renderSlotBox(); save();
+}
+function renderSlotBox() {
+  const table = $('slotPayoutTable');
+  if (!table) return;
+  table.innerHTML = `<div style="font-size:12px;color:var(--sub);line-height:1.6;">${SLOT_SYMBOLS.map(s => `${s.icon} ${s.label} 3개 = ×${s.mult3}`).join('<br>')}<br>2개만 일치 = ×${SLOT_TWO_MATCH_MULT}</div>`;
+  const reels = $('slotReelsView');
+  if (reels && !reels.innerHTML) {
+    reels.innerHTML = `<div style="font-size:40px;text-align:center;opacity:.5;">${SLOT_SYMBOLS[0].icon} ${SLOT_SYMBOLS[0].icon} ${SLOT_SYMBOLS[0].icon}</div>`;
+  }
+}
+
+/* ===================== 도박장: 주사위 베팅(식보식) ===================== */
+function rollDice(ratio) {
+  let bet = Math.floor(S.gold * ratio);
+  if (bet > S.gold) bet = S.gold;
+  if (bet < 100) { log('주사위 베팅은 최소 100 골드부터 가능합니다.', 'lg-bad'); return; }
+  S.gold -= bet;
+  const dice = [1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6), 1 + Math.floor(Math.random() * 6)];
+  const sum = dice[0] + dice[1] + dice[2];
+  const isTriple = dice[0] === dice[1] && dice[1] === dice[2];
+  const betType = diceSelectedBetType;
+  const bt = DICE_BET_TYPES[betType];
+  let win = false;
+  if (betType === 'odd') win = !isTriple && sum % 2 === 1;
+  else if (betType === 'even') win = !isTriple && sum % 2 === 0;
+  else if (betType === 'sum10') win = sum === 10;
+  else if (betType === 'sum11') win = sum === 11;
+  else if (betType === 'triple') win = isTriple && dice[0] === diceSelectedTripleNum;
+  const payout = win ? Math.floor(bet * bt.mult) : 0;
+  S.gold += payout;
+  $('diceView').innerHTML = `<div style="font-size:32px;text-align:center;">🎲${dice[0]} 🎲${dice[1]} 🎲${dice[2]} <span style="font-size:16px;color:var(--sub)">(합계 ${sum}${isTriple ? ' · 트리플!' : ''})</span></div>`;
+  const rb = $('diceResult');
+  if (win) {
+    rb.innerHTML = `<span style="color:var(--gold)">🎉 적중! ${bt.label} ×${bt.mult} (+${fmt(payout)})</span>`;
+    log(`🎲 주사위 적중! ${bt.label} — ${fmt(bet)} 걸고 +${fmt(payout)} 획득`, 'lg-gold');
+  } else {
+    const tripleNote = isTriple && (betType === 'odd' || betType === 'even') ? ' (트리플 발생 — 홀/짝 자동 패배)' : '';
+    rb.innerHTML = `<span style="color:#ff4444">💀 실패... (-${fmt(bet)})</span>`;
+    log(`🎲 주사위 실패... ${bt.label} 배팅, ${fmt(bet)} 골드 손실${tripleNote}`, 'lg-bad');
+  }
+  renderTop(); save();
+}
+function renderDiceBox() {
+  const typeBox = $('diceBetTypeBtns');
+  if (!typeBox) return;
+  typeBox.innerHTML = Object.entries(DICE_BET_TYPES).map(([k, t]) => {
+    const on = diceSelectedBetType === k;
+    return `<button data-type="${k}" title="${t.desc}" style="${on ? 'border-color:var(--gold);color:var(--gold);font-weight:bold;' : ''}">${t.label}<br><span style="font-size:11px;color:var(--sub)">×${t.mult}</span></button>`;
+  }).join('');
+  typeBox.querySelectorAll('button').forEach(b => b.onclick = () => { diceSelectedBetType = b.dataset.type; renderDiceBox(); });
+  const tripleBox = $('diceTripleNumBtns');
+  tripleBox.style.display = diceSelectedBetType === 'triple' ? 'flex' : 'none';
+  tripleBox.innerHTML = [1, 2, 3, 4, 5, 6].map(n => {
+    const on = diceSelectedTripleNum === n;
+    return `<button data-n="${n}" style="${on ? 'border-color:var(--gold);color:var(--gold);font-weight:bold;' : ''}">🎲${n}</button>`;
+  }).join('');
+  tripleBox.querySelectorAll('button').forEach(b => b.onclick = () => { diceSelectedTripleNum = parseInt(b.dataset.n); renderDiceBox(); });
 }
 
 // 무기 도감 렌더링 — 등급별로 섹션을 나눠서 표시
@@ -7186,6 +7443,10 @@ function renderFloorBtns() {
 // 탭별로 독립된 선택 상태(예: 강화기는 보조무기를 보고 있어도 가방은 무기를 보고 있을 수
 // 있음)를 유지하기 위해 저장하지 않는 전역 변수 3개로 따로 관리한다(순수 UI 상태라 세이브 불필요).
 let invSubTab = 'weapon', enhSubTab = 'weapon', boxSubTab = 'weapon';
+let gambleSubTab = 'roulette';
+let hiloSession = null; // { bet, pot, round } — 보스전(bossFight)과 동일하게 저장하지 않는 진행 중 세션
+let diceSelectedBetType = 'odd';
+let diceSelectedTripleNum = 1;
 let huntSubTab = null; // null이면 renderFloorBtns()가 현재 층 기준으로 최초 1회 자동 결정
 let accSubTab = 'world1';
 const WORLD_SUBTAB_OPTIONS = [
@@ -8832,6 +9093,11 @@ function init() {
   $('enhBtn').onclick = () => tryEnhance(false);
   // 도박
   document.querySelectorAll('#betbtns button').forEach(b => b.onclick = () => gamble(parseFloat(b.dataset.bet)));
+  document.querySelectorAll('#hiloStartBtns button').forEach(b => b.onclick = () => startHilo(parseFloat(b.dataset.bet)));
+  $('hiloContinueBtn').onclick = hiloContinue;
+  $('hiloCashoutBtn').onclick = hiloCashout;
+  document.querySelectorAll('#slotBetBtns button').forEach(b => b.onclick = () => spinSlot(parseFloat(b.dataset.bet)));
+  document.querySelectorAll('#diceBetBtns button').forEach(b => b.onclick = () => rollDice(parseFloat(b.dataset.bet)));
   $('syncBtn').onclick = syncModalHome;
   $('resetBtn').onclick = () => {
     showConfirmModal('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?', () => {

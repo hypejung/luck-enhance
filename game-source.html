@@ -8004,6 +8004,11 @@ function renderEnhance() {
   const cost = maxed ? 0 : enhanceCost(w);
   const chance = maxed ? 0 : Math.min(100, (isGenesisWeapon(w) ? genesisSuccessChance(w.enhance) : gradeAdjustedSuccess(w.grade, w.enhance)) + enhTierBonus(w.enhance));
   const dChance = maxed ? 0 : effectiveDestroyChance(w);
+  // 하락 확률(실패했는데 파괴/초기화에도 안 걸렸을 때, 단계가 유지되지 않고 -1될 확률) — 기존엔
+  // "성공 확률"만 크게 보이고 이 수치가 화면에 없어서, 실패 시 체감 손실이 왜 이렇게 큰지
+  // 플레이어가 가늠하기 어렵다는 피드백을 반영해 표시한다. resolveEnhance()의 baseStayChance(0.5,
+  // 일반 강화 기준)와 동일한 공식을 그대로 재사용.
+  const downgradeChance = maxed ? 0 : Math.round(50 * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
   const matSt = highMatStatus(w.grade, matNeed);
   const matOk = matSt.ok;
@@ -8041,12 +8046,12 @@ function renderEnhance() {
   $('enhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
     : isFist(w)
-      ? `✊ 맨손은 파괴되지 않습니다. 실패 시: 유지 / 단계 -1 / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
+      ? `✊ 맨손은 파괴되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%)</span> / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''} · 현재 <b>+${w.enhance}</b>`
       : isAncientWeapon(w)
-        ? `🏺 고대 무기는 파괴되지 않습니다. 실패 시: 유지 / 단계 -1 / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''}${matNote} · 현재 <b>+${w.enhance}</b>`
+        ? `🏺 고대 무기는 파괴되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%)</span> / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''}${matNote} · 현재 <b>+${w.enhance}</b>`
         : isGenesisWeapon(w)
-          ? `🌌 태초 무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / 단계 -1 (고급 강화 시 유지 확률 상승)${matNote} · 현재 <b>+${w.enhance}</b>`
-          : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
+          ? `🌌 태초 무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%, 고급 강화 시 유지 확률 상승)</span>${matNote} · 현재 <b>+${w.enhance}</b>`
+          : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderAdvancedEnhance(w, maxed);
   renderAwakening(w, maxed);
   renderAutoEnhance(w, maxed);
@@ -8102,9 +8107,14 @@ function renderAdvancedEnhance(w, maxed) {
   // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대는 "초기화" 확률을,
   // 그 외 등급은 "파괴" 확률을 절반으로 낮춘다는 걸 정확히 표기한다.
   const riskLabel = isGenesisWeapon(w) ? '하락' : isAncientWeapon(w) ? '초기화' : '파괴';
+  // resolveEnhance()의 advanced 분기 공식과 동일하게 계산 — 태초는 baseStayChance 0.75(유지 확률
+  // 상승), 그 외는 dChance*ADVANCED_ENH_DESTROY_MULT(0.5)를 그대로 재사용.
+  const advRiskValue = isGenesisWeapon(w)
+    ? Math.round(25 * enhanceEventDowngradeMult(w.enhance) * 10) / 10
+    : Math.round(effectiveDestroyChance(w) * ADVANCED_ENH_DESTROY_MULT * 10) / 10;
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="advancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
-      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${riskLabel} 확률 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
+      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${riskLabel} 확률 ${advRiskValue}%로 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
     </button>`;
   const btn = $('advancedEnhBtn');
   if (btn) btn.onclick = () => tryEnhance(true);

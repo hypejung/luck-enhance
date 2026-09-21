@@ -2798,11 +2798,15 @@ function hungerStackCount() {
   return Math.min(1000, fx.hungerStackTimes.length);
 }
 function hungerBonusPct() { return hungerStackCount() * 0.005; }
-// 끝없는 허기(B): 보유 골드가 많을수록 공격력 증가 — 선형보다 완만하고 sqrt보다 가파른 지수 0.7, 상한 +10000%.
+// 끝없는 허기(B): 보유 골드가 많을수록 공격력 증가 — 선형보다 완만하고 sqrt보다 가파른 지수 0.7, 상한 +300%.
+// (상한이 원래 100=+10000%였는데, 빅넘버 도입 이후 골드가 사실상 무한히 불어나는 구조라 어느
+// 정도 진행된 계정이면 거의 항상 이 상한에 붙어버려 카마소츠의 조종(약 4.2배 정도 우위였던
+// 저골드 구간과 대비해)보다 최대 24배까지 압도적으로 강해지는 문제가 있었음. 펀치기계 측정으로
+// 재보정: 상한 포화 시 카마소츠와 동급 이하(약 95%)가 되도록 3으로 하향)
 const GENESIS_GOLD_ATK_RATE = 0.01;
 const GENESIS_GOLD_ATK_UNIT = 1e11;
 const GENESIS_GOLD_ATK_EXP = 0.7;
-const GENESIS_GOLD_ATK_CAP = 100;
+const GENESIS_GOLD_ATK_CAP = 3;
 function goldAtkBonusPct() {
   if (!hasGenesisEquipped('gluttony')) return 0;
   // BN.toNumber()은 골드가 배정도 실수 범위를 넘어서면 Infinity를 주는데, 그래도 이후

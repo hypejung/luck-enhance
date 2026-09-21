@@ -3759,12 +3759,16 @@ function gradeAdjustedSuccess(grade, enhance) {
 // 나오지만 기본확률 자체가 이미 높아 min(100,...)에 묻히고, cap보다 높은 단계는 성공확률표 자체가
 // 가속도로 무너지는 형태를 그대로 물려받아 뚝 끊기지 않고 갈수록 가파르게 줄어든다.
 // 획득 난이도가 어려운 소스일수록 cap과 %p 모두 더 높게 배정한다(저주받은성 세트가 최상단).
+// 2026-09-21 재조정: 조합 장신구만 가진 플레이어가 +15강을 넘어서면 보정이 거의 남지 않아
+// 그 이상은 사실상 근접도 못 한다는 피드백을 받아, cap을 전체적으로 소폭 상향(+2강씩)하고
+// 대현자의 금서 %p를 올렸다. 신왕의 태초 인장은 cap은 올리되(22) %p는 낮춰(3) 저주받은성
+// 세트와 cap이 겹쳐도 최상단 소스로서의 위상이 과하지 않도록 재조정.
 const ENH_BONUS_SOURCES = [
   { cap: 22, value: 9, has: () => { const p = codexAncientSetProgress(10); return p.need > 0 && p.have >= p.need; } }, // 도감: 저주받은성 세트 (획득 최난도)
-  { cap: 20, value: 5, has: () => S.bossAccs.includes(19) },                  // 신왕의 태초 인장 (20층 보스장신구)
-  { cap: 18, value: 4, has: () => S.bossAccs.includes(12) },                  // 대현자의 금서 (13층 보스장신구)
-  { cap: 16, value: 4, has: () => S.accEquipped.some(a => a.floor === 19) },  // 20층 장신구
-  { cap: 14, value: 3, has: () => S.accEquipped.some(a => a.floor === 12) },  // 13층 장신구 (획득 최이지)
+  { cap: 22, value: 3, has: () => S.bossAccs.includes(19) },                  // 신왕의 태초 인장 (20층 보스장신구)
+  { cap: 18, value: 6, has: () => S.bossAccs.includes(12) },                  // 대현자의 금서 (13층 보스장신구)
+  { cap: 18, value: 4, has: () => S.accEquipped.some(a => a.floor === 19) },  // 20층 장신구
+  { cap: 16, value: 3, has: () => S.accEquipped.some(a => a.floor === 12) },  // 13층 장신구 (획득 최이지)
 ];
 
 function enhTierBonus(enhance) {

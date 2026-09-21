@@ -2413,7 +2413,7 @@ function enhanceEventCostMult(enhance) {
 
 function raidEnsureDay() {
   const today = todayKey();
-  if (S.raid.day !== today) { S.raid.day = today; S.raid.count = 0; S.raid.done = {}; }
+  if (S.raid.day !== today) { S.raid.day = today; S.raid.count = 0; S.raid.done = {}; S.osirisRaidRefundToday = 0; }
 }
 function raidHp(stage) { return BN.floor(BN.mul(BN.pow(RAID.hpGrowth, stage), RAID.baseHp)); }
 // 화룡의 인장: 하루 총 도전 횟수 +1
@@ -2474,7 +2474,7 @@ function weekKey() {
 }
 function libraryEnsureWeek() {
   const wk = weekKey();
-  if (S.library.week !== wk) { S.library.week = wk; S.library.count = 0; S.library.done = {}; }
+  if (S.library.week !== wk) { S.library.week = wk; S.library.count = 0; S.library.done = {}; S.osirisLibraryRefundThisWeek = 0; }
 }
 function libraryUnlocked() { return (S.raidMaxCleared || 0) > LIBRARY.unlockRaidStage; }
 
@@ -2856,7 +2856,44 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'redcap', name: '핏빛 두건과 멈추지 않는 사냥' },
   },
-  null, null, null, null, null,
+  { // floor 5 — 폐허 — 스켈레톤
+    id: 'osiris',
+    floor: 5,
+    type: 'weapon',
+    name: '오시리우스의 심판 저울',
+    subtitle: 'Osiris, the Judge of the Dead',
+    icon: '⚖️',
+    art: 'assets/artifacts/osiris_scale.svg',
+    lore: `나일이 마르지 않는 한, 죽음은 끝이 아니었다.
+
+파라오도, 거지도, 죽으면 같은 문 앞에 섰다. 그 문 너머에는 저울이 하나 놓여 있었다.
+
+저울의 한쪽 접시에는 깃털 하나. 다른 한쪽에는 살아온 날들의 무게, 심장이 놓였다.
+
+심장이 깃털보다 무거우면, 그 자리에서 아미트가 삼켰다. 이름도, 얼굴도 없이.
+
+가벼우면, 다시 강 이편으로 돌아갈 자격을 얻었다.
+
+그러나 그 문을 지키는 자는, 한 번은 스스로 죽어본 자였다. 동생의 손에 찢겨 강에 뿌려졌다가, 아내의 손으로 다시 하나가 된 자.
+
+그는 죽음을 두려워하지 않았다. 죽음이 끝이 아님을, 자신이 증명했으므로.
+
+그래서 그의 문은 닫히는 법이 없었다. 누군가 쓰러지면, 그 죽음만큼 다음 심판이 더 빨리 열렸다.
+
+사람들은 그를 이렇게 불렀다.
+
+오시리우스(Osiris).
+
+저울을 쥔 자, 그리고 몇 번이고 다시 일어서는 자.`,
+    effectsText: [
+      '부활의 굴레: 스러진 것들은 다음 심판의 문을 그만큼 더 빨리 연다.',
+      '심판의 저울: 무게가 기울 때마다, 가차없는 저울추가 떨어진다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'osiris', name: '부활의 굴레와 심판의 저울' },
+  },
+  null, null, null, null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -3099,6 +3136,63 @@ function redcapBossRewardMult() {
 function redcapBossAncientMult() {
   if (!hasRedcap()) return 1;
   return 1 + (fx.redcapBossStacks || 0) * REDCAP.bossAncientPerStack;
+}
+
+// 오시리우스의 심판 저울(태초의 유물): 일반 사냥에서는 처치할 때마다 사냥터 보스 쿨타임이
+// 줄어들고, 토벌전/도서관 도전 횟수가 일정 처치마다 환급된다(하루/주간 상한 있음 — 이미
+// 오늘/이번 주 클리어한 단계·서고의 재도전 잠금 자체는 풀리지 않고, 순수하게 "도전 가능
+// 횟수"만 늘어난다). 보스전(토벌전/도서관/펀치기계 포함)에서는 보스 체력이 50%/25%/10%
+// 구간에 처음 진입할 때마다 확정 고정 피해 폭발이 발동한다(구간당 1회, 전투당 최대 3회).
+// 유틸 효과가 섞여 있는 만큼 전투력 자체는 카마소츠 등 순수 전투형 태초보다 확실히 낮게 설계.
+const OSIRIS = {
+  bossCdReduceMs: 2000,      // 처치 1회당 사냥터 보스 쿨타임 감소(ms) — 1차 초안
+  raidRefundEvery: 40,       // 토벌전 도전 횟수 환급까지 필요한 처치 수
+  raidRefundDailyCap: 5,     // 토벌전 환급 하루 상한
+  libraryRefundEvery: 60,    // 도서관 도전 횟수 환급까지 필요한 처치 수
+  libraryRefundWeeklyCap: 5, // 도서관 환급 주간 상한
+  bossThresholds: [0.5, 0.25, 0.10], // 심판 발동 체력 구간(비율)
+  bossBurstPct: 0.03,        // 구간 진입 시 보스 최대체력의 몇 %를 고정 피해로 방출 — 1차 초안
+};
+function hasOsiris() { return hasGenesisEquipped('osiris'); }
+
+// 일반 사냥 처치 시 — handleKill()의 일반 처치 분기에서 호출
+function osirisPassiveKill() {
+  if (!hasOsiris()) return;
+  // 사냥터 보스 쿨타임 감소
+  S.bossCooldowns[S.floor] = Math.max(0, (S.bossCooldowns[S.floor] || 0) - OSIRIS.bossCdReduceMs);
+
+  // 토벌전 도전 횟수 환급(하루 상한 — raidEnsureDay()로 날짜 경계 먼저 확인)
+  raidEnsureDay();
+  fx.osirisRaidKills = (fx.osirisRaidKills || 0) + 1;
+  if (fx.osirisRaidKills >= OSIRIS.raidRefundEvery && (S.osirisRaidRefundToday || 0) < OSIRIS.raidRefundDailyCap) {
+    fx.osirisRaidKills -= OSIRIS.raidRefundEvery;
+    S.raid.count = Math.max(0, S.raid.count - 1);
+    S.osirisRaidRefundToday = (S.osirisRaidRefundToday || 0) + 1;
+  }
+
+  // 도서관 도전 횟수 환급(주간 상한 — libraryEnsureWeek()로 주 경계 먼저 확인)
+  libraryEnsureWeek();
+  fx.osirisLibraryKills = (fx.osirisLibraryKills || 0) + 1;
+  if (fx.osirisLibraryKills >= OSIRIS.libraryRefundEvery && (S.osirisLibraryRefundThisWeek || 0) < OSIRIS.libraryRefundWeeklyCap) {
+    fx.osirisLibraryKills -= OSIRIS.libraryRefundEvery;
+    S.library.count = Math.max(0, S.library.count - 1);
+    S.osirisLibraryRefundThisWeek = (S.osirisLibraryRefundThisWeek || 0) + 1;
+  }
+}
+// 보스전 한정 "심판" — dealMonDamage()에서 피해 적용 직후 호출해 그 시점 체력 비율을 확인한다.
+function osirisBossJudgment() {
+  if (!hasOsiris() || !bossFight.active) return;
+  const maxHp = BN.toNumber(mon.maxHp);
+  if (!(maxHp > 0)) return;
+  const frac = BN.toNumber(mon.hp) / maxHp;
+  fx.osirisThresholds = fx.osirisThresholds || {};
+  for (const t of OSIRIS.bossThresholds) {
+    if (frac <= t && !fx.osirisThresholds[t]) {
+      fx.osirisThresholds[t] = true;
+      floatText('⚖️ 심판!');
+      dealMonDamage(maxHp * OSIRIS.bossBurstPct);
+    }
+  }
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4749,6 +4843,7 @@ function dealMonDamage(amount) {
   // 레드캡(태초의 유물): 보스전 한정으로 보스 체력을 깎은 비율만큼 전리품 스택 적립
   redcapBossAccumulate(amount);
   mon.hp = BN.sub(mon.hp, amount);
+  osirisBossJudgment();
 }
 
 function floorGold(f) {
@@ -5570,6 +5665,8 @@ function handleKill(chainDepth) {
   dropRoll();
   // 레드캡(태초의 유물): 일반 사냥 처치마다 전리품 스택 적립(임계치 도달 시 내부에서 폭발 처리)
   redcapFarmKill();
+  // 오시리우스(태초의 유물): 처치마다 보스 쿨타임 감소 + 토벌전/도서관 도전 횟수 환급
+  osirisPassiveKill();
   // 가속 각인(레전더리 공격속도): 몬스터를 처치할 때마다 공속 버프 스택 적립
   const w = getEquipped();
   if (w && w.effect === 'accel') {
@@ -6220,6 +6317,7 @@ function resetTimedStacks() {
   fx.tiangouAccum = 0;
   fx.redcapBossStacks = 0;
   fx.redcapBossAccum = 0;
+  fx.osirisThresholds = {};
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

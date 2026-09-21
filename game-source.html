@@ -2361,9 +2361,9 @@ function unequipSeal(id) {
   renderInventory(); renderTop(); save();
 }
 // 토벌전 승리 시 그 단계의 인장을 낮은 확률로 시도. 이미 보유 중이면 골드로 대체 지급.
-function rollAncientSeal(stage) {
+function rollAncientSeal(stage, kindMult) {
   const seal = ANCIENT_SEALS[stage];
-  if (!seal || Math.random() >= ANCIENT_SEAL_DROP_CHANCE) return;
+  if (!seal || Math.random() >= ANCIENT_SEAL_DROP_CHANCE * (kindMult || 1)) return;
   if (hasSeal(seal.id)) {
     const gold = Math.floor(raidGoldReward(stage) * 0.5);
     S.gold = BN.add(S.gold, gold);
@@ -2823,7 +2823,40 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'tiangou', name: '만월의 사냥과 되삼킨 상처' },
   },
-  null, null, null, null, null, null,
+  { // floor 4 — 고블린 마을 — 고블린
+    id: 'redcap',
+    floor: 4,
+    type: 'weapon',
+    name: '레드캡의 핏빛 두건',
+    subtitle: 'Redcap, the Blood-Drunk Reiver',
+    icon: '🧢',
+    art: 'assets/artifacts/redcap_hood.svg',
+    lore: `국경 너머, 무너진 성채가 늘어선 땅이 있었다.
+
+그곳의 폐허에는 아무도 오래 살지 않았다. 밤이 되면, 낡은 성벽 틈에서 작고 사나운 것이 기어나왔으니까.
+
+그것은 늙지도, 크지도 않았다. 다만 머리에 쓴 모자 하나만은 유난히 붉었다.
+
+원래도 붉었던 것이 아니다. 그저 마르지 않았을 뿐.
+
+나그네가 그 땅을 지나면, 돌팔매보다 빠른 손이 목을 갈랐다. 흐른 피는 땅에 떨어지기 전에 모자로 스며들었다.
+
+모자가 마르면, 그 안의 것은 죽는다고 했다. 그래서 그것은 쉬지 않고 사냥했다. 하나를 거두면 다음을 노렸고, 전리품이 쌓일수록 손속은 더 사나워졌다.
+
+사람들은 그 폐허의 약탈자를 이렇게 불렀다.
+
+레드캡(Redcap).
+
+멈추면 마르고, 마르면 죽는 — 그래서 영원히 굶주린 자.`,
+    effectsText: [
+      '핏빛 두건: 거둬들인 것들이 두건을 적시면, 그 모든 것이 한꺼번에 터져 나온다.',
+      '멈추지 않는 사냥: 오래 물어뜯을수록 손속은 사나워지고, 마지막 숨통에서 그 대가를 남김없이 걷는다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'redcap', name: '핏빛 두건과 멈추지 않는 사냥' },
+  },
+  null, null, null, null, null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -2997,6 +3030,75 @@ function tiangouTick(now) {
       floatText('🌑 되삼킨 상처!');
     }
   }
+}
+
+// 레드캡의 핏빛 두건(태초의 유물): 일반 사냥에서는 처치마다 전리품 스택이 쌓여 임계치에
+// 도달하면 골드/재료 획득 버프 + 랜덤박스·무기 즉시 지급으로 "폭발"한다(사냥터 전환 시 스택
+// 초기화). 보스전(토벌전/도서관/펀치기계 포함)에서는 보스 체력을 깎은 비율만큼 스택이 쌓여
+// 전투력이 소폭 오르고(카마소츠 등 순수 전투형 태초보다 확실히 낮은 수준으로 설계), 처치 시
+// 스택 비례로 보상이 늘어난다.
+const REDCAP = {
+  farmStackMax: 40,      // 폭발까지 필요한 처치 수
+  farmBuffDur: 20,       // 폭발 시 골드/재료 버프 지속시간(초)
+  farmGoldMult: 3.0,     // 버프 중 골드 획득 배율
+  farmMatMult: 3.0,      // 버프 중 재료 획득 확률 배율
+  farmBoxCount: 5,       // 폭발 시 즉시 지급하는 랜덤박스 개수
+  farmBoxTier: 3,        // 지급 박스 등급 인덱스(BOXES, 3=전설 랜덤박스)
+  farmWeaponCount: 3,    // 폭발 시 즉시 지급하는 무기 개수
+  farmWeaponGrade: 5,    // 지급 무기 등급(5=신화 — 고대/태초 제외 최고 등급)
+
+  bossPctPerStack: 5,    // 보스 최대체력의 몇 %를 깎을 때마다 스택 1 적립
+  bossStackMax: 20,      // 스택 상한(= 보스 체력 100% 분량)
+  bossAtkPerStack: 0.02,     // 스택당 공격력 증가 — 1차 초안, 펀치기계 측정으로 조정 예정
+  bossRewardPerStack: 0.03,  // 처치 시 스택당 보상(골드/재료/토큰/정수) 추가 배율
+  bossAncientPerStack: 0.05, // 처치 시 스택당 고대급 드랍률 추가 배율(태초 제외)
+};
+function hasRedcap() { return hasGenesisEquipped('redcap'); }
+
+// 일반 사냥 전리품 스택 — handleKill()의 일반 처치 분기에서 호출
+function redcapFarmKill() {
+  if (!hasRedcap()) return;
+  fx.redcapFarmStacks = (fx.redcapFarmStacks || 0) + 1;
+  if (fx.redcapFarmStacks < REDCAP.farmStackMax) return;
+  fx.redcapFarmStacks = 0;
+  fx.redcapFarmBuffUntil = Date.now() + REDCAP.farmBuffDur * 1000;
+  for (let i = 0; i < REDCAP.farmBoxCount; i++) giveBox(REDCAP.farmBoxTier, '레드캡의 약탈');
+  for (let i = 0; i < REDCAP.farmWeaponCount; i++) addWeapon(genWeapon(REDCAP.farmWeaponGrade));
+  log(`🧢 <b>레드캡의 핏빛 두건</b>이 터졌습니다! ${REDCAP.farmBuffDur}초간 골드·재료 획득량이 대폭 상승하고, 신화 무기 ${REDCAP.farmWeaponCount}개와 랜덤박스 ${REDCAP.farmBoxCount}개를 얻었습니다!`, 'lg-prim');
+  renderTop(); renderInventory(); save();
+}
+function redcapFarmGoldMult() {
+  return (hasRedcap() && fx.redcapFarmBuffUntil && Date.now() < fx.redcapFarmBuffUntil) ? REDCAP.farmGoldMult : 1;
+}
+function redcapFarmMatMult() {
+  return (hasRedcap() && fx.redcapFarmBuffUntil && Date.now() < fx.redcapFarmBuffUntil) ? REDCAP.farmMatMult : 1;
+}
+
+// 보스전 스택 — dealMonDamage()에서 호출(보스 최대체력 대비 누적 피해 비율로 스택 적립)
+function redcapBossAccumulate(amount) {
+  if (!hasRedcap() || !bossFight.active) return;
+  if ((fx.redcapBossStacks || 0) >= REDCAP.bossStackMax) return;
+  fx.redcapBossAccum = (fx.redcapBossAccum || 0) + amount;
+  const need = BN.toNumber(mon.maxHp) * (REDCAP.bossPctPerStack / 100);
+  if (!(need > 0)) return;
+  while (fx.redcapBossAccum >= need && (fx.redcapBossStacks || 0) < REDCAP.bossStackMax) {
+    fx.redcapBossAccum -= need;
+    fx.redcapBossStacks = (fx.redcapBossStacks || 0) + 1;
+  }
+}
+function redcapBossAtkBonusPct() {
+  if (!hasRedcap() || !bossFight.active) return 0;
+  return (fx.redcapBossStacks || 0) * REDCAP.bossAtkPerStack;
+}
+// 처치(승리) 시 그동안 쌓인 스택 비례로 보상 배율을 계산 — 스택 자체는 다음 전투 시작 시
+// resetTimedStacks()에서 초기화된다.
+function redcapBossRewardMult() {
+  if (!hasRedcap()) return 1;
+  return 1 + (fx.redcapBossStacks || 0) * REDCAP.bossRewardPerStack;
+}
+function redcapBossAncientMult() {
+  if (!hasRedcap()) return 1;
+  return 1 + (fx.redcapBossStacks || 0) * REDCAP.bossAncientPerStack;
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -3790,7 +3892,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct());
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct());
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -4644,6 +4746,8 @@ function dealMonDamage(amount) {
   if (fx.tiangouUntil && Date.now() < fx.tiangouUntil && hasGenesisEquipped('tiangou')) {
     fx.tiangouAccum = (fx.tiangouAccum || 0) + amount;
   }
+  // 레드캡(태초의 유물): 보스전 한정으로 보스 체력을 깎은 비율만큼 전리품 스택 적립
+  redcapBossAccumulate(amount);
   mon.hp = BN.sub(mon.hp, amount);
 }
 
@@ -4719,6 +4823,8 @@ function dropRoll() {
     dropMul *= hungerMul;
     goldMul *= hungerMul;
   }
+  // 레드캡(태초의 유물): 전리품 폭발 버프 중엔 골드 획득량이 크게 상승(재료는 dropMaterials에서 별도 적용)
+  goldMul *= redcapFarmGoldMult();
 
   // 골드
   let gold = Math.floor(floorGold(S.floor) * goldMul * (0.9 + Math.random() * 0.2));
@@ -4752,7 +4858,7 @@ function dropRoll() {
   log(`💰 +${fmt(gold)} 골드${isU ? ' <span class="lg-prim">(유니크 10배!)</span>' : ''}${jackpot ? ' <span class="lg-prim">(골드 잭팟!)</span>' : ''}`);
 
   // 재료 드롭 (항상 1~2개)
-  dropMaterials(isU, luck);
+  dropMaterials(isU, luck, redcapFarmMatMult());
   // 늪의 진주(고대 에이션트 스피릿): 처치 시 낮은 확률로 귀한 재료 발견
   if (w && w.spirit === 'pearl' && Math.random() < ANCIENT_SPIRITS.pearl.proc) {
     S.mats.pearl = (S.mats.pearl || 0) + 1;
@@ -4835,22 +4941,23 @@ function sealMatSlot(slot) {
   if (slot < 2 && sealEquippedHas('swampHeart') && Math.random() < 0.10) return slot + 1;
   return slot;
 }
-function dropMaterials(isU, luck) {
+function dropMaterials(isU, luck, matMult) {
   const f = S.floor;
+  matMult = matMult || 1;
 
   // 일반 재료 (두 종류 중 하나)
-  const commonChance = (0.5 + luck) * (isU ? 2 : 1);
+  const commonChance = (0.5 + luck) * (isU ? 2 : 1) * matMult;
   if (Math.random() < Math.min(0.95, commonChance)) {
     addMat(f, sealMatSlot(0));
   }
   // 레어 재료
-  const rareChance = (0.12 + luck * 0.5) * (isU ? 4 : 1);
+  const rareChance = (0.12 + luck * 0.5) * (isU ? 4 : 1) * matMult;
   if (Math.random() < Math.min(0.9, rareChance)) {
     addMat(f, sealMatSlot(1));
   }
   // 에픽(최고) 재료 — "운빨강화" 개편으로 골드/강화 시행 횟수가 크게 늘어난 만큼
   // 고급 재료 파밍이 병목이 되지 않도록 기본 확률을 상향(3%→15%)
-  const epicChance = (0.15 + luck * 0.3) * (isU ? 8 : 1);
+  const epicChance = (0.15 + luck * 0.3) * (isU ? 8 : 1) * matMult;
   if (Math.random() < Math.min(0.8, epicChance)) {
     addMat(f, 2);
   }
@@ -5461,6 +5568,8 @@ function handleKill(chainDepth) {
     return 'boss';
   }
   dropRoll();
+  // 레드캡(태초의 유물): 일반 사냥 처치마다 전리품 스택 적립(임계치 도달 시 내부에서 폭발 처리)
+  redcapFarmKill();
   // 가속 각인(레전더리 공격속도): 몬스터를 처치할 때마다 공속 버프 스택 적립
   const w = getEquipped();
   if (w && w.effect === 'accel') {
@@ -6109,6 +6218,8 @@ function resetTimedStacks() {
   fx.tiangouNext = 0;
   fx.tiangouUntil = 0;
   fx.tiangouAccum = 0;
+  fx.redcapBossStacks = 0;
+  fx.redcapBossAccum = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -6232,14 +6343,16 @@ function endRaidFight(win) {
   $('raidMonEmoji').classList.remove('boss-glow');
   if (win) {
     onGenesisHungerKill(); // 끝없는 허기(글러트니): 토벌전 처치도 스택 적립 대상
-    const tokens = raidTokenReward(stage);
-    const gold = raidGoldReward(stage);
+    // 레드캡(태초의 유물): 보스전 중 쌓은 전리품 스택 비례로 처치 보상 상승
+    const redcapMult = redcapBossRewardMult();
+    const tokens = Math.round(raidTokenReward(stage) * redcapMult);
+    const gold = Math.floor(raidGoldReward(stage) * redcapMult);
     S.gold = BN.add(S.gold, gold);
     S.raidTokens = BN.add(S.raidTokens, tokens);
     log(`🏆 <b>토벌전 승리!</b> <span class="grade-고대">${rm.name}</span> 격파! +${fmt(gold)} 골드, 🎫 토벌의 증표 +${tokens}개`, 'lg-prim');
     $('raidMonEmoji').classList.add('boss-appear');
     setTimeout(() => $('raidMonEmoji').classList.remove('boss-appear'), 700);
-    rollAncientSeal(stage);
+    rollAncientSeal(stage, redcapBossAncientMult());
     // 고대의 도서관 해금 조건(토벌전 특정 단계 클리어)을 위한 영구 최고 기록
     S.raidMaxCleared = Math.max(S.raidMaxCleared || 0, stage + 1);
     tryUnlockWorld2(); // 20층 처치 조건은 이미 채워둔 상태로 토벌전 9단계를 지금 막 깼을 수도 있으니 즉시 재확인
@@ -6357,13 +6470,16 @@ function endLibraryFight(win) {
     S.library.done[depth] = true; // 이 서고는 다음 주까지 재도전 불가
     S.library.best = Math.max(S.library.best, depth + 1); // 새 기록 갱신(이미 깬 서고 재도전이면 그대로)
     const w = getEquipped();
-    const essence = BN.floor(BN.mul(libraryEssenceReward(depth), essenceRewardMult(w) * relicEssenceMult()));
-    const awaken = BN.floor(BN.mul(libraryAwakenReward(depth), essenceRewardMult(w) * relicAwakenMult()));
+    // 레드캡(태초의 유물): 보스전 중 쌓은 전리품 스택 비례로 처치 보상 상승
+    const redcapMult = redcapBossRewardMult();
+    const redcapAncientMult = redcapBossAncientMult();
+    const essence = BN.floor(BN.mul(libraryEssenceReward(depth), essenceRewardMult(w) * relicEssenceMult() * redcapMult));
+    const awaken = BN.floor(BN.mul(libraryAwakenReward(depth), essenceRewardMult(w) * relicAwakenMult() * redcapMult));
     S.weaponEssence = BN.add(S.weaponEssence, essence);
     S.awakeningEssence = BN.add(S.awakeningEssence, awaken);
     let msg = `🏆 <b>고대의 도서관 승리!</b> 제${depth + 1}서고 돌파! 📜 무기의 정수 +${fmt(essence)}, 💠 각성의 정수 +${fmt(awaken)}`;
     // 도서관 전용 룬 드롭 (등급은 레전더리 위주, 신화/고대는 드물게)
-    if (Math.random() < LIBRARY.runeDropChance) {
+    if (Math.random() < LIBRARY.runeDropChance * redcapAncientMult) {
       const grade = wrand([[4, 60], [5, 30], [6, 10]]);
       const pool = RUNE_SPECIALS_LIBRARY_BY_GRADE[grade];
       if (pool && pool.length) {
@@ -6373,7 +6489,7 @@ function endLibraryFight(win) {
       }
     }
     // 고대의 유물 드롭 (아직 없는 유물 중 무작위 하나)
-    if (Math.random() < LIBRARY.relicDropChance) {
+    if (Math.random() < LIBRARY.relicDropChance * redcapAncientMult) {
       const uncollected = [];
       for (let i = 0; i < RELICS.length; i++) if (!S.relics[i]) uncollected.push(i);
       if (uncollected.length) {
@@ -6475,6 +6591,8 @@ function endBossFight(win) {
     let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
     goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
     if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
+    // 레드캡(태초의 유물): 보스전 중 쌓은 전리품 스택 비례로 처치 보상 상승
+    goldMul *= redcapBossRewardMult();
     const killsPerHour = weaponSpeed(w) * 3600;
     const gold = Math.floor(floorGold(f) * killsPerHour * goldMul);
     S.gold = BN.add(S.gold, gold);
@@ -6482,7 +6600,7 @@ function endBossFight(win) {
     // 고급 재료 보너스: 해당 사냥터의 최고 등급 재료(고급 강화 재료)를 대량 지급 — 보스 쿨타임이
     // 1시간이라 꾸준히 도전하면 고급 강화 재료 조달의 주요 경로가 되도록 층이 높을수록 더 많이 지급.
     // (버그 수정: 예전엔 S.mats를 직접 건드려서 재료 자동판매 필터가 전혀 먹지 않았음)
-    const matBonus = 15 + f * 3;
+    const matBonus = Math.floor((15 + f * 3) * redcapBossRewardMult());
     const matKey2 = f + '|2';
     const matGradeName = GRADES[MAT_TIERS[Math.min(3, Math.floor((f % 20) / 5))][2]].name;
     if (S.matAutoSell && S.matAutoSell[matKey2]) {
@@ -6495,8 +6613,8 @@ function endBossFight(win) {
     }
     // 태초의 유물: 보스 처치는 10배 확률로 시도
     rollGenesisArtifact(f, GENESIS_BOSS_MULT);
-    // 고대 무기: 보스 처치는 10배 확률로 시도
-    rollAncientWeapon(f, ANCIENT_BOSS_MULT);
+    // 고대 무기: 보스 처치는 10배 확률로 시도 (레드캡 장착 시 전리품 스택만큼 추가 상승, 태초는 제외)
+    rollAncientWeapon(f, ANCIENT_BOSS_MULT * redcapBossAncientMult());
     // 승리 연출
     $('monemoji').classList.add('boss-appear');
     setTimeout(() => $('monemoji').classList.remove('boss-appear'), 700);
@@ -8029,6 +8147,7 @@ function renderFloorBtns() {
         if (bossFight.active) { endBossFight(false); log('사냥터 이동으로 보스전이 중단되었습니다.', 'lg-bad'); }
         S.floor = i; spawnMonster(); renderFloorBtns(); renderFloorUI(); renderBossBtn();
         fx.enduranceStart = Date.now(); // 늑대왕의 인장: 사냥터 이동 시 지구력 보너스 초기화
+        fx.redcapFarmStacks = 0; fx.redcapFarmBuffUntil = 0; // 레드캡(태초의 유물): 사냥터 이동 시 전리품 스택/버프 초기화
         save();
       };
     } else {

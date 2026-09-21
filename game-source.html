@@ -2705,7 +2705,42 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'gluttony', name: '끝없는 탐욕과 허기' },
   },
-  null, null, null, null, null, null, null, null, null,
+  { // floor 1 — 동굴 — 야생 박쥐
+    id: 'camazotz',
+    floor: 1,
+    type: 'weapon',
+    name: '카마족의 조종',
+    subtitle: 'Camazotz, the Death Bat',
+    icon: '🔔',
+    art: 'assets/artifacts/camazotz_bell.svg',
+    lore: `동굴 가장 깊은 곳, 빛이 닿지 않는 그 안쪽에는 문이 하나 있었다고 전해진다.
+
+산 자가 그 문을 넘으면, 다시는 자신의 목소리로 돌아오지 못한다.
+
+그 문 너머에 사는 것은 눈이 없었다. 대신 어둠 전체를 귀로 삼아,
+숨소리 하나, 심장이 뛰는 소리 하나까지 놓치지 않았다.
+
+사냥감이 숨을 참아도 소용없었다.
+그것은 이미 그 자리를 알고 있었으니까.
+
+전해지는 옛 이야기 속에서, 잠든 영웅 하나가 그 앞에서
+목숨 대신 목을 내주었다고 한다. 소리 없이, 단 한 번의 날갯짓으로.
+
+사람들은 그 밤의 지배자를 죽음의 박쥐라 불렀다.
+
+카마족(Camazotz).
+
+동굴이라는 이름의 왕국 전부가 그의 귀였고,
+그 안에서 울리는 모든 메아리는 그의 목소리였다.`,
+    effectsText: [
+      '천 개의 메아리: 모든 타격은 어둠 속에서 몇 번이고 되돌아온다.',
+      '공진 파쇄: 열다섯 번째 울림에, 그 무엇도 온전할 수 없다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'camazotz', name: '천 개의 메아리와 공진 파쇄' },
+  },
+  null, null, null, null, null, null, null, null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -2772,6 +2807,39 @@ function goldAtkBonusPct() {
   if (!hasGenesisEquipped('gluttony')) return 0;
   const raw = Math.pow(Math.max(0, S.gold) / GENESIS_GOLD_ATK_UNIT, GENESIS_GOLD_ATK_EXP) * GENESIS_GOLD_ATK_RATE;
   return Math.min(GENESIS_GOLD_ATK_CAP, raw);
+}
+
+// ---------- 카마족(태초 무기) 전용 전투 효과 ----------
+// 천 개의 메아리: 매 공격마다 확정 4연쇄 메아리(80%→52%→33.8%→21.97%, 합산 약 +187.77%)가
+// 치명타/연타 판정과 무관하게 항상 추가로 발생한다. 공진 파쇄: 공격 15회(대상이 바뀌면 초기화)
+// 마다 일반 사냥터에서는 대상을 즉시 처치, 보스전/토벌전/도서관에서는 대신 고정 피해가 폭발한다.
+const CAMAZOTZ = {
+  echoStart: 0.80,     // 첫 메아리 = 원래 피해의 80%
+  echoDecay: 0.65,     // 다음 메아리마다 65%씩 감쇠
+  echoCount: 4,        // 총 4연쇄
+  shatterStacks: 15,   // 15타마다 발동
+  shatterBossMult: 20.0, // 보스전 등: 무기 공격력의 2000% 고정 피해
+};
+function camazotzEcho(baseDmg) {
+  if (!hasGenesisEquipped('camazotz')) return;
+  let echoDmg = baseDmg * CAMAZOTZ.echoStart;
+  for (let i = 0; i < CAMAZOTZ.echoCount; i++) {
+    mon.hp -= echoDmg;
+    echoDmg *= CAMAZOTZ.echoDecay;
+  }
+  floatText('🔔 메아리!');
+}
+function camazotzResonance(w) {
+  if (!hasGenesisEquipped('camazotz')) return;
+  fx.camazotzStacks = (fx.camazotzStacks || 0) + 1;
+  if (fx.camazotzStacks < CAMAZOTZ.shatterStacks) return;
+  fx.camazotzStacks = 0;
+  if (bossFight.active) {
+    mon.hp -= weaponAtk(w) * CAMAZOTZ.shatterBossMult;
+  } else {
+    mon.hp = 0;
+  }
+  floatText('🔊 공진 파쇄!');
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4322,6 +4390,8 @@ function spawnMonster() {
   if (eqw && eqw.spirit === 'acid') { eqw.acidStacks = 0; eqw.acidTimer = 0; }
   // 필멸 파훼의 룬(도서관 전용): 대상이 바뀌면 누적 스택 초기화
   if (eqw && weaponSpecialCount(eqw, 'mortalRune') > 0) { fx.mortalStacks = 0; fx.mortalNext = 0; }
+  // 카마족의 조종(태초의 유물): 대상이 바뀌면 공진 스택 초기화
+  if (eqw && hasGenesisEquipped('camazotz')) fx.camazotzStacks = 0;
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -5610,6 +5680,9 @@ function attack(w) {
   } else {
     mon.hp -= dmg;
   }
+  // 카마족의 조종(태초의 유물): 매 공격 확정 메아리 연쇄 + 15타마다 공진 파쇄
+  camazotzEcho(dmg);
+  camazotzResonance(w);
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc');
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -5721,6 +5794,7 @@ function resetTimedStacks() {
   fx.mortalNext = 0;
   fx.brandUntil = 0;
   fx.causalityEcho = null;
+  fx.camazotzStacks = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

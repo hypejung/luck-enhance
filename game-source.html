@@ -1065,9 +1065,13 @@ function typeTrait(w, key) {
 // 지팡이는 "공격력" 대신 "마력"으로 표기(수치/계산은 동일, 표시만 다름)
 function atkLabel(w) { return (w && w.type === '지팡이') ? '마력' : '공격력'; }
 // 둔기 특성 + 도감 컬렉션 보너스(파괴 확률 감소)까지 반영한 실제 파괴 확률
+// 실패 시 세 결과(유지/하락/파괴·초기화)의 체감 순서가 "유지 > 하락 > 파괴"가 항상 보장되도록
+// 파괴 확률 테이블 자체를 큰 폭으로 낮춘다(1/4로 축소 — 예전엔 고강화 구간에서 파괴 확률이
+// 82%까지 치솟아 오히려 유지/하락보다 파괴가 더 흔한 결과가 돼버리는 역전 현상이 있었음).
+const ENH_DESTROY_SCALE = 0.25;
 function effectiveDestroyChance(w) {
   if (isGenesisWeapon(w)) return 0; // 태초 무기는 파괴되지 않는다 (실패 시 유지 또는 하락뿐)
-  const base = ENH.destroy[w.enhance] || 0;
+  const base = (ENH.destroy[w.enhance] || 0) * ENH_DESTROY_SCALE;
   // destroyReduce는 다른 %p 스탯(enh/critChance/critDamage 등)과 동일하게 "%p 차감"이어야
   // 하는데, 예전엔 비율 곱연산(base*(1-reduce))으로 새고 있었다. %p 차감으로 고치되, 저강화
   // 구간이 통째로 0%가 되지 않도록 소스 수치 자체를 낮게 재설계했다(신화까지 합계 8%p로,
@@ -6758,9 +6762,11 @@ function resolveEnhance(w, advanced) {
     // 로그 문구용: 고대는 "파괴"가 아니라 "초기화"가, 태초는 파괴/초기화 자체가 없으니 아예 표기하지 않는다.
     const riskWord = isGenesisWeapon(w) ? null : isAncientWeapon(w) ? '초기화' : '파괴';
     const riskTag = riskWord ? ` (${riskWord} 확률이었음: ${dChance}%)` : '';
-    // 태초 무기는 파괴/초기화가 없는 대신, 고급 강화 시 "단계 하락" 확률 자체가 절반으로 줄어든다
-    // (일반/고대의 고급 강화가 파괴·초기화 확률을 절반으로 낮추는 것과 대응되는 태초 전용 효과).
-    const baseStayChance = (advanced && isGenesisWeapon(w)) ? 0.75 : 0.5;
+    // "유지 > 하락 > 파괴" 체감 순서를 보장하기 위해 유지 쪽에 더 큰 비중을 준다(예전엔 50/50).
+    // 태초 무기는 파괴/초기화가 없는 대신, 고급 강화 시 "단계 하락" 확률 자체가 더 줄어든다
+    // (일반/고대의 고급 강화가 파괴·초기화 확률을 절반으로 낮추는 것과 대응되는 태초 전용 효과 —
+    // 기존과 동일하게 +0.25만큼 유지 확률을 추가로 올리는 구조를 유지).
+    const baseStayChance = (advanced && isGenesisWeapon(w)) ? 0.90 : 0.65;
     // 강화데이: "하락" 확률(=1-stayChance)에 배율을 곱해서 상대적으로 줄인다(유지 확률은 그만큼 상승)
     const stayChance = 1 - (1 - baseStayChance) * enhanceEventDowngradeMult(attemptLevel);
     // 파괴/초기화 여부는 단 한 번만 굴려서(destroyRoll) 재사용한다 — 분기마다 새로 굴리면
@@ -8006,9 +8012,9 @@ function renderEnhance() {
   const dChance = maxed ? 0 : effectiveDestroyChance(w);
   // 하락 확률(실패했는데 파괴/초기화에도 안 걸렸을 때, 단계가 유지되지 않고 -1될 확률) — 기존엔
   // "성공 확률"만 크게 보이고 이 수치가 화면에 없어서, 실패 시 체감 손실이 왜 이렇게 큰지
-  // 플레이어가 가늠하기 어렵다는 피드백을 반영해 표시한다. resolveEnhance()의 baseStayChance(0.5,
-  // 일반 강화 기준)와 동일한 공식을 그대로 재사용.
-  const downgradeChance = maxed ? 0 : Math.round(50 * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
+  // 플레이어가 가늠하기 어렵다는 피드백을 반영해 표시한다. resolveEnhance()의 baseStayChance(0.65,
+  // 일반 강화 기준)와 동일한 공식을 그대로 재사용(유지 65% / 하락 35%).
+  const downgradeChance = maxed ? 0 : Math.round(35 * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
   const matSt = highMatStatus(w.grade, matNeed);
   const matOk = matSt.ok;
@@ -8107,10 +8113,10 @@ function renderAdvancedEnhance(w, maxed) {
   // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대는 "초기화" 확률을,
   // 그 외 등급은 "파괴" 확률을 절반으로 낮춘다는 걸 정확히 표기한다.
   const riskLabel = isGenesisWeapon(w) ? '하락' : isAncientWeapon(w) ? '초기화' : '파괴';
-  // resolveEnhance()의 advanced 분기 공식과 동일하게 계산 — 태초는 baseStayChance 0.75(유지 확률
-  // 상승), 그 외는 dChance*ADVANCED_ENH_DESTROY_MULT(0.5)를 그대로 재사용.
+  // resolveEnhance()의 advanced 분기 공식과 동일하게 계산 — 태초는 baseStayChance 0.90(유지 확률
+  // 상승, 하락 10%), 그 외는 dChance*ADVANCED_ENH_DESTROY_MULT(0.5)를 그대로 재사용.
   const advRiskValue = isGenesisWeapon(w)
-    ? Math.round(25 * enhanceEventDowngradeMult(w.enhance) * 10) / 10
+    ? Math.round(10 * enhanceEventDowngradeMult(w.enhance) * 10) / 10
     : Math.round(effectiveDestroyChance(w) * ADVANCED_ENH_DESTROY_MULT * 10) / 10;
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="advancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>

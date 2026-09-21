@@ -1517,7 +1517,7 @@ function unlockCodexEntry(w) {
   S.codexSeen[key] = true;
   log(`📖 <b>무기 도감</b>에 새 항목이 등록되었습니다: ${weaponItemName(w)}`, 'lg-prim');
   if (sealEquippedHas('lichOverlord')) {
-    S.raidTokens = (S.raidTokens || 0) + 1;
+    S.raidTokens = BN.add(S.raidTokens, 1);
     log('👻 <b>리치대군주의 인장</b>이 영혼을 거두었다 — 🎫 토벌의 증표 +1', 'lg-prim');
   }
 }
@@ -2454,8 +2454,8 @@ const LIBRARY = {
   relicDropChance: 0.10,
 };
 function libraryHp(depth) { return BN.floor(BN.mul(raidHp(LIBRARY.baseHpStage), BN.pow(LIBRARY.hpGrowth, depth))); }
-function libraryEssenceReward(depth) { return Math.round(LIBRARY.baseEssence * Math.pow(LIBRARY.rewardGrowth, depth)); }
-function libraryAwakenReward(depth) { return Math.round(LIBRARY.baseAwaken * Math.pow(LIBRARY.rewardGrowth, depth)); }
+function libraryEssenceReward(depth) { return BN.floor(BN.mul(BN.pow(LIBRARY.rewardGrowth, depth), LIBRARY.baseEssence)); }
+function libraryAwakenReward(depth) { return BN.floor(BN.mul(BN.pow(LIBRARY.rewardGrowth, depth), LIBRARY.baseAwaken)); }
 function weekKey() {
   // 로컬 자정 기준 날짜를 일수로 환산한 뒤, 7로 나눠 "주" 단위로 묶는다(정확한 달력
   // 주 정렬보다는 "7일마다 로컬 자정에 바뀌는 안정적인 정수"면 충분).
@@ -2583,8 +2583,8 @@ function awakenAttempt(w, rankIdx) {
   const isReroll = !!w.awakening[rankIdx];
   if (!isReroll && rankIdx > 0 && !w.awakening[rankIdx - 1]) { log('이전 랭크(★' + rankIdx + ')를 먼저 각성해야 합니다.', 'lg-bad'); return; }
   const cost = isReroll ? rank.rerollCost : rank.unlockCost;
-  if ((S.awakeningEssence || 0) < cost) { log(`각성의 정수가 부족합니다! (필요 ${cost}, 보유 ${S.awakeningEssence || 0})`, 'lg-bad'); return; }
-  S.awakeningEssence -= cost;
+  if (BN.lt(S.awakeningEssence, cost)) { log(`각성의 정수가 부족합니다! (필요 ${cost}, 보유 ${fmt(S.awakeningEssence)})`, 'lg-bad'); return; }
+  S.awakeningEssence = BN.sub(S.awakeningEssence, cost);
   const result = rollAwakeningResult(rankIdx);
   w.awakening[rankIdx] = result;
   log(`✨ 각성 ★${rankIdx + 1} ${isReroll ? '재도전' : '발동'}! [${AWAKENING_RARITY_LABEL[result.rarity]}] ${awakenSlotLabel(result)}`, 'lg-prim');
@@ -3535,12 +3535,12 @@ function newState() {
     runeAutoSellGrade: null, // 이 등급 이하 룬은 획득 즉시 자동판매 (null=끔)
     subAutoSellGrade: null, // 이 등급 이하 + 강화0 보조무기는 획득 즉시 자동판매 (null=끔)
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
-    weaponEssence: 0,  // 무기의 정수 — 태초 무기 강화 전용 재화 (고대의 도서관 컨텐츠에서 획득 예정)
+    weaponEssence: BN.from(0),  // 무기의 정수 — 태초 무기 강화 전용 재화 (고대의 도서관 컨텐츠에서 획득 예정)
     eggs: {},          // 달성한 이스터에그: { eggId: true }
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
     blacksmithTraces: [], // 파괴된 고대 무기의 흔적: [{ id, ancientFloor, nameVariant, type, icon, spirit, effect, name }]
-    raidTokens: 0,     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
+    raidTokens: BN.from(0),     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
     punch: { best: BN.from(0), last: BN.from(0) }, // 펀치기계: 연습용, 횟수 제한 없음
     ancientSeals: [],  // 보유한 고대의 인장 id 목록
@@ -3555,7 +3555,7 @@ function newState() {
     presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null })),
     presetSlots: 3,
     raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
-    awakeningEssence: 0,   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
+    awakeningEssence: BN.from(0),   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
     library: { week: null, count: 0, best: 0, done: {} }, // 고대의 도서관: 주간 도전 횟수 + 최고 깊이 기록 + 이번 주 클리어한 서고(재도전 잠금)
     relics: [],            // 고대의 유물 컬렉션: [true/false, ...] 20개, index = 층 번호
     subBossCodexSeen: [],  // 보스 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
@@ -4219,11 +4219,11 @@ function tokensForShortfall(shortfall) { return Math.ceil(shortfall / RAID_TOKEN
 // 고급 재료 필요량에 대한 현재 상태(보유 재료 + 부족분을 토큰으로 대체 가능한지) 요약
 function highMatStatus(grade, need) {
   const have = countHighMats(grade);
-  if (need <= 0) return { ok: true, have, need: 0, shortfall: 0, tokensNeed: 0, tokensHave: S.raidTokens || 0 };
+  if (need <= 0) return { ok: true, have, need: 0, shortfall: 0, tokensNeed: 0, tokensHave: S.raidTokens };
   const shortfall = Math.max(0, need - have);
   const tokensNeed = tokensForShortfall(shortfall);
-  const tokensHave = S.raidTokens || 0;
-  return { ok: shortfall === 0 || tokensHave >= tokensNeed, have, need, shortfall, tokensNeed, tokensHave };
+  const tokensHave = S.raidTokens;
+  return { ok: shortfall === 0 || BN.gte(tokensHave, tokensNeed), have, need, shortfall, tokensNeed, tokensHave };
 }
 // 고급 재료를 최대한 소모하고, 부족분은 토벌의 증표로 대체 소모
 function consumeHighMatsWithTokens(grade, need) {
@@ -4231,7 +4231,7 @@ function consumeHighMatsWithTokens(grade, need) {
   const useMats = Math.min(have, need);
   if (useMats > 0) consumeHighMats(grade, useMats);
   const shortfall = need - useMats;
-  if (shortfall > 0) S.raidTokens -= tokensForShortfall(shortfall);
+  if (shortfall > 0) S.raidTokens = BN.sub(S.raidTokens, tokensForShortfall(shortfall));
 }
 
 // 재료 판매가 (사냥터 골드 기준: 일반 1.5배 / 레어 4배 / 에픽 10배)
@@ -6035,7 +6035,7 @@ function endRaidFight(win) {
     const tokens = raidTokenReward(stage);
     const gold = raidGoldReward(stage);
     S.gold = BN.add(S.gold, gold);
-    S.raidTokens += tokens;
+    S.raidTokens = BN.add(S.raidTokens, tokens);
     log(`🏆 <b>토벌전 승리!</b> <span class="grade-고대">${rm.name}</span> 격파! +${fmt(gold)} 골드, 🎫 토벌의 증표 +${tokens}개`, 'lg-prim');
     $('raidMonEmoji').classList.add('boss-appear');
     setTimeout(() => $('raidMonEmoji').classList.remove('boss-appear'), 700);
@@ -6157,11 +6157,11 @@ function endLibraryFight(win) {
     S.library.done[depth] = true; // 이 서고는 다음 주까지 재도전 불가
     S.library.best = Math.max(S.library.best, depth + 1); // 새 기록 갱신(이미 깬 서고 재도전이면 그대로)
     const w = getEquipped();
-    const essence = Math.round(libraryEssenceReward(depth) * essenceRewardMult(w) * relicEssenceMult());
-    const awaken = Math.round(libraryAwakenReward(depth) * essenceRewardMult(w) * relicAwakenMult());
-    S.weaponEssence = (S.weaponEssence || 0) + essence;
-    S.awakeningEssence = (S.awakeningEssence || 0) + awaken;
-    let msg = `🏆 <b>고대의 도서관 승리!</b> 제${depth + 1}서고 돌파! 📜 무기의 정수 +${essence}, 💠 각성의 정수 +${awaken}`;
+    const essence = BN.floor(BN.mul(libraryEssenceReward(depth), essenceRewardMult(w) * relicEssenceMult()));
+    const awaken = BN.floor(BN.mul(libraryAwakenReward(depth), essenceRewardMult(w) * relicAwakenMult()));
+    S.weaponEssence = BN.add(S.weaponEssence, essence);
+    S.awakeningEssence = BN.add(S.awakeningEssence, awaken);
+    let msg = `🏆 <b>고대의 도서관 승리!</b> 제${depth + 1}서고 돌파! 📜 무기의 정수 +${fmt(essence)}, 💠 각성의 정수 +${fmt(awaken)}`;
     // 도서관 전용 룬 드롭 (등급은 레전더리 위주, 신화/고대는 드물게)
     if (Math.random() < LIBRARY.runeDropChance) {
       const grade = wrand([[4, 60], [5, 30], [6, 10]]);
@@ -6466,9 +6466,9 @@ function grantEnchant(w) {
   if (w.enchant) { log('이미 각인이 부여된 무기입니다.', 'lg-bad'); return; }
   const tokenCost = ENCHANT_TOKEN_COST[1];
   const goldCost = enchantGoldCost(1);
-  if ((S.raidTokens || 0) < tokenCost) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
+  if (BN.lt(S.raidTokens, tokenCost)) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
   if (BN.lt(S.gold, goldCost)) { log(`골드가 부족합니다 (${fmt(goldCost)} 필요)`, 'lg-bad'); return; }
-  S.raidTokens -= tokenCost;
+  S.raidTokens = BN.sub(S.raidTokens, tokenCost);
   S.gold = BN.sub(S.gold, goldCost);
   w.enchant = { grade: 1, lines: rollEnchantLines(1), pity: 0 };
   log(`⚒️ <b>각인 부여!</b> ${gradeTag(w)}에 <span class="grade-레어">레어</span> 각인이 새겨졌습니다.`, 'lg-prim');
@@ -6479,9 +6479,9 @@ function resetEnchant(w) {
   const grade = w.enchant.grade;
   const tokenCost = ENCHANT_TOKEN_COST[grade];
   const goldCost = enchantGoldCost(grade);
-  if ((S.raidTokens || 0) < tokenCost) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
+  if (BN.lt(S.raidTokens, tokenCost)) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
   if (BN.lt(S.gold, goldCost)) { log(`골드가 부족합니다 (${fmt(goldCost)} 필요)`, 'lg-bad'); return; }
-  S.raidTokens -= tokenCost;
+  S.raidTokens = BN.sub(S.raidTokens, tokenCost);
   S.gold = BN.sub(S.gold, goldCost);
   const ceiling = ENCHANT_CEILING[grade];
   const canPromote = grade < ENCHANT_MAX_GRADE;
@@ -6525,7 +6525,7 @@ function renderEnchantBox() {
   const ceiling = ENCHANT_CEILING[grade];
   const tokenCost = ENCHANT_TOKEN_COST[grade];
   const goldCost = enchantGoldCost(grade);
-  const canAfford = (S.raidTokens || 0) >= tokenCost && BN.gte(S.gold, goldCost);
+  const canAfford = BN.gte(S.raidTokens, tokenCost) && BN.gte(S.gold, goldCost);
   box.innerHTML = `
     <div style="font-size:13px;margin-bottom:6px;">${gradeTag(w)} — 각인 등급 <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span></div>
     <div class="lg-prim" style="margin-bottom:2px;">${enchantLineText(en.lines[0])}</div>
@@ -6595,8 +6595,8 @@ function tryEnhance(advanced, targetWeapon) {
   if (BN.lt(S.gold, cost)) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
   // 태초/고대 무기: 골드 외에 "무기의 정수"도 함께 필요 (고대는 태초보다 적게)
   const essenceNeed = essenceCostFor(w);
-  if (essenceNeed > 0 && (S.weaponEssence || 0) < essenceNeed) {
-    log(`무기의 정수가 부족합니다! (필요 ${essenceNeed}, 보유 ${S.weaponEssence || 0}) — 고대의 도서관에서 획득하세요`, 'lg-bad');
+  if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) {
+    log(`무기의 정수가 부족합니다! (필요 ${essenceNeed}, 보유 ${fmt(S.weaponEssence)}) — 고대의 도서관에서 획득하세요`, 'lg-bad');
     return;
   }
   // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름). 고급 강화는 배수 소모.
@@ -6604,12 +6604,12 @@ function tryEnhance(advanced, targetWeapon) {
   const matNeed = highMatsNeeded(w.enhance) * (advanced ? advancedEnhMult() : 1);
   const matSt = highMatStatus(w.grade, matNeed);
   if (!matSt.ok) {
-    log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${matSt.tokensHave}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
+    log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
     return;
   }
   if (freeThisTry) { fx.freeEnhance = false; log('🕯️ 끝나지 않은 맹세 발동! 이번 강화는 무료입니다.', 'lg-prim'); }
   S.gold = BN.sub(S.gold, cost);
-  if (essenceNeed > 0) S.weaponEssence -= essenceNeed;
+  if (essenceNeed > 0) S.weaponEssence = BN.sub(S.weaponEssence, essenceNeed);
   if (matNeed > 0) {
     consumeHighMatsWithTokens(w.grade, matNeed);
     if (matSt.shortfall > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
@@ -6804,7 +6804,7 @@ function autoEnhanceTick() {
     if (!matSt.ok) {
       const target = autoEnhanceTarget;
       stopAutoEnhance();
-      log(`⚙️ 고급 재료가 부족해 자동 강화(목표 +${target})를 중지했습니다. (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${matSt.tokensHave}개)`, 'lg-bad');
+      log(`⚙️ 고급 재료가 부족해 자동 강화(목표 +${target})를 중지했습니다. (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개)`, 'lg-bad');
       return;
     }
   }
@@ -7342,13 +7342,13 @@ function migrate(d) {
   if (typeof d.mats !== 'object' || d.mats === null || Array.isArray(d.mats)) d.mats = {};
   if (!d.raid || typeof d.raid !== 'object') d.raid = { day: null, count: 0, done: {} };
   if (typeof d.raid.done !== 'object' || d.raid.done === null) d.raid.done = {};
-  if (typeof d.raidTokens !== 'number') d.raidTokens = 0;
+  d.raidTokens = BN.from(d.raidTokens);
   if (!d.punch || typeof d.punch !== 'object') d.punch = { best: BN.from(0), last: BN.from(0) };
   d.punch.best = BN.from(d.punch.best);
   d.punch.last = BN.from(d.punch.last);
   if (!Array.isArray(d.ancientSeals)) d.ancientSeals = [];
   if (typeof d.raidMaxCleared !== 'number') d.raidMaxCleared = 0;
-  if (typeof d.awakeningEssence !== 'number') d.awakeningEssence = 0;
+  d.awakeningEssence = BN.from(d.awakeningEssence);
   if (!d.library || typeof d.library !== 'object') d.library = { week: null, count: 0, best: 0 };
   if (typeof d.library.done !== 'object' || d.library.done === null) d.library.done = {};
   if (!Array.isArray(d.relics)) d.relics = [];
@@ -7438,7 +7438,7 @@ function migrate(d) {
     if (!Array.isArray(w.runes)) w.runes = w.rune ? [w.rune] : [];
     delete w.rune;
   }
-  if (typeof d.weaponEssence !== 'number' || d.weaponEssence !== d.weaponEssence) d.weaponEssence = 0;
+  d.weaponEssence = BN.from(d.weaponEssence);
   // 죽은 무기 참조 정리 (id가 인벤토리에 없으면 해제)
   if (d.equipped != null && !d.weapons.some(w => w.id === d.equipped)) d.equipped = null;
   return d;
@@ -7899,12 +7899,12 @@ function renderEnhance() {
   const matSt = highMatStatus(w.grade, matNeed);
   const matOk = matSt.ok;
   const matText = matNeed > 0
-    ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matSt.have}/${matSt.need}</b>${matSt.shortfall > 0 ? ` <span style="font-size:11px;color:${matSt.ok ? '#7de08a' : '#ff7a7a'}">(부족분 🎫${matSt.tokensNeed}개로 대체, 보유 🎫${matSt.tokensHave})</span>` : ''}</div>`
+    ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matSt.have}/${matSt.need}</b>${matSt.shortfall > 0 ? ` <span style="font-size:11px;color:${matSt.ok ? '#7de08a' : '#ff7a7a'}">(부족분 🎫${matSt.tokensNeed}개로 대체, 보유 🎫${fmt(matSt.tokensHave)})</span>` : ''}</div>`
     : '';
   const essenceNeed = maxed ? 0 : essenceCostFor(w);
-  const essenceOk = (S.weaponEssence || 0) >= essenceNeed;
+  const essenceOk = BN.gte(S.weaponEssence, essenceNeed);
   const essenceText = essenceNeed > 0
-    ? `<div>무기의 정수<b style="color:${essenceOk ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence || 0)}/${fmt(essenceNeed)}</b></div>`
+    ? `<div>무기의 정수<b style="color:${essenceOk ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence)}/${fmt(essenceNeed)}</b></div>`
     : '';
   const typeInfo = isFist(w) ? null : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   const flavor = weaponFlavorText(w);
@@ -8016,7 +8016,7 @@ function renderAwakening(w, maxed) {
     const slot = w.awakening[i];
     const locked = !slot && i > 0 && !w.awakening[i - 1];
     const cost = slot ? rank.rerollCost : rank.unlockCost;
-    const affordable = !locked && (S.awakeningEssence || 0) >= cost;
+    const affordable = !locked && BN.gte(S.awakeningEssence, cost);
     // 각성 등급도 기존 무기/룬 등급과 같은 색상 체계(일반=회색 ~ 전설=레전더리 빨강)를 그대로 재사용
     const rarityClass = slot ? (AWAKENING_RARITY_GRADE_CLASS[slot.rarity] || '') : '';
     const label = slot
@@ -9629,8 +9629,8 @@ function updateAutoBtn() {
 // 구현되기 전까지 무기의 정수를 얻을 정식 경로가 없어 QA 편의를 위해 임시로 마련해둔 것.
 window.cheatEssence = function (n) {
   n = n || 100;
-  S.weaponEssence = (S.weaponEssence || 0) + n;
-  log(`🔧 개발자 치트: 무기의 정수 +${n} (보유 ${S.weaponEssence})`, 'lg-prim');
+  S.weaponEssence = BN.add(S.weaponEssence, n);
+  log(`🔧 개발자 치트: 무기의 정수 +${n} (보유 ${fmt(S.weaponEssence)})`, 'lg-prim');
   renderEnhance(); save();
 };
 

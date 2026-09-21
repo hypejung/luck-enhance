@@ -5049,8 +5049,16 @@ function subEnhanceCost(sw) {
   const cost = anchor * Math.pow(1.35, sw.enhance);
   return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
+// 메인 무기(gradeAdjustedSuccess)와 동일한 방식: +15 미만은 등급 무관 동일, +15부터는
+// 등급이 높을수록 (성공확률)^지수로 더 가파르게 낮아진다(지수 자체도 메인 무기와 동일하게 재사용).
+function subGradeAdjustedSuccess(grade, enhance) {
+  const base = SUB_ENH.success[enhance] || 0;
+  if (enhance < 15) return base;
+  const exponent = 1 + (grade || 0) * ENH.gradeSuccessExp;
+  return Math.max(0.0000001, Math.pow(base / 100, exponent) * 100);
+}
 function subSuccessChance(sw) {
-  const base = SUB_ENH.success[sw.enhance] || 0;
+  const base = subGradeAdjustedSuccess(sw.grade, sw.enhance);
   return Math.min(100, base + (accEff().subEnh || 0) * 100 + subEnhanceEventSuccessBonus(sw.enhance));
 }
 function subDestroyChance(sw) {

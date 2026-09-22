@@ -3239,13 +3239,13 @@ function osirisBossJudgment() {
 const NEPHILIM = {
   generalDur: 8,        // 오크 제너럴 지속시간(초)
   shamanDur: 8,          // 오크 샤먼 지속시간(초)
-  generalAtkMult: 3.0,   // 제너럴 소환 중 공격력 배율
-  shamanTakenMult: 3.0,  // 샤먼 소환 중 적이 받는 피해 배율
+  generalAtkMult: 3.3,   // 제너럴 소환 중 공격력 배율
+  shamanTakenMult: 3.3,  // 샤먼 소환 중 적이 받는 피해 배율
   lordEvery: 3,          // 제너럴/샤먼이 몇 번 등장할 때마다 그 대신 오크로드가 소환되는지
   lordDur: 6,            // 오크로드 지속시간(초)
-  lordAtkMult: 6.0,      // 오크로드 소환 중 공격력 배율
-  lordBurstMult: 15.0,   // 오크로드 강림 즉시 그 순간 공격력의 몇 배를 고정 피해로 방출
-  // 펀치기계 측정 기준 카마소츠 대비 약 94% — 순수 전투형 태초 기준(90~110%) 충족
+  lordAtkMult: 6.6,      // 오크로드 소환 중 공격력 배율
+  lordBurstMult: 17.0,   // 오크로드 강림 즉시 그 순간 공격력의 몇 배를 고정 피해로 방출
+  // 펀치기계 측정 기준 카마소츠 대비 약 105% — 순수 전투형 태초 기준(90~110%) 충족, 상단부로 상향
 };
 function hasNephilim() { return hasGenesisEquipped('nephilim'); }
 // 다음 순환 페이즈 결정 — lord 페이즈 직후엔 lord로 대체되기 전 예정돼 있던 페이즈로 복귀한다.

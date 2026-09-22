@@ -10051,12 +10051,17 @@ function init() {
     S.equipped = best.id;
     log(`장착된 무기가 없어 자동 장착: ${gradeTag(best)}`);
   }
-  // 무기가 하나도 없으면 맨손 지급
-  if (!S.weapons.length) {
+  // 맨손은 재미로 강화해볼 수 있는 별도 무기라, 무기 보유 여부와 무관하게 없으면 항상 지급한다
+  // (이미 장착 무기가 있으면 장착은 바꾸지 않고 가방에만 추가 — 무기가 아예 없을 때만 장착까지 시켜준다).
+  if (!S.weapons.some(isFist)) {
     const fist = makeFist(0);
     S.weapons.push(fist);
-    S.equipped = fist.id;
-    log('✊ 소유한 무기가 없어 <b>맨손으로 시작합니다.</b> (맨손도 강화 가능!)', 'lg-prim');
+    if (!getEquipped()) {
+      S.equipped = fist.id;
+      log('✊ 소유한 무기가 없어 <b>맨손으로 시작합니다.</b> (맨손도 강화 가능!)', 'lg-prim');
+    } else {
+      log('✊ <b>맨손</b>을 가방에 새로 받았습니다. (재미로 강화해볼 수 있어요!)', 'lg-good');
+    }
   }
 
   // 탭

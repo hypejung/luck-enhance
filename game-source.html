@@ -3900,10 +3900,11 @@ function newState() {
     matAutoSell: {},   // 재료 자동판매 필터: 'f|g' 키가 true면 그 재료는 획득 즉시 자동 판매됨
     enhanceFxEnabled: true, // 강화 뜸들이기~리빌 연출 on/off (꺼두면 강화가 즉시 판정됨)
     lastSeenPatchVersion: latestPatchVersion(), // 신규 플레이어는 처음부터 전부 "읽은" 상태로 시작
-    // 전투 프리셋: 무기는 id로 참조, 장신구와 룬 구성(runeIds)은 스냅샷으로 저장한다.
+    // 전투 프리셋: 무기·보조무기는 id로 참조, 장신구와 룬 구성(runeIds)은 스냅샷으로 저장한다.
     // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서 id 참조만으론 "그때 그 구성"이 보장 안 됨.
+    // 보조무기는 룬이 없어서 id 참조만으로 충분하다.
     // 슬롯 자체는 항상 5개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
-    presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null })),
+    presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null })),
     presetSlots: 3,
     raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
     awakeningEssence: BN.from(0),   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
@@ -7786,8 +7787,10 @@ function migrate(d) {
   }
   if (!Array.isArray(d.presets) || !d.presets.length) d.presets = [];
   // 프리셋 슬롯을 5개로 확장하면서, 기존에 3개만 있던 세이브는 나머지를 빈 슬롯으로 채운다.
-  while (d.presets.length < 5) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null, runeIds: null });
+  while (d.presets.length < 5) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null });
   if (typeof d.presetSlots !== 'number' || d.presetSlots < 3) d.presetSlots = 3;
+  // 이전 버전 호환: 보조무기 프리셋 필드가 없던 세이브는 채워넣는다.
+  for (const p of d.presets) if (!('subWeaponId' in p)) p.subWeaponId = null;
   if (!Array.isArray(d.sealEquipped)) d.sealEquipped = [];
   if (typeof d.matAutoSell !== 'object' || d.matAutoSell === null || Array.isArray(d.matAutoSell)) d.matAutoSell = {};
   if (typeof d.enhanceFxEnabled !== 'boolean') d.enhanceFxEnabled = true;
@@ -9595,7 +9598,10 @@ function savePreset(idx) {
     // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서, 무기 id만으론 "저장 당시의 룬 구성"이
     // 보장되지 않는다 — 장착 중이던 룬의 id 목록을 스냅샷으로 별도 저장한다.
     p.runeIds = Array.isArray(w.runes) ? w.runes.map(r => r.id) : [];
-    log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)}), 장신구 ${p.accEquipped.length}개, 룬 ${p.runeIds.length}개를 저장했습니다.`, 'lg-good');
+    // 보조무기는 룬이 없어서 id 참조만 저장하면 충분하다. 장착 중이 아니면 null(=해제 상태 저장).
+    const sw = getEquippedSubweapon();
+    p.subWeaponId = sw ? sw.id : null;
+    log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)}), 장신구 ${p.accEquipped.length}개, 룬 ${p.runeIds.length}개${sw ? `, 보조무기(${subweaponGradeTag(sw)})` : ''}를 저장했습니다.`, 'lg-good');
     renderPresetTab(); save();
   };
   if (p.weaponId != null) {
@@ -9633,8 +9639,20 @@ function loadPreset(idx) {
     }
     if (missing > 0) runeNote = ` (룬 ${missing}개는 찾을 수 없거나 장착 불가해 제외됨)`;
   }
-  log(`📥 <b>${p.name}</b>을(를) 불러왔습니다.${w ? ` ${gradeTag(w)} 장착.` : ''}${runeNote}`, 'lg-prim');
-  renderAll(); save();
+  // 보조무기 복원: 프리셋 저장 당시 장착 중이었으면(subWeaponId != null) 그 보조무기로 교체하고,
+  // 저장 당시 미장착 상태였으면(null) 현재 장착 중인 보조무기도 함께 해제해 "그때 그 구성"을 그대로 재현한다.
+  let subNote = '';
+  if ('subWeaponId' in p) {
+    if (p.subWeaponId == null) {
+      S.subEquipped = null;
+    } else {
+      const sw = (S.subweapons || []).find(x => x.id === p.subWeaponId);
+      if (sw) S.subEquipped = sw.id;
+      else { S.subEquipped = null; subNote = ' (보조무기를 찾을 수 없어 해제됨: 판매·파괴됨)'; }
+    }
+  }
+  log(`📥 <b>${p.name}</b>을(를) 불러왔습니다.${w ? ` ${gradeTag(w)} 장착.` : ''}${runeNote}${subNote}`, 'lg-prim');
+  renderAll(); renderSubweaponTab(); save();
 }
 function renamePreset(idx, newName) {
   const p = S.presets[idx];
@@ -9672,7 +9690,14 @@ function renderPresetTab() {
     let summary;
     if (p2.weaponId == null) summary = '<span style="color:var(--sub)">저장된 내용 없음</span>';
     else if (!w) summary = '<span style="color:#ff7a7a">저장된 무기를 찾을 수 없음(판매·파괴됨)</span>';
-    else summary = `${gradeTag(w)}${accNames.length ? ` · 📿 ${accNames.join(', ')}` : ' · 장신구 없음'}${Array.isArray(p2.runeIds) ? ` · 🔮 룬 ${p2.runeIds.length}개` : ''}`;
+    else {
+      let subSummary = '';
+      if (p2.subWeaponId != null) {
+        const sw = (S.subweapons || []).find(x => x.id === p2.subWeaponId);
+        subSummary = sw ? ` · 🗡️ ${subweaponGradeTag(sw)}` : ' · <span style="color:#ff7a7a">보조무기를 찾을 수 없음</span>';
+      }
+      summary = `${gradeTag(w)}${accNames.length ? ` · 📿 ${accNames.join(', ')}` : ' · 장신구 없음'}${Array.isArray(p2.runeIds) ? ` · 🔮 룬 ${p2.runeIds.length}개` : ''}${subSummary}`;
+    }
     div.className = 'invitem';
     div.innerHTML = `
       <div style="flex:1;min-width:0;">

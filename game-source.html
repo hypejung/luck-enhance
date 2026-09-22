@@ -2893,7 +2893,44 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'osiris', name: '부활의 굴레와 심판의 저울' },
   },
-  null, null, null, null,
+  { // floor 6 — 오크 진지 — 오크 전사
+    id: 'nephilim',
+    floor: 6,
+    type: 'weapon',
+    name: '네피림의 진군나팔',
+    subtitle: 'Nephilim, the Mighty Ones of Old',
+    icon: '📯',
+    art: 'assets/artifacts/nephilim_horn.svg',
+    lore: `태초에, 하늘의 아들들이 땅의 딸들을 보고 내려왔다.
+
+그렇게 태어난 것들은 사람이었으나, 사람이 아니었다.
+
+키는 산봉우리에 닿았고, 한 걸음에 골짜기를 건넜다. 그들은 옛적의 용사, 이름을 떨친 자들이라 불렸다.
+
+그러나 그 힘은 다스려지지 않았다. 손에 잡히는 모든 것을 먹어치웠다. 짐승을 먹고, 사람을 먹고, 마침내는 서로를 먹었다.
+
+땅은 그들의 발밑에서 울부짖었다. 하늘은 그들을 내려다보며 후회했다.
+
+그래서 큰 물이 내려와 그들을 삼켰다고 전해진다. 그러나 뼈까지 씻겨나가지는 않았다.
+
+깊은 곳에 가라앉은 그 골격은, 다시 태어날 날을 기다렸다.
+
+수많은 세대가 지나, 그 피와 뼈를 이어받은 것들이 진지를 세우고 나팔을 불기 시작했다.
+
+사람들은 그 옛적 용사들의 이름을 다시 불렀다.
+
+네피림(Nephilim).
+
+땅을 먹어치우던 자들, 그리고 나팔 소리에 다시 일어서는 자들.`,
+    effectsText: [
+      '군세의 나팔: 나팔이 울릴 때마다, 진지의 전열이 통째로 바뀐다.',
+      '옛적 용사의 강림: 아주 가끔, 그 옛날의 거인이 직접 전장에 내려선다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'nephilim', name: '군세의 나팔과 옛적 용사의 강림' },
+  },
+  null, null, null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -3193,6 +3230,70 @@ function osirisBossJudgment() {
       dealMonDamage(maxHp * OSIRIS.bossBurstPct);
     }
   }
+}
+
+// 네피림의 진군나팔(태초의 유물): 오크 제너럴(공격력 배율)과 오크 샤먼(적이 받는 피해 배율)이
+// 짧은 주기로 계속 번갈아 등장하고, 일정 순환마다 그 대신 오크로드가 강림해 즉시 확정 강타를
+// 날린 뒤 더 강한 배율로 잠시 활약한다. 일반 사냥/보스전 구분 없이 항상 동일하게 순환하며(사냥터
+// 전환에도 끊기지 않음), 전투 시작(보스전/토벌전/도서관/펀치기계) 시에만 처음부터 다시 시작한다.
+const NEPHILIM = {
+  generalDur: 8,        // 오크 제너럴 지속시간(초)
+  shamanDur: 8,          // 오크 샤먼 지속시간(초)
+  generalAtkMult: 3.0,   // 제너럴 소환 중 공격력 배율
+  shamanTakenMult: 3.0,  // 샤먼 소환 중 적이 받는 피해 배율
+  lordEvery: 3,          // 제너럴/샤먼이 몇 번 등장할 때마다 그 대신 오크로드가 소환되는지
+  lordDur: 6,            // 오크로드 지속시간(초)
+  lordAtkMult: 6.0,      // 오크로드 소환 중 공격력 배율
+  lordBurstMult: 15.0,   // 오크로드 강림 즉시 그 순간 공격력의 몇 배를 고정 피해로 방출
+  // 펀치기계 측정 기준 카마소츠 대비 약 94% — 순수 전투형 태초 기준(90~110%) 충족
+};
+function hasNephilim() { return hasGenesisEquipped('nephilim'); }
+// 다음 순환 페이즈 결정 — lord 페이즈 직후엔 lord로 대체되기 전 예정돼 있던 페이즈로 복귀한다.
+function nephilimNextPhase() {
+  const cur = fx.nephilimPhase;
+  if (cur === 'lord') return fx.nephilimPreLordNext || 'general';
+  const next = cur === 'general' ? 'shaman' : 'general';
+  fx.nephilimGSCount = (fx.nephilimGSCount || 0) + 1;
+  if (fx.nephilimGSCount % NEPHILIM.lordEvery === 0) {
+    fx.nephilimPreLordNext = next;
+    return 'lord';
+  }
+  return next;
+}
+function nephilimPhaseDur(phase) {
+  return phase === 'general' ? NEPHILIM.generalDur : phase === 'shaman' ? NEPHILIM.shamanDur : NEPHILIM.lordDur;
+}
+function nephilimTick(now) {
+  if (!hasNephilim()) return;
+  if (!fx.nephilimUntil) {
+    fx.nephilimPhase = 'general';
+    fx.nephilimUntil = now + NEPHILIM.generalDur * 1000;
+    floatText('⚔️ 오크 제너럴!');
+    return;
+  }
+  if (now < fx.nephilimUntil) return;
+  const next = nephilimNextPhase();
+  fx.nephilimPhase = next;
+  fx.nephilimUntil = now + nephilimPhaseDur(next) * 1000;
+  if (next === 'lord') {
+    const w = getEquipped();
+    if (w) {
+      floatText('👹 오크로드 강림!');
+      dealMonDamage(weaponAtk(w) * NEPHILIM.lordBurstMult);
+    }
+  } else {
+    floatText(next === 'general' ? '⚔️ 오크 제너럴!' : '🔮 오크 샤먼!');
+  }
+}
+function nephilimAtkBonusPct() {
+  if (!hasNephilim()) return 0;
+  if (fx.nephilimPhase === 'general') return NEPHILIM.generalAtkMult - 1;
+  if (fx.nephilimPhase === 'lord') return NEPHILIM.lordAtkMult - 1;
+  return 0;
+}
+function nephilimTakenMult() {
+  if (!hasNephilim()) return 1;
+  return fx.nephilimPhase === 'shaman' ? NEPHILIM.shamanTakenMult : 1;
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -3987,7 +4088,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct());
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct());
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -4836,6 +4937,8 @@ const mon = { hp: BN.from(0), maxHp: BN.from(0), atkTimer: 0, spawnTimer: 0, dea
 // 별도로 누적"하는 방식으로 측정한다 — mon.hp 차감과 무관하게 punchDealtOverflow가 정확한
 // 총합을 갖는다.
 function dealMonDamage(amount) {
+  // 네피림(태초의 유물): 오크 샤먼이 소환된 동안엔 적이 받는 모든 피해가 배율만큼 증폭된다.
+  amount = amount * nephilimTakenMult();
   if (bossFight.active && bossFight.isPunch) punchDealtOverflow = BN.add(punchDealtOverflow, amount);
   // 천구(태초의 유물): 만월이 떠있는 동안 입힌 모든 피해를 누적(다른 무기로 바꾸면 더 이상 쌓이지 않음)
   if (fx.tiangouUntil && Date.now() < fx.tiangouUntil && hasGenesisEquipped('tiangou')) {
@@ -5791,6 +5894,8 @@ function tick(dt) {
   wapaqGrow(nowDecay);
   // 천구의 월아(태초의 유물): 주기적으로 만월 발동/종료 체크
   tiangouTick(nowDecay);
+  // 네피림(태초의 유물): 오크 제너럴/샤먼/로드 순환 진행
+  nephilimTick(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -6319,6 +6424,10 @@ function resetTimedStacks() {
   fx.redcapBossStacks = 0;
   fx.redcapBossAccum = 0;
   fx.osirisThresholds = {};
+  fx.nephilimPhase = null;
+  fx.nephilimUntil = 0;
+  fx.nephilimGSCount = 0;
+  fx.nephilimPreLordNext = null;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

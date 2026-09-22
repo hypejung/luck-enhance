@@ -489,7 +489,7 @@
       <span class="stat" id="dpsshow">DPS 0</span>
     </div>
   </div>
-  <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! 9/20 하루(자정~자정), 강화 성공률 UP · 파괴/하락 확률 DOWN · 비용 대폭 할인! 🌟✨</div>
+  <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! (매주 수·일 자정~자정) 파괴/하락 확률 절반 · 비용 30% 할인! 🌟✨</div>
 
   <div id="tabs">
     <div class="tabgroup" data-group="combat">
@@ -2156,7 +2156,7 @@ const RAID = {
   tokenBase: 5,            // 0단계 토벌의 증표 보상
   tokenGrowthBase: 0.35,   // 0단계에서의 단계당 성장률(=×1.35)
   tokenGrowthLinear: 0.01, // 단계마다 성장률 자체가 이만큼씩 더 커짐
-  dailyTotal: 3,        // 하루 총 도전 가능 횟수(전체 단계 합산)
+  dailyTotal: 4,        // 하루 총 도전 가능 횟수(전체 단계 합산)
 };
 // 단계가 오를수록 성장률 자체가 커지는 가속형 누적 배율 (0단계부터 stage단계까지 매 단계의
 // (1+growthBase+growthLinear*s) 배율을 전부 곱함)
@@ -2379,36 +2379,24 @@ function todayKey() {
   return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
 }
 
-// ---------- 이벤트: 강화데이 (샤이닝스타포스데이 컨셉, 로컬 자정~다음날 자정 하루) ----------
-// 서버 없는 정적 사이트라 실시간 토글은 불가능 — todayKey()(위와 같은 "로컬 자정 기준
-// 하루" 계산)와 비교할 날짜를 미리 코드에 박아넣고 배포하는 방식. 이벤트를 또 열 때는
-// 이 배열에 날짜(YYYYMMDD)만 추가해서 재배포하면 된다.
+// ---------- 이벤트: 강화데이 (매주 수요일·일요일, 로컬 자정~다음날 자정) ----------
+// 예전엔 성공확률 보너스까지 얹어주는 "고강도" 이벤트를 특정 날짜에만 수동으로 여는
+// 방식이었는데, 상시로 자주 도는 이벤트가 되면서 확률 보너스는 빼고 "위험 부담을 줄여주는"
+// 쪽으로 성격을 바꿨다 — 파괴/하락 확률을 낮추고 비용을 할인해주되, 성공확률 자체는
+// 건드리지 않는다. 요일 기반이라 서버 없이도 자동으로 반복된다.
 // (RUNE_BOXES 등 일부 데이터가 모듈 로드 시점에 enhanceCost()를 미리 호출하므로, 이 블록은
-// todayKey() 바로 다음, 그런 이른 호출들보다 반드시 앞에 위치해야 한다.)
-const ENHANCE_EVENT_DATES = [20260920]; // 2026-09-20 00:00 ~ 09-21 00:00 (로컬)
-function enhanceEventActive() { return ENHANCE_EVENT_DATES.includes(todayKey()); }
+// 그런 이른 호출들보다 반드시 앞에 위치해야 한다.)
+function enhanceEventActive() { const dow = new Date().getDay(); return dow === 0 || dow === 3; } // 일요일(0)·수요일(3)
 const ENHANCE_EVENT = {
-  mainSuccessCap: 23, mainSuccessValue: 5,  // 메인: ENH_BONUS_SOURCES와 같은 방식(23강 기준 +5%p)
-  subSuccessCap: 20, subSuccessValue: 7,    // 보조: 같은 방식(20강 기준 +7%p)
-  destroyMult: 0.5,                          // 파괴확률 전 구간 절반(고급강화와 곱연산되면 1/4)
-  downgradeThreshold: 20, downgradeMultLow: 0.3, downgradeMultHigh: 0.5, // 하락확률: 20강 이하 -70%, 초과 -50%
-  costThreshold: 20, costMultLow: 0.5, costMultHigh: 0.7,                 // 골드/재료: 20강 이하 -50%, 초과 -30%
+  destroyMult: 0.5,   // 파괴확률 전 구간 절반(고급강화와 곱연산되면 1/4)
+  downgradeMult: 0.5, // 하락확률 전 구간 절반(등급·강화단계 무관 균일)
+  costMult: 0.7,      // 골드/재료 소모 30% 감소(전 구간 균일)
 };
-function enhanceEventSuccessBonus(enhance) {
-  if (!enhanceEventActive()) return 0;
-  return ENHANCE_EVENT.mainSuccessValue * (ENH.success[enhance] / ENH.success[ENHANCE_EVENT.mainSuccessCap]);
-}
-function subEnhanceEventSuccessBonus(enhance) {
-  if (!enhanceEventActive()) return 0;
-  return ENHANCE_EVENT.subSuccessValue * (SUB_ENH.success[enhance] / SUB_ENH.success[ENHANCE_EVENT.subSuccessCap]);
-}
 function enhanceEventDowngradeMult(enhance) {
-  if (!enhanceEventActive()) return 1;
-  return enhance <= ENHANCE_EVENT.downgradeThreshold ? ENHANCE_EVENT.downgradeMultLow : ENHANCE_EVENT.downgradeMultHigh;
+  return enhanceEventActive() ? ENHANCE_EVENT.downgradeMult : 1;
 }
 function enhanceEventCostMult(enhance) {
-  if (!enhanceEventActive()) return 1;
-  return enhance <= ENHANCE_EVENT.costThreshold ? ENHANCE_EVENT.costMultLow : ENHANCE_EVENT.costMultHigh;
+  return enhanceEventActive() ? ENHANCE_EVENT.costMult : 1;
 }
 
 function raidEnsureDay() {
@@ -2437,16 +2425,16 @@ function raidGoldReward(stage) {
   return Math.floor(base * raidAccelMult(stage, RAID.goldGrowthBase, RAID.goldGrowthLinear));
 }
 
-// ---------- 고대의 도서관 (토벌전보다 상위 컨텐츠, 주간 도전 · 서고 선택형) ----------
+// ---------- 고대의 도서관 (토벌전보다 상위 컨텐츠, 주 2회 초기화 · 서고 선택형) ----------
 // 1단계(깊이 0) 난이도 = 토벌전 12단계(stage index 11)와 동급으로 시작하되, 단계 성장률은
 // 토벌전보다 훨씬 가파르게(2.8배) 잡아서 몇 단계만 더 들어가도 토벌전을 추월한다.
 // 기존엔 "최고 기록"만 갱신 가능한 구조라 실력이 막히면 그 순간부터 영구적으로 보상이
 // 0이 되는 문제가 있었다. 토벌전처럼 재도전(파밍)이 가능하도록, 현재 기록(S.library.best)
-// 이하의 서고 중 원하는 곳을 선택해서 도전할 수 있게 바꿨다 — 단, 자원 공급량이 과하게
-// 늘어나지 않도록 리셋 주기는 그대로 주간(3회) 유지하고, 이번 주에 이미 "클리어"한 서고는
-// 다음 주까지 다시 돌 수 없게 잠근다(S.library.done). 실패한 시도는 잠기지 않아 같은 주에
-// 다시 도전 가능하지만, 승패 무관하게 주간 도전 횟수는 소모한다(토벌전과 동일한 "도전
-// 자체가 소모" 철학).
+// 이하의 서고 중 원하는 곳을 선택해서 도전할 수 있게 바꿨다 — 리셋 주기는 매주 수요일·
+// 일요일 자정(2회/주, `libraryPeriodKey()`)이고, 이번 초기화 주기에 이미 "클리어"한 서고는
+// 다음 초기화까지 다시 돌 수 없게 잠근다(S.library.done). 실패한 시도는 잠기지 않아 같은
+// 주기에 다시 도전 가능하지만, 승패 무관하게 그 주기의 도전 횟수는 소모한다(토벌전과 동일한
+// "도전 자체가 소모" 철학).
 const LIBRARY = {
   timeLimit: 120,
   unlockRaidStage: 11,   // 토벌전 12단계(0-indexed 11) 클리어 시 해금
@@ -2455,7 +2443,7 @@ const LIBRARY = {
   // 유물/각성)를 이론상 최대치로 갖춘 상태를 기준으로, 20서고(깊이19) 클리어에 필요한 화력이
   // 태초 +27 정도가 되도록 역산해서 잡은 값.
   hpGrowth: 2.35,
-  weeklyTotal: 3,
+  weeklyTotal: 3,       // 초기화 주기(수요일/일요일 자정)당 도전 가능 횟수
   baseEssence: 20,       // 깊이 0의 무기의 정수 보상 (재상향)
   baseAwaken: 14,        // 깊이 0의 각성의 정수 보상 (재상향)
   rewardGrowth: 1.7,     // 정수 보상 성장률도 체력 완화에 맞춰 더 올림(기존 1.5)
@@ -2465,15 +2453,18 @@ const LIBRARY = {
 function libraryHp(depth) { return BN.floor(BN.mul(raidHp(LIBRARY.baseHpStage), BN.pow(LIBRARY.hpGrowth, depth))); }
 function libraryEssenceReward(depth) { return BN.floor(BN.mul(BN.pow(LIBRARY.rewardGrowth, depth), LIBRARY.baseEssence)); }
 function libraryAwakenReward(depth) { return BN.floor(BN.mul(BN.pow(LIBRARY.rewardGrowth, depth), LIBRARY.baseAwaken)); }
-function weekKey() {
-  // 로컬 자정 기준 날짜를 일수로 환산한 뒤, 7로 나눠 "주" 단위로 묶는다(정확한 달력
-  // 주 정렬보다는 "7일마다 로컬 자정에 바뀌는 안정적인 정수"면 충분).
+// 도서관은 일주일에 두 번(수요일·일요일 자정)씩 초기화된다 — "가장 최근에 지난 수요일 또는
+// 일요일"을 그 구간의 시작일로 삼아, 그 시작일의 dayIndex 자체를 구간 식별자로 쓴다(요일이
+// 바뀌는 시점마다 자연히 새 정수가 됨).
+function libraryPeriodKey() {
   const d = new Date();
   const dayIndex = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
-  return Math.floor(dayIndex / 7);
+  const dow = d.getDay(); // 0=일 1=월 2=화 3=수 4=목 5=금 6=토
+  const sinceAnchor = dow >= 3 ? dow - 3 : dow; // 수(3) 또는 일(0) 중 가장 최근 것부터 며칠 지났는지
+  return dayIndex - sinceAnchor;
 }
 function libraryEnsureWeek() {
-  const wk = weekKey();
+  const wk = libraryPeriodKey();
   if (S.library.week !== wk) { S.library.week = wk; S.library.count = 0; S.library.done = {}; S.osirisLibraryRefundThisWeek = 0; }
 }
 function libraryUnlocked() { return (S.raidMaxCleared || 0) > LIBRARY.unlockRaidStage; }
@@ -4009,7 +4000,7 @@ function newState() {
     presetSlots: 3,
     raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
     awakeningEssence: BN.from(0),   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
-    library: { week: null, count: 0, best: 0, done: {} }, // 고대의 도서관: 주간 도전 횟수 + 최고 깊이 기록 + 이번 주 클리어한 서고(재도전 잠금)
+    library: { week: null, count: 0, best: 0, done: {} }, // 고대의 도서관: 초기화 주기(수·일 자정)별 도전 횟수 + 최고 깊이 기록 + 이번 주기 클리어한 서고(재도전 잠금)
     relics: [],            // 고대의 유물 컬렉션: [true/false, ...] 20개, index = 층 번호
     subBossCodexSeen: [],  // 보스 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
     subRelics: [],         // 고대 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
@@ -4151,7 +4142,7 @@ const ENH_BONUS_SOURCES = [
 ];
 
 function enhTierBonus(enhance) {
-  let bonus = enhanceEventSuccessBonus(enhance);
+  let bonus = 0;
   for (const src of ENH_BONUS_SOURCES) {
     if (!src.has()) continue;
     bonus += src.value * (ENH.success[enhance] / ENH.success[src.cap]);
@@ -4602,7 +4593,7 @@ function playerDPS() {
 function enhanceCost(w) {
   // 기본비용 × costGrowth^단계 로 기하급수적 상승 (저강화도 결코 싸지 않음)
   const cost = GRADES[w.grade].enhanceCost * Math.pow(ENH.costGrowth, w.enhance);
-  return Math.floor(cost * enhanceEventCostMult(w.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
+  return Math.floor(cost * enhanceEventCostMult(w.enhance)); // 강화데이: 비용 30% 할인
 }
 // 태초 무기 전용 강화 재화: 골드 외에 "무기의 정수"도 함께 소모한다. 정식 획득처("고대의
 // 도서관")가 아직 구현되지 않아 당장은 완강이 불가능한 게 의도된 설계 — 장기 목표로 남겨둔다.
@@ -4621,7 +4612,7 @@ const HIGH_MAT_START = 15;
 const HIGH_MAT_MULT = 5;
 function highMatsNeeded(enhance) {
   const need = enhance >= HIGH_MAT_START ? (enhance - (HIGH_MAT_START - 1)) * HIGH_MAT_MULT : 0;
-  return Math.round(need * enhanceEventCostMult(enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
+  return Math.round(need * enhanceEventCostMult(enhance)); // 강화데이: 비용 30% 할인
 }
 // 무기 등급별로 사용 가능한 고급 재료의 사냥터 구간(0-index 층 범위)이 정해져 있다.
 // 일반~레어: 1~6단계, 에픽~유니크: 7~12단계, 레전더리~신화: 13~19단계, 태초: 20단계
@@ -5514,7 +5505,7 @@ function subEnhanceCost(sw) {
   // 수급처가 더 늘어난 상태라는 점을 반영).
   const anchor = GRADES[sw.grade].enhanceCost / floorGold(0) * floorGold(WORLD2_START_FLOOR) * SUB_ENH_COST_EXTRA_MULT;
   const cost = anchor * Math.pow(1.35, sw.enhance);
-  return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
+  return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 비용 30% 할인
 }
 // 메인 무기(gradeAdjustedSuccess)와 동일한 방식: +15 미만은 등급 무관 동일, +15부터는
 // 등급이 높을수록 (성공확률)^지수로 더 가파르게 낮아진다(지수 자체도 메인 무기와 동일하게 재사용).
@@ -5526,7 +5517,7 @@ function subGradeAdjustedSuccess(grade, enhance) {
 }
 function subSuccessChance(sw) {
   const base = subGradeAdjustedSuccess(sw.grade, sw.enhance);
-  return Math.min(100, base + (accEff().subEnh || 0) * 100 + subEnhanceEventSuccessBonus(sw.enhance));
+  return Math.min(100, base + (accEff().subEnh || 0) * 100);
 }
 function subDestroyChance(sw) {
   const base = SUB_ENH.destroy[sw.enhance] || 0;
@@ -6644,9 +6635,9 @@ function startLibraryFight(depth) {
   libraryEnsureWeek();
   // depth: 현재 기록(S.library.best) 이하의 서고 중 선택 — 그 이상(아직 못 뚫은 곳)은 선택 불가
   if (!Number.isInteger(depth) || depth < 0 || depth > S.library.best) { log('도전할 수 없는 서고입니다.', 'lg-bad'); return; }
-  // unlimitedAttempts: 테스트 계정 전용 필드(정상 플레이로는 절대 붙지 않음) — 주간 제한 무시
-  if (!S.unlimitedAttempts && S.library.done[depth]) { log('이 서고는 이번 주에 이미 클리어했습니다. 다음 주에 다시 도전할 수 있습니다.', 'lg-bad'); return; }
-  if (!S.unlimitedAttempts && S.library.count >= LIBRARY.weeklyTotal) { log(`이번 주 도서관 도전 횟수를 모두 사용했습니다. (주간 ${LIBRARY.weeklyTotal}회)`, 'lg-bad'); return; }
+  // unlimitedAttempts: 테스트 계정 전용 필드(정상 플레이로는 절대 붙지 않음) — 초기화 주기 제한 무시
+  if (!S.unlimitedAttempts && S.library.done[depth]) { log('이 서고는 이번 초기화 주기에 이미 클리어했습니다. 다음 초기화(수요일·일요일 자정)에 다시 도전할 수 있습니다.', 'lg-bad'); return; }
+  if (!S.unlimitedAttempts && S.library.count >= LIBRARY.weeklyTotal) { log(`이번 초기화 주기 도서관 도전 횟수를 모두 사용했습니다. (수·일 초기화, 주기당 ${LIBRARY.weeklyTotal}회)`, 'lg-bad'); return; }
   // 도전 시작 시점에 즉시 소모(승패 무관 — 토벌전과 동일한 "도전 자체가 소모" 철학)
   S.library.count++;
   resetTimedStacks();
@@ -6675,7 +6666,7 @@ function endLibraryFight(win) {
   $('libraryMonEmoji').classList.remove('boss-glow');
   if (win) {
     onGenesisHungerKill();
-    S.library.done[depth] = true; // 이 서고는 다음 주까지 재도전 불가
+    S.library.done[depth] = true; // 이 서고는 다음 초기화 주기까지 재도전 불가
     S.library.best = Math.max(S.library.best, depth + 1); // 새 기록 갱신(이미 깬 서고 재도전이면 그대로)
     const w = getEquipped();
     // 레드캡(태초의 유물): 보스전 중 쌓은 전리품 스택 비례로 처치 보상 상승
@@ -6741,13 +6732,13 @@ function renderLibraryBox() {
     rows.push(`
       <div class="invitem">
         <div><div class="wn">📖 <span class="grade-태초">제${depth + 1}서고</span>${depth === S.library.best ? ' <span style="color:var(--unique);font-size:12px">(신규 기록)</span>' : ''}</div>
-        <div class="wi">HP ${fmt(hp)} · 보상: 📜 ${fmt(essence)} / 💠 ${fmt(awaken)}${cleared ? ' <span style="color:var(--sub)">(이번 주 클리어함)</span>' : ''}</div></div>
+        <div class="wi">HP ${fmt(hp)} · 보상: 📜 ${fmt(essence)} / 💠 ${fmt(awaken)}${cleared ? ' <span style="color:var(--sub)">(이번 주기 클리어함)</span>' : ''}</div></div>
         <div class="btns"><button class="lib-challenge-btn" data-depth="${depth}"></button></div>
       </div>`);
   }
   box.innerHTML = `
-    <div style="font-size:13px;margin-bottom:8px;">최고 기록: <b style="color:var(--gold)">제${S.library.best}서고 돌파</b> · 이번 주 도전: <b>${S.library.count}/${LIBRARY.weeklyTotal}</b></div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">현재 기록 이하의 서고 중 원하는 곳을 골라 도전하세요. 승패 무관하게 도전 횟수가 소모되고, 클리어한 서고는 다음 주까지 재도전할 수 없습니다.</div>
+    <div style="font-size:13px;margin-bottom:8px;">최고 기록: <b style="color:var(--gold)">제${S.library.best}서고 돌파</b> · 이번 주기 도전: <b>${S.library.count}/${LIBRARY.weeklyTotal}</b></div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">현재 기록 이하의 서고 중 원하는 곳을 골라 도전하세요(매주 수요일·일요일 자정 초기화). 승패 무관하게 도전 횟수가 소모되고, 클리어한 서고는 다음 초기화까지 재도전할 수 없습니다.</div>
     ${rows.reverse().join('')}
     <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
       <div style="font-size:13px;margin-bottom:6px;">📖 고대의 유물 (${relicCollectedCount()}/${RELICS.length})</div>
@@ -6762,8 +6753,8 @@ function renderLibraryBox() {
     const depth = +btn.dataset.depth;
     const cleared = !!S.library.done[depth];
     if (bossFight.active) { btn.textContent = '전투 중'; btn.disabled = true; }
-    else if (cleared && !S.unlimitedAttempts) { btn.textContent = '이번 주 클리어함'; btn.disabled = true; }
-    else if (weeklyLeft <= 0 && !S.unlimitedAttempts) { btn.textContent = '주간 횟수 소진'; btn.disabled = true; }
+    else if (cleared && !S.unlimitedAttempts) { btn.textContent = '이번 주기 클리어함'; btn.disabled = true; }
+    else if (weeklyLeft <= 0 && !S.unlimitedAttempts) { btn.textContent = '이번 주기 횟수 소진'; btn.disabled = true; }
     else { btn.textContent = '도전'; btn.className = 'lib-challenge-btn primary'; btn.onclick = () => startLibraryFight(depth); }
   });
 }
@@ -6912,7 +6903,7 @@ function fleeBoss() {
     : bossFight.isPunch
       ? '펀치기계 측정을 중단하시겠습니까? (지금까지의 누적 데미지로 기록됩니다)'
       : bossFight.isLibrary
-        ? '고대의 도서관 도전을 포기하시겠습니까? (이미 소모된 이번 주 도전 횟수는 돌아오지 않습니다)'
+        ? '고대의 도서관 도전을 포기하시겠습니까? (이미 소모된 이번 주기 도전 횟수는 돌아오지 않습니다)'
         : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
   showConfirmModal(msg, () => {
     log(bossFight.isRaid ? '🏳️ 토벌전을 포기했습니다.' : bossFight.isPunch ? '🏳️ 펀치기계 측정을 중단했습니다.' : bossFight.isLibrary ? '🏳️ 고대의 도서관 도전을 포기했습니다.' : '🏳️ 보스전을 포기했습니다.', 'lg-bad');

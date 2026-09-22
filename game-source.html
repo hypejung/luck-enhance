@@ -2937,7 +2937,38 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'nephilim', name: '군세의 나팔과 옛적 용사의 강림' },
   },
-  null, null, null,
+  { // floor 7 — 거미 둥지 — 독거미
+    id: 'arachne',
+    floor: 7,
+    type: 'weapon',
+    name: '아라크네의 저주받은 실',
+    subtitle: 'Arachne, the Cursed Weaver',
+    icon: '🧵',
+    art: 'assets/artifacts/arachne_thread.svg',
+    lore: `아라크네의 손은 원래 무기를 쥐라고 태어난 손이 아니었다.
+
+베틀 앞에 앉으면, 그 손끝에서 세상 어떤 장인도 흉내 낼 수 없는 천이 태어났다. 신들조차 그 솜씨에 감탄했다.
+
+그러나 아테나는 감탄 대신 분노를 택했다. 인간이, 감히 신의 솜씨를 앞질렀다는 이유만으로.
+
+찢겨진 것은 천만이 아니었다. 아라크네는 스스로 목을 맸다. 여신은 그 목숨마저 앗아가지 않는 것으로 벌을 완성했다 — 대신 그녀를 영원히 실을 뽑는 몸으로 바꿔놓았다.
+
+그날 이후, 아라크네의 손끝에서 나오는 실은 더 이상 아름답지 않았다.
+
+한 올 한 올에 원한이 배어들었다. 스치기만 해도 서서히 살이 썩어들어갔고, 그 실이 충분히 감기면, 배어있던 독이 한꺼번에 흘러나왔다.
+
+그녀는 더 이상 무기를 휘두르지 않는다. 그저, 실을 짤 뿐이다.
+
+그리고 그 실이, 서서히 모든 것을 죽인다.`,
+    effectsText: [
+      '저주받은 손: 그 손은 무기가 아닌 베틀을 쥐던 손 — 직접 겨눈 칼끝은 무디기 그지없다.',
+      '감겨오는 실: 감길수록 그 몸은 무뎌지고, 스며든 독은 때가 되면 한꺼번에 새어나온다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: 0.1,
+    uniqueSkill: { key: 'arachne', name: '저주받은 손과 감겨오는 실' },
+  },
+  null, null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -3301,6 +3332,54 @@ function nephilimAtkBonusPct() {
 function nephilimTakenMult() {
   if (!hasNephilim()) return 1;
   return fx.nephilimPhase === 'shaman' ? NEPHILIM.shamanTakenMult : 1;
+}
+
+// 아라크네의 저주받은 실(태초의 유물): 기본 공격력이 크게 줄어드는 대신(dmgMultOverride),
+// 공격할 때마다 "직조" 스택이 전투 끝날 때까지 무제한 누적되어 대상이 받는 피해를 계속
+// 늘린다. 일정 횟수(weaveEvery)마다 "맹독의 실"이 5초간 발동해 매초 (직조 스택×공격력)에
+// 비례한 도트 피해를 주며, 발동 중엔 직조 스택이 늘지 않는다(끝나면 다시 쌓이기 시작).
+// "스택 쌓아서 한 번에 터뜨리는" 기존 패턴과 다르게, 순간 폭발 없이 계속 세지는 지속딜+
+// 디버프 구조로 설계.
+const ARACHNE = {
+  weaveEvery: 15,          // 공격 몇 회마다 맹독의 실이 발동되는지
+  venomDur: 5,             // 맹독의 실 지속시간(초)
+  venomTickInterval: 1,    // 맹독 틱 주기(초)
+  takenDebuffPerStack: 0.005, // 직조 스택 1당 대상이 받는 피해 증가(0.5%p, 무제한 누적)
+  venomTickCoeff: 2.0,     // 맹독 틱 피해 = 직조 스택 × 공격력 × 이 값 — 펀치기계 측정 기준 카마소츠 대비 약 95% (순수 전투형 태초 기준 90~110% 충족)
+};
+function hasArachne() { return hasGenesisEquipped('arachne'); }
+function arachneVenomActive() { return !!(fx.arachneVenomUntil && Date.now() < fx.arachneVenomUntil); }
+// 공격 시마다 호출 — attack()에서 주 타격 직후 호출
+function arachneOnAttack() {
+  if (!hasArachne() || arachneVenomActive()) return;
+  fx.arachneWeaveStacks = (fx.arachneWeaveStacks || 0) + 1;
+  fx.arachneSinceTrigger = (fx.arachneSinceTrigger || 0) + 1;
+  if (fx.arachneSinceTrigger >= ARACHNE.weaveEvery) {
+    fx.arachneSinceTrigger = 0;
+    const now = Date.now();
+    fx.arachneVenomUntil = now + ARACHNE.venomDur * 1000;
+    fx.arachneVenomTickNext = now + ARACHNE.venomTickInterval * 1000;
+    floatText('🧵 맹독의 실!');
+  }
+}
+// 대상이 받는 모든 피해에 곱연산으로 적용 — dealMonDamage()에서 호출
+function arachneTakenMult() {
+  if (!hasArachne()) return 1;
+  return 1 + (fx.arachneWeaveStacks || 0) * ARACHNE.takenDebuffPerStack;
+}
+// 맹독의 실 발동 중 매초 도트 피해 — tick()에서 호출
+function arachneVenomTick(now) {
+  if (!hasArachne() || !arachneVenomActive()) return;
+  if (!fx.arachneVenomTickNext) fx.arachneVenomTickNext = now + ARACHNE.venomTickInterval * 1000;
+  if (now >= fx.arachneVenomTickNext) {
+    fx.arachneVenomTickNext = now + ARACHNE.venomTickInterval * 1000;
+    const w = getEquipped();
+    const stacks = fx.arachneWeaveStacks || 0;
+    if (w && stacks > 0) {
+      dealMonDamage(stacks * weaponAtk(w) * ARACHNE.venomTickCoeff);
+      floatText('☠️ 맹독!');
+    }
+  }
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4946,6 +5025,8 @@ const mon = { hp: BN.from(0), maxHp: BN.from(0), atkTimer: 0, spawnTimer: 0, dea
 function dealMonDamage(amount) {
   // 네피림(태초의 유물): 오크 샤먼이 소환된 동안엔 적이 받는 모든 피해가 배율만큼 증폭된다.
   amount = amount * nephilimTakenMult();
+  // 아라크네(태초의 유물): 직조 스택에 비례해 대상이 받는 모든 피해 증폭
+  amount = amount * arachneTakenMult();
   if (bossFight.active && bossFight.isPunch) punchDealtOverflow = BN.add(punchDealtOverflow, amount);
   // 천구(태초의 유물): 만월이 떠있는 동안 입힌 모든 피해를 누적(다른 무기로 바꾸면 더 이상 쌓이지 않음)
   if (fx.tiangouUntil && Date.now() < fx.tiangouUntil && hasGenesisEquipped('tiangou')) {
@@ -5903,6 +5984,8 @@ function tick(dt) {
   tiangouTick(nowDecay);
   // 네피림(태초의 유물): 오크 제너럴/샤먼/로드 순환 진행
   nephilimTick(nowDecay);
+  // 아라크네(태초의 유물): 맹독의 실 발동 중 매초 도트 피해
+  arachneVenomTick(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -6311,6 +6394,8 @@ function attack(w) {
   camazotzResonance(w);
   // 왓팍의 기생낭(태초의 유물): 매 공격 시 분신 수만큼 확정 연타
   wapaqStrike(w);
+  // 아라크네의 저주받은 실(태초의 유물): 매 공격 시 직조 스택 적립(맹독의 실 발동 중엔 정지)
+  arachneOnAttack();
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc');
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -6435,6 +6520,10 @@ function resetTimedStacks() {
   fx.nephilimUntil = 0;
   fx.nephilimGSCount = 0;
   fx.nephilimPreLordNext = null;
+  fx.arachneWeaveStacks = 0;
+  fx.arachneSinceTrigger = 0;
+  fx.arachneVenomUntil = 0;
+  fx.arachneVenomTickNext = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

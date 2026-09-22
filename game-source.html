@@ -489,7 +489,7 @@
       <span class="stat" id="dpsshow">DPS 0</span>
     </div>
   </div>
-  <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! (매주 수·일 자정~자정) 파괴/하락 확률 절반 · 비용 30% 할인! 🌟✨</div>
+  <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! (매주 수·일 자정~자정) 성공확률 UP(저강화 구간은 보정 축소) · 파괴/하락 확률 DOWN · 비용 할인! 🌟✨</div>
 
   <div id="tabs">
     <div class="tabgroup" data-group="combat">
@@ -2380,23 +2380,39 @@ function todayKey() {
 }
 
 // ---------- 이벤트: 강화데이 (매주 수요일·일요일, 로컬 자정~다음날 자정) ----------
-// 예전엔 성공확률 보너스까지 얹어주는 "고강도" 이벤트를 특정 날짜에만 수동으로 여는
-// 방식이었는데, 상시로 자주 도는 이벤트가 되면서 확률 보너스는 빼고 "위험 부담을 줄여주는"
-// 쪽으로 성격을 바꿨다 — 파괴/하락 확률을 낮추고 비용을 할인해주되, 성공확률 자체는
-// 건드리지 않는다. 요일 기반이라 서버 없이도 자동으로 반복된다.
+// 예전엔 특정 날짜에만 수동으로 여는 1회성 이벤트였는데, 상시로 자주 도는 이벤트가 되면서
+// 성공확률 보너스가 저강화 구간에서 과도하게 커지는 문제(원래도 높은 성공확률에 또 크게
+// 붙어 사실상 날먹)가 있어 보정 배율을 추가로 낮췄다. 파괴/하락/비용 쪽은 기존 그대로
+// 강화단계 구간별 차등을 유지한다. 요일 기반이라 서버 없이도 자동으로 반복된다.
 // (RUNE_BOXES 등 일부 데이터가 모듈 로드 시점에 enhanceCost()를 미리 호출하므로, 이 블록은
 // 그런 이른 호출들보다 반드시 앞에 위치해야 한다.)
 function enhanceEventActive() { const dow = new Date().getDay(); return dow === 0 || dow === 3; } // 일요일(0)·수요일(3)
 const ENHANCE_EVENT = {
-  destroyMult: 0.5,   // 파괴확률 전 구간 절반(고급강화와 곱연산되면 1/4)
-  downgradeMult: 0.5, // 하락확률 전 구간 절반(등급·강화단계 무관 균일)
-  costMult: 0.7,      // 골드/재료 소모 30% 감소(전 구간 균일)
+  mainSuccessCap: 23, mainSuccessValue: 5,  // 메인: 23강 기준 +5%p (아래 성공보정 배율 적용 전 원본값)
+  subSuccessCap: 20, subSuccessValue: 7,    // 보조: 20강 기준 +7%p (동일)
+  successThreshold: 20, successMultLow: 0.5, successMultHigh: 0.3, // 성공확률 보정 배율: 20강 이하 50%, 초과 30%
+  destroyMult: 0.5,                          // 파괴확률 전 구간 절반(고급강화와 곱연산되면 1/4)
+  downgradeThreshold: 20, downgradeMultLow: 0.3, downgradeMultHigh: 0.5, // 하락확률: 20강 이하 -70%, 초과 -50%
+  costThreshold: 20, costMultLow: 0.5, costMultHigh: 0.7,                 // 골드/재료: 20강 이하 -50%, 초과 -30%
 };
+function enhanceEventSuccessMult(enhance) {
+  return enhance <= ENHANCE_EVENT.successThreshold ? ENHANCE_EVENT.successMultLow : ENHANCE_EVENT.successMultHigh;
+}
+function enhanceEventSuccessBonus(enhance) {
+  if (!enhanceEventActive()) return 0;
+  return ENHANCE_EVENT.mainSuccessValue * (ENH.success[enhance] / ENH.success[ENHANCE_EVENT.mainSuccessCap]) * enhanceEventSuccessMult(enhance);
+}
+function subEnhanceEventSuccessBonus(enhance) {
+  if (!enhanceEventActive()) return 0;
+  return ENHANCE_EVENT.subSuccessValue * (SUB_ENH.success[enhance] / SUB_ENH.success[ENHANCE_EVENT.subSuccessCap]) * enhanceEventSuccessMult(enhance);
+}
 function enhanceEventDowngradeMult(enhance) {
-  return enhanceEventActive() ? ENHANCE_EVENT.downgradeMult : 1;
+  if (!enhanceEventActive()) return 1;
+  return enhance <= ENHANCE_EVENT.downgradeThreshold ? ENHANCE_EVENT.downgradeMultLow : ENHANCE_EVENT.downgradeMultHigh;
 }
 function enhanceEventCostMult(enhance) {
-  return enhanceEventActive() ? ENHANCE_EVENT.costMult : 1;
+  if (!enhanceEventActive()) return 1;
+  return enhance <= ENHANCE_EVENT.costThreshold ? ENHANCE_EVENT.costMultLow : ENHANCE_EVENT.costMultHigh;
 }
 
 function raidEnsureDay() {
@@ -4142,7 +4158,7 @@ const ENH_BONUS_SOURCES = [
 ];
 
 function enhTierBonus(enhance) {
-  let bonus = 0;
+  let bonus = enhanceEventSuccessBonus(enhance);
   for (const src of ENH_BONUS_SOURCES) {
     if (!src.has()) continue;
     bonus += src.value * (ENH.success[enhance] / ENH.success[src.cap]);
@@ -4593,7 +4609,7 @@ function playerDPS() {
 function enhanceCost(w) {
   // 기본비용 × costGrowth^단계 로 기하급수적 상승 (저강화도 결코 싸지 않음)
   const cost = GRADES[w.grade].enhanceCost * Math.pow(ENH.costGrowth, w.enhance);
-  return Math.floor(cost * enhanceEventCostMult(w.enhance)); // 강화데이: 비용 30% 할인
+  return Math.floor(cost * enhanceEventCostMult(w.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
 // 태초 무기 전용 강화 재화: 골드 외에 "무기의 정수"도 함께 소모한다. 정식 획득처("고대의
 // 도서관")가 아직 구현되지 않아 당장은 완강이 불가능한 게 의도된 설계 — 장기 목표로 남겨둔다.
@@ -4612,7 +4628,7 @@ const HIGH_MAT_START = 15;
 const HIGH_MAT_MULT = 5;
 function highMatsNeeded(enhance) {
   const need = enhance >= HIGH_MAT_START ? (enhance - (HIGH_MAT_START - 1)) * HIGH_MAT_MULT : 0;
-  return Math.round(need * enhanceEventCostMult(enhance)); // 강화데이: 비용 30% 할인
+  return Math.round(need * enhanceEventCostMult(enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
 // 무기 등급별로 사용 가능한 고급 재료의 사냥터 구간(0-index 층 범위)이 정해져 있다.
 // 일반~레어: 1~6단계, 에픽~유니크: 7~12단계, 레전더리~신화: 13~19단계, 태초: 20단계
@@ -5505,7 +5521,7 @@ function subEnhanceCost(sw) {
   // 수급처가 더 늘어난 상태라는 점을 반영).
   const anchor = GRADES[sw.grade].enhanceCost / floorGold(0) * floorGold(WORLD2_START_FLOOR) * SUB_ENH_COST_EXTRA_MULT;
   const cost = anchor * Math.pow(1.35, sw.enhance);
-  return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 비용 30% 할인
+  return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
 // 메인 무기(gradeAdjustedSuccess)와 동일한 방식: +15 미만은 등급 무관 동일, +15부터는
 // 등급이 높을수록 (성공확률)^지수로 더 가파르게 낮아진다(지수 자체도 메인 무기와 동일하게 재사용).
@@ -5517,7 +5533,7 @@ function subGradeAdjustedSuccess(grade, enhance) {
 }
 function subSuccessChance(sw) {
   const base = subGradeAdjustedSuccess(sw.grade, sw.enhance);
-  return Math.min(100, base + (accEff().subEnh || 0) * 100);
+  return Math.min(100, base + (accEff().subEnh || 0) * 100 + subEnhanceEventSuccessBonus(sw.enhance));
 }
 function subDestroyChance(sw) {
   const base = SUB_ENH.destroy[sw.enhance] || 0;

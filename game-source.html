@@ -717,8 +717,17 @@
       <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
         🗑️ 자동판매:
         <select id="autoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
-        이하 + 강화 0인 무기 획득 시 즉시 판매
+        이하, 또는 아래 필터에 걸리는 무기는 강화 0단계일 때 획득 즉시 판매
         <button id="autoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
+      </div>
+      <div class="guide-card" id="autoSellFilterCard" style="margin-bottom:8px;">
+        <div class="guide-head" id="autoSellFilterToggle">🔍 판매 필터(종류/효과)<span class="guide-arrow">▾</span></div>
+        <div class="guide-body" id="autoSellFilterBody" hidden>
+          <div style="margin-bottom:6px;color:var(--sub);">무기 종류</div>
+          <div id="autoSellTypeList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
+          <div style="margin-bottom:6px;color:var(--sub);">무기 효과</div>
+          <div id="autoSellEffectList" style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;padding:6px;background:var(--panel);border-radius:6px;"></div>
+        </div>
       </div>
       <div id="invlist"></div>
     </div>
@@ -4102,6 +4111,8 @@ function newState() {
     runes: [],         // 보유 룬(미장착): [{ id, grade, key }]
     training: {},      // 능력치 훈련 레벨: { atk, atkSpeed, critChance, critDamage, extraAtk, bossDmg }
     autoSellGrade: null, // 이 등급 이하 + 강화0 무기는 획득 즉시 자동판매 (null=끔)
+    autoSellTypes: [],   // 이 무기 종류(들) + 강화0인 무기는 획득 즉시 자동판매
+    autoSellEffects: [], // 이 무기 효과(들) + 강화0인 무기는 획득 즉시 자동판매
     runeAutoSellGrade: null, // 이 등급 이하 룬은 획득 즉시 자동판매 (null=끔)
     subAutoSellGrade: null, // 이 등급 이하 + 강화0 보조무기는 획득 즉시 자동판매 (null=끔)
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
@@ -5427,13 +5438,21 @@ function openBox(idx, src) {
   save();
 }
 
+// 자동판매 필터 판정: 등급 이하 / 선택한 무기 종류 / 선택한 무기 효과 중 하나라도 걸리면 대상
+// (강화 0단계 + 태초·고대 제외는 호출부에서 별도로 체크).
+function autoSellFilterMatch(w) {
+  if (S.autoSellGrade != null && w.grade <= S.autoSellGrade) return true;
+  if (S.autoSellTypes && S.autoSellTypes.includes(w.type)) return true;
+  if (S.autoSellEffects && w.effect && S.autoSellEffects.includes(w.effect)) return true;
+  return false;
+}
 function addWeapon(w) {
   unlockCodexEntry(w); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록
-  // 자동판매 필터: 지정 등급 이하 + 강화수치 0인 새 무기는 획득 즉시 자동 판매
-  if (S.autoSellGrade != null && w.grade <= S.autoSellGrade && w.enhance === 0 && !isGenesisWeapon(w) && !isAncientWeapon(w)) {
+  // 자동판매 필터: 등급/종류/효과 중 하나라도 걸리고 강화수치 0인 새 무기는 획득 즉시 자동 판매
+  if (w.enhance === 0 && !isGenesisWeapon(w) && !isAncientWeapon(w) && autoSellFilterMatch(w)) {
     const price = sellPrice(w);
     S.gold = BN.add(S.gold, price);
-    log(`🗑️ 자동판매(${GRADES[w.grade].name} 이하): ${gradeTag(w)} → +${fmt(price)} 골드`);
+    log(`🗑️ 자동판매: ${gradeTag(w)} → +${fmt(price)} 골드`);
     return;
   }
   // unlimitedBag 계정도 완전 무제한은 아니고 500개로 크게만 늘려둔다 — 진짜 무제한으로 두면
@@ -8754,8 +8773,7 @@ function setupAutoSellControls() {
       save();
     };
     $('autoSellCleanBtn').onclick = () => {
-      if (S.autoSellGrade == null) { log('먼저 자동판매 등급을 선택하세요.', 'lg-bad'); return; }
-      const targets = S.weapons.filter(w => !isFist(w) && !isGenesisWeapon(w) && !isAncientWeapon(w) && w.id !== S.equipped && w.grade <= S.autoSellGrade && w.enhance === 0);
+      const targets = S.weapons.filter(w => !isFist(w) && !isGenesisWeapon(w) && !isAncientWeapon(w) && w.id !== S.equipped && w.enhance === 0 && autoSellFilterMatch(w));
       if (!targets.length) { log('정리할 무기가 없습니다.'); return; }
       let total = 0;
       for (const w of targets) total += sellPrice(w);
@@ -8765,8 +8783,46 @@ function setupAutoSellControls() {
       log(`🗑️ 가방 일괄 정리: ${targets.length}개 판매 → +${fmt(total)} 골드`, 'lg-good');
       renderAll(); save();
     };
+    $('autoSellFilterToggle').onclick = () => {
+      const body = $('autoSellFilterBody');
+      const willOpen = body.hidden;
+      body.hidden = !willOpen;
+      $('autoSellFilterCard').classList.toggle('open', willOpen);
+    };
+    const typeBox = $('autoSellTypeList');
+    typeBox.innerHTML = WEAPON_TYPES.map(t => `
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+        <input type="checkbox" data-type="${t.name}"> ${t.icon} ${t.name}
+      </label>`).join('');
+    typeBox.querySelectorAll('input[data-type]').forEach(cb => {
+      cb.onchange = () => {
+        const set = new Set(S.autoSellTypes || []);
+        if (cb.checked) set.add(cb.dataset.type); else set.delete(cb.dataset.type);
+        S.autoSellTypes = [...set];
+        save();
+      };
+    });
+    const effectBox = $('autoSellEffectList');
+    effectBox.innerHTML = Object.entries(EFFECTS).map(([key, e]) => `
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;">
+        <input type="checkbox" data-effect="${key}"> <span class="grade-${GRADES[e.grade].name}">${e.name}</span>
+      </label>`).join('');
+    effectBox.querySelectorAll('input[data-effect]').forEach(cb => {
+      cb.onchange = () => {
+        const set = new Set(S.autoSellEffects || []);
+        if (cb.checked) set.add(cb.dataset.effect); else set.delete(cb.dataset.effect);
+        S.autoSellEffects = [...set];
+        save();
+      };
+    });
   }
   sel.value = S.autoSellGrade == null ? '' : String(S.autoSellGrade);
+  $('autoSellTypeList').querySelectorAll('input[data-type]').forEach(cb => {
+    cb.checked = (S.autoSellTypes || []).includes(cb.dataset.type);
+  });
+  $('autoSellEffectList').querySelectorAll('input[data-effect]').forEach(cb => {
+    cb.checked = (S.autoSellEffects || []).includes(cb.dataset.effect);
+  });
 }
 function renderGenesisList() {
   const box = $('genesisList');

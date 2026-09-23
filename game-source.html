@@ -142,6 +142,10 @@
   .guide-body { padding: 0 14px 14px; font-size: 13px; line-height: 1.7; color: var(--text); }
   .guide-body[hidden] { display: none; }
   .guide-body b { color: var(--gold); }
+  .guide-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+  .guide-table th, .guide-table td { padding: 5px 6px; border: 1px solid var(--border); text-align: left; }
+  .guide-table th { background: var(--panel); color: var(--gold); white-space: nowrap; }
+  .guide-table td:first-child { white-space: nowrap; }
 
   .panel {
     background: var(--panel); border: 1px solid var(--border);
@@ -9725,17 +9729,50 @@ const GUIDE_SECTIONS = [
     <br><br>룬박스(등급별 가챠)를 구매해서 얻거나, <b>룬 합성</b>으로 같은 등급 3개를 소모해 한 단계 위 등급 룬을 얻을 수 있습니다 — 등급이 높을수록 합성 성공 확률이 낮아지고(신화 8%까지), 고대 등급은 합성 대상에서 제외되며, 실패하면 재료 3개는 전부 사라집니다.
     <br><br>고대의 도서관 전용 특수 룬 8종은 룬박스에서 절대 드롭되지 않고, 오직 도서관 클리어 보상으로만 얻을 수 있습니다.
     <br><br><b>등장 가능한 특수 효과(레전더리 이상)</b>
-    <br>· <b>레전더리</b>: 더블 스트라이크(공격 시 8% 확률로 이번 타격 한 번 더) · 골드 러시(처치 시 20% 확률로 골드 2배) · 박스 자석(랜덤박스 드롭 확률 2배) · 풍작의 룬(고급 재료 획득 시 3% 확률로 +3개)
-    <br>· <b>신화</b>: 연쇄 처치(처치 시 15% 확률로 보상 한 번 더) · 시간 왜곡(보스전 제한시간 +20초) · 보스 러시(보스 쿨타임 50% 감소) · 정예 사냥꾼(엘리트 몬스터 출현 확률 +2%p) · 풍요의 룬(고급 재료 획득 시 5% 확률로 +3개)
-    <br>· <b>고대</b>: 미다스의 손(처치 시 8% 확률로 랜덤박스 즉시 획득, 장착 중엔 박스 최고 등급 확률 2배) · 신벌(공격 시 2% 확률로 즉시 처치, 보스는 최대체력 1% 고정 피해) · 전능의 룬(훈련 비용 -30%, 골드 획득 +50%) · 도박의 신(도박장 손해 시 25% 확률로 즉시 재도전) · 대풍요의 룬(재료 획득 시 확률적으로 +3~+30개)
-    <br>· <b>도서관 전용</b>: 여운 증폭의 룬(연타 발동 시 20% 확률로 한 번 더) · 탐구의 룬(무기의 정수 +50%) · 낙인 폭발의 룬(치명타 표식 후 3초 내 재적중 시 공격력 200% 추가 피해) · 심층 지식의 룬(룬 합성 확률 +15%p) · 인과율의 룬(공격 시 5% 확률로 다음 공격에 잔향 피해 추가) · 만물 공명의 룬(적용 중인 도트/버프 1개당 공격력 +4%p) · 필멸 파훼의 룬(같은 대상 계속 공격 시 받는 피해 누적 상승) · 천공서고의 룬(무기의 정수 +100%)`,
+    <table class="guide-table">
+      <tr><th>등급</th><th>이름</th><th>효과</th><th>구분</th></tr>
+      <tr><td><span class="grade-레전더리">레전더리</span></td><td>더블 스트라이크</td><td>공격 시 8% 확률로 이번 타격 한 번 더 적용</td><td></td></tr>
+      <tr><td><span class="grade-레전더리">레전더리</span></td><td>골드 러시</td><td>처치 시 20% 확률로 골드 2배</td><td></td></tr>
+      <tr><td><span class="grade-레전더리">레전더리</span></td><td>박스 자석</td><td>랜덤박스 드롭 확률 2배</td><td></td></tr>
+      <tr><td><span class="grade-레전더리">레전더리</span></td><td>풍작의 룬</td><td>고급 재료 획득 시 3% 확률로 +3개</td><td></td></tr>
+      <tr><td><span class="grade-레전더리">레전더리</span></td><td>여운 증폭의 룬</td><td>연타 발동 시 20% 확률로 한 번 더 발동</td><td>도서관 전용</td></tr>
+      <tr><td><span class="grade-레전더리">레전더리</span></td><td>탐구의 룬</td><td>무기의 정수 획득량 +50%</td><td>도서관 전용</td></tr>
+      <tr><td><span class="grade-신화">신화</span></td><td>연쇄 처치</td><td>처치 시 15% 확률로 보상(골드/재료/드롭) 한 번 더</td><td></td></tr>
+      <tr><td><span class="grade-신화">신화</span></td><td>시간 왜곡</td><td>보스전 제한시간 +20초</td><td></td></tr>
+      <tr><td><span class="grade-신화">신화</span></td><td>보스 러시</td><td>보스 재도전 쿨타임 50% 감소</td><td></td></tr>
+      <tr><td><span class="grade-신화">신화</span></td><td>정예 사냥꾼</td><td>엘리트 몬스터 출현 확률 +2%p</td><td></td></tr>
+      <tr><td><span class="grade-신화">신화</span></td><td>풍요의 룬</td><td>고급 재료 획득 시 5% 확률로 +3개</td><td></td></tr>
+      <tr><td><span class="grade-신화">신화</span></td><td>낙인 폭발의 룬</td><td>치명타 표식 후 3초 내 재적중 시 공격력 200% 추가 피해</td><td>도서관 전용</td></tr>
+      <tr><td><span class="grade-신화">신화</span></td><td>심층 지식의 룬</td><td>룬 합성 성공 확률 +15%p</td><td>도서관 전용</td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>미다스의 손</td><td>처치 시 8% 확률로 랜덤박스 즉시 획득, 장착 중엔 박스 최고 등급 확률 2배</td><td></td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>신벌</td><td>공격 시 2% 확률로 즉시 처치(보스는 최대체력 1% 고정 피해)</td><td></td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>전능의 룬</td><td>훈련 비용 -30%, 골드 획득 +50%</td><td></td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>도박의 신</td><td>도박장 손해 시 25% 확률로 즉시 재도전</td><td></td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>대풍요의 룬</td><td>재료 획득 시 확률적으로 +3~+30개 추가</td><td></td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>인과율의 룬</td><td>공격 시 5% 확률로 다음 공격에 잔향 피해 추가</td><td>도서관 전용</td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>만물 공명의 룬</td><td>적용 중인 도트/버프 1개당 공격력 +4%p</td><td>도서관 전용</td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>필멸 파훼의 룬</td><td>같은 대상을 계속 공격 중이면 받는 피해가 누적 상승(대상 바뀌면 초기화)</td><td>도서관 전용</td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>천공서고의 룬</td><td>무기의 정수 획득량 +100%</td><td>도서관 전용</td></tr>
+    </table>`,
   },
   {
     icon: '⚒️', title: '무기 각인',
     body: `대장장이 탭에서 <b>+15강 이상</b> 강화한 무기(맨손 제외)에 부여할 수 있습니다. 항상 2줄이며 <b>레어</b> 등급에서 시작해 최대 <b>태초</b> 등급까지 승급합니다. 에픽 등급부터는 첫째 줄이 현재 등급, 둘째 줄은 한 단계 낮은 등급으로 나뉩니다(아주 드물게 "이탈"로 둘 다 같은 등급이 되기도 합니다).
     <br><br><b>각인 재설정</b>을 하면 두 줄의 효과와 수치가 다시 뽑힙니다. 재설정을 거듭해 등급별로 정해진 누적 횟수(천장)에 도달하면 확정으로 다음 등급으로 승급하고, 그 전에도 재설정마다 낮은 확률로 조기 승급할 수 있습니다.
     <br><br>각인 부여·재설정에는 골드와 함께 🎫 <b>토벌의 증표</b>가 필요합니다(등급이 오를수록 비용 증가). 무기가 파괴되면 각인도 함께 사라집니다.
-    <br><br><b>등장 가능한 효과</b>(줄마다 무작위 1종, 등급이 높을수록 수치 범위도 커짐): 공격력 · 공격속도 · 골드 획득 · 드롭률 · 보스 피해량 · 치명타 확률 · 치명타 피해 · 연타 확률 · 연타 피해`,
+    <br><br><b>등장 가능한 효과</b>(줄마다 무작위 1종, 등급이 높을수록 수치 범위도 커짐)
+    <table class="guide-table">
+      <tr><th>효과</th><th>단위</th><th><span class="grade-레어">레어</span>(시작) 범위</th><th><span class="grade-태초">태초</span>(최대) 범위</th></tr>
+      <tr><td>공격력</td><td>%</td><td>1~3%</td><td>31.5~79%</td></tr>
+      <tr><td>공격속도</td><td>%</td><td>1~3%</td><td>31.5~79%</td></tr>
+      <tr><td>골드 획득</td><td>%</td><td>2~5%</td><td>55~137.5%</td></tr>
+      <tr><td>드롭률</td><td>%</td><td>2~5%</td><td>55~137.5%</td></tr>
+      <tr><td>보스 피해량</td><td>%</td><td>2~5%</td><td>55~137.5%</td></tr>
+      <tr><td>치명타 확률</td><td>%p</td><td>0.5~1.5%p</td><td>17.2~43%p</td></tr>
+      <tr><td>치명타 피해</td><td>%p</td><td>2~5%p</td><td>55~137.5%p</td></tr>
+      <tr><td>연타 확률</td><td>%p</td><td>0.5~1.5%p</td><td>17.2~43%p</td></tr>
+      <tr><td>연타 피해</td><td>%p</td><td>2~5%p</td><td>55~137.5%p</td></tr>
+    </table>`,
   },
   {
     icon: '📖', title: '무기 도감',

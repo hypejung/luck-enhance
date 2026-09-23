@@ -128,6 +128,21 @@
   .patchnote-title { font-weight: bold; margin-bottom: 6px; }
   .patchnote-changes { font-size: 13px; line-height: 1.6; margin: 0; padding-left: 18px; }
 
+  .guide-card {
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 10px; margin-bottom: 10px; overflow: hidden;
+  }
+  .guide-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 12px 14px; cursor: pointer; font-weight: bold; user-select: none;
+  }
+  .guide-head:hover { color: var(--gold); }
+  .guide-head .guide-arrow { font-size: 11px; color: var(--sub); transition: transform .15s; }
+  .guide-card.open .guide-head .guide-arrow { transform: rotate(180deg); }
+  .guide-body { padding: 0 14px 14px; font-size: 13px; line-height: 1.7; color: var(--text); }
+  .guide-body[hidden] { display: none; }
+  .guide-body b { color: var(--gold); }
+
   .panel {
     background: var(--panel); border: 1px solid var(--border);
     border-radius: 12px; padding: 16px; margin-bottom: 10px;
@@ -524,6 +539,7 @@
       <div class="tabgroup-body" hidden>
         <div class="tab" data-tab="gamble">🎲 도박장</div>
         <div class="tab" data-tab="codex">📖 도감</div>
+        <div class="tab" data-tab="guide">📘 가이드</div>
         <div class="tab" data-tab="patchnotes">📜 패치노트<span id="patchNotesBadge" class="tab-badge" hidden></span></div>
       </div>
     </div>
@@ -582,10 +598,7 @@
       <div id="awakeningBox" style="margin-top:8px;"></div>
       <div id="autoEnhanceBox" style="margin-top:8px;"></div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
-        강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험!
-        <b style="color:var(--unique)">+10 이후</b>부터 강화당 공격력 상승폭이 커집니다 · 등급이 높을수록 +15 이상 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다!
-        <br>+15부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다 (일반~레어: 1~6단계 / 에픽~유니크: 7~12단계 / 레전더리~신화: 13~19단계 / 고대: 20단계).
-        <br>+15 이상에서는 골드를 <b style="color:var(--unique)">5배</b>, 고급 재료를 <b style="color:var(--unique)">50배</b> 사용하는 <b style="color:var(--unique)">고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
+        강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험! 자세한 규칙은 📘 가이드 탭 참고.
       </div>
       <div class="panelFxOverlay"></div>
     </div>
@@ -763,8 +776,8 @@
     <div class="panel">
       <h3>🔮 룬 상점</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다. 슬롯 수는 무기 등급에 따라 늘어납니다(일반 1개 ~ 신화 6개, 고대 8개, 태초 10개).
-        <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다.
+        룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다.
+        <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다. 슬롯 수 등 자세한 내용은 📘 가이드 탭 참고.
       </div>
       <div id="runeboxlist"></div>
       <div id="runegachaslot"></div>
@@ -977,6 +990,16 @@
         저장은 그 시점의 무기를 "기억"해두는 것이라, 이후 그 무기를 계속 강화하거나 룬을 바꿔도 불러올 때는 항상 최신 상태로 적용됩니다.
       </div>
       <div id="presetList"></div>
+    </div>
+  </div>
+
+  <div id="tab-guide" style="display:none">
+    <div class="panel">
+      <h3>📘 가이드</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        시스템별 상세 규칙 모음입니다. 제목을 눌러 펼쳐보세요.
+      </div>
+      <div id="guideList"></div>
     </div>
   </div>
 
@@ -6851,7 +6874,7 @@ function renderLibraryBox() {
   }
   box.innerHTML = `
     <div style="font-size:13px;margin-bottom:8px;">최고 기록: <b style="color:var(--gold)">제${S.library.best}서고 돌파</b> · 이번 주기 도전: <b>${S.library.count}/${LIBRARY.weeklyTotal}</b></div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">현재 기록 이하의 서고 중 원하는 곳을 골라 도전하세요(매주 수요일·일요일 자정 초기화). 승패 무관하게 도전 횟수가 소모되고, 클리어한 서고는 다음 초기화까지 재도전할 수 없습니다.</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">현재 기록 이하의 서고 중 원하는 곳을 골라 도전하세요. 자세한 규칙은 📘 가이드 탭 참고.</div>
     ${rows.reverse().join('')}
     <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
       <div style="font-size:13px;margin-bottom:6px;">📖 고대의 유물 (${relicCollectedCount()}/${RELICS.length})</div>
@@ -8661,7 +8684,7 @@ function renderAwakening(w, maxed) {
   if (!box) return;
   if (isFist(w)) { box.innerHTML = ''; return; }
   if ((w.enhance || 0) < AWAKENING_ENH_REQ) {
-    box.innerHTML = `<div style="font-size:12px;color:var(--sub);text-align:center;">📖 각성은 <b style="color:var(--unique)">+${AWAKENING_ENH_REQ}</b> 이상부터 가능합니다 (강화 RNG와 무관한 확정 파워 트랙, 고대의 도서관에서 "각성의 정수" 획득).</div>`;
+    box.innerHTML = `<div style="font-size:12px;color:var(--sub);text-align:center;">📖 각성은 <b style="color:var(--unique)">+${AWAKENING_ENH_REQ}</b> 이상부터 가능합니다. 자세한 내용은 📘 가이드 탭 참고.</div>`;
     return;
   }
   if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
@@ -9601,7 +9624,7 @@ const TAB_GROUPS = [
   { id: 'combat', tabs: ['hunt', 'raid', 'library'] },
   { id: 'growth', tabs: ['enhance', 'stats', 'rune', 'blacksmith'] },
   { id: 'items', tabs: ['inventory', 'craft', 'acc', 'box'] },
-  { id: 'etc', tabs: ['gamble', 'codex', 'patchnotes'] },
+  { id: 'etc', tabs: ['gamble', 'codex', 'guide', 'patchnotes'] },
 ];
 // 활성 탭이 속한 카테고리는 펼치되, 다른 카테고리가 펼쳐져 있어도 그대로 둔다(여러 개 동시 펼침 가능)
 function setActiveTabGroup(name) {
@@ -9616,7 +9639,7 @@ function switchTab(name) {
   currentTab = name;
   setActiveTabGroup(name);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'acc', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'patchnotes', 'preset']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'acc', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'guide', 'patchnotes', 'preset']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'preset') renderPresetTab();
@@ -9632,8 +9655,67 @@ function switchTab(name) {
   if (name === 'codex') renderCodex();
   if (name === 'blacksmith') renderBlacksmith();
   if (name === 'raid') renderRaidTab();
+  if (name === 'guide') renderGuide();
   if (name === 'patchnotes') renderPatchNotes();
 }
+
+// ---------- 가이드 ----------
+// 시스템 설명은 앞으로 여기 한 곳에 모아 적는다 — 실제 UI 쪽 안내 문구는 핵심 요약 한 줄만
+// 남기고, 괄호로 조건/수치를 줄줄이 붙이는 대신 이 탭으로 넘긴다. 신규 시스템 추가 시에도
+// 이 원칙을 그대로 따를 것(새 안내문에 괄호 설명을 쌓지 말고 여기 항목을 추가).
+const GUIDE_SECTIONS = [
+  {
+    icon: '🔨', title: '강화 시스템',
+    body: `강화 실패 시 결과는 <b>유지</b> / <b>단계 -1(하락)</b> 중 하나이며, <b>+10강 이상</b>부터는 실패 시 <b>파괴</b>(맨손·고대 무기는 파괴 대신 <b>+0 초기화</b>, 태초 무기는 파괴·초기화 없이 하락만) 위험도 생깁니다.
+    <br><br><b>+10강 이후</b>부터는 강화 1회당 공격력 상승폭이 점점 커지고, 등급이 높을수록 <b>+15강 이상</b> 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다.
+    <br><br><b>+15강</b>부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다: 일반~레어 1~6단계 / 에픽~유니크 7~12단계 / 레전더리~신화 13~19단계 / 고대·태초 20단계. 같은 단계부터 골드 5배·고급 재료 50배를 쓰는 <b>고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
+    <br><br><b>룬</b>은 +15강 이상 강화한 무기에만 장착 가능하며, 슬롯 수는 무기 등급에 따라 일반 1개부터 신화 6개, 고대 8개, 태초 10개까지 늘어납니다.
+    <br><br><b>태초/고대 무기</b>는 강화 시 골드 외에 "무기의 정수"도 함께 소모합니다.`,
+  },
+  {
+    icon: '✨', title: '강화데이 이벤트',
+    body: `매주 <b>수요일·일요일</b>, 로컬 자정부터 다음날 자정까지 진행됩니다.
+    <br><br>강화 <b>성공 확률 UP</b>(저강화 구간은 이미 확률이 높아 보정폭을 작게, 고강화로 갈수록 보정폭을 크게 잡아 구간별로 체감이 고르게 됩니다), <b>파괴/하락 확률 DOWN</b>, 강화 <b>비용(골드·재료) DOWN</b> 세 가지가 동시에 적용됩니다.`,
+  },
+  {
+    icon: '🌌', title: '태초의 유물',
+    body: `사냥터마다 1개씩 존재하는 최상위 등급(태초) 무기로, 아주 낮은 확률로 드랍됩니다(엘리트 몬스터는 5배, 보스는 10배 확률).
+    <br><br>획득 후 <b>가방에서 직접 장착해야</b> 효과가 발동합니다 — 보유만 하고 있으면 아무 효과도 없습니다. 동시에 하나의 태초 무기만 장착할 수 있어, 발동하는 효과도 항상 하나뿐입니다.
+    <br><br>판매·파괴가 불가능하고, 강화 실패는 유지/하락만 있을 뿐 파괴나 초기화는 없습니다. 대신 강화 시 골드 외에 "무기의 정수"가 추가로 필요합니다(고대 무기보다 소모량이 훨씬 큽니다).`,
+  },
+  {
+    icon: '📖', title: '고대의 도서관',
+    body: `매주 <b>수요일·일요일 자정</b>에 초기화되며, 주기당 <b>3회</b> 도전할 수 있습니다.
+    <br><br>현재까지의 최고 기록 이하 서고 중 원하는 곳을 골라 도전하는 방식이라, 이미 깬 서고도 재도전(파밍)할 수 있습니다. 다만 승패와 무관하게 도전 횟수가 소모되고, <b>클리어한 서고는 다음 초기화 전까지 다시 도전할 수 없습니다</b>(실패한 시도는 잠기지 않아 같은 주기에 재도전 가능).
+    <br><br>보상은 태초/고대 무기 강화에 쓰는 <b>무기의 정수</b>, 각성 시스템에 쓰는 <b>각성의 정수</b>, 그리고 도서관 전용 룬과 고대의 유물이 확률적으로 함께 나옵니다.
+    <br><br>월드2(황혼국) 사냥터 보스를 처치해도 무기의 정수를 보조로 얻을 수 있습니다 — 쿨타임 1시간마다 반복 가능한 대신, 1회당 보상은 도서관보다 확실히 낮습니다.`,
+  },
+  {
+    icon: '💠', title: '각성 시스템',
+    body: `<b>+20강 이상</b> 무기부터 가능한, 강화 RNG와 완전히 분리된 확정 파워 트랙입니다. 재화는 고대의 도서관에서 얻는 <b>각성의 정수</b>를 사용합니다.
+    <br><br>★1~★5 다섯 슬롯을 순서대로 각성의 정수로 언락하며, 언락할 때마다 일반/레어/에픽/전설 등급 중 확률적으로 하나를 얻습니다. 이미 얻은 슬롯도 더 저렴한 비용으로 재도전(리롤)할 수 있습니다.
+    <br><br>모든 슬롯의 효과는 동시에 전부 적용됩니다 — 상위 등급이 하위 등급을 대체하지 않으니, 다섯 슬롯 모두 각각의 값어치가 있습니다.`,
+  },
+];
+let guideOpenIdx = 0; // 처음엔 첫 섹션만 펼쳐둔다
+function renderGuide() {
+  const list = $('guideList');
+  if (!list) return;
+  list.innerHTML = GUIDE_SECTIONS.map((s, i) => `
+    <div class="guide-card ${i === guideOpenIdx ? 'open' : ''}" data-idx="${i}">
+      <div class="guide-head">${s.icon} ${s.title}<span class="guide-arrow">▾</span></div>
+      <div class="guide-body" ${i === guideOpenIdx ? '' : 'hidden'}>${s.body}</div>
+    </div>`).join('');
+  list.querySelectorAll('.guide-card').forEach(card => {
+    card.querySelector('.guide-head').onclick = () => {
+      const idx = +card.dataset.idx;
+      const willOpen = guideOpenIdx !== idx;
+      guideOpenIdx = willOpen ? idx : -1;
+      renderGuide();
+    };
+  });
+}
+
 // 패치노트: 안읽음 여부는 렌더링 시점의 "이전에 확인한 버전" 기준으로 표시한 뒤,
 // 탭을 열람하는 즉시 최신 버전까지 전부 확인한 것으로 갱신한다.
 function renderPatchNotes() {

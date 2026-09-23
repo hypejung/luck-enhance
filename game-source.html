@@ -669,9 +669,7 @@
       <div class="panel">
         <h3>🧪 재료 → 장신구 조합</h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-          사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료: <b>일반 재료 12개 + 레어 재료 4개</b><br>
-          장신구 등급은 사냥터 구간이 높을수록 올라갑니다. 만든 장신구의 보유·장착 관리는 "📿 장신구" 탭에서 합니다.<br>
-          💡 <b>+15 이상 강화</b>에는 고급(에픽+) 재료가 소모됩니다. 판매할지 강화에 쓸지 선택하세요!
+          사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료: <b>일반 재료 12개 + 레어 재료 4개</b>. 자세한 내용은 📘 가이드 탭 참고.
         </div>
         <div id="craftlist"></div>
       </div>
@@ -888,9 +886,7 @@
     <div class="panel">
       <h3>📖 무기 도감</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        아이콘은 아직 실루엣으로만 보입니다. 클릭(터치)하면 이름이 팝업으로 뜨고, 해당 무기를
-        <b style="color:var(--unique)">한 번이라도 획득</b>하면 도감에 정식으로 등록되어 이름·설명·효과를 전부 볼 수 있습니다.
-        (단, <b style="color:var(--legend)">레전더리 이상</b>은 미보유 상태에서도 클릭하면 이름·설명을 미리 볼 수 있습니다.)
+        아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다. 등록 조건과 보너스 종류는 📘 가이드 탭 참고.
       </div>
       <div id="codexGrid"></div>
       <div id="codexDetail" style="font-size:13px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border); min-height:20px;">
@@ -4075,6 +4071,7 @@ const DICE_FACES = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 let S = null;   // state
 let uid = 1;
 let expandedWeapons = new Set(); // 가방에서 "효과 보기"로 펼친 무기 id (세이브 대상 아님)
+let expandedSubweapons = new Set(); // 가방에서 "효과 보기"로 펼친 보조무기 id (세이브 대상 아님)
 
 function newState() {
   return {
@@ -9190,11 +9187,31 @@ function renderSubInventory() {
   list.innerHTML = '';
   for (const sw of sorted) {
     const equipped = sw.id === S.subEquipped;
+    const t = SUBWEAPON_TYPES[sw.typeIdx];
+    const flavor = subweaponFlavorText(sw);
+    const passiveEff = subweaponPassiveEff(sw, accEff().subAmp);
+    const passiveText = Object.entries(passiveEff).map(([k, v]) => {
+      const def = SUB_PASSIVE_STAT_LABELS[k];
+      return `${def ? def.label : k} +${(v * 100).toFixed(1)}${def ? def.unit : '%'}`;
+    }).join(', ');
+    const expanded = expandedSubweapons.has(sw.id);
     const div = document.createElement('div');
     div.className = 'invitem' + (equipped ? ' equipped' : '');
+    const detailHtml = expanded
+      ? `<div class="wi" style="margin-top:4px;padding:6px 8px;background:var(--panel2);border-radius:6px">
+          ${flavor ? `<div style="font-style:italic;margin-bottom:4px">${flavor}</div>` : ''}
+          🗡️ [${t ? t.name : ''} 패시브] ${passiveText || '없음'}<br>
+          ⚡ [${SUBWEAPON_ACTIVE.name}] 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (보스 계열 전투당 1회)
+        </div>`
+      : '';
     div.innerHTML = `
-      <div><div class="wn">${subweaponGradeTag(sw)}${equipped ? ' <span style="color:var(--unique);font-size:12px">✅ 장착중</span>' : ''}</div></div>
+      <div><div class="wn" style="cursor:pointer">${subweaponGradeTag(sw)}${equipped ? ' <span style="color:var(--unique);font-size:12px">✅ 장착중</span>' : ''} <span style="font-size:11px;color:var(--sub)">${expanded ? '▴ 효과 접기' : '▾ 효과 보기'}</span></div>
+      ${detailHtml}</div>
       <div class="btns"></div>`;
+    div.querySelector('.wn').onclick = () => {
+      if (expandedSubweapons.has(sw.id)) expandedSubweapons.delete(sw.id); else expandedSubweapons.add(sw.id);
+      renderSubInventory();
+    };
     const btns = div.querySelector('.btns');
     if (!equipped) {
       const eqBtn = document.createElement('button');
@@ -9719,6 +9736,22 @@ const GUIDE_SECTIONS = [
     <br><br><b>각인 재설정</b>을 하면 두 줄의 효과와 수치가 다시 뽑힙니다. 재설정을 거듭해 등급별로 정해진 누적 횟수(천장)에 도달하면 확정으로 다음 등급으로 승급하고, 그 전에도 재설정마다 낮은 확률로 조기 승급할 수 있습니다.
     <br><br>각인 부여·재설정에는 골드와 함께 🎫 <b>토벌의 증표</b>가 필요합니다(등급이 오를수록 비용 증가). 무기가 파괴되면 각인도 함께 사라집니다.
     <br><br><b>등장 가능한 효과</b>(줄마다 무작위 1종, 등급이 높을수록 수치 범위도 커짐): 공격력 · 공격속도 · 골드 획득 · 드롭률 · 보스 피해량 · 치명타 확률 · 치명타 피해 · 연타 확률 · 연타 피해`,
+  },
+  {
+    icon: '📖', title: '무기 도감',
+    body: `무기를 <b>실제로 한 번이라도 획득</b>하면 도감에 등록되고, 등록 현황에 따라 별도의 장착 없이 자동으로 파밍 보조 효과가 붙습니다. <b>레전더리 이상</b> 항목은 아직 못 모았어도 클릭하면 이름·설명을 미리 볼 수 있습니다.
+    <br><br>보너스는 네 갈래로 나뉩니다.
+    <br>· <b>쌍 세트</b>: 성격이 비슷한 무기 타입 2종(예: 단검+쌍검)을 등급별로 모두 모으면 스탯 보너스
+    <br>· <b>타입 풀세트</b>: 한 무기 타입의 변형 3개를 <b>레전더리</b>·<b>신화</b> 등급 각각 모두 모으면 세트 보너스
+    <br>· <b>사냥터별 고대 세트</b>: 1~20층 각 사냥터 전용 고대 등급 세트를 모으면 그 사냥터 고유의 스탯 보너스
+    <br>· <b>보스의 무력</b>: 1~20층 보스 신화무기를 1/2/4/6/8/10/12/14/16/18/20종 모을 때마다 계단식으로 누적되는 보너스
+    <br><br>21~40층(월드2) 보스 보조무기 수집도 별도 트랙으로 존재합니다.`,
+  },
+  {
+    icon: '🧪', title: '조합',
+    body: `사냥터에서 얻은 재료로 장신구를 만들 수 있습니다. 필요 재료는 <b>일반 재료 12개 + 레어 재료 4개</b>이며, 만들어지는 장신구의 등급은 재료를 가져온 사냥터 구간이 높을수록 함께 올라갑니다.
+    <br><br>+15강 이상 강화에는 고급(에픽+) 재료가 필요합니다 — 같은 탭의 "보유 재료" 서브탭에서 사냥터별로 자동판매를 켜둘지, 강화용으로 모아둘지 관리할 수 있습니다.
+    <br><br>만든 장신구의 보유·장착 관리는 📿 장신구 탭에서 합니다.`,
   },
 ];
 let guideOpenIdx = 0; // 처음엔 첫 섹션만 펼쳐둔다

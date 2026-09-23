@@ -3008,7 +3008,42 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: 0.1,
     uniqueSkill: { key: 'arachne', name: '저주받은 손과 감겨오는 실' },
   },
-  null, null,
+  { // floor 8 — 고대 유적 — 골렘 파수병
+    id: 'moai',
+    floor: 8,
+    type: 'weapon',
+    name: '마지막 형제의 눈',
+    subtitle: 'Aringa Ora, the Last Living Face',
+    icon: '🗿',
+    art: 'assets/artifacts/moai_eye.svg',
+    lore: `섬사람들은 알고 있었다. 돌은 그저 돌일 뿐이라는 것을.
+
+그래서 라노 라라쿠의 화산재 암벽을 밤낮으로 깎아 거인의 몸을 빚었다. 조상의 얼굴을 새기고, 밧줄을 걸어 좌우로 흔들며 걷게 했다. 섬에 남은 나무란 나무는 모조리 그 밧줄과 굴림대가 되어 사라져갔다 — 섬은 스스로의 숲을 다 바쳐, 자신을 지킬 거인들을 해안까지 걸어오게 만들었다.
+
+그러나 몸을 다 빚어도, 그것은 아직 돌이었다.
+
+살아있는 얼굴이 되려면 눈을 넣어야 했다. 산호로 흰자를, 흑요석이나 붉은 화산석으로 눈동자를 — 그리하여 마침내 조상의 영이 깃들어 섬을 굽어보게 된다고, 사람들은 그렇게 믿었다.
+
+하지만 단 하나, 가장 마지막으로 세워진 거인에게는 그런 눈을 넣어주지 않았다.
+
+그 거인에게 눈을 준 것은 산호도 흑요석도 아니었다. 아직 온기가 식지 않은, 산 것의 눈이었다.
+
+그날 이후로 그 거인은 다른 형제들처럼 그저 바다를 등지고 마을을 바라보기만 하지 않았다. 그 눈은 무언가를 계속 갈구했다 — 처음 그 눈을 채워준 것과 같은, 산 것의 온기를.
+
+섬사람들은 그것이 자신들을 지켜준다고 오래도록 믿었다. 굶주림이 섬을 덮쳤을 때도, 전쟁이 이웃을 서로 겨누게 만들었을 때도, 그 거인만은 늘 그 자리에서 눈을 뜨고 있었으니까.
+
+그리고 훗날, 사람들은 자신들이 세운 거인들을 하나둘 직접 쓰러뜨리기 시작했다. 대부분은 원한과 굶주림 때문이었다고 전해진다.
+
+그러나 유독 그 하나만은, 쓰러뜨리는 데 마을 전체의 힘이 필요했다고 한다.`,
+    effectsText: [
+      '흔들림 없는 눈: 그 시선은 처음부터 끝까지 단 한 번도 흔들리지 않는다.',
+      '천 년의 응시: 아주 가끔, 그 오랜 응시가 하나의 타격으로 쏟아진다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: 4.0,
+    uniqueSkill: { key: 'moai', name: '흔들림 없는 눈과 천 년의 응시' },
+  },
+  null,
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -3418,6 +3453,28 @@ function arachneVenomTick(now) {
     if (w && stacks > 0) {
       dealMonDamage(stacks * weaponAtk(w) * ARACHNE.venomTickCoeff);
       floatText('☠️ 맹독!');
+    }
+  }
+}
+
+// 마지막 형제의 눈(태초의 유물): 다른 태초들과 달리 스택이나 순환 없이 "항상 일정하게
+// 강한" 고정형 구조. 항시 배율 자체는 dmgMultOverride(4.0)로 처리되고, 여기서는 그 위에
+// 주기적으로(스택 없이, 순수 타이머) 터지는 확정 강타만 담당한다.
+// 펀치기계 측정 기준 카마소츠 대비 약 98% — 순수 전투형 태초 기준(90~110%) 충족.
+const MOAI = {
+  burstInterval: 12,  // 강타 발동 주기(초)
+  burstMult: 8.0,     // 강타 피해 = 무기 공격력 × 이 값
+};
+function hasMoai() { return hasGenesisEquipped('moai'); }
+function moaiTick(now) {
+  if (!hasMoai()) return;
+  if (!fx.moaiBurstNext) fx.moaiBurstNext = now + MOAI.burstInterval * 1000;
+  if (now >= fx.moaiBurstNext) {
+    fx.moaiBurstNext = now + MOAI.burstInterval * 1000;
+    const w = getEquipped();
+    if (w) {
+      dealMonDamage(weaponAtk(w) * MOAI.burstMult);
+      floatText('👁️ 천 년의 응시!');
     }
   }
 }
@@ -6037,6 +6094,8 @@ function tick(dt) {
   nephilimTick(nowDecay);
   // 아라크네(태초의 유물): 맹독의 실 발동 중 매초 도트 피해
   arachneVenomTick(nowDecay);
+  // 마지막 형제의 눈(태초의 유물): 주기적으로 터지는 확정 강타
+  moaiTick(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -6575,6 +6634,7 @@ function resetTimedStacks() {
   fx.arachneSinceTrigger = 0;
   fx.arachneVenomUntil = 0;
   fx.arachneVenomTickNext = 0;
+  fx.moaiBurstNext = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

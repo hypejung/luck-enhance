@@ -2119,6 +2119,14 @@ function tryUnlockWorld2() {
   log(`🔓 사냥터 [${FLOORS[WORLD2_START_FLOOR].name}] 해금! (토벌전 ${WORLD2_RAID_UNLOCK_STAGE}단계 클리어)`, 'lg-gold');
   if (S.unlocked >= FLOOR_CAP && S.boxCount === 0) unlockEgg('noBox');
 }
+// 월드2 보스 처치 보상 — 📜 무기의 정수. 도서관(주 6회 한정)을 보완하는 상시 파밍 경로로,
+// 보스 쿨타임 1시간마다 반복 가능한 대신 1회당 보상은 도서관보다 확실히 낮게 잡는다
+// (40층 보스 10회 ≈ 같은 급 도서관 1회분 — HP 환산 기준 40층 보스는 도서관 13서고 상당).
+const WORLD2_BOSS_ESSENCE_BASE = 2;
+const WORLD2_BOSS_ESSENCE_GROWTH = 1.4;
+function world2BossEssenceReward(f) {
+  return Math.floor(WORLD2_BOSS_ESSENCE_BASE * Math.pow(WORLD2_BOSS_ESSENCE_GROWTH, f - WORLD2_START_FLOOR));
+}
 
 // ---------- 보스 시스템 ----------
 const BOSS = {
@@ -6914,6 +6922,12 @@ function endBossFight(win) {
     } else {
       S.mats[matKey2] = (S.mats[matKey2] || 0) + matBonus;
       log(`🌿 보스 처치 보상: <span class="grade-${matGradeName}">${F.mats[2]}</span> ×${matBonus} 획득!`, 'lg-good');
+    }
+    // 월드2(황혼국) 보스 처치 보상: 📜 무기의 정수 (도서관을 보완하는 상시 파밍 경로)
+    if (f >= WORLD2_START_FLOOR) {
+      const essence = world2BossEssenceReward(f);
+      S.weaponEssence = BN.add(S.weaponEssence, essence);
+      log(`📜 보스 처치 보상: 무기의 정수 +${fmt(essence)}`, 'lg-good');
     }
     // 태초의 유물: 보스 처치는 10배 확률로 시도
     rollGenesisArtifact(f, GENESIS_BOSS_MULT);

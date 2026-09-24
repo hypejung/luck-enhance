@@ -7422,26 +7422,51 @@ function renderLibraryTab() { renderLibraryBox(); }
 
 // ---------- 주간 통합 레이드 UI ----------
 // 전역 랭킹은 매 렌더마다 네트워크를 다시 부르지 않도록 주차 단위로 캐시해두고, 비동기
-// 조회가 끝나면(또는 새로고침 버튼으로) 다시 그린다.
+// 조회가 끝나면(또는 새로고침 버튼으로) 다시 그린다. 실패(error)했을 때도 캐시된 것으로
+// 취급해서 더 이상 자동 재시도하지 않는다 — 그렇지 않으면 매 렌더마다 다시 요청 → 실패 →
+// 재렌더 → 다시 요청 ... 으로 이어지는 루프가 생기고, 그 재렌더가 닉네임 입력창을 통째로
+// 다시 그리면서 매번 포커스를 잃어(모바일에서는 키보드가 내려가는 형태로 나타남) 버린다.
 let worldRaidLeaderboardCache = { week: null, entries: null, loading: false, error: false };
 function refreshWorldRaidLeaderboard(force) {
   const wk = weekKey();
   if (worldRaidLeaderboardCache.loading) return;
-  if (!force && worldRaidLeaderboardCache.week === wk && worldRaidLeaderboardCache.entries) return;
+  if (!force && worldRaidLeaderboardCache.week === wk && (worldRaidLeaderboardCache.entries || worldRaidLeaderboardCache.error)) return;
   worldRaidLeaderboardCache.loading = true;
   fetchWeeklyRaidEntries(wk).then(entries => {
     worldRaidLeaderboardCache = { week: wk, entries, loading: false, error: false };
-    if (currentTab === 'worldraid') renderWorldRaidTab();
+    if (currentTab === 'worldraid') renderWorldRaidLeaderboardBox();
   }).catch(() => {
-    worldRaidLeaderboardCache.loading = false;
-    worldRaidLeaderboardCache.error = true;
-    if (currentTab === 'worldraid') renderWorldRaidTab();
+    worldRaidLeaderboardCache = { week: wk, entries: null, loading: false, error: true };
+    if (currentTab === 'worldraid') renderWorldRaidLeaderboardBox();
   });
 }
 function worldRaidTitleBadge(titleKey) {
   if (!titleKey || !WEEKLY_RAID_TITLES[titleKey]) return '';
   const t = WEEKLY_RAID_TITLES[titleKey];
   return `<span class="raidtitle raidtitle-${titleKey}">${t.emoji} ${t.name}</span>`;
+}
+// 랭킹 목록만 별도 컨테이너로 분리 렌더링 — 비동기 조회가 끝나서 다시 그릴 때 닉네임
+// 입력창 등 나머지 UI(특히 입력 중인 <input>)를 건드리지 않기 위함.
+function renderWorldRaidLeaderboardBox() {
+  const el = $('worldRaidLeaderboardBox');
+  if (!el) return;
+  const lb = worldRaidLeaderboardCache;
+  const myId = raidParticipantId();
+  if (!lb.entries) {
+    el.innerHTML = lb.error
+      ? `<div style="font-size:12px;color:#ff7a7a;">랭킹을 불러오지 못했습니다. 🔄로 다시 시도해주세요.</div>`
+      : `<div style="font-size:12px;color:var(--sub);">랭킹 불러오는 중...</div>`;
+  } else if (!lb.entries.length) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--sub);">이번 주 아직 기록이 없습니다. 첫 도전자가 되어보세요!</div>`;
+  } else {
+    el.innerHTML = lb.entries.map((e, i) => {
+      const rank = i + 1;
+      const mine = e.id === myId;
+      return `<div class="invitem${mine ? ' equipped' : ''}">
+        <div><div class="wn">#${rank} ${e.nickname || '(익명)'} ${worldRaidTitleBadge(e.title)}</div>
+        <div class="wi">데미지 ${fmt(e.dmg)}</div></div></div>`;
+    }).join('');
+  }
 }
 function renderWorldRaidTab() {
   const battlePanel = $('worldRaidBattlePanel');
@@ -7463,35 +7488,23 @@ function renderWorldRaidTab() {
   const attemptsLeft = WEEKLY_RAID.maxAttempts - S.weeklyRaid.count;
   const available = !bossFight.active && attemptsLeft > 0;
 
-  const lb = worldRaidLeaderboardCache;
-  const myId = raidParticipantId();
-  let lbHtml;
-  if (!lb.entries) {
-    lbHtml = lb.error
-      ? `<div style="font-size:12px;color:#ff7a7a;">랭킹을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</div>`
-      : `<div style="font-size:12px;color:var(--sub);">랭킹 불러오는 중...</div>`;
-  } else if (!lb.entries.length) {
-    lbHtml = `<div style="font-size:12px;color:var(--sub);">이번 주 아직 기록이 없습니다. 첫 도전자가 되어보세요!</div>`;
-  } else {
-    lbHtml = lb.entries.map((e, i) => {
-      const rank = i + 1;
-      const mine = e.id === myId;
-      return `<div class="invitem${mine ? ' equipped' : ''}">
-        <div><div class="wn">#${rank} ${e.nickname || '(익명)'} ${worldRaidTitleBadge(e.title)}</div>
-        <div class="wi">데미지 ${fmt(e.dmg)}</div></div></div>`;
-    }).join('');
-  }
+  // 닉네임 입력창이 포커스된 채로 재렌더가 걸리는 경우(예: 다른 곳에서 renderTop() 등과
+  // 함께 호출될 때)를 대비해, 값/포커스/커서 위치를 보존했다가 다시 그린 뒤 복원한다.
+  const nickEl = $('worldRaidNickInput');
+  const nickFocused = nickEl && document.activeElement === nickEl;
+  const nickValue = nickEl ? nickEl.value : (S.weeklyRaid.nickname || '');
+  const nickSel = nickFocused ? [nickEl.selectionStart, nickEl.selectionEnd] : null;
 
   box.innerHTML = `
     <div style="margin-bottom:10px;">
       <div style="font-size:13px;">이번 주 도전: <b>${S.weeklyRaid.count}/${WEEKLY_RAID.maxAttempts}</b> · 이번 주 최고 기록: <b style="color:var(--gold)">${fmt(S.weeklyRaid.best)}</b>${worldRaidTitleBadge(S.weeklyRaid.title)}</div>
-      <div style="font-size:12px;color:var(--sub);margin:6px 0 8px;">닉네임: <input type="text" id="worldRaidNickInput" placeholder="비우면 참가 ID 사용" value="${(S.weeklyRaid.nickname || '').replace(/"/g, '&quot;')}" maxlength="16" style="width:140px;"> <button id="worldRaidNickSaveBtn">저장</button></div>
+      <div style="font-size:12px;color:var(--sub);margin:6px 0 8px;">닉네임: <input type="text" id="worldRaidNickInput" placeholder="비우면 참가 ID 사용" value="${nickValue.replace(/"/g, '&quot;')}" maxlength="16" style="width:140px;"> <button id="worldRaidNickSaveBtn">저장</button></div>
       <button class="primary" id="worldRaidChallengeBtn" ${available ? '' : 'disabled'}>🩸 그르마에게 도전 (${WEEKLY_RAID.duration}초)</button>
       <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : attemptsLeft <= 0 ? '이번 주 도전 횟수를 모두 사용했습니다.' : '도전을 시작하면 승패와 무관하게 이번 주 횟수가 소모됩니다.'}</div>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
       <div style="font-size:13px;margin-bottom:6px;">🏆 이번 주 랭킹 <button id="worldRaidRefreshBtn" style="font-size:11px;padding:2px 8px;">🔄</button></div>
-      ${lbHtml}
+      <div id="worldRaidLeaderboardBox"></div>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:10px;">
       <div style="font-size:13px;margin-bottom:6px;">💠 명예의 정수 상점 (보유: <b style="color:var(--gold)">${fmt(S.honorEssence)}</b>)</div>
@@ -7501,6 +7514,12 @@ function renderWorldRaidTab() {
           <div class="btns"><button class="honor-buy-btn" data-id="${h.id}" ${BN.gte(S.honorEssence, h.cost) ? '' : 'disabled'}>💠${h.cost}</button></div>
         </div>`).join('')}
     </div>`;
+  renderWorldRaidLeaderboardBox();
+  if (nickFocused) {
+    const el = $('worldRaidNickInput');
+    el.focus();
+    try { el.setSelectionRange(nickSel[0], nickSel[1]); } catch (e) {}
+  }
   const btn = $('worldRaidChallengeBtn');
   if (btn) btn.onclick = startWeeklyRaidFight;
   const refreshBtn = $('worldRaidRefreshBtn');

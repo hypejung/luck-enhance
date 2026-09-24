@@ -8623,12 +8623,16 @@ function renderBlacksmith() {
 /* ===================== 저장 / 불러오기 ===================== */
 const SAVE_KEY = 'luckEnhance_v1';
 let resetting = false;  // 초기화 중에는 저장 금지
+// save()는 액션마다(강화 한 번, 구매 한 번 등) 아주 자주 호출되는데, 예전엔 그때마다
+// 클라우드(Firebase) 업로드까지 매번 같이 나가서 활발히 플레이할수록 초 단위로 업로드가
+// 쏟아졌다. 로컬 저장(localStorage)은 공짜라 그대로 매번 하되, 클라우드 업로드는 10초
+// 주기 자동저장 + 탭을 벗어나는 시점(markLeave)에서만 별도로 트리거해서 트래픽을 아낀다
+// (그 사이 비정상 종료 시 최대 10초 분량만 클라우드에 덜 반영될 수 있음 — 로컬 진행은 무관).
 function save() {
   if (resetting) return;
   const hr = new Date().getHours();
   if (hr === 0 && S.eggs && !S.eggs.midnight) unlockEgg('midnight');
   try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
-  syncUpload();
 }
 // 이전 버전 저장 데이터에 빠진 필드를 채워주는 마이그레이션
 function migrate(d) {
@@ -11335,15 +11339,17 @@ function init() {
       console.error('tick error:', e);
     }
   }, 100);
-  // 자동 저장 (10초)
-  setInterval(save, 10000);
+  // 자동 저장 (10초) — 클라우드 업로드(syncUpload)는 여기서만 정기적으로 트리거된다.
+  setInterval(() => { if (resetting) return; save(); syncUpload(); }, 10000);
 
   // ===== 백그라운드/오프라인 보상 =====
-  // 탭이 숨겨지거나 닫힐 때 시각 기록 (save() 내부에서 resetting 체크)
+  // 탭이 숨겨지거나 닫힐 때 시각 기록 (save() 내부에서 resetting 체크). 이때도 클라우드
+  // 업로드를 한 번 더 트리거해서, 다른 기기로 넘어가기 직전 상태는 최대한 최신으로 반영한다.
   const markLeave = () => {
     if (resetting) return;
     S.lastSeen = Date.now();
     save();
+    syncUpload();
   };
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) markLeave();

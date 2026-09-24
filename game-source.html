@@ -7457,7 +7457,8 @@ function refreshWorldRaidLeaderboard(force) {
   fetchWeeklyRaidEntries(wk).then(entries => {
     worldRaidLeaderboardCache = { week: wk, entries, loading: false, error: false };
     if (currentTab === 'worldraid') renderWorldRaidLeaderboardBox();
-  }).catch(() => {
+  }).catch(err => {
+    console.error('세계수의 단말마 랭킹 조회 실패:', err);
     worldRaidLeaderboardCache = { week: wk, entries: null, loading: false, error: true };
     if (currentTab === 'worldraid') renderWorldRaidLeaderboardBox();
   });
@@ -8889,12 +8890,19 @@ function uploadWeeklyRaidRecord() {
   fetch(`${SYNC_DB_URL}/weeklyRaid/${weekKey()}/entries/${raidParticipantId()}.json`, {
     method: 'PUT',
     body: JSON.stringify({ nickname: weeklyRaidDisplayName(), dmgM: dmg.m, dmgE: dmg.e, title: S.weeklyRaid.title, updatedAt: Date.now() }),
-  }).then(() => {
+  }).then(res => {
+    // fetch()는 403/404 같은 HTTP 에러 상태에서도 reject하지 않고 그대로 resolve하므로,
+    // res.ok를 직접 확인하지 않으면 서버가 실제로 거부한 업로드(예: DB 규칙 문제)를
+    // "성공"으로 착각해서 안 보이는 원인도 못 찾고 계속 반복되는 문제가 있었다.
+    if (!res.ok) throw new Error('http ' + res.status);
     // 방금 올린 내 기록이 반영된 최신 랭킹을 다시 불러온다 — 캐시만 믿으면 전투 직후
     // 화면엔 업로드 전(내 기록이 빠진) 랭킹이 그대로 남아 "쳤는데 랭킹에 안 보인다"는
     // 상황이 된다.
     if (currentTab === 'worldraid') refreshWorldRaidLeaderboard(true);
-  }).catch(() => { /* 오프라인 - 다음 기록 갱신 때 재시도됨 */ }).finally(() => { worldRaidUploadBusy = false; });
+  }).catch(err => {
+    console.error('세계수의 단말마 기록 업로드 실패:', err);
+    log(`⚠️ 순위 기록을 서버에 올리지 못했습니다 (${err && err.message ? err.message : '네트워크 오류'}). 이번 주 최고 기록은 로컬에는 저장돼 있으니, 다음에 다시 도전하면 재시도됩니다.`, 'lg-bad');
+  }).finally(() => { worldRaidUploadBusy = false; });
 }
 // 지난 주 최종 순위를 조회해 아직 못 받은 보상이 있으면 지급한다. 정산 주체가 없는 정적
 // 사이트 구조상 "정해진 시각 자동 지급"은 불가능해서, 다음에 게임을 켰을 때 클라이언트가

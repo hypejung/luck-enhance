@@ -62,6 +62,27 @@
     0% { background-position: 0% 50%; }
     100% { background-position: 400% 50%; }
   }
+  /* 신규 콘텐츠 홍보 배너(세계수의 단말마) — 인장 배지와 같은 썩은 수액 톤의 녹-적 그라데이션 */
+  #worldRaidPromoBanner {
+    background: linear-gradient(90deg, #163018, #3a1210, #163018, #3a1210, #163018);
+    background-size: 400% 100%;
+    animation: worldRaidPromoShine 4s linear infinite;
+    color: #eaffe0;
+    font-weight: bold;
+    text-align: center;
+    padding: 8px 14px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    border: 1px solid #4ee06a;
+    box-shadow: 0 0 10px -2px rgba(78,224,106,.5);
+    cursor: pointer;
+  }
+  #worldRaidPromoBanner[hidden] { display: none; }
+  @keyframes worldRaidPromoShine {
+    0% { background-position: 0% 50%; }
+    100% { background-position: 400% 50%; }
+  }
   .stat { font-size: 15px; margin-left: 14px; }
   .stat b { color: var(--gold); }
   #dpsshow { color: var(--sub); font-size: 13px; }
@@ -534,6 +555,7 @@
     </div>
   </div>
   <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! (매주 수·일 자정~자정) 성공확률 UP · 파괴/하락 확률 DOWN · 비용 할인! 🌟✨</div>
+  <div id="worldRaidPromoBanner" hidden>🌳🩸 신규 주간 레이드 오픈! 「세계수의 단말마」— 그르마에게 도전하고 순위 보상을 받아보세요! (9/28 월요일까지 안내)</div>
 
   <div id="tabs">
     <div class="tabgroup" data-group="combat">
@@ -9143,11 +9165,16 @@ function syncCopyText(text, okMsg) {
 /* ===================== 렌더 ===================== */
 let currentTab = 'hunt';
 
+// 세계수의 단말마 오픈 홍보 배너 — 2026-09-28(월) 로컬 자정(레이드 첫 주간 초기화 시점)까지만 노출
+const WORLDRAID_PROMO_UNTIL = 20260928;
+function worldRaidPromoActive() { return todayKey() < WORLDRAID_PROMO_UNTIL; }
 function renderTop() {
   $('gold').textContent = fmt(S.gold);
   $('dpsshow').textContent = 'DPS ' + fmt(playerDPS());
   const banner = $('enhanceEventBanner');
   if (banner) banner.hidden = !enhanceEventActive();
+  const promoBanner = $('worldRaidPromoBanner');
+  if (promoBanner) promoBanner.hidden = !worldRaidPromoActive();
 }
 
 function renderMonster() {
@@ -11242,6 +11269,7 @@ function init() {
   document.querySelectorAll('#slotBetBtns button').forEach(b => b.onclick = () => spinSlot(parseFloat(b.dataset.bet)));
   document.querySelectorAll('#diceBetBtns button').forEach(b => b.onclick = () => rollDice(parseFloat(b.dataset.bet)));
   $('syncBtn').onclick = syncModalHome;
+  $('worldRaidPromoBanner').onclick = () => switchTab('worldraid');
   $('resetBtn').onclick = () => {
     showConfirmModal('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?', () => {
       resetting = true;  // 언로드 핸들러가 재저장하는 것을 차단

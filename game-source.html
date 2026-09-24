@@ -945,14 +945,40 @@
 
   <!-- 무기 도감 -->
   <div id="tab-codex" style="display:none">
-    <div class="panel">
-      <h3>📖 무기 도감</h3>
-      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다. 등록 조건과 보너스 종류는 📘 가이드 탭 참고.
+    <div id="codexMainSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
+    <div id="codexWeaponSection">
+      <div class="panel">
+        <h3>📖 무기 도감</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+          아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다. 등록 조건과 보너스 종류는 📘 가이드 탭 참고.
+        </div>
+        <div id="codexGrid"></div>
+        <div id="codexDetail" style="font-size:13px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border); min-height:20px;">
+          도감 항목을 클릭하면 상세 정보가 여기와 팝업으로 표시됩니다.
+        </div>
       </div>
-      <div id="codexGrid"></div>
-      <div id="codexDetail" style="font-size:13px; padding:8px 10px; background:var(--panel2); border-radius:8px; border:1px solid var(--border); min-height:20px;">
-        도감 항목을 클릭하면 상세 정보가 여기와 팝업으로 표시됩니다.
+      <div class="panel">
+        <h3>🏆 컬렉션 세트 효과</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+          도감 등록 현황에 따라 자동으로 활성화되는 효과입니다. 별도 장착 없이 조건을 만족하는 즉시 항상 적용됩니다.
+        </div>
+        <div id="codexBonusList"></div>
+      </div>
+    </div>
+    <div id="codexSubweaponSection" style="display:none">
+      <div class="panel">
+        <h3>🗡️ 보조무기 도감</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+          월드2(황혼국) 보조무기 컬렉션입니다. 일반 보조무기(등급×타입), 보스 보조무기, 고대 보조무기 세 트랙으로 나뉘며, 전부 월드 구분 없이 항상 적용됩니다. 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
+        </div>
+        <div id="subCodexGrid"></div>
+      </div>
+      <div class="panel">
+        <h3>🏆 보조무기 컬렉션 효과</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+          도감 등록 현황에 따라 자동으로 활성화되는 효과입니다. 별도 장착 없이 조건을 만족하는 즉시 항상 적용됩니다.
+        </div>
+        <div id="subCodexBonusList"></div>
       </div>
     </div>
     <div id="codexPopup" hidden>
@@ -960,13 +986,6 @@
         <div id="codexPopupContent"></div>
         <button id="codexPopupClose" class="primary" style="width:100%;margin-top:10px;">닫기</button>
       </div>
-    </div>
-    <div class="panel">
-      <h3>🏆 컬렉션 세트 효과</h3>
-      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        도감 등록 현황에 따라 자동으로 활성화되는 효과입니다. 별도 장착 없이 조건을 만족하는 즉시 항상 적용됩니다.
-      </div>
-      <div id="codexBonusList"></div>
     </div>
   </div>
 
@@ -1455,12 +1474,12 @@ const SUB_ENH = {
   ],
 };
 
-// ---------- 보스 보조무기 / 고대 보조무기 (월드2 전용 컬렉션, 아직 드롭 경로 없음) ----------
+// ---------- 보스 보조무기 / 고대 보조무기 (월드2 전용 컬렉션) ----------
 // 월드1의 "보스 신화무기"/"고대 에이션트 스피릿"에 해당하는 월드2 콘텐츠는 별도의 메인
-// 무기가 아니라 보조무기로 나간다 — 사냥터 보스가 그 층 전용 "보스 보조무기"를 고정 드롭하고,
-// 고대 등급 보조무기는 "고대 보조무기"라는 별개의 수집형 트랙(1~20층 고대의 유물과 같은 위치)
-// 으로 간다. 둘 다 아직 실제 드롭/획득 로직은 없고(카운트가 항상 0), 나중에 보스전 로직과
-// 고대의 도서관(또는 별도 경로)에 연결할 예정. index = 층 번호(0 = 21층).
+// 무기가 아니라 보조무기로 나간다 — 사냥터 보스가 그 층 전용 "보스 보조무기"를 고정 드롭하고
+// (endBossFight() 참고), 고대 등급 보조무기는 "고대 보조무기"라는 별개의 수집형 트랙(1~20층
+// 고대의 유물과 같은 위치)으로 월드2 사냥 중 확률적으로 드롭된다(rollSubweaponRelic()).
+// index = 층 번호(0 = 21층).
 const SUBWEAPON_BOSS_NAMES = [
   { name: '그레이헐트의 안개표창집', subType: '표창집', flavor: '안개 속에서 던지면 표창이 스스로 목표를 찾아간다.' },
   { name: '카샨의 허수아비검집',     subType: '검집',   flavor: '지푸라기로 감쌌지만 그 안의 날은 결코 무디지 않다.' },
@@ -1485,8 +1504,6 @@ const SUBWEAPON_BOSS_NAMES = [
 ];
 // 카운트 1/2/4/6/8/10/12/14/16/18/20 구간 — 1~20층 "보스의 무력"과 같은 구조를 재사용하되
 // 효과는 보조무기 자체(액티브 위력/지속시간, 강화확률/파괴확률, 드롭률·뽑기 할인)에 집중했다.
-// 수치는 전부 밸런스 미확정 임시값(TODO) — subActiveDmg/subActiveDuration/subEnh/
-// subDestroyReduce/subDropRate/subGachaDiscount는 아직 accEff()가 소비하지 않는 예약 스탯이다.
 const SUBWEAPON_BOSS_MILESTONES = [
   { count: 1,  effs: [['subEnh', 0.03]] },
   { count: 2,  effs: [['subDropRate', 0.10]] },
@@ -1535,10 +1552,12 @@ const SUBWEAPON_RELICS = [
 ];
 // 카운트 5/10/15/20 — 1~20층 "고대의 유물"과 같은 구조. 파밍 계열 중에서도 특히
 // 보조무기 파밍/뽑기 개선에 집중했다(말씀하신 "새로운 파밍 요소 획득률 개선" 취지).
+// 20단계는 accEff 스탯이 아니라 openSubweaponBox()에서 applySubRelicGradeBoost()로 직접 처리한다
+// (14/20층 "보스의 무력"이 endBossFight()에서 직접 처리되는 것과 같은 패턴).
 const SUBWEAPON_RELIC_MILESTONES = [
   { count: 5,  effs: [['subDropRate', 0.15]] },
   { count: 10, effs: [['subGachaDiscount', 0.10]] },
-  { count: 15, effs: [], text: '🔮 보조무기 강화 시 소모 골드 -20%' },
+  { count: 15, effs: [['subEnhGoldReduce', 0.20]] },
   { count: 20, effs: [], text: '🔮 보조무기 뽑기 고급 등급 확률 소폭 상향' },
 ];
 function subRelicCollectedCount() { return (S.subRelics || []).filter(Boolean).length; }
@@ -1550,6 +1569,72 @@ function subRelicMilestoneEff() {
     for (const [stat, val] of m.effs) eff[stat] = (eff[stat] || 0) + val;
   }
   return eff;
+}
+
+// ---------- 보조무기 도감 (일반, 8타입×6등급=48종) ----------
+// 무기 도감의 "쌍/타입 세트"에 대응하는 보조무기 버전 — 등급별 세로줄(8타입 전부 수집) +
+// 타입별 가로줄(6등급 전부 수집) 두 축의 컬렉션 보너스. 전부 sub* 스탯만 지급해서
+// 보조무기 시스템 자체를 강화하는 계정 범용 트랙으로 둔다(월드1 무기 도감처럼 world1
+// 게이트를 걸지 않음 — 보스 보조무기/유물 마일스톤과 동일한 취급).
+const SUBWEAPON_CODEX_GRADE_SETS = [
+  { grade: 0, effs: [['subDropRate', 0.05]] },
+  { grade: 1, effs: [['subEnh', 0.02]] },
+  { grade: 2, effs: [['subGachaDiscount', 0.05]] },
+  { grade: 3, effs: [['subDestroyReduce', 0.03]] },
+  { grade: 4, effs: [['subAmp', 0.08]] },
+  { grade: 5, effs: [['subAmp', 0.15], ['subActiveDmg', 0.10]] },
+];
+const SUBWEAPON_CODEX_TYPE_MASTERY = [
+  { type: '표창집',     effs: [['subDropRate', 0.03]] },
+  { type: '검집',       effs: [['subEnh', 0.015]] },
+  { type: '쌍검 벨트',  effs: [['subGachaDiscount', 0.03]] },
+  { type: '도끼걸이',   effs: [['subDestroyReduce', 0.02]] },
+  { type: '창꽂이',     effs: [['subDropRate', 0.03]] },
+  { type: '화살통',     effs: [['subEnh', 0.015]] },
+  { type: '마도서',     effs: [['subGachaDiscount', 0.03]] },
+  { type: '건틀릿',     effs: [['subDestroyReduce', 0.02]] },
+];
+function subweaponCodexKey(sw) {
+  if (sw.bossFloor !== undefined) return null; // 보스 보조무기는 별도 트랙(S.subBossCodexSeen)에서 관리
+  return `g${sw.grade}_${SUBWEAPON_TYPES[sw.typeIdx].name}`;
+}
+function unlockSubCodexEntry(sw) {
+  const key = subweaponCodexKey(sw);
+  if (!key || S.subCodexSeen[key]) return;
+  S.subCodexSeen[key] = true;
+  log(`🗡️ <b>보조무기 도감</b>에 새 항목이 등록되었습니다: ${subweaponItemName(sw)}`, 'lg-prim');
+}
+function subCodexHas(key) { return !!(S && S.subCodexSeen && S.subCodexSeen[key]); }
+function subCodexGradeSetProgress(grade) {
+  let have = 0;
+  for (const t of SUBWEAPON_TYPES) if (subCodexHas(`g${grade}_${t.name}`)) have++;
+  return { have, need: SUBWEAPON_TYPES.length };
+}
+function subCodexTypeMasteryProgress(typeName) {
+  let have = 0;
+  for (let g = 0; g <= 5; g++) if (subCodexHas(`g${g}_${typeName}`)) have++;
+  return { have, need: 6 };
+}
+function subCodexBonusEff() {
+  const eff = {};
+  for (const gs of SUBWEAPON_CODEX_GRADE_SETS) {
+    const p = subCodexGradeSetProgress(gs.grade);
+    if (p.have >= p.need) for (const [stat, val] of gs.effs) eff[stat] = (eff[stat] || 0) + val;
+  }
+  for (const tm of SUBWEAPON_CODEX_TYPE_MASTERY) {
+    const p = subCodexTypeMasteryProgress(tm.type);
+    if (p.have >= p.need) for (const [stat, val] of tm.effs) eff[stat] = (eff[stat] || 0) + val;
+  }
+  return eff;
+}
+// 고대 보조무기 20개 전부 수집 시(마일스톤 20단계) 보조무기 뽑기에서 상위 등급 확률을
+// 소폭 상향 — 하위 등급들 가중치의 15%씩을 덜어내 최고 등급 쪽으로 옮긴다.
+function applySubRelicGradeBoost(pairs) {
+  if (subRelicCollectedCount() < 20 || pairs.length < 2) return pairs;
+  const sorted = [...pairs].sort((a, b) => a[0] - b[0]);
+  const bestIdx = sorted.length - 1;
+  const shiftAmount = sorted.reduce((s, p, i) => i === bestIdx ? s : s + p[1] * 0.15, 0);
+  return sorted.map((p, i) => i === bestIdx ? [p[0], p[1] + shiftAmount] : [p[0], p[1] * 0.85]);
 }
 
 // 등급별 무기 이름(브라켓 태그 안에 들어갈 텍스트) 계산
@@ -1846,6 +1931,14 @@ function codexStatText(stat, value) {
     bossDmg: v => `👹 보스 피해량 +${Math.round(v * 100)}%`,
     destroyReduce: v => `🛡️ 강화 파괴 확률 -${Math.round(v * 100)}%p`,
     offline: v => `🌙 오프라인 효율 +${Math.round(v * 100)}%p`,
+    subAmp: v => `🗡️ 보조무기 패시브/액티브 효과 증폭 +${Math.round(v * 100)}%`,
+    subEnh: v => `🔧 보조무기 강화 확률 +${(v * 100).toFixed(1)}%p`,
+    subDestroyReduce: v => `🛡️ 보조무기 강화 파괴 확률 -${Math.round(v * 100)}%p`,
+    subActiveDmg: v => `💥 보조무기 액티브 피해량 +${Math.round(v * 100)}%p`,
+    subActiveDuration: v => `⏱️ 보조무기 액티브 지속시간 +${v}초`,
+    subDropRate: v => `🍀 보조무기 드롭률 +${Math.round(v * 100)}%`,
+    subGachaDiscount: v => `🎁 보조무기 상자 가격 -${Math.round(v * 100)}%`,
+    subEnhGoldReduce: v => `💰 보조무기 강화 골드 소모 -${Math.round(v * 100)}%`,
   };
   return (map[stat] || (v => `+${v}`))(value);
 }
@@ -2399,6 +2492,7 @@ const PATCH_NOTES = [
       '🌳 주간 통합 레이드 "세계수의 단말마" 신설 — 사냥터 진행도와 무관하게 전용 탭에서 상대(그르마)에게 120초간 누적 데미지를 겨루는 콘텐츠. 주당 최대 3회 도전해 최고 기록이 전역 랭킹에 오르며, 매주 월요일 로컬 자정 초기화',
       '🏆 순위별 보상 신설 — 골드(사냥터 보스 처치 보상의 배수) + 신규 재화 "명예의 정수" 지급, 1~3위는 전용 칭호를 얻어 이후 레이드 기록에 닉네임과 함께 표시됨. 보상은 다음 접속 시 지난 주 랭킹을 확인해 정산',
       '🎖️ 명예의 정수 상점 신설 — 특수효과 변경권(무기 특수효과를 같은 등급 내 다른 효과로 무작위 재배정), 희귀·전설 랜덤박스, 신화·고대 룬박스, 무기의 정수·각성의 정수·토벌의 증표 교환',
+      '🗡️ 보조무기 도감 신설 — 📖 도감 탭에 서브탭 추가. 일반 보조무기(48종, 등급 세트/타입 마스터리), 보스 보조무기(20종), 고대 보조무기(유물, 20종) 세 트랙을 한 화면에서 확인 가능. 보스 보조무기·고대 보조무기는 원래 있던 컬렉션 데이터에 UI만 새로 붙인 것이며, 보조무기 액티브 스킬 보너스(피해량/지속시간 마일스톤)가 실제로는 적용되지 않던 버그와 고대 보조무기 15/20단계 미구현 효과도 함께 수정',
     ],
   },
   {
@@ -4566,6 +4660,7 @@ function newState() {
     relics: [],            // 고대의 유물 컬렉션: [true/false, ...] 20개, index = 층 번호
     subBossCodexSeen: [],  // 보스 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
     subRelics: [],         // 고대 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
+    subCodexSeen: {},      // 일반 보조무기 도감(월드2): 키 `g{grade}_{타입명}` — 8타입×6등급(0~5) 48종
     subweapons: [],        // 보유 보조무기 목록: [{id, typeIdx, grade, enhance, activeTiming}, ...]
     subEquipped: null,     // 장착 중인 보조무기 id
     weeklyRaid: { week: null, count: 0, best: BN.from(0), nickname: '', nicknameLocked: false, title: null, claimedWeek: null }, // 세계수의 단말마: week=주차키, count=이번 주 도전 횟수(최대 3), best=이번 주 최고 데미지, nicknameLocked=이번 주 첫 입장 시 닉네임 확정 여부(주간 초기화마다 다시 풀림), title=지난 주 순위로 획득해 이번 주 기록에 붙는 칭호, claimedWeek=마지막으로 정산받은 주차키
@@ -5013,11 +5108,11 @@ function isWorld1BonusActive() { return !S || S.floor < WORLD2_START_FLOOR; }
 function accEff() {
   const eff = {
     gold: 0, speed: 0, atk: 0, luck: 0, enh: 0, critChance: 0, critDamage: 0, extraAtk: 0, extraAtkDmg: 0, bossDmg: 0, destroyReduce: 0,
-    // 보조무기 전용 예약 스탯(월드2 장신구/컬렉션에서 지급) — 아직 어떤 로직도 소비하지 않는다.
-    // subAmp: 보조무기 패시브/액티브 효과 전체 증폭(%), subEnh/subDestroyReduce: 보조무기
-    // 강화확률/파괴확률 보정, subActiveDmg/subActiveDuration: 액티브 위력/지속시간,
-    // subDropRate/subGachaDiscount: 보조무기 드롭률/뽑기 비용 할인.
-    subAmp: 0, subEnh: 0, subDestroyReduce: 0, subActiveDmg: 0, subActiveDuration: 0, subDropRate: 0, subGachaDiscount: 0,
+    // 보조무기 전용 스탯(월드2 장신구/컬렉션에서 지급) — subAmp: 보조무기 패시브/액티브
+    // 효과 전체 증폭(%), subEnh/subDestroyReduce: 보조무기 강화확률/파괴확률 보정,
+    // subActiveDmg/subActiveDuration: 액티브 위력/지속시간, subDropRate/subGachaDiscount:
+    // 보조무기 드롭률/뽑기 비용 할인, subEnhGoldReduce: 보조무기 강화 골드 소모 감소.
+    subAmp: 0, subEnh: 0, subDestroyReduce: 0, subActiveDmg: 0, subActiveDuration: 0, subDropRate: 0, subGachaDiscount: 0, subEnhGoldReduce: 0,
   };
   const world1 = isWorld1BonusActive();
   // 장신구/보스장신구는 "그 장신구가 몇 층 것인가"(eq.floor)로 개별 판정한다 — 21~40층
@@ -5074,12 +5169,14 @@ function accEff() {
     const cbe = codexBonusEff();
     for (const k of Object.keys(cbe)) eff[k] = (eff[k] || 0) + cbe[k];
   }
-  // 보스 보조무기 / 고대 보조무기 컬렉션 마일스톤 보너스 (월드2 전용 트랙 — 계정 범용으로
-  // 항상 적용. 실제로는 아직 획득 경로가 없어 카운트가 0으로 고정되어 무해하다)
+  // 보스 보조무기 / 고대 보조무기 / 일반 보조무기 도감 컬렉션 마일스톤 보너스
+  // (월드2 전용 트랙이지만 계정 범용으로 월드 구분 없이 항상 적용)
   const sbe = subBossMilestoneEff();
   for (const k of Object.keys(sbe)) eff[k] = (eff[k] || 0) + sbe[k];
   const sre = subRelicMilestoneEff();
   for (const k of Object.keys(sre)) eff[k] = (eff[k] || 0) + sre[k];
+  const sce = subCodexBonusEff();
+  for (const k of Object.keys(sce)) eff[k] = (eff[k] || 0) + sce[k];
   // 장착 중인 보조무기의 패시브(공용 스탯 키만) — spellProc/smashMultBonus는 여기 없는 별도
   // 훅(typeTrait 자리)에서 처리된다. ampBonus는 여기까지 누적된 eff.subAmp를 그대로 넘긴다
   // (accEff() 안에서 accEff()를 다시 부르면 무한 재귀가 되므로).
@@ -5976,13 +6073,16 @@ function subweaponPassiveEff(sw, ampBonus) {
   return eff;
 }
 // 액티브 "결전의 기백" 위력/지속시간 — 위력은 등급 배율, 지속시간은 초 단위라 등급 배율 없이 강화만 반영.
+// subweaponActiveBossDmg/Duration은 accEff() 내부(subweaponPassiveEff 호출부)에서는 쓰이지
+// 않으므로, 여기서 accEff()를 직접 불러도 무한 재귀가 되지 않는다 — 보스 보조무기/유물/
+// 보조무기 도감 마일스톤이 주는 subActiveDmg(%)·subActiveDuration(초)를 여기서 반영한다.
 function subweaponActiveBossDmg(sw, ampBonus) {
   const base = SUBWEAPON_ACTIVE_BASE_DMG[sw.grade] || SUBWEAPON_ACTIVE_BASE_DMG[0];
-  return base * subweaponActiveDmgTierMult(subActivePctTier(sw.enhance)) * (1 + (ampBonus || 0));
+  return base * subweaponActiveDmgTierMult(subActivePctTier(sw.enhance)) * (1 + (ampBonus || 0) + (accEff().subActiveDmg || 0));
 }
 function subweaponActiveDuration(sw) {
   const base = SUBWEAPON_ACTIVE_BASE_DURATION[sw.grade] || SUBWEAPON_ACTIVE_BASE_DURATION[0];
-  return base * subweaponActiveTierMult(subActiveDurTier(sw.enhance));
+  return base * subweaponActiveTierMult(subActiveDurTier(sw.enhance)) + (accEff().subActiveDuration || 0);
 }
 function getEquippedSubweapon() { return (S.subweapons || []).find(sw => sw.id === S.subEquipped) || null; }
 // 강화기의 강화 대상: 메인 무기 강화기(getEnhanceTarget/enhanceTargetId)와 동일한 패턴 —
@@ -6045,6 +6145,7 @@ function makeSubweapon(grade, typeIdx) {
 }
 const SUBWEAPON_BAG_MAX = 60; // 무기 가방(60)과 동일하게 상향
 function addSubweapon(sw) {
+  unlockSubCodexEntry(sw); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록 (무기 도감과 동일한 원칙)
   if (!Array.isArray(S.subweapons)) S.subweapons = [];
   // 자동판매 필터: 무기 가방과 동일한 패턴 — 지정 등급 이하 + 강화0인 새 보조무기는 획득 즉시 자동 판매
   if (S.subAutoSellGrade != null && sw.grade <= S.subAutoSellGrade && sw.enhance === 0) {
@@ -6111,7 +6212,8 @@ function subEnhanceCost(sw) {
   // 수급처가 더 늘어난 상태라는 점을 반영).
   const anchor = GRADES[sw.grade].enhanceCost / floorGold(0) * floorGold(WORLD2_START_FLOOR) * SUB_ENH_COST_EXTRA_MULT;
   const cost = anchor * Math.pow(1.35, sw.enhance);
-  return Math.round(cost * enhanceEventCostMult(sw.enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
+  const goldReduceMult = 1 - Math.min(0.9, accEff().subEnhGoldReduce || 0); // 고대 보조무기 15개 수집 마일스톤
+  return Math.round(cost * enhanceEventCostMult(sw.enhance) * goldReduceMult); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
 // 메인 무기(gradeAdjustedSuccess)와 동일한 방식: +15 미만은 등급 무관 동일, +15부터는
 // 등급이 높을수록 (성공확률)^지수로 더 가파르게 낮아진다(지수 자체도 메인 무기와 동일하게 재사용).
@@ -6292,7 +6394,7 @@ function openSubweaponBox(idx, src) {
   const wChance = b.subweapon ? b.subweapon.reduce((s, p) => s + p[1], 0) / 100 : 0;
   const bChance = (b.box ? b.box.reduce((s, p) => s + p[1], 0) / 100 : 0) * (sealEquippedHas('mazeHorn') ? 1.5 : 1);
   if (roll < wChance) {
-    const grade = wrand(b.subweapon);
+    const grade = wrand(applySubRelicGradeBoost(b.subweapon)); // 고대 보조무기 20개 수집 마일스톤: 상위 등급 확률 소폭 상향
     const sw = makeSubweapon(grade, Math.floor(Math.random() * SUBWEAPON_TYPES.length));
     addSubweapon(sw);
     log(`${b.icon} [${b.name}]${src ? '(' + src + ')' : ''} → 보조무기! ${subweaponGradeTag(sw)}`, grade >= 4 ? 'lg-prim' : 'lg-good');
@@ -8561,7 +8663,16 @@ function codexEntKey(ent) {
   if (ent.isBossSet) return bossCodexKey(ent.floor);
   return codexKey(ent.grade, ent.type, ent.variant, ent.floor);
 }
+let codexMainSubTab = 'weapon'; // 순수 UI 상태라 세이브 불필요
+const CODEX_MAIN_SUBTAB_OPTIONS = [
+  { v: 'weapon', label: '📖 무기 도감' },
+  { v: 'subweapon', label: '🗡️ 보조무기 도감' },
+];
 function renderCodex() {
+  renderEquipSubTabBar('codexMainSubTabBar', codexMainSubTab, (v) => { codexMainSubTab = v; renderCodex(); }, CODEX_MAIN_SUBTAB_OPTIONS);
+  $('codexWeaponSection').style.display = codexMainSubTab === 'weapon' ? '' : 'none';
+  $('codexSubweaponSection').style.display = codexMainSubTab === 'subweapon' ? '' : 'none';
+  if (codexMainSubTab === 'subweapon') { renderSubCodex(); return; }
   renderCodexBonuses();
   const box = $('codexGrid');
   if (!box) return;
@@ -8631,6 +8742,163 @@ function showCodexPopup(html) {
 }
 function hideCodexPopup() { $('codexPopup').hidden = true; }
 
+// ---------- 보조무기 도감 UI ----------
+// 무기 도감(renderCodex)과 같은 .codex-section/.codex-grid/.codex-cell 스타일을 그대로
+// 재사용해서 일관된 룩을 유지한다. 일반 보조무기(48종)/보스 보조무기(20종)는 아이콘
+// 그리드+팝업 방식, 고대 보조무기(유물, 20종)는 고대의 유물(도서관 탭)과 동일하게
+// 이름 카드 나열 방식을 쓴다(원래 그 트랙이 그런 스타일이었음).
+function subCodexGradeCellHtml(icon, name, flavor) {
+  return `<div style="font-size:15px;font-weight:bold;margin-bottom:4px;">${icon} ${name}</div>
+    ${flavor ? `<div style="font-style:italic;color:var(--sub);margin-bottom:6px;">${flavor}</div>` : ''}`;
+}
+function renderSubCodex() {
+  const box = $('subCodexGrid');
+  if (!box) return;
+  box.innerHTML = '';
+
+  // 1) 일반 보조무기 (등급별 섹션, 8타입)
+  for (let grade = 0; grade <= 5; grade++) {
+    const gcolor = GRADES[grade].color;
+    const items = SUBWEAPON_TYPES.map(t => {
+      const key = `g${grade}_${t.name}`;
+      const unlocked = subCodexHas(key);
+      const fakeSw = { grade, typeIdx: SUBWEAPON_TYPES.indexOf(t) };
+      const name = subweaponItemName(fakeSw);
+      const flavor = subweaponFlavorText(fakeSw);
+      const revealDetail = unlocked || grade >= 4; // 레전더리 이상은 미보유라도 수집 목표로 미리 공개
+      return { icon: t.icon, unlocked, name, html: revealDetail ? subCodexGradeCellHtml(t.icon, name, flavor) : `<div style="color:var(--sub);font-style:italic;">${name}</div>` };
+    });
+    const unlockedCount = items.filter(i => i.unlocked).length;
+    const section = document.createElement('div');
+    section.className = 'codex-section';
+    section.innerHTML = `<div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name}
+      <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>
+      <div class="codex-grid"></div>`;
+    const grid = section.querySelector('.codex-grid');
+    items.forEach(it => {
+      const cell = document.createElement('div');
+      cell.className = 'codex-cell' + (it.unlocked ? '' : ' locked');
+      cell.title = it.name;
+      cell.style.borderColor = it.unlocked ? gcolor : '';
+      if (it.unlocked && grade >= 5) cell.style.boxShadow = `0 0 8px ${gcolor}`;
+      cell.innerHTML = `<span class="codex-icon" style="${it.unlocked ? `color:${gcolor}` : ''}">${it.icon}</span>`;
+      cell.onclick = () => showCodexPopup(it.html);
+      grid.appendChild(cell);
+    });
+    box.appendChild(section);
+  }
+
+  // 2) 보스 보조무기 (20종, 신화 등급 취급)
+  {
+    const items = SUBWEAPON_BOSS_NAMES.map((bs, idx) => {
+      const unlocked = !!(S.subBossCodexSeen && S.subBossCodexSeen[idx]);
+      const t = SUBWEAPON_TYPES.find(x => x.name === bs.subType);
+      return { icon: t.icon, unlocked, name: bs.name, html: subCodexGradeCellHtml(t.icon, bs.name, bs.flavor) };
+    });
+    const unlockedCount = items.filter(i => i.unlocked).length;
+    const section = document.createElement('div');
+    section.className = 'codex-section';
+    section.innerHTML = `<div class="codex-section-title grade-신화">보스 보조무기
+      <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>
+      <div class="codex-grid"></div>`;
+    const grid = section.querySelector('.codex-grid');
+    items.forEach(it => {
+      const cell = document.createElement('div');
+      cell.className = 'codex-cell' + (it.unlocked ? '' : ' locked');
+      cell.title = it.unlocked ? '' : it.name;
+      cell.style.borderColor = it.unlocked ? GRADES[5].color : '';
+      if (it.unlocked) cell.style.boxShadow = `0 0 8px ${GRADES[5].color}`;
+      cell.innerHTML = `<span class="codex-icon" style="${it.unlocked ? `color:${GRADES[5].color}` : ''}">${it.icon}</span>`;
+      cell.onclick = () => showCodexPopup(it.html); // 보스 보조무기는 미보유라도 목표 미리보기(무기 도감 "보스의 무력"과 동일한 취급)
+      grid.appendChild(cell);
+    });
+    box.appendChild(section);
+  }
+
+  // 3) 고대 보조무기(유물, 20종) — 고대의 유물(도서관 탭)과 동일한 카드 나열 스타일
+  {
+    const section = document.createElement('div');
+    section.className = 'codex-section';
+    section.innerHTML = `<div class="codex-section-title grade-고대">고대 보조무기
+      <span class="codex-section-count">${subRelicCollectedCount()}/${SUBWEAPON_RELICS.length}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;"></div>`;
+    const grid = section.querySelector('div[style*="grid-template-columns"]');
+    SUBWEAPON_RELICS.forEach((r, i) => {
+      const owned = !!(S.subRelics && S.subRelics[i]);
+      const cell = document.createElement('div');
+      cell.style.cssText = 'font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;';
+      if (owned) {
+        cell.style.background = '#2a2a1a';
+        cell.title = r.flavor;
+        cell.innerHTML = `<b style="color:var(--gold)">${r.name}</b>`;
+      } else {
+        cell.style.color = 'var(--sub)';
+        cell.style.opacity = '0.5';
+        cell.innerHTML = '❓ 미발견';
+      }
+      grid.appendChild(cell);
+    });
+    box.appendChild(section);
+  }
+
+  renderSubCodexBonuses();
+}
+// 보조무기 컬렉션 효과 요약(무기 도감의 renderCodexBonuses와 동일한 레이아웃) —
+// 일반 도감(등급 세트/타입 마스터리) + 보스 보조무기 마일스톤 + 고대 보조무기 마일스톤 전부 취합.
+function renderSubCodexBonuses() {
+  const listBox = $('subCodexBonusList');
+  if (!listBox) return;
+  const active = [];
+  const pending = [];
+  for (const gs of SUBWEAPON_CODEX_GRADE_SETS) {
+    const p = subCodexGradeSetProgress(gs.grade);
+    const label = `[${GRADES[gs.grade].name}] 등급 전체 수집(8종)`;
+    const effText = gs.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ');
+    if (p.have >= p.need) active.push({ grade: gs.grade, label, effText });
+    else pending.push({ grade: gs.grade, label, effText, have: p.have, need: p.need });
+  }
+  for (const tm of SUBWEAPON_CODEX_TYPE_MASTERY) {
+    const p = subCodexTypeMasteryProgress(tm.type);
+    const label = `${tm.type} 전체 등급 수집(6종)`;
+    const effText = tm.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ');
+    if (p.have >= p.need) active.push({ grade: 3, label, effText });
+    else pending.push({ grade: 3, label, effText, have: p.have, need: p.need });
+  }
+  const bossCount = subBossWeaponCodexCount();
+  for (const m of SUBWEAPON_BOSS_MILESTONES) {
+    const label = `[보스 보조무기] ${m.count}종 수집`;
+    const effText = m.text || m.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ');
+    if (bossCount >= m.count) active.push({ grade: 5, label, effText });
+    else pending.push({ grade: 5, label, effText, have: bossCount, need: m.count });
+  }
+  const relicCount = subRelicCollectedCount();
+  for (const m of SUBWEAPON_RELIC_MILESTONES) {
+    const label = `[고대 보조무기] ${m.count}종 수집`;
+    const effText = m.text || m.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ');
+    if (relicCount >= m.count) active.push({ grade: 6, label, effText });
+    else pending.push({ grade: 6, label, effText, have: relicCount, need: m.count });
+  }
+  const row = (x, dim) => `
+    <div class="invitem${dim ? '' : ' equipped'}"${dim ? ' style="opacity:0.55"' : ''}>
+      <div><div class="wn"><span class="grade-${GRADES[x.grade].name}">${x.label}</span>${dim ? ` <span style="color:var(--sub);font-size:12px">${x.have}/${x.need}</span>` : ''}</div>
+      <div class="wi">${x.effText}</div></div>
+    </div>`;
+  const activeHtml = active.length ? active.map(a => row(a, false)).join('') : '<div style="color:var(--sub);font-size:13px;">아직 활성화된 세트 효과가 없습니다.</div>';
+  const pendingSorted = pending.sort((a, b) => (b.have / b.need) - (a.have / a.need));
+  const totals = {};
+  for (const eff of [subCodexBonusEff(), subBossMilestoneEff(), subRelicMilestoneEff()]) {
+    for (const [k, v] of Object.entries(eff)) totals[k] = (totals[k] || 0) + v;
+  }
+  const totalLines = Object.entries(totals)
+    .filter(([, v]) => Math.abs(v) > 1e-9)
+    .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v).replace(' ', ' 총 ')}</div>`)
+    .join('');
+  const totalHtml = totalLines || '<div style="color:var(--sub);font-size:13px;">아직 합산될 효과가 없습니다.</div>';
+  listBox.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">📊 현재 보조무기 도감 효과 합계</div>${totalHtml}
+    <div style="font-weight:bold;margin:12px 0 6px;">✅ 활성화된 세트 효과 (${active.length}개)</div>${activeHtml}
+    <div style="font-weight:bold;margin:12px 0 6px;">⏳ 미완성 세트</div>${pendingSorted.map(p => row(p, true)).join('')}`;
+}
+
 // 대장장이 탭 렌더링 — 무기 각인 UI
 function renderBlacksmith() {
   renderEnchantBox();
@@ -8680,6 +8948,13 @@ function migrate(d) {
   if (!Array.isArray(d.subRelics)) d.subRelics = [];
   if (!Array.isArray(d.subweapons)) d.subweapons = [];
   if (d.subEquipped === undefined) d.subEquipped = null;
+  if (typeof d.subCodexSeen !== 'object' || d.subCodexSeen === null) d.subCodexSeen = {};
+  // 보조무기 도감 신설 이전 세이브 대응: 이미 보유 중인(가방+장착) 보조무기들을 도감에 소급 등록
+  for (const sw of d.subweapons) {
+    if (sw.bossFloor !== undefined) continue; // 보스 보조무기는 별도 트랙(subBossCodexSeen)에서 이미 관리됨
+    const key = `g${sw.grade}_${SUBWEAPON_TYPES[sw.typeIdx].name}`;
+    d.subCodexSeen[key] = true;
+  }
   // 월드2(21층) 해금 조건 버그 수정 — 원래 "토벌전 9단계 클리어"가 조건이어야 했는데,
   // FLOOR_CAP을 40으로 올릴 때 실수로 일반 사냥 진행(20층 처치 수)만으로 열리고 있었다.
   // 이미 이 버그로 21층 이상이 열려버린 세이브는 토벌전 9단계를 실제로 못 깼다면 재잠금한다.
@@ -10654,7 +10929,16 @@ const GUIDE_SECTIONS = [
     <br>· <b>타입 풀세트</b>: 한 무기 타입의 변형 3개를 <b>레전더리</b>·<b>신화</b> 등급 각각 모두 모으면 세트 보너스
     <br>· <b>사냥터별 고대 세트</b>: 1~20층 각 사냥터 전용 고대 등급 세트를 모으면 그 사냥터 고유의 스탯 보너스
     <br>· <b>보스의 무력</b>: 1~20층 보스 신화무기를 1/2/4/6/8/10/12/14/16/18/20종 모을 때마다 계단식으로 누적되는 보너스
-    <br><br>21~40층(월드2) 보스 보조무기 수집도 별도 트랙으로 존재합니다.`,
+    <br><br>21~40층(월드2) 보조무기 컬렉션은 완전히 별도의 "보조무기 도감"(📖 도감 탭 서브탭)으로 존재합니다 — 아래 항목 참고.`,
+  },
+  {
+    icon: '🗡️', title: '보조무기 도감',
+    body: `📖 도감 탭의 "🗡️ 보조무기 도감" 서브탭에서 관리하는, 월드2(황혼국) 보조무기 컬렉션입니다. 무기 도감과 마찬가지로 <b>실제로 한 번이라도 획득</b>하면 등록되고, 등록 현황에 따라 자동으로 보너스가 붙습니다. 전부 <b>월드 구분 없이 항상 적용</b>됩니다(무기 도감과 달리 월드1 한정이 아님).
+    <br><br>세 트랙으로 나뉩니다.
+    <br>· <b>일반 보조무기(48종, 8타입×6등급)</b>: 그 등급 8타입을 전부 모으면 <b>등급 세트</b> 보너스, 한 타입의 6등급을 전부 모으면 <b>타입 마스터리</b> 보너스
+    <br>· <b>보스 보조무기(20종)</b>: 21~40층 보스가 그 층 전용 보조무기를 고정 드롭. 1/2/4/6/8/10/12/14/16/18/20종 수집 시 계단식 누적 보너스(액티브 위력·지속시간, 강화확률·파괴확률, 드롭률·뽑기 할인)
+    <br>· <b>고대 보조무기(유물, 20종)</b>: 월드2 사냥 중 아주 낮은 확률로 드롭되는 수집형 트린켓. 5/10/15/20개 수집 시 드롭률·뽑기 할인·강화 골드 절감·뽑기 고급 등급 확률 상향 보너스
+    <br><br>보너스는 전부 보조무기 시스템 자체를 강화하는 sub* 스탯(패시브/액티브 증폭, 강화·파괴 확률, 드롭률, 뽑기 할인·비용)으로 지급됩니다.`,
   },
   {
     icon: '🗿', title: '고대의 유물',

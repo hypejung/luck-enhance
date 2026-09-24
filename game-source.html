@@ -1933,6 +1933,7 @@ const fx = {
   freeEnhance: false,      // 끝나지 않은 맹세: 다음 강화 비용 무료 대기 중
   glideUntil: 0,           // 활공: 사냥터 이동 직후 공속 버프 만료 시각
   enduranceStart: 0,       // 늑대왕의 인장: 현재 사냥터에서 쉬지 않고 사냥을 지속한 시작 시각
+  nagaAwakenStart: 0,      // 나가의 잠들지 않는 눈(태초의 유물): 현재 사냥터에서 쉬지 않고 사냥을 지속한 시작 시각
   hungerStackTimes: [],    // 끝없는 허기(글러트니): 최근 처치 시각 기록 (10초 지나면 자동 소멸)
   bloodThirstUntil: 0,     // 피의 갈증: 자가 공격력/공격속도 버프 만료 시각
   bloodThirstDot: null,    // 피의 갈증: 대상에게 건 출혈 도트 { dmgPerSec, remain } (재발동 시 갱신)
@@ -3043,7 +3044,37 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: 4.0,
     uniqueSkill: { key: 'moai', name: '흔들림 없는 눈과 천 년의 응시' },
   },
-  null,
+  { // floor 9 — 늪지대 — 리저드맨
+    id: 'naga',
+    floor: 9,
+    type: 'weapon',
+    name: '나가의 잠들지 않는 눈',
+    subtitle: 'Vasuki, Keeper of the Deep',
+    icon: '🐍',
+    art: 'assets/artifacts/naga_eye.svg',
+    lore: `물 속 깊은 곳에는, 사람이 닿을 수 없는 창고가 있다고 했다.
+
+나가들은 그 창고의 열쇠를 쥔 채 태어났다. 반은 사람이었고, 반은 뱀이었다. 물길을 따라 스며들듯 움직였고, 잠들 때조차 눈은 완전히 감기지 않았다.
+
+늪을 지나는 자들은 종종 그 존재를 눈치채지 못했다. 물풀 사이로 비친 것은 그저 흔들리는 그림자였을 뿐 — 그러나 그 그림자는, 언제나 지켜보고 있었다.
+
+오래 머무는 자에게는 특별한 것이 따랐다. 나가는 침입자를 곧바로 물지 않았다. 대신 지켜보았다. 그 자리를 떠나지 않고 버티는 이에게는, 서서히 감춰둔 것들을 흘려보내 주었다 — 마치 오래 잠들어 있던 눈이, 조금씩 다시 뜨이듯이.
+
+그러나 자리를 뜨면, 그 눈은 다시 감겼다. 창고의 문도 함께.
+
+사람들은 그 늪의 수호자를 왕의 이름으로 불렀다.
+
+바수키(Vasuki).
+
+서두르는 자에게는 아무것도 주지 않는, 그러나 머무는 자에게는 모든 것을 여는 자.`,
+    effectsText: [
+      '지켜온 보물: 오래 지킨 것들은, 손대는 순간 스스로 넘쳐흐른다.',
+      '깊은 곳의 눈: 깊이 잠들어 있던 것들이, 서서히 다시 눈을 뜬다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'naga', name: '지켜온 보물과 깊은 곳의 눈' },
+  },
   null, null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
@@ -4737,6 +4768,8 @@ function accEff() {
     for (const k of ['atk', 'speed', 'gold', 'luck', 'critChance', 'critDamage', 'extraAtk', 'bossDmg']) eff[k] += 0.12;
   }
   if (world1 && sealEquippedHas('wolfKing')) eff.speed += wolfKingEnduranceBonus();
+  // 나가의 잠들지 않는 눈(태초의 유물): 장착 중인 무기 자체의 효과라 월드 구분 없이 항상 적용
+  eff.luck += nagaLuckBonus();
   return eff;
 }
 // 늑대왕의 인장: 같은 사냥터에서 쉬지 않고 사냥한 시간에 비례한 공속 보너스(5분당 +5%p, 최대 +25%p)
@@ -4744,6 +4777,25 @@ function wolfKingEnduranceBonus() {
   if (!fx.enduranceStart) return 0;
   const elapsedMin = (Date.now() - fx.enduranceStart) / 60000;
   return Math.min(0.25, Math.floor(elapsedMin / 5) * 0.05);
+}
+// 나가의 잠들지 않는 눈(태초의 유물): 같은 사냥터에서 쉬지 않고 사냥한 시간에 비례해
+// 드롭률이 서서히 더 오른다(늑대왕의 인장과 동일한 "지속 사냥" 판정 방식) — 2분당 +12.5%p,
+// 최대 +100%p(16분 도달). 상시 기본 보너스(NAGA.baseLuck)와는 별개로 더해진다.
+const NAGA = {
+  baseLuck: 1.5,          // 상시 드롭률 보너스
+  awakenInterval: 2,      // 깨어남 게이지 증가 주기(분)
+  awakenPerInterval: 0.125, // 주기마다 추가되는 드롭률(%p)
+  awakenCap: 1.0,         // 깨어남 게이지 최대 추가 드롭률
+};
+function hasNaga() { return hasGenesisEquipped('naga'); }
+function nagaAwakenBonus() {
+  if (!fx.nagaAwakenStart) return 0;
+  const elapsedMin = (Date.now() - fx.nagaAwakenStart) / 60000;
+  return Math.min(NAGA.awakenCap, Math.floor(elapsedMin / NAGA.awakenInterval) * NAGA.awakenPerInterval);
+}
+function nagaLuckBonus() {
+  if (!hasNaga()) return 0;
+  return NAGA.baseLuck + nagaAwakenBonus();
 }
 // 세트 효과가 발동하는 사냥터 (장착한 보스무기와 같은 사냥터의 보스장신구를 보유 중이면)
 function bossSetFloor() {
@@ -8570,6 +8622,7 @@ function renderFloorBtns() {
         if (bossFight.active) { endBossFight(false); log('사냥터 이동으로 보스전이 중단되었습니다.', 'lg-bad'); }
         S.floor = i; spawnMonster(); renderFloorBtns(); renderFloorUI(); renderBossBtn();
         fx.enduranceStart = Date.now(); // 늑대왕의 인장: 사냥터 이동 시 지구력 보너스 초기화
+        fx.nagaAwakenStart = Date.now(); // 나가의 잠들지 않는 눈: 사냥터 이동 시 깨어남 게이지 초기화
         fx.redcapFarmStacks = 0; fx.redcapFarmBuffUntil = 0; // 레드캡(태초의 유물): 사냥터 이동 시 전리품 스택/버프 초기화
         save();
       };
@@ -10443,6 +10496,7 @@ function init() {
     log('💾 저장된 진행 상황을 불러왔습니다.');
   }
   fx.enduranceStart = Date.now(); // 늑대왕의 인장: 페이지 로드 시점부터 지구력 보너스 계산 시작
+  fx.nagaAwakenStart = Date.now(); // 나가의 잠들지 않는 눈: 페이지 로드 시점부터 깨어남 게이지 계산 시작
   // 이전 버전 호환: effect 검증
   for (const w of S.weapons) {
     if (w.effect && !EFFECTS[w.effect]) w.effect = null;
@@ -10562,6 +10616,7 @@ function init() {
     if (awaySec < 10) return;  // 10초 미만이면 무시
     S.lastSeen = null;
     fx.enduranceStart = Date.now(); // 늑대왕의 인장: 자리 비움 후 복귀 시 지구력 보너스 초기화
+    fx.nagaAwakenStart = Date.now(); // 나가의 잠들지 않는 눈: 자리 비움 후 복귀 시 깨어남 게이지 초기화
 
     // 오프라인 사냥: 실제 장비 DPS 기반 (재료/드롭 제외, 최대 8시간(흡혈군주의 인장 장착 시 12시간), 효율 70%)
     const offlineCapSec = (sealEquippedHas('vampireLord') ? 12 : 8) * 3600;

@@ -1771,6 +1771,7 @@ function codexStatText(stat, value) {
     critChance: v => `💥 치명타 확률 +${(v * 100).toFixed(1)}%p`,
     critDamage: v => `💢 치명타 피해 +${Math.round(v * 100)}%p`,
     extraAtk: v => `⚡ 연타 확률 +${(v * 100).toFixed(1)}%p`,
+    extraAtkDmg: v => `💢 연타 피해 +${Math.round(v * 100)}%p`,
     bossDmg: v => `👹 보스 피해량 +${Math.round(v * 100)}%`,
     destroyReduce: v => `🛡️ 강화 파괴 확률 -${Math.round(v * 100)}%p`,
     offline: v => `🌙 오프라인 효율 +${Math.round(v * 100)}%p`,
@@ -1827,7 +1828,15 @@ function renderCodexBonuses() {
     </div>`;
   const activeHtml = active.length ? active.map(a => row(a, false)).join('') : '<div style="color:var(--sub);font-size:13px;">아직 활성화된 세트 효과가 없습니다.</div>';
   const pendingSorted = pending.sort((a, b) => (b.have / b.need) - (a.have / a.need));
-  box.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">✅ 활성화된 세트 효과 (${active.length}개)</div>${activeHtml}
+  // 활성화된 세트 효과들을 스탯별로 합산한 요약 (예: "총 연타 확률 +5%p")
+  const totals = codexBonusEff();
+  const totalLines = Object.entries(totals)
+    .filter(([, v]) => Math.abs(v) > 1e-9)
+    .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v).replace(' ', ' 총 ')}</div>`)
+    .join('');
+  const totalHtml = totalLines || '<div style="color:var(--sub);font-size:13px;">아직 합산될 효과가 없습니다.</div>';
+  box.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">📊 현재 도감 효과 합계</div>${totalHtml}
+    <div style="font-weight:bold;margin:12px 0 6px;">✅ 활성화된 세트 효과 (${active.length}개)</div>${activeHtml}
     <div style="font-weight:bold;margin:12px 0 6px;">⏳ 미완성 세트</div>${pendingSorted.map(p => row(p, true)).join('')}`;
 }
 

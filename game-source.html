@@ -600,6 +600,7 @@
       </div>
       <div id="advancedEnhanceBox" style="margin-top:8px;"></div>
       <div id="awakeningBox" style="margin-top:8px;"></div>
+      <div id="ariadneBox" style="margin-top:8px;"></div>
       <div id="autoEnhanceBox" style="margin-top:8px;"></div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험! 자세한 규칙은 📘 가이드 탭 참고.
@@ -3112,7 +3113,42 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'draugr', name: '뼈에 새겨지는 것과 쓰러져도 끝나지 않는 것' },
   },
-  null, null, null, null, null, null, null, null, null,
+  { // floor 11 — 미궁 — 미노타우르스
+    id: 'ariadne',
+    floor: 11,
+    type: 'weapon',
+    name: '아리아드네의 실타래',
+    subtitle: "Ariadne's Thread, the Guide Through the Maze",
+    icon: '🧵',
+    art: 'assets/artifacts/ariadne_thread.svg',
+    lore: `미궁은 한 번 들어가면 다시는 나올 수 없는 곳이었다.
+
+다이달로스 자신조차 설계도 없이는 그 길을 다시 찾지 못할 만큼 복잡하게 지어졌으니까.
+
+아리아드네는 그 미궁 속으로 걸어 들어가는 자에게, 실타래 하나를 건넸다.
+
+"이 실이 풀리는 동안은, 너는 길을 잃지 않을 거야. 하지만..."
+
+실은 풀리면 풀릴수록 점점 가늘어졌다. 얼마나 깊이 들어갔는지, 그 실의 길이가 고스란히 말해주었다.
+
+너무 가늘어진 실은, 종종 스스로 끊어지기도 했다. 그러면 처음부터, 다시 풀어나가야 했다.
+
+깊이 들어갈수록 실은 위태로워졌지만, 그 위태로움을 끝까지 견뎌낸 자에게는 — 다시는 끊어지지 않는 확실한 길이 주어졌다.
+
+그 길 끝에서, 실은 더 이상 흔들리지 않았다.
+
+사람들은 그 실타래를 이렇게 불렀다.
+
+아리아드네의 실(Ariadne's Thread) — 길을 잃은 자에게 주어지는, 위태롭지만 끝내는 확실해지는 인도.`,
+    effectsText: [
+      '풀려나가는 실: 나아갈수록, 손에 쥔 실은 조금씩 풀려나가며 힘을 더한다.',
+      '끝내 이어지는 길: 충분히 나아간 자에게는, 더는 흔들리지 않는 확실한 길이 주어진다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'ariadne', name: '풀려나가는 실과 끝내 이어지는 길' },
+  },
+  null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -3636,6 +3672,55 @@ function draugrFloorListHtml(w) {
     </div>`;
   });
   return `<div style="margin-top:4px;margin-bottom:4px;max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;padding:4px;background:var(--panel);border-radius:6px;">${rows.join('')}</div>`;
+}
+
+// 아리아드네의 실타래(태초의 유물): "성장기"(0→목표 길이) 동안은 0.5초마다 실이 +1씩
+// 길어지고, 길수록 그 틱에 실이 끊어질 확률도 함께 올라간다(끊어지면 그 길이만큼 고정 피해
+// 폭발 후 0으로 리셋). 목표 길이에 무사히 도달하면 그 이후로는 더 이상 끊어지지 않고
+// "지속 폭발기"에 들어가 0.5초마다 계속 고정 피해가 터진다. 공격력은 현재 실 길이에
+// 항상 비례해서 상승한다. 목표 길이는 플레이어가 1~120 사이에서 직접 설정(계정 설정, 기본값
+// 15 — 안전하게 목표에 도달해 지속 폭발기에 들어갈 확률이 높은 수준). 목표를 낮게 잡을수록
+// 안전하게 "지속 폭발기"에 들어가 시간이 갈수록 강해지고, 높게 잡을수록 위험 부담이 커지는
+// 대신 한 번 도달하면 그만큼 더 강력해지는 위험-보상 구조.
+// 펀치기계 측정(15회 평균) 기준 카마소츠 대비 — 기본값(목표 15) 약 91%, 목표 20이면 117%,
+// 목표를 더 높일수록 변동성이 커지고(도달 여부 자체가 불확실해짐) 60 이상은 대부분 도달하지
+// 못해 오히려 약해진다. 순수 전투형 태초 기준(90~110%)은 기본값 기준으로 충족.
+const ARIADNE = {
+  growthInterval: 0.5,      // 실이 자라는 주기(초)
+  maxLen: 120,               // 목표 길이 설정 가능 상한
+  defaultTarget: 15,        // 목표 길이 기본값
+  atkPerLen: 0.01,           // 실 길이 1당 공격력 +1%p
+  snapChancePerLen: 0.002,   // 실 길이 1당 끊어질 확률 +0.2%p(성장기에만 적용, 목표 도달 후엔 미적용)
+  burstCoeff: 0.35,          // 폭발 피해 = 무기 공격력 × 실 길이 × 이 값
+};
+function hasAriadne() { return hasGenesisEquipped('ariadne'); }
+function ariadneTargetLen() { return Math.min(ARIADNE.maxLen, Math.max(1, (S && S.ariadneTarget) || ARIADNE.defaultTarget)); }
+function ariadneAtkBonus() {
+  if (!hasAriadne()) return 0;
+  return (fx.ariadneLen || 0) * ARIADNE.atkPerLen;
+}
+function ariadneTick(now) {
+  if (!hasAriadne()) return;
+  if (!fx.ariadneNextTick) fx.ariadneNextTick = now + ARIADNE.growthInterval * 1000;
+  if (now < fx.ariadneNextTick) return;
+  fx.ariadneNextTick = now + ARIADNE.growthInterval * 1000;
+  const w = getEquipped();
+  if (!w) return;
+  const target = ariadneTargetLen();
+  const len = fx.ariadneLen || 0;
+  if (len < target) {
+    const newLen = len + 1;
+    fx.ariadneLen = newLen;
+    if (Math.random() < newLen * ARIADNE.snapChancePerLen) {
+      dealMonDamage(newLen * weaponAtk(w) * ARIADNE.burstCoeff);
+      floatText('🧵 실이 끊어지다!');
+      fx.ariadneLen = 0;
+    }
+  } else {
+    // 목표 길이에 도달한 뒤로는 더 이상 끊어지지 않고 매 틱 지속 폭발
+    dealMonDamage(len * weaponAtk(w) * ARIADNE.burstCoeff);
+    floatText('🧵 실이 터지다!');
+  }
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4329,6 +4414,7 @@ function newState() {
     autoSellGrade: null, // 이 등급 이하 + 강화0 무기는 획득 즉시 자동판매 (null=끔)
     autoSellTypes: [],   // 이 무기 종류(들) + 강화0인 무기는 획득 즉시 자동판매
     autoSellEffects: [], // 이 무기 효과(들) + 강화0인 무기는 획득 즉시 자동판매
+    ariadneTarget: null, // 아리아드네의 실타래(태초의 유물): 플레이어가 설정한 목표 실 길이(1~120, null=기본 최대)
     runeAutoSellGrade: null, // 이 등급 이하 룬은 획득 즉시 자동판매 (null=끔)
     subAutoSellGrade: null, // 이 등급 이하 + 강화0 보조무기는 획득 즉시 자동판매 (null=끔)
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
@@ -4904,6 +4990,8 @@ function accEff() {
   for (const k of ['atk', 'speed', 'critChance', 'critDamage', 'extraAtk', 'extraAtkDmg', 'bossDmg']) {
     eff[k] += draugrStatBonus(k);
   }
+  // 아리아드네의 실타래(태초의 유물): 현재 실 길이에 비례한 공격력 보너스
+  eff.atk += ariadneAtkBonus();
   return eff;
 }
 // 늑대왕의 인장: 같은 사냥터에서 쉬지 않고 사냥한 시간에 비례한 공속 보너스(5분당 +5%p, 최대 +25%p)
@@ -6288,6 +6376,8 @@ function tick(dt) {
   moaiTick(nowDecay);
   // 드라우그르(태초의 유물): 보스전 중 생존/죽음 사이클 진행
   draugrTick(nowDecay);
+  // 아리아드네의 실타래(태초의 유물): 실 성장/폭발 진행
+  ariadneTick(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -6830,6 +6920,8 @@ function resetTimedStacks() {
   fx.draugrPhase = 'alive';
   fx.draugrPhaseUntil = 0;
   fx.draugrRevives = 0;
+  fx.ariadneLen = 0;
+  fx.ariadneNextTick = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -8824,7 +8916,7 @@ function renderEnhance() {
   if (!w) {
     box.innerHTML = `<div style="color:var(--sub)">장착된 무기가 없습니다. 사냥을 하거나 가방에서 무기를 장착하세요.</div>`;
     $('enhstat').innerHTML = ''; $('enhrates').innerHTML = ''; $('enhBtn').disabled = true;
-    $('advancedEnhanceBox').innerHTML = ''; $('autoEnhanceBox').innerHTML = ''; $('awakeningBox').innerHTML = '';
+    $('advancedEnhanceBox').innerHTML = ''; $('autoEnhanceBox').innerHTML = ''; $('awakeningBox').innerHTML = ''; $('ariadneBox').innerHTML = '';
     return;
   }
   $('enhBtn').disabled = enhanceRevealPending;
@@ -8887,6 +8979,7 @@ function renderEnhance() {
           : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   renderAdvancedEnhance(w, maxed);
   renderAwakening(w, maxed);
+  renderAriadneBox(w);
   renderAutoEnhance(w, maxed);
 }
 
@@ -8990,6 +9083,29 @@ function renderAwakening(w, maxed) {
   box.querySelectorAll('[data-awaken]').forEach(btn => {
     btn.onclick = () => awakenAttempt(w, +btn.dataset.awaken);
   });
+}
+
+// 아리아드네의 실타래(태초의 유물) 전용: 목표 실 길이(1~120) 설정 UI. 이 무기를 장착 중일 때만 표시.
+function renderAriadneBox(w) {
+  const box = $('ariadneBox');
+  if (!box) return;
+  if (!w || w.genesisId !== 'ariadne') { box.innerHTML = ''; return; }
+  const current = ariadneTargetLen();
+  box.innerHTML = `
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div style="flex:1; font-size:13px;">🧵 목표 실 길이 (1~${ARIADNE.maxLen})</div>
+      <input type="number" id="ariadneTargetInput" min="1" max="${ARIADNE.maxLen}" value="${current}" style="width:60px;">
+      <button class="primary" id="ariadneTargetBtn">설정</button>
+    </div>
+    <div style="font-size:11px;color:var(--sub);margin-top:4px;">현재 실 길이: <b style="color:var(--gold)">${fx.ariadneLen || 0}</b> / ${current}${(fx.ariadneLen || 0) >= current ? ' <span class="lg-prim">(지속 폭발 중)</span>' : ''}</div>`;
+  $('ariadneTargetBtn').onclick = () => {
+    const v = Math.round(+$('ariadneTargetInput').value);
+    if (!v || v < 1 || v > ARIADNE.maxLen) { log(`목표 실 길이는 1~${ARIADNE.maxLen} 사이로 설정하세요.`, 'lg-bad'); return; }
+    S.ariadneTarget = v;
+    log(`🧵 목표 실 길이를 ${v}로 설정했습니다.`, 'lg-good');
+    save();
+    renderAriadneBox(w);
+  };
 }
 
 function renderAutoEnhance(w, maxed) {

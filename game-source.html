@@ -11255,6 +11255,22 @@ function init() {
   } else {
     log('💾 저장된 진행 상황을 불러왔습니다.');
   }
+  // 디버그용 URL 진입점 — 모바일 등 개발자도구를 쓰기 번거로운 환경에서도 링크 하나로
+  // 세계수의 단말마 이번 주 도전 상태를 초기화할 수 있게. 처리 후 파라미터는 바로 지운다
+  // (새로고침해도 반복 초기화되지 않도록).
+  try {
+    const params = new URLSearchParams(location.search);
+    if (params.get('resetweeklyraid') === '1') {
+      S.weeklyRaid.count = 0;
+      S.weeklyRaid.best = BN.from(0);
+      S.weeklyRaid.nicknameLocked = false;
+      save();
+      log('🔧 [디버그] 세계수의 단말마 이번 주 도전 상태가 초기화되었습니다.', 'lg-prim');
+      params.delete('resetweeklyraid');
+      const qs = params.toString();
+      history.replaceState(null, '', location.pathname + (qs ? '?' + qs : ''));
+    }
+  } catch (e) {}
   fx.enduranceStart = Date.now(); // 늑대왕의 인장: 페이지 로드 시점부터 지구력 보너스 계산 시작
   fx.nagaAwakenStart = Date.now(); // 나가의 잠들지 않는 눈: 페이지 로드 시점부터 깨어남 게이지 계산 시작
   // 이전 버전 호환: effect 검증

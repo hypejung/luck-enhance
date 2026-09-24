@@ -8889,6 +8889,11 @@ function uploadWeeklyRaidRecord() {
   fetch(`${SYNC_DB_URL}/weeklyRaid/${weekKey()}/entries/${raidParticipantId()}.json`, {
     method: 'PUT',
     body: JSON.stringify({ nickname: weeklyRaidDisplayName(), dmgM: dmg.m, dmgE: dmg.e, title: S.weeklyRaid.title, updatedAt: Date.now() }),
+  }).then(() => {
+    // 방금 올린 내 기록이 반영된 최신 랭킹을 다시 불러온다 — 캐시만 믿으면 전투 직후
+    // 화면엔 업로드 전(내 기록이 빠진) 랭킹이 그대로 남아 "쳤는데 랭킹에 안 보인다"는
+    // 상황이 된다.
+    if (currentTab === 'worldraid') refreshWorldRaidLeaderboard(true);
   }).catch(() => { /* 오프라인 - 다음 기록 갱신 때 재시도됨 */ }).finally(() => { worldRaidUploadBusy = false; });
 }
 // 지난 주 최종 순위를 조회해 아직 못 받은 보상이 있으면 지급한다. 정산 주체가 없는 정적

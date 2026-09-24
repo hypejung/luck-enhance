@@ -925,14 +925,6 @@
   <!-- 대장장이 -->
   <div id="tab-blacksmith" style="display:none">
     <div class="panel">
-      <h3>🔨 대장장이</h3>
-      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        고대 등급 무기가 강화 파괴로 사라지면 완전히 잃지 않고 "흔적"이 남습니다. 그 무기가
-        나온 사냥터의 최고 등급 재료를 모아오면 이곳에서 <b style="color:var(--ancient)">+0 상태로 복구</b>할 수 있습니다.
-      </div>
-      <div id="blacksmithList"></div>
-    </div>
-    <div class="panel">
       <h3>⚒️ 무기 각인</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">대장장이가 망치를 내려놓으며 말했다. "무기에 이름을 새기는 것과, 운명을 새기는 것은 다른 일이야.
@@ -2366,7 +2358,7 @@ const ANCIENT_SEALS = [
   { id: 'thiefKing', floor: 4, name: '도적왕의 인장',
     desc: '무기와 재료의 판매 가격이 20% 오른다.' },
   { id: 'undyingFortress', floor: 5, name: '불멸성채의 인장',
-    desc: '대장장이에서 고대 무기를 복구할 때 필요한 재료가 40% 줄어든다.' },
+    desc: '고대 무기가 강화 실패로 초기화될 위기에 처하면, +0 대신 강화 단계가 절반으로만 줄어든다.' },
   { id: 'wrathAvatar', floor: 6, name: '분노화신의 인장',
     desc: '능력치 훈련 비용이 15% 줄어든다.' },
   { id: 'venomQueen', floor: 7, name: '만독여왕의 인장',
@@ -4017,47 +4009,6 @@ function rollSubweaponRelic(floorIdx, kindMult) {
   renderTop(); save();
 }
 
-// ---------- 대장장이 (파괴된 고대 무기 복구) ----------
-// 고대 등급 무기가 강화 파괴로 사라지면 완전히 잃는 대신 "흔적"이 남는다. 같은
-// 사냥터의 최고 등급 재료(슬롯2, +15 강화에도 쓰이는 그 재료)를 모으면 복구할 수 있다.
-// 필요 개수는 1층 2000개에서 시작해 20층으로 갈수록 줄어든다(고층 재료는 파밍이 어려우므로).
-function ancientRestoreCost(floorIdx) {
-  const cost = Math.round(2000 * Math.pow(0.85, floorIdx));
-  return sealEquippedHas('undyingFortress') ? Math.round(cost * 0.6) : cost;
-}
-function addBlacksmithTrace(w) {
-  if (w.grade !== 6 || w.ancientFloor == null) return;
-  S.blacksmithTraces.push({
-    id: uid++, ancientFloor: w.ancientFloor, nameVariant: w.nameVariant || 0,
-    type: w.type, icon: w.icon, spirit: w.spirit, effect: w.effect,
-    name: weaponItemName(w),
-  });
-  log(`🔨 <b>${weaponItemName(w)}의 흔적</b>이 남았습니다. 대장장이 탭에서 복구할 수 있습니다.`, 'lg-prim');
-}
-function restoreBlacksmithTrace(traceId) {
-  const trace = S.blacksmithTraces.find(t => t.id === traceId);
-  if (!trace) return;
-  const cost = ancientRestoreCost(trace.ancientFloor);
-  const matKey = trace.ancientFloor + '|2';
-  const have = S.mats[matKey] || 0;
-  if (have < cost) {
-    log(`재료가 부족합니다! (${FLOORS[trace.ancientFloor].mats[2]} ${fmt(have)}/${fmt(cost)})`, 'lg-bad');
-    return;
-  }
-  S.mats[matKey] -= cost;
-  if (S.mats[matKey] <= 0) delete S.mats[matKey];
-  const nw = {
-    id: uid++, grade: 6, type: trace.type, icon: trace.icon, enhance: 0,
-    effect: trace.effect, runes: [],
-    ancientFloor: trace.ancientFloor, nameVariant: trace.nameVariant, spirit: trace.spirit,
-    soulStacks: 0, soulKillCount: 0,
-  };
-  addWeapon(nw);
-  S.blacksmithTraces = S.blacksmithTraces.filter(t => t.id !== traceId);
-  log(`🔨✨ <b class="grade-고대">${trace.name}</b>을(를) 복구했습니다!`, 'lg-prim');
-  renderInventory(); renderBlacksmith(); renderTop(); save();
-}
-
 // ---------- 이스터에그 ----------
 // 정답은 유저에게 알려주지 않고 저장소의 EASTER_EGGS.md에만 기록한다. 달성하면 타이틀
 // 옆에 뱃지가 붙는다. 조건은 코드 곳곳(강화/도박/사냥/인벤토리)에 흩어져 있음.
@@ -4431,7 +4382,6 @@ function newState() {
     eggs: {},          // 달성한 이스터에그: { eggId: true }
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
-    blacksmithTraces: [], // 파괴된 고대 무기의 흔적: [{ id, ancientFloor, nameVariant, type, icon, spirit, effect, name }]
     raidTokens: BN.from(0),     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
     punch: { best: BN.from(0), last: BN.from(0) }, // 펀치기계: 연습용, 횟수 제한 없음
@@ -7701,12 +7651,17 @@ function resolveEnhance(w, advanced) {
     // 맨손/고대 무기는 파괴되지 않는 대신, 파괴가 확정됐을 순간 통째로 +0 초기화된다.
     // 그 외의 경우(파괴 확률에 안 걸림)는 다른 무기와 똑같이 유지/단계 하락으로 처리된다.
     if ((isFist(w) || isAncientWeapon(w)) && destroyRoll < dChance) {
-      w.enhance = 0;
       playEnhanceFx('fail', attemptLevel);
       playEnhancePanelReveal('enhMainPanel', 'crack');
       if (isFist(w)) {
+        w.enhance = 0;
         log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (초기화 확률이었음: ${dChance}%)`, 'lg-bad');
+      } else if (sealEquippedHas('undyingFortress')) {
+        // 불멸성채의 인장: 고대 무기가 초기화될 위기에 처하면 +0 대신 절반으로만 하락
+        w.enhance = Math.floor(w.enhance / 2);
+        log(`🏺🌫️ <b>[불멸성채의 인장]</b>이 무너지는 갑주를 붙들었습니다 — +0 대신 <b>+${w.enhance}</b>로 하락에 그쳤습니다! ${gradeTag(w)}${advTag}`, 'lg-bad');
       } else {
+        w.enhance = 0;
         log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
       }
     } else if (!isFist(w) && !isAncientWeapon(w) && destroyRoll < dChance) {
@@ -7716,8 +7671,6 @@ function resolveEnhance(w, advanced) {
       log(`💥 무기가 파괴되었습니다!! ${destroyedTag}${advTag}`, 'lg-bad');
       S.destroyedCount++;
       if (S.destroyedCount >= 50) unlockEgg('blacksmith');
-      // 고대 등급 무기는 파괴돼도 완전히 사라지지 않고 "흔적"이 남아 대장장이 탭에서 복구 가능
-      if (w.grade === 6) addBlacksmithTrace(w);
       // 무기는 파괴돼도 장착 중이던 룬은 함께 사라지지 않고 가방(보유 룬)으로 돌아온다
       if (Array.isArray(w.runes) && w.runes.length) {
         S.runes.push(...w.runes);
@@ -8326,35 +8279,9 @@ function showCodexPopup(html) {
 }
 function hideCodexPopup() { $('codexPopup').hidden = true; }
 
-// 대장장이 탭 렌더링 — 파괴된 고대 무기의 흔적 목록 + 복구
+// 대장장이 탭 렌더링 — 무기 각인 UI
 function renderBlacksmith() {
   renderEnchantBox();
-  const box = $('blacksmithList');
-  if (!box) return;
-  if (!S.blacksmithTraces.length) {
-    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">아직 남은 흔적이 없습니다. 고대 등급 무기가 강화 파괴되면 여기에 흔적이 남습니다.</div>';
-    return;
-  }
-  box.innerHTML = '';
-  for (const trace of S.blacksmithTraces) {
-    const cost = ancientRestoreCost(trace.ancientFloor);
-    const have = S.mats[trace.ancientFloor + '|2'] || 0;
-    const matName = FLOORS[trace.ancientFloor].mats[2];
-    const ok = have >= cost;
-    const div = document.createElement('div');
-    div.className = 'invitem';
-    div.innerHTML = `
-      <div><div class="wn">${trace.icon} <span class="grade-고대">${trace.name}의 흔적</span></div>
-      <div class="wi">${FLOORS[trace.ancientFloor].name} 최고급 재료 필요: <b style="color:${ok ? '#7de08a' : '#ff7a7a'}">${matName} ${fmt(have)}/${fmt(cost)}</b></div></div>
-      <div class="btns"></div>`;
-    const btn = document.createElement('button');
-    btn.textContent = '복구';
-    btn.className = ok ? 'primary' : '';
-    btn.disabled = !ok;
-    btn.onclick = () => restoreBlacksmithTrace(trace.id);
-    div.querySelector('.btns').appendChild(btn);
-    box.appendChild(div);
-  }
 }
 
 /* ===================== 저장 / 불러오기 ===================== */
@@ -10246,7 +10173,7 @@ const GUIDE_SECTIONS = [
     <tr><td>3</td><td>포자모의 인장</td><td>무기 드롭 시 15% 확률로 같은 무기 1개 추가 드롭</td></tr>
     <tr><td>4</td><td>늑대왕의 인장</td><td>한 사냥터에서 쉬지 않고 사냥할수록 공격속도 서서히 상승(5분마다 +5%p, 최대 +25%p, 사냥터 이동/자리 비움 시 초기화)</td></tr>
     <tr><td>5</td><td>도적왕의 인장</td><td>무기·재료 판매 가격 +20%</td></tr>
-    <tr><td>6</td><td>불멸성채의 인장</td><td>고대 무기 복구에 필요한 재료 -40%</td></tr>
+    <tr><td>6</td><td>불멸성채의 인장</td><td>고대 무기가 강화 실패로 초기화될 위기에 처하면, +0 대신 강화 단계가 절반으로만 하락</td></tr>
     <tr><td>7</td><td>분노화신의 인장</td><td>능력치 훈련 비용 -15%</td></tr>
     <tr><td>8</td><td>만독여왕의 인장</td><td>룬 합성 성공 확률 +10%p</td></tr>
     <tr><td>9</td><td>진동파수꾼의 인장</td><td>사냥터 보스 재도전 쿨타임 절반</td></tr>

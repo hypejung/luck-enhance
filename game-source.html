@@ -1551,8 +1551,8 @@ function unlockCodexEntry(w) {
   S.codexSeen[key] = true;
   log(`📖 <b>무기 도감</b>에 새 항목이 등록되었습니다: ${weaponItemName(w)}`, 'lg-prim');
   if (sealEquippedHas('lichOverlord')) {
-    S.raidTokens = BN.add(S.raidTokens, 1);
-    log('👻 <b>리치대군주의 인장</b>이 영혼을 거두었다 — 🎫 토벌의 증표 +1', 'lg-prim');
+    S.raidTokens = BN.add(S.raidTokens, 20);
+    log('👻 <b>리치대군주의 인장</b>이 영혼을 거두었다 — 🎫 토벌의 증표 +20', 'lg-prim');
   }
 }
 function codexEntries() {
@@ -2376,7 +2376,7 @@ const ANCIENT_SEALS = [
   { id: 'stormGlider', floor: 13, name: '활공자의 인장',
     desc: '능력치 훈련 시 5% 확률로 레벨이 2씩 동시에 오른다.' },
   { id: 'lichOverlord', floor: 14, name: '리치대군주의 인장',
-    desc: '무기 도감에 새 항목이 등록될 때마다 🎫 토벌의 증표를 1개 획득한다.' },
+    desc: '무기 도감에 새 항목이 등록될 때마다 🎫 토벌의 증표를 20개 획득한다.' },
   { id: 'fallenWarrior', floor: 15, name: '파계전사의 인장',
     desc: '강화 실패로 단계가 하락할 상황이면, 30% 확률로 하락 대신 소량의 골드를 얻는다.' },
   { id: 'endlessMarch', floor: 16, name: '무한진군의 인장',
@@ -10186,7 +10186,7 @@ const GUIDE_SECTIONS = [
     <tr><td>12</td><td>광포한뿔의 인장</td><td>랜덤박스 상위 박스 연쇄 개봉 확률 1.5배</td></tr>
     <tr><td>13</td><td>금서파편의 인장</td><td>무기 도감 컬렉션(쌍/세트) 보너스 효과 +20%</td></tr>
     <tr><td>14</td><td>활공자의 인장</td><td>능력치 훈련 시 5% 확률로 레벨 2씩 동시 상승</td></tr>
-    <tr><td>15</td><td>리치대군주의 인장</td><td>무기 도감에 새 항목 등록마다 🎫 토벌의 증표 +1개</td></tr>
+    <tr><td>15</td><td>리치대군주의 인장</td><td>무기 도감에 새 항목 등록마다 🎫 토벌의 증표 +20개</td></tr>
     <tr><td>16</td><td>파계전사의 인장</td><td>강화 하락 상황에서 30% 확률로 하락 대신 소량 골드 획득</td></tr>
     <tr><td>17</td><td>무한진군의 인장</td><td>사냥터 보스 격파 시 쿨타임 무관 즉시 재도전 기회 1회 충전</td></tr>
     <tr><td>18</td><td>심연포식자의 인장</td><td>월드1 장신구 장착 슬롯 +1개</td></tr>

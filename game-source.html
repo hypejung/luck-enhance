@@ -4568,7 +4568,7 @@ function newState() {
     subRelics: [],         // 고대 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
     subweapons: [],        // 보유 보조무기 목록: [{id, typeIdx, grade, enhance, activeTiming}, ...]
     subEquipped: null,     // 장착 중인 보조무기 id
-    weeklyRaid: { week: null, count: 0, best: BN.from(0), nickname: '', title: null, claimedWeek: null }, // 세계수의 단말마: week=주차키, count=이번 주 도전 횟수(최대 3), best=이번 주 최고 데미지, title=지난 주 순위로 획득해 이번 주 기록에 붙는 칭호, claimedWeek=마지막으로 정산받은 주차키
+    weeklyRaid: { week: null, count: 0, best: BN.from(0), nickname: '', nicknameLocked: false, title: null, claimedWeek: null }, // 세계수의 단말마: week=주차키, count=이번 주 도전 횟수(최대 3), best=이번 주 최고 데미지, nicknameLocked=최초 입장 시 닉네임 확정 여부, title=지난 주 순위로 획득해 이번 주 기록에 붙는 칭호, claimedWeek=마지막으로 정산받은 주차키
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
   };
 }
@@ -7277,6 +7277,14 @@ function startWeeklyRaidFight() {
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   weeklyRaidEnsureWeek();
   if (S.weeklyRaid.count >= WEEKLY_RAID.maxAttempts) { log(`이번 주 세계수의 단말마 도전 횟수를 모두 사용했습니다. (주당 ${WEEKLY_RAID.maxAttempts}회)`, 'lg-bad'); return; }
+  // 최초 입장 시점의 닉네임으로 영구 확정 — 이후로는 변경 불가. 입력창에 아직 "저장"을
+  // 누르지 않은 값이 있어도 그대로 확정해서, 굳이 저장 버튼을 먼저 누르게 강요하지 않는다.
+  if (!S.weeklyRaid.nicknameLocked) {
+    const nickInput = $('worldRaidNickInput');
+    if (nickInput) S.weeklyRaid.nickname = nickInput.value.trim().slice(0, 16);
+    S.weeklyRaid.nicknameLocked = true;
+    log(`🔒 닉네임이 "${weeklyRaidDisplayName()}"(으)로 확정되었습니다. (이후 변경 불가)`, 'lg-prim');
+  }
   S.weeklyRaid.count++;
   resetTimedStacks();
   bossFight.active = true;
@@ -7517,11 +7525,16 @@ function renderWorldRaidTab() {
   const nickFocused = nickEl && document.activeElement === nickEl;
   const nickValue = nickEl ? nickEl.value : (S.weeklyRaid.nickname || '');
   const nickSel = nickFocused ? [nickEl.selectionStart, nickEl.selectionEnd] : null;
+  // 최초 입장(첫 도전 시작) 시점에 닉네임이 확정되므로, 그 전까지만 자유롭게 수정 가능
+  const nickRow = S.weeklyRaid.nicknameLocked
+    ? `닉네임: <b>${weeklyRaidDisplayName()}</b> <span style="color:var(--sub)">(최초 입장 시 확정됨, 변경 불가)</span>`
+    : `닉네임: <input type="text" id="worldRaidNickInput" placeholder="비우면 참가 ID 사용" value="${nickValue.replace(/"/g, '&quot;')}" maxlength="16" style="width:140px;"> <button id="worldRaidNickSaveBtn">저장</button>
+       <div style="margin-top:2px;">첫 도전을 시작하는 순간 닉네임이 확정되고 이후로는 바꿀 수 없습니다.</div>`;
 
   box.innerHTML = `
     <div style="margin-bottom:10px;">
       <div style="font-size:13px;">이번 주 도전: <b>${S.weeklyRaid.count}/${WEEKLY_RAID.maxAttempts}</b> · 이번 주 최고 기록: <b style="color:var(--gold)">${fmt(S.weeklyRaid.best)}</b>${worldRaidTitleBadge(S.weeklyRaid.title)}</div>
-      <div style="font-size:12px;color:var(--sub);margin:6px 0 8px;">닉네임: <input type="text" id="worldRaidNickInput" placeholder="비우면 참가 ID 사용" value="${nickValue.replace(/"/g, '&quot;')}" maxlength="16" style="width:140px;"> <button id="worldRaidNickSaveBtn">저장</button></div>
+      <div style="font-size:12px;color:var(--sub);margin:6px 0 8px;">${nickRow}</div>
       <button class="primary" id="worldRaidChallengeBtn" ${available ? '' : 'disabled'}>🩸 그르마에게 도전 (${WEEKLY_RAID.duration}초)</button>
       <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : attemptsLeft <= 0 ? '이번 주 도전 횟수를 모두 사용했습니다.' : '도전을 시작하면 승패와 무관하게 이번 주 횟수가 소모됩니다.'}</div>
     </div>

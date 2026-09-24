@@ -2295,7 +2295,7 @@ const RAID_MONSTERS = [
 // 사실상 무한, 시간 내 누적 데미지 측정)으로 진행하되, 주당 3회로 제한하고 최고 기록을
 // Firebase 전역 랭킹에 올려 순위 보상을 받는다는 점이 다르다.
 const WEEKLY_RAID_BOSS = {
-  name: '그르마', subtitle: '뿌리 끝의 절규', emoji: '🩸',
+  name: '그르마', subtitle: '뿌리 끝의 절규', emoji: '🩸', art: 'assets/raid/groma_boss.png',
   flavor: '니드호그가 끝없이 갉아온 세계수의 뿌리는 이미 돌이킬 수 없이 썩었다. 그 뿌리를 지키던 루멘 아르카조차 신성을 버리고 등을 돌렸다 — 세계수는 스스로를 지킬 힘조차 잃은 것이다. 썩은 수액이 응어리져 터져 나오면, 초원의 슬라임 못부터 신들의 영역 균열까지 푸른세계 스무 곳 어딘가에서 동시에 같은 절규가 솟는다. 사냥꾼들은 저마다의 자리에서, 하나의 세계수가 지르는 단말마와 맞선다.',
 };
 const WEEKLY_RAID = { duration: 120, maxAttempts: 3 };
@@ -7268,7 +7268,7 @@ function startWeeklyRaidFight() {
   weeklyRaidDealtOverflow = BN.from(0);
   fx.executionerReady = true;
   triggerFightStartSpirits();
-  $('worldRaidMonEmoji').textContent = WEEKLY_RAID_BOSS.emoji;
+  $('worldRaidMonEmoji').innerHTML = `<img src="${WEEKLY_RAID_BOSS.art}" alt="${WEEKLY_RAID_BOSS.name}" style="max-width:100%;max-height:220px;" onerror="this.outerHTML='${WEEKLY_RAID_BOSS.emoji}'">`;
   $('worldRaidMonEmoji').classList.add('boss-appear');
   $('worldRaidMonName').innerHTML = `<span class="grade-고대" style="font-size:19px">${WEEKLY_RAID_BOSS.emoji} ${WEEKLY_RAID_BOSS.name}, ${WEEKLY_RAID_BOSS.subtitle}</span> <span style="font-size:12px;color:#ff7cf0;">★ 주간 레이드 ★</span>`;
   log(`🌳 <b>세계수의 단말마 — ${WEEKLY_RAID_BOSS.name} 도전!</b> ${WEEKLY_RAID.duration}초간 누적 데미지를 겨룹니다. (이번 주 ${S.weeklyRaid.count}/${WEEKLY_RAID.maxAttempts})`, 'lg-prim');

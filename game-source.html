@@ -1680,23 +1680,30 @@ const RELICS = [
   { name: '식지 않는 용의 숨결 조각', flavor: '응축된 화염이 유리처럼 굳어버린 파편.' },
   { name: '몰락한 신의 마지막 왕관 조각', flavor: '부서진 왕관에서 유일하게 남은 조각. 아직도 희미하게 빛난다.' },
 ];
-const RELIC_MILESTONES = [
-  { count: 5,  effs: [['gold', 0.10]] },
-  { count: 10, effs: [['luck', 0.10]] },
-  { count: 15, effs: [], text: '📖 무기의 정수 획득량 +20%' },
-  { count: 20, effs: [], text: '📖 각성의 정수 획득량 +30%' },
+// 무기의 정수·각성의 정수 획득량 보너스를 4개씩 교차로 쌓아가는 마일스톤 — 각 트랙 누적 상한
+// +100%p(즉 최대 ×2)에 정확히 20/20(전체 수집) 시점에 도달한다.
+const RELIC_ESSENCE_MILESTONES = [
+  { count: 4,  bonus: 0.20 },
+  { count: 12, bonus: 0.30 },
+  { count: 20, bonus: 0.50 },
+];
+const RELIC_AWAKEN_MILESTONES = [
+  { count: 8,  bonus: 0.20 },
+  { count: 16, bonus: 0.30 },
+  { count: 20, bonus: 0.50 },
 ];
 function relicCollectedCount() { return (S.relics || []).filter(Boolean).length; }
-function relicEssenceMult() { return relicCollectedCount() >= 15 ? 1.2 : 1; }
-function relicAwakenMult() { return relicCollectedCount() >= 20 ? 1.3 : 1; }
-function relicBonusEff() {
-  const eff = { gold: 0, luck: 0 };
+function relicEssenceMult() {
   const n = relicCollectedCount();
-  for (const m of RELIC_MILESTONES) {
-    if (n < m.count) continue;
-    for (const [stat, val] of m.effs) eff[stat] += val;
-  }
-  return eff;
+  let bonus = 0;
+  for (const m of RELIC_ESSENCE_MILESTONES) if (n >= m.count) bonus += m.bonus;
+  return 1 + bonus;
+}
+function relicAwakenMult() {
+  const n = relicCollectedCount();
+  let bonus = 0;
+  for (const m of RELIC_AWAKEN_MILESTONES) if (n >= m.count) bonus += m.bonus;
+  return 1 + bonus;
 }
 function codexHas(key) { return !!(S && S.codexSeen[key]); }
 function codexPairProgress(pair, grade) {
@@ -4908,11 +4915,6 @@ function accEff() {
   if (world1) {
     const cbe = codexBonusEff();
     for (const k of Object.keys(cbe)) eff[k] = (eff[k] || 0) + cbe[k];
-  }
-  // 고대의 유물 컬렉션 마일스톤 보너스 (1~20층 결부형, 월드1 한정)
-  if (world1) {
-    const rbe = relicBonusEff();
-    for (const k of Object.keys(rbe)) eff[k] = (eff[k] || 0) + rbe[k];
   }
   // 보스 보조무기 / 고대 보조무기 컬렉션 마일스톤 보너스 (월드2 전용 트랙 — 계정 범용으로
   // 항상 적용. 실제로는 아직 획득 경로가 없어 카운트가 0으로 고정되어 무해하다)
@@ -10160,12 +10162,11 @@ const GUIDE_SECTIONS = [
   },
   {
     icon: '🗿', title: '고대의 유물',
-    body: `고대의 도서관을 클리어하면 낮은 확률로 드롭되는 20종의 수집형 아이템으로, 각 사냥터(1~20층) 몬스터 테마에 맞춘 이름과 사연이 붙어 있습니다. <b>무기 도감과는 완전히 별개의 트랙</b>이며, 유물 하나하나에는 개별 효과가 없고 <b>수집한 총 개수</b>에 따라 마일스톤 보너스가 붙습니다.
-    <br><br>· 5개: 골드 획득 +10%
-    <br>· 10개: 드롭률 +10%
-    <br>· 15개: 📜 무기의 정수 획득량 +20%
-    <br>· 20개(전체 수집): 💠 각성의 정수 획득량 +30%
-    <br><br>1~20층에 결부된 콘텐츠라 이 보너스는 월드1(1~20층) 사냥 중에만 적용됩니다.`,
+    body: `고대의 도서관을 클리어하면 10% 확률로 드롭되는 20종의 수집형 아이템으로, 각 사냥터(1~20층) 몬스터 테마에 맞춘 이름과 사연이 붙어 있습니다. <b>무기 도감과는 완전히 별개의 트랙</b>이며, 유물 하나하나에는 개별 효과가 없고 <b>수집한 총 개수</b>에 따라 📜 무기의 정수와 💠 각성의 정수 획득량 보너스가 교차로 쌓입니다(도서관 보상에 적용, 월드 구분 없음).
+    <br><br>📜 무기의 정수 획득량
+    <br>· 4개: +20% · 12개: +50%(누적) · 20개(전체 수집): +100%(누적, 최대 ×2)
+    <br><br>💠 각성의 정수 획득량
+    <br>· 8개: +20% · 16개: +50%(누적) · 20개(전체 수집): +100%(누적, 최대 ×2)`,
   },
   {
     icon: '🌫️', title: '고대의 인장',
@@ -10204,7 +10205,7 @@ const GUIDE_SECTIONS = [
     icon: '🌍', title: '월드1·월드2 효과 적용 범위',
     body: `<b>전투 관련 스탯</b>(공격력·공격속도·치명타확률·치명타피해·연타확률·연타피해·보스피해량)은 어느 세계의 사냥터에 있든 항상 그대로 적용됩니다.
     <br><br>반면 <b>파밍/강화 관련 스탯</b>(골드 획득·드롭률·강화확률)은 <b>1~20층(월드1) 장신구·보스장신구</b>와 <b>무기 각인</b>에서 나온 것에 한해 월드2(황혼국) 사냥 중엔 적용되지 않습니다 — 같은 장신구·각인이라도 전투 효과 줄은 그대로 유지된 채 파밍 계열 줄만 꺼지는 방식입니다.
-    <br><br><b>무기 도감 컬렉션 보너스</b>(쌍 세트·타입 풀세트·사냥터별 고대 세트·보스의 무력)와 <b>고대의 유물 컬렉션</b>은 애초에 1~20층에 결부된 콘텐츠라, 전투·파밍을 가리지 않고 월드2 사냥 중엔 전부 꺼집니다. 고대의 인장 중 1~20층 테마형(초월의 인장·늑대왕의 인장·심연포식자의 인장 등)도 마찬가지입니다.
+    <br><br><b>무기 도감 컬렉션 보너스</b>(쌍 세트·타입 풀세트·사냥터별 고대 세트·보스의 무력)는 애초에 1~20층에 결부된 콘텐츠라, 전투·파밍을 가리지 않고 월드2 사냥 중엔 전부 꺼집니다. 고대의 인장 중 1~20층 테마형(초월의 인장·늑대왕의 인장·심연포식자의 인장 등)도 마찬가지입니다. (반면 <b>고대의 유물 컬렉션</b>은 사냥 스탯이 아니라 고대의 도서관 보상 배율에 붙는 효과라 월드 구분 없이 항상 적용됩니다.)
     <br><br>반면 <b>능력치 훈련, 각성, 태초의 유물</b> 자체 효과는 월드 구분 없이 항상 그대로 적용됩니다.
     <br><br>보스 무기+보스 장신구의 <b>세트 효과</b>는 월드 구분과 별개로, 정확히 그 세트가 속한 사냥터에 있을 때만 발동합니다.`,
   },

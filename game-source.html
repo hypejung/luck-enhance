@@ -2358,7 +2358,7 @@ const ANCIENT_SEALS = [
   { id: 'thiefKing', floor: 4, name: '도적왕의 인장',
     desc: '무기와 재료의 판매 가격이 20% 오른다.' },
   { id: 'undyingFortress', floor: 5, name: '불멸성채의 인장',
-    desc: '고대 무기가 강화 실패로 초기화될 위기에 처하면, +0 대신 강화 단계가 절반으로만 줄어든다.' },
+    desc: '고대 무기가 강화 실패로 초기화될 위기에 처하면, 40% 확률로 +0 초기화 대신 단계 -1 하락으로 경감된다.' },
   { id: 'wrathAvatar', floor: 6, name: '분노화신의 인장',
     desc: '능력치 훈련 비용이 15% 줄어든다.' },
   { id: 'venomQueen', floor: 7, name: '만독여왕의 인장',
@@ -7656,10 +7656,10 @@ function resolveEnhance(w, advanced) {
       if (isFist(w)) {
         w.enhance = 0;
         log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (초기화 확률이었음: ${dChance}%)`, 'lg-bad');
-      } else if (sealEquippedHas('undyingFortress')) {
-        // 불멸성채의 인장: 고대 무기가 초기화될 위기에 처하면 +0 대신 절반으로만 하락
-        w.enhance = Math.floor(w.enhance / 2);
-        log(`🏺🌫️ <b>[불멸성채의 인장]</b>이 무너지는 갑주를 붙들었습니다 — +0 대신 <b>+${w.enhance}</b>로 하락에 그쳤습니다! ${gradeTag(w)}${advTag}`, 'lg-bad');
+      } else if (sealEquippedHas('undyingFortress') && Math.random() < 0.4) {
+        // 불멸성채의 인장: 40% 확률로 초기화 대신 단계 -1 하락으로 경감
+        w.enhance = Math.max(0, w.enhance - 1);
+        log(`🏺🌫️ <b>[불멸성채의 인장]</b>이 무너지는 갑주를 붙들었습니다 — +0 초기화 대신 <b>-1 하락</b>에 그쳤습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
       } else {
         w.enhance = 0;
         log(`🏺💢 고대 무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gradeTag(w)} (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
@@ -10173,7 +10173,7 @@ const GUIDE_SECTIONS = [
     <tr><td>3</td><td>포자모의 인장</td><td>무기 드롭 시 15% 확률로 같은 무기 1개 추가 드롭</td></tr>
     <tr><td>4</td><td>늑대왕의 인장</td><td>한 사냥터에서 쉬지 않고 사냥할수록 공격속도 서서히 상승(5분마다 +5%p, 최대 +25%p, 사냥터 이동/자리 비움 시 초기화)</td></tr>
     <tr><td>5</td><td>도적왕의 인장</td><td>무기·재료 판매 가격 +20%</td></tr>
-    <tr><td>6</td><td>불멸성채의 인장</td><td>고대 무기가 강화 실패로 초기화될 위기에 처하면, +0 대신 강화 단계가 절반으로만 하락</td></tr>
+    <tr><td>6</td><td>불멸성채의 인장</td><td>고대 무기가 강화 실패로 초기화될 위기에 처하면, 40% 확률로 +0 초기화 대신 단계 -1 하락으로 경감</td></tr>
     <tr><td>7</td><td>분노화신의 인장</td><td>능력치 훈련 비용 -15%</td></tr>
     <tr><td>8</td><td>만독여왕의 인장</td><td>룬 합성 성공 확률 +10%p</td></tr>
     <tr><td>9</td><td>진동파수꾼의 인장</td><td>사냥터 보스 재도전 쿨타임 절반</td></tr>

@@ -3075,7 +3075,44 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'naga', name: '지켜온 보물과 깊은 곳의 눈' },
   },
-  null, null, null, null, null, null, null, null, null, null,
+  { // floor 10 — 저주받은 성 — 해골 기사
+    id: 'draugr',
+    floor: 10,
+    type: 'weapon',
+    name: '드라우그르의 되살아나는 갑주',
+    subtitle: 'Draugr, the Mound-Dweller Who Would Not Stay Dead',
+    icon: '💀',
+    art: 'assets/artifacts/draugr_armor.svg',
+    lore: `성문은 오래전에 무너졌다. 그러나 그 안의 기사는, 여전히 자리를 지키고 있었다.
+
+살아있을 때 그는 이름 있는 기사였다. 주군을 위해 셀 수 없이 많은 전장에서 창칼을 맞댔고, 그 몸에는 벨 수 없을 만큼 많은 상처가 새겨졌다.
+
+그가 성에 갇히기 전, 그는 오랜 세월 여러 전장을 떠돌았다고 전해진다. 밟았던 땅 하나하나가, 그의 뼈와 갑주에 서서히 흔적을 남겼다 — 시간이 흐를수록, 그가 지나온 모든 곳의 기억이 고스란히 새겨져 있었다.
+
+그러나 그를 죽인 것은 적의 칼이 아니었다. 주군의 배신이었다.
+
+성이 무너지던 날, 그는 홀로 성벽 앞에 서서 끝까지 물러서지 않았다. 그리고 그 자리에서, 그대로 쓰러졌다.
+
+그러나 죽음은 그를 놓아주지 않았다. 아니, 정확히는 — 그가 죽음을 놓아주지 않았다.
+
+무너진 성 아래, 그의 몸은 뼈가 되고 갑주는 녹슬었지만, 다시 눈을 떴다. 몇 번이고, 몇 번이고.
+
+죽을 때마다 조금씩 약해지는 대신, 그는 매번 다시 일어설 때마다 전보다 사나워졌다. 마치 죽음 그 자체가 그를 단련시키는 것처럼.
+
+사람들은 그를 이렇게 불렀다.
+
+드라우그르(Draugr) — 무덤을 떠나지 않는 자, 벨 수는 있어도 끝낼 수는 없는 자.
+
+지금도 그 성을 찾는 자들은 알게 된다. 그를 쓰러뜨리는 것은 오히려, 그를 더 강하게 만들 뿐이라는 것을.`,
+    effectsText: [
+      '뼈에 새겨지는 것: 사냥터를 오래 누빌수록, 그 뼈와 갑주에는 지워지지 않는 힘이 새겨진다.',
+      '쓰러져도 끝나지 않는 것: 쓰러질 때마다, 다시 일어서는 순간 그 힘은 이전보다 거세진다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'draugr', name: '뼈에 새겨지는 것과 쓰러져도 끝나지 않는 것' },
+  },
+  null, null, null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -3508,6 +3545,97 @@ function moaiTick(now) {
       floatText('👁️ 천 년의 응시!');
     }
   }
+}
+
+// 드라우그르(태초의 유물): 두 파트로 구성된다.
+// Part1(평시 사냥): 월드1(1~20층) 각 사냥터마다 담당 스탯이 정해져 있고, 이 무기를 장착한
+// 상태로 그 사냥터에서 1만 마리 처치할 때마다 담당 스탯이 영구 적립(최대 10회=10만 마리).
+// 강화 RNG와 무관하게 무기 자체에 영구 귀속되는 성장이라 판매/파괴 불가인 태초 특성과 잘
+// 맞는다. Part2(보스전): 생존↔죽음을 오가며, 부활할 때마다 더 강해진다.
+const DRAUGR_FLOOR_STAT = [
+  'atk', 'speed', 'critChance', 'critDamage', 'extraAtk', 'extraAtkDmg', 'bossDmg',
+  'atk', 'speed', 'critChance', 'critDamage', 'extraAtk', 'extraAtkDmg', 'bossDmg',
+  'atk', 'speed', 'critChance', 'critDamage', 'extraAtk', 'extraAtkDmg',
+]; // 20개 사냥터(0~19) 각각의 담당 스탯
+const DRAUGR_STAT_PER_BUMP = {
+  atk: 0.10, speed: 0.10, critDamage: 0.10, extraAtkDmg: 0.10, bossDmg: 0.10, // 확률형이 아닌 스탯은 회당 +10%p
+  critChance: 0.02, extraAtk: 0.02, // 확률형 스탯은 회당 +2%p로 낮게
+};
+const DRAUGR_STAT_LABEL = { atk: '공격력', speed: '공격속도', critChance: '치명타 확률', critDamage: '치명타 피해', extraAtk: '연타 확률', extraAtkDmg: '연타 피해', bossDmg: '보스 피해량' };
+const DRAUGR = {
+  killsPerBump: 10000,   // 담당 스탯 1회 적립에 필요한 처치 수
+  maxBumps: 10,          // 사냥터당 최대 적립 횟수(=최대 10만 마리)
+  deadDur: 3,            // 보스전: 죽음 상태 지속시간(초, 공격 불가)
+  aliveDur: 8,           // 보스전: 생존 상태 지속시간(초)
+  revivePowerGrowth: 0.34, // 부활마다 공격력 복리 증가율 — 펀치기계 측정 기준 카마소츠 대비 약 99%(순수 전투형 태초 기준 90~110% 충족)
+};
+function hasDraugr() { return hasGenesisEquipped('draugr'); }
+// 일반 사냥 처치마다 호출 — handleKill()에서 보스전이 아닐 때만
+function draugrOnKill(w) {
+  if (!w || w.genesisId !== 'draugr' || S.floor >= WORLD2_START_FLOOR) return;
+  if (!Array.isArray(w.draugrKills)) w.draugrKills = new Array(DRAUGR_FLOOR_STAT.length).fill(0);
+  const f = S.floor;
+  const cap = DRAUGR.killsPerBump * DRAUGR.maxBumps;
+  const before = Math.min(DRAUGR.maxBumps, Math.floor(w.draugrKills[f] / DRAUGR.killsPerBump));
+  w.draugrKills[f] = Math.min(cap, w.draugrKills[f] + 1);
+  const after = Math.min(DRAUGR.maxBumps, Math.floor(w.draugrKills[f] / DRAUGR.killsPerBump));
+  if (after > before) {
+    const stat = DRAUGR_FLOOR_STAT[f];
+    floatText(after >= DRAUGR.maxBumps ? `💀 ${FLOORS[f].name} 완전 각성!` : `💀 ${DRAUGR_STAT_LABEL[stat]} 각인!`);
+  }
+}
+// 특정 스탯 키의 Part1 누적 보너스 총합(accEff()에서 매 스탯마다 호출)
+function draugrStatBonus(statKey) {
+  if (!hasDraugr()) return 0;
+  const w = getEquipped();
+  if (!w || !Array.isArray(w.draugrKills)) return 0;
+  const perBump = DRAUGR_STAT_PER_BUMP[statKey];
+  if (!perBump) return 0;
+  let total = 0;
+  for (let f = 0; f < DRAUGR_FLOOR_STAT.length; f++) {
+    if (DRAUGR_FLOOR_STAT[f] !== statKey) continue;
+    total += Math.min(DRAUGR.maxBumps, Math.floor(w.draugrKills[f] / DRAUGR.killsPerBump)) * perBump;
+  }
+  return total;
+}
+// Part2: 보스전 중 생존/죽음 사이클 진행 — tick()에서 호출
+function draugrTick(now) {
+  if (!hasDraugr() || !bossFight.active) return;
+  if (!fx.draugrPhaseUntil) {
+    fx.draugrPhase = 'alive';
+    fx.draugrPhaseUntil = now + DRAUGR.aliveDur * 1000;
+    return;
+  }
+  if (now < fx.draugrPhaseUntil) return;
+  if (fx.draugrPhase === 'alive') {
+    fx.draugrPhase = 'dead';
+    fx.draugrPhaseUntil = now + DRAUGR.deadDur * 1000;
+    floatText('💀 쓰러지다...');
+  } else {
+    fx.draugrRevives = (fx.draugrRevives || 0) + 1;
+    fx.draugrPhase = 'alive';
+    fx.draugrPhaseUntil = now + DRAUGR.aliveDur * 1000;
+    floatText('💀 다시 일어서다!');
+  }
+}
+// 부활 횟수에 비례한 공격력 복리 배율 — dealMonDamage()에서 호출
+function draugrRevivalMult() {
+  if (!hasDraugr()) return 1;
+  return Math.pow(1 + DRAUGR.revivePowerGrowth, fx.draugrRevives || 0);
+}
+// 가방 "효과 보기"에 표시할 사냥터별 진행 목록
+function draugrFloorListHtml(w) {
+  const kills = Array.isArray(w.draugrKills) ? w.draugrKills : new Array(DRAUGR_FLOOR_STAT.length).fill(0);
+  const cap = DRAUGR.killsPerBump * DRAUGR.maxBumps;
+  const rows = DRAUGR_FLOOR_STAT.map((stat, f) => {
+    const k = kills[f] || 0;
+    const filled = k >= cap;
+    return `<div style="display:flex;justify-content:space-between;gap:6px;padding:2px 6px;border-radius:4px;font-size:11px;${filled ? 'background:linear-gradient(90deg,rgba(255,213,74,.28),transparent);color:var(--gold);font-weight:bold;' : 'color:var(--sub);'}">
+      <span>${FLOORS[f].name}(${DRAUGR_STAT_LABEL[stat]})</span>
+      <span>${filled ? '✨ 완료' : `${fmt(k)}/${fmt(cap)}`}</span>
+    </div>`;
+  });
+  return `<div style="margin-top:4px;margin-bottom:4px;max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;padding:4px;background:var(--panel);border-radius:6px;">${rows.join('')}</div>`;
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4441,6 +4569,8 @@ function rawWeaponSpeed(w) {
 function weaponSpeed(w) {
   // 불멸의 진격(고대 에이션트 스피릿): 실질 공격속도를 고정값으로 못박는다(초과분은 weaponAtk로 환산됨)
   if (w && w.spirit === 'undyingbone') return ANCIENT_SPIRITS.undyingbone.fixedSpeed || 1;
+  // 드라우그르(태초의 유물): 보스전 중 "죽음" 상태에서는 공격 자체가 불가능(공속 0)
+  if (bossFight.active && hasDraugr() && fx.draugrPhase === 'dead') return 0;
   return rawWeaponSpeed(w);
 }
 
@@ -4770,6 +4900,10 @@ function accEff() {
   if (world1 && sealEquippedHas('wolfKing')) eff.speed += wolfKingEnduranceBonus();
   // 나가의 잠들지 않는 눈(태초의 유물): 장착 중인 무기 자체의 효과라 월드 구분 없이 항상 적용
   eff.luck += nagaLuckBonus();
+  // 드라우그르(태초의 유물): 사냥터별로 적립한 영구 스탯 보너스(장착 중인 무기 자체 귀속)
+  for (const k of ['atk', 'speed', 'critChance', 'critDamage', 'extraAtk', 'extraAtkDmg', 'bossDmg']) {
+    eff[k] += draugrStatBonus(k);
+  }
   return eff;
 }
 // 늑대왕의 인장: 같은 사냥터에서 쉬지 않고 사냥한 시간에 비례한 공속 보너스(5분당 +5%p, 최대 +25%p)
@@ -5179,6 +5313,8 @@ function dealMonDamage(amount) {
   amount = amount * nephilimTakenMult();
   // 아라크네(태초의 유물): 직조 스택에 비례해 대상이 받는 모든 피해 증폭
   amount = amount * arachneTakenMult();
+  // 드라우그르(태초의 유물): 보스전 중 부활 횟수에 비례한 공격력 복리 증폭
+  amount = amount * draugrRevivalMult();
   if (bossFight.active && bossFight.isPunch) punchDealtOverflow = BN.add(punchDealtOverflow, amount);
   // 천구(태초의 유물): 만월이 떠있는 동안 입힌 모든 피해를 누적(다른 무기로 바꾸면 더 이상 쌓이지 않음)
   if (fx.tiangouUntil && Date.now() < fx.tiangouUntil && hasGenesisEquipped('tiangou')) {
@@ -6039,6 +6175,8 @@ function handleKill(chainDepth) {
   if (w && w.spirit === 'unbrokenoath') {
     w.oathStacks = Math.min(ANCIENT_SPIRITS.unbrokenoath.stackMax || 100, (w.oathStacks || 0) + 1);
   }
+  // 드라우그르(태초의 유물): 사냥터별 담당 스탯 영구 적립
+  draugrOnKill(w);
   spawnMonster(); // 리스폰 지연 없이 즉시 — 공격속도가 빠를수록 그만큼 더 많이 잡도록
   // 돌파의 질주(고대 에이션트 스피릿): 처치 시 확률적으로 관성이 남아 다음 몬스터도 함께 처치
   // (연쇄당 다시 판정, chainDepth로 최대 연쇄 마리 수를 제한한다)
@@ -6148,6 +6286,8 @@ function tick(dt) {
   arachneVenomTick(nowDecay);
   // 마지막 형제의 눈(태초의 유물): 주기적으로 터지는 확정 강타
   moaiTick(nowDecay);
+  // 드라우그르(태초의 유물): 보스전 중 생존/죽음 사이클 진행
+  draugrTick(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -6687,6 +6827,9 @@ function resetTimedStacks() {
   fx.arachneVenomUntil = 0;
   fx.arachneVenomTickNext = 0;
   fx.moaiBurstNext = 0;
+  fx.draugrPhase = 'alive';
+  fx.draugrPhaseUntil = 0;
+  fx.draugrRevives = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -9033,6 +9176,7 @@ function renderInventory() {
           ${spirit ? `<span class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${spiritStackText(w)}</span>` : ''}
           ${spirit && runes.length ? '<br>' : ''}
           ${genesisArtifact ? genesisArtifact.effectsText.map(t => `<span class="grade-태초">🌌 ${t}</span>`).join('<br>') : ''}
+          ${genesisArtifact && genesisArtifact.id === 'draugr' ? draugrFloorListHtml(w) : ''}
           ${genesisArtifact && runes.length ? '<br>' : ''}
           ${runes.map(r => `🔮 [${runeName(r)}] ${runeDesc(r)}`).join('<br>')}
         </div>`

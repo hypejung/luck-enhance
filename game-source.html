@@ -3443,7 +3443,36 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'pandora', name: '쌓여가는 페이지와 마지막 장의 대가' },
   },
-  null, null, null, null, null, null, null,
+  { // floor 13 — 하늘섬 — 와이번
+    id: 'fujinraijin',
+    floor: 13,
+    type: 'weapon',
+    name: '풍신뇌신도(風神雷神図)',
+    subtitle: 'Fūjin and Raijin, the Two Faces of the Storm',
+    icon: '🌪️',
+    art: 'assets/artifacts/fujinraijin.svg',
+    lore: `하늘섬 위로 몰아치는 먹구름 속에서는, 언제나 두 개의 그림자가 함께 움직인다.
+
+하나는 자루를 짊어진 채 바람을 몰고, 다른 하나는 북을 두드리며 벼락을 부른다.
+
+둘은 결코 나란히 걷지 않는다 — 바람이 지나가면 천둥이 뒤를 잇고, 천둥이 잦아들면 다시 바람이 인다.
+
+와이번들이 그 틈을 타고 솟아오르는 하늘섬에서, 옛 사람들은 이 순환을 그림으로 남겼다.
+
+병풍 위, 초록빛 풍신(風神)은 바람 자루를 펼쳐 들었고, 그 맞은편 흰빛 뇌신(雷神)은 북 고리를 둘러메고 있었다.
+
+폭풍은 한 몸이 아니라, 두 신이 번갈아 내쉬는 숨이었다.
+
+풍신뇌신도(風神雷神図) — 바람의 신과 천둥의 신, 서로 자리를 바꾸며 하늘을 다스리는 두 얼굴의 폭풍.`,
+    effectsText: [
+      '뇌신의 숨결: 하늘이 번뜩이는 동안, 손끝은 반드시 급소를 꿴다.',
+      '풍신의 숨결: 바람이 몰아치는 동안, 손은 멈추지 않고 거듭 휘두른다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'fujinraijin', name: '뇌신의 숨결과 풍신의 숨결' },
+  },
+  null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -4058,6 +4087,27 @@ function pandoraOnAttack() {
   fx.pandoraBurstUntil = Date.now() + PANDORA.burstDur * 1000;
   floatText('📖 마지막 장!');
 }
+
+// ---------- 풍신뇌신도(태초의 유물) 전용 전투 효과 ----------
+// 전투 시작(또는 대상 전환) 즉시 뇌신 위상부터 시작해, 이후 위상 지속시간마다 적립/대기 없이
+// 뇌신↔풍신을 계속 순환한다. 뇌신 위상: 모든 공격이 확정 치명타 + 치명타 피해량 대폭 추가.
+// 풍신 위상: 모든 공격에 확정 연타(추가공격) + 연타 피해 비율 대폭 추가. 수치는 전부 밸런스
+// 미확정 1차 초안(TODO) — 펀치기계 측정 후 조정 예정.
+const FUJIN_RAIJIN = {
+  phaseDur: 5,           // 각 위상 지속시간(초)
+  critMultBonus: 2.5,    // 뇌신 위상 중 치명타 피해 배율 +250%p 추가
+  extraAtkDmgBonus: 2.5, // 풍신 위상 중 연타 피해 비율 +250%p 추가
+};
+function hasFujinRaijin() { return hasGenesisEquipped('fujinraijin'); }
+// 현재 위상('raijin'|'fujin')을 반환. 미장착 시 null.
+function fujinRaijinPhase() {
+  if (!hasFujinRaijin()) return null;
+  if (!fx.fujinRaijinStart) fx.fujinRaijinStart = Date.now();
+  const elapsed = (Date.now() - fx.fujinRaijinStart) / 1000;
+  return Math.floor(elapsed / FUJIN_RAIJIN.phaseDur) % 2 === 0 ? 'raijin' : 'fujin';
+}
+function raijinPhaseActive() { return fujinRaijinPhase() === 'raijin'; }
+function fujinPhaseActive() { return fujinRaijinPhase() === 'fujin'; }
 
 // ---------- 고대 무기 (grade 6) ----------
 // 태초의 유물과 같은 방식(사냥터별 초저확률 처치 판정)으로 얻는 초레어 "무기"이다.
@@ -5744,6 +5794,8 @@ function spawnMonster() {
   if (eqw && hasGenesisEquipped('wapaq')) { fx.wapaqStacks = 0; fx.wapaqNext = 0; }
   // 판도라의 마지막 책장(태초의 유물): 대상이 바뀌면 지식 스택/발동 상태 초기화
   if (eqw && hasGenesisEquipped('pandora')) { fx.pandoraStacks = 0; fx.pandoraBurstUntil = 0; fx.pandoraDownStat = null; }
+  // 풍신뇌신도(태초의 유물): 대상이 바뀌면 위상 순환을 뇌신 위상부터 다시 시작
+  if (eqw && hasGenesisEquipped('fujinraijin')) fx.fujinRaijinStart = 0;
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -6905,7 +6957,7 @@ function attack(w) {
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage) * pandoraStatMult('critDamage');
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0)) * pandoraStatMult('critDamage');
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -6913,8 +6965,10 @@ function attack(w) {
   // 심연의 기습(고대 에이션트 스피릿): 몬스터 스폰 후 첫 공격은 확정 치명타 + 피해 2배 추가
   const ambushCrit = w.spirit === 'ambush' && fx.ambushReady;
   if (ambushCrit) fx.ambushReady = false;
+  // 풍신뇌신도(태초의 유물): 뇌신 위상 중엔 모든 공격이 확정 치명타
+  const raijinCrit = raijinPhaseActive();
   let didCrit = false;
-  if (forceCrit || ambushCrit || (critChance > 0 && Math.random() < critChance)) {
+  if (forceCrit || ambushCrit || raijinCrit || (critChance > 0 && Math.random() < critChance)) {
     dmg *= critMult;
     didCrit = true;
     floatText('💥 치명타!');
@@ -7117,8 +7171,9 @@ function attack(w) {
     (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk');
   // 연타 피해 = 기준 배율(평소 75%, 포자 폭발 활성 중엔 150%) × (1 + 연타 피해 스탯 합계)
   // — 치명타 피해와 마찬가지로 장신구/룬/훈련/인챈트/무기 특성/각성에서 상한 없이 누적된다.
-  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg');
-  if (extraChance > 0 && Math.random() < extraChance) {
+  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0);
+  // 풍신뇌신도(태초의 유물): 풍신 위상 중엔 모든 공격에 확정 연타(추가공격) 발생
+  if (fujinPhaseActive() || (extraChance > 0 && Math.random() < extraChance)) {
     const extraDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
     let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg');
     // 포자 폭발(고대 에이션트 스피릿): 다른 무기와 달리 연타(추가공격)도 별도로 치명타 판정을 받는다
@@ -7239,6 +7294,7 @@ function resetTimedStacks() {
   fx.pandoraStacks = 0;
   fx.pandoraBurstUntil = 0;
   fx.pandoraDownStat = null;
+  fx.fujinRaijinStart = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -10769,13 +10825,13 @@ function computeStats() {
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0) + pandoraStackCritChanceBonus();
   const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance') * 100;
   const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
-  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0)) * pandoraStatMult('critDamage');
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0) + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0)) * pandoraStatMult('critDamage');
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
   const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk') * 100;
   const extraAtkDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
-  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae.extraAtkDmg + awakenStat(w, 'extraAtkDmg');
+  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0);
   const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * 100;
   // 골드/드랍률은 dropRoll()의 실제 계산식(곱연산)과 맞춘다 — 약탈자의 격노(고대 에이션트
   // 스피릿)의 고정 +50%/스택 보너스가 예전엔 이 화면에 전혀 반영되지 않았음.

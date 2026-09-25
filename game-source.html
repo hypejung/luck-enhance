@@ -1179,7 +1179,7 @@ function typeTrait(w, key) {
   return (t && t.trait && t.trait[key]) || 0;
 }
 // 지팡이는 "공격력" 대신 "마력"으로 표기(수치/계산은 동일, 표시만 다름)
-function atkLabel(w) { return (w && w.type === '지팡이') ? '마력' : '공격력'; }
+function atkLabel(w) { return (w && (w.type === '지팡이' || w.genesisId === 'koschei')) ? '마력' : '공격력'; }
 // 둔기 특성 + 도감 컬렉션 보너스(파괴 확률 감소)까지 반영한 실제 파괴 확률
 // 실패 시 세 결과(유지/하락/파괴·초기화)의 체감 순서가 "유지 > 하락 > 파괴"가 항상 보장되도록
 // 파괴 확률 테이블 자체를 큰 폭으로 낮춘다(1/4로 축소 — 예전엔 고강화 구간에서 파괴 확률이
@@ -3472,7 +3472,40 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'fujinraijin', name: '뇌신의 숨결과 풍신의 숨결' },
   },
-  null, null, null, null, null, null,
+  { // floor 14 — 죽음의 땅 — 리치 로드
+    id: 'koschei',
+    floor: 14,
+    type: 'weapon',
+    name: '코셰이의 마지막 바늘',
+    subtitle: 'Koschei the Deathless, Whose Death Is Hidden Far Away',
+    icon: '🪡',
+    art: 'assets/artifacts/koschei_needle.svg',
+    lore: `죽음의 땅 가장 깊은 곳, 리치 로드조차 스스로의 죽음을 몸에 두지 않았다.
+
+전해지길, 그의 죽음은 바다 건너 이름 없는 섬에 있었다.
+
+섬에는 오래된 참나무 한 그루, 그 뿌리 아래 돌 상자 하나.
+
+상자를 열면 산토끼가 뛰쳐나오고, 토끼를 쫓으면 오리가 날아오르고, 오리를 잡으면 그 뱃속에서 마침내 알 하나가 나온다.
+
+그리고 그 알 속에는, 아주 가느다란 바늘 하나가 잠들어 있다.
+
+그 바늘 끝이 부러지는 순간에야, 비로소 그는 죽는다.
+
+사람들은 그를 코셰이(Koschei)라 불렀다 — 자신의 죽음을 몸이 아닌 세상 저 멀리 숨겨둔 자, 그래서 불사(不死)라 불린 자.
+
+이 바늘을 손에 쥔 자는, 그 겹겹의 여정을 스스로 되풀이하게 된다 — 그리고 마지막 겹을 넘어설 때마다, 잠시 그 자신도 죽음을 나눠 가진다.
+
+코셰이의 마지막 바늘(Koschei's Last Needle) — 불사자의 죽음이 잠든 자리, 그리고 그 죽음을 대신 짊어지는 대가.`,
+    effectsText: [
+      '겹겹이 쌓이는 여정: 나아갈수록 마력이 차오르고, 주문은 더 자주, 더 강하게 터진다.',
+      '나눠 지는 죽음: 마지막 겹을 넘어서는 순간, 잠시 자신도 죽음을 나눠 짊어진다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'koschei', name: '겹겹이 쌓이는 여정과 나눠 지는 죽음' },
+  },
+  null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -4108,6 +4141,52 @@ function fujinRaijinPhase() {
 }
 function raijinPhaseActive() { return fujinRaijinPhase() === 'raijin'; }
 function fujinPhaseActive() { return fujinRaijinPhase() === 'fujin'; }
+
+// ---------- 코셰이의 마지막 바늘(태초의 유물) 전용 전투 효과 ----------
+// 전투 시작(또는 대상 전환) 즉시 1단계부터 시작해, 단계 지속시간마다 1→5단계로 나아가며
+// 마력(공격력)/주문 작렬 확률/주문 작렬 데미지가 계속 상승한다. 5단계가 끝나면 "죽음 상태"
+// (공격 자체가 불가능)가 되었다가, 그 상태가 끝나면 다시 1단계부터 순환한다. 수치는 전부
+// 밸런스 미확정 1차 초안(TODO) — 펀치기계 측정 후 조정 예정.
+const KOSCHEI = {
+  stages: 5,             // 단계 수
+  stageDur: 4,           // 단계당 지속시간(초)
+  deathDur: 5,           // 죽음 상태 지속시간(초, 공격 불가)
+  atkPerStage: 0.20,     // 단계당 마력(공격력) +20%p
+  spellProcBase: 0.25,   // 주문 작렬 확률 기본값(마력 무기 기본 수치)
+  spellProcPerStage: 0.15, // 단계당 주문 작렬 확률 +15%p (5단계 시 기본 포함 100%)
+  spellMultPerStage: 0.60, // 단계당 주문 작렬 데미지 +60%p (기본 100%에 가산)
+};
+function hasKoschei() { return hasGenesisEquipped('koschei'); }
+// 현재 국면을 반환: 1~5(단계 번호) 또는 'dead'. 미장착 시 null.
+function koscheiPhase() {
+  if (!hasKoschei()) return null;
+  if (!fx.koscheiStart) fx.koscheiStart = Date.now();
+  const elapsed = (Date.now() - fx.koscheiStart) / 1000;
+  const activeLen = KOSCHEI.stages * KOSCHEI.stageDur;
+  const cycleLen = activeLen + KOSCHEI.deathDur;
+  const pos = elapsed % cycleLen;
+  if (pos >= activeLen) return 'dead';
+  return Math.floor(pos / KOSCHEI.stageDur) + 1;
+}
+// 현재 단계 번호(1~5). 죽음 상태/미장착 시 0.
+function koscheiStageNum() {
+  const p = koscheiPhase();
+  return (typeof p === 'number') ? p : 0;
+}
+function koscheiDeathActive() { return koscheiPhase() === 'dead'; }
+function koscheiAtkBonus() {
+  if (!hasKoschei()) return 0;
+  return koscheiStageNum() * KOSCHEI.atkPerStage;
+}
+function koscheiSpellProcBonus() {
+  if (!hasKoschei()) return 0;
+  const n = koscheiStageNum();
+  return n > 0 ? KOSCHEI.spellProcBase + n * KOSCHEI.spellProcPerStage : 0;
+}
+function koscheiSpellMultBonus() {
+  if (!hasKoschei()) return 0;
+  return koscheiStageNum() * KOSCHEI.spellMultPerStage;
+}
 
 // ---------- 고대 무기 (grade 6) ----------
 // 태초의 유물과 같은 방식(사냥터별 초저확률 처치 판정)으로 얻는 초레어 "무기"이다.
@@ -4866,7 +4945,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -5004,6 +5083,8 @@ function weaponSpeed(w) {
   if (w && w.spirit === 'undyingbone') return ANCIENT_SPIRITS.undyingbone.fixedSpeed || 1;
   // 드라우그르(태초의 유물): 보스전 중 "죽음" 상태에서는 공격 자체가 불가능(공속 0)
   if (bossFight.active && hasDraugr() && fx.draugrPhase === 'dead') return 0;
+  // 코셰이의 마지막 바늘(태초의 유물): 죽음 상태에서는 공격 자체가 불가능(공속 0)
+  if (koscheiDeathActive()) return 0;
   return rawWeaponSpeed(w) * pandoraStatMult('speed');
 }
 
@@ -5796,6 +5877,8 @@ function spawnMonster() {
   if (eqw && hasGenesisEquipped('pandora')) { fx.pandoraStacks = 0; fx.pandoraBurstUntil = 0; fx.pandoraDownStat = null; }
   // 풍신뇌신도(태초의 유물): 대상이 바뀌면 위상 순환을 뇌신 위상부터 다시 시작
   if (eqw && hasGenesisEquipped('fujinraijin')) fx.fujinRaijinStart = 0;
+  // 코셰이의 마지막 바늘(태초의 유물): 대상이 바뀌면 단계 순환을 1단계부터 다시 시작
+  if (eqw && hasGenesisEquipped('koschei')) fx.koscheiStart = 0;
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -7157,9 +7240,9 @@ function attack(w) {
   // 판도라의 마지막 책장(태초의 유물): 매 공격 시 "지식" 스택 적립, 최대치 도달 시 마지막 장 발동
   pandoraOnAttack();
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
-  const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc');
+  const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
   if (spellProc > 0 && Math.random() < spellProc) {
-    const spellDmg = dmg * (typeTrait(w, 'spellMult') || 1);
+    const spellDmg = dmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus());
     dealMonDamage(spellDmg);
     floatText('🔮 주문 작렬!');
   }
@@ -7295,6 +7378,7 @@ function resetTimedStacks() {
   fx.pandoraBurstUntil = 0;
   fx.pandoraDownStat = null;
   fx.fujinRaijinStart = 0;
+  fx.koscheiStart = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

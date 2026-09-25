@@ -3406,7 +3406,44 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'ariadne', name: '풀려나가는 실과 끝내 이어지는 길' },
   },
-  null, null, null, null, null, null, null, null,
+  { // floor 12 — 어둠의 탑 — 암흑 마법사
+    id: 'pandora',
+    floor: 12,
+    type: 'weapon',
+    name: '판도라의 마지막 책장',
+    subtitle: 'Pandora, She Who Opened What Should Stay Sealed',
+    icon: '📖',
+    art: 'assets/artifacts/pandora_grimoire.svg',
+    lore: `어둠의 탑 가장 안쪽 서고에는, 열람이 금지된 책 한 권이 있었다.
+
+표지에는 이런 경고가 새겨져 있었다 — "마지막 장을 넘기지 마라."
+
+그러나 지식을 탐하는 자들은, 언제나 그 경고를 넘어선다.
+
+네크로티스조차 이 책을 통째로 삼켰지만, 정작 마지막 한 장만은 소화하지 못했다.
+
+그 한 장이 지금도 어딘가에서, 누군가 펼쳐주기를 기다리고 있다.
+
+전해지길, 아주 오래 전 — 신들조차 열지 말라 봉인해둔 상자가 있었다고 한다.
+
+호기심을 이기지 못한 자가 그 뚜껑을 여는 순간, 안에 있던 모든 것이 한꺼번에 터져 나왔다.
+
+축복과 저주는, 애초에 갈라놓을 수 없는 한 몸이었다.
+
+사람들은 그 존재를 이렇게 불렀다.
+
+판도라(Pandora) — 모든 것을 받은 자, 그리고 모든 것을 풀어놓은 자.
+
+이 책의 마지막 장에는, 그녀가 마지막까지 놓지 않았던 것 — 희망 대신, 대가를 치를 각오가 새겨져 있다.`,
+    effectsText: [
+      '쌓여가는 페이지: 책장을 넘길 때마다, 손끝에 힘이 조금씩 스며든다.',
+      '마지막 장의 대가: 마지막 책장을 넘기는 순간, 무언가는 잃고 훨씬 더 큰 무언가를 얻는다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'pandora', name: '쌓여가는 페이지와 마지막 장의 대가' },
+  },
+  null, null, null, null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -3979,6 +4016,47 @@ function ariadneTick(now) {
     dealMonDamage(len * weaponAtk(w) * ARIADNE.burstCoeff);
     floatText('🧵 실이 터지다!');
   }
+}
+
+// ---------- 판도라의 마지막 책장(태초의 유물) 전용 전투 효과 ----------
+// 공격마다 "지식" 스택이 쌓이며(발동 중엔 적립 정지), 최대 스택(15타)에 도달하면 무작위
+// 능력치 1종은 크게 떨어지고 나머지 전부는 크게 오르는 상태(10초)가 발동한 뒤 스택이
+// 초기화되고 다시 쌓이기 시작한다. 수치는 전부 밸런스 미확정 1차 초안(TODO) —
+// 펀치기계 측정 후 조정 예정.
+const PANDORA = {
+  maxStacks: 15,           // 발동까지 필요한 타격 수
+  atkPerStack: 0.02,       // 스택 1당 공격력 +2%p
+  critChancePerStack: 0.01, // 스택 1당 치명타 확률 +1%p
+  burstDur: 10,            // 발동 지속시간(초)
+  downMult: 0.30,          // 무작위로 뽑힌 1종은 현재 수치의 30%로 급락(=−70%)
+  upMult: 1.90,            // 나머지 전부는 현재 수치의 190%로 폭등(=+90%)
+  pool: ['atk', 'speed', 'critChance', 'critDamage', 'extraAtk', 'extraAtkDmg', 'bossDmg'],
+};
+function hasPandora() { return hasGenesisEquipped('pandora'); }
+function pandoraBurstActive() { return hasPandora() && !!fx.pandoraBurstUntil && Date.now() < fx.pandoraBurstUntil; }
+// stat: PANDORA.pool에 속한 스탯 키. 발동 중이 아니면 항상 1(무영향).
+function pandoraStatMult(stat) {
+  if (!pandoraBurstActive()) return 1;
+  return stat === fx.pandoraDownStat ? PANDORA.downMult : PANDORA.upMult;
+}
+// 적립 중(발동 전) 스택 1당 소폭 공격력/치명타 확률 보너스 — 발동 중엔 위 pandoraStatMult가
+// 이미 그 두 스탯을 포함해 훨씬 크게 적용되므로, 이중 적용 방지를 위해 발동 중엔 0을 반환.
+function pandoraStackAtkBonus() {
+  if (!hasPandora() || pandoraBurstActive()) return 0;
+  return (fx.pandoraStacks || 0) * PANDORA.atkPerStack;
+}
+function pandoraStackCritChanceBonus() {
+  if (!hasPandora() || pandoraBurstActive()) return 0;
+  return (fx.pandoraStacks || 0) * PANDORA.critChancePerStack;
+}
+function pandoraOnAttack() {
+  if (!hasPandora() || pandoraBurstActive()) return; // 발동 중엔 페이지가 넘어가지 않음
+  fx.pandoraStacks = (fx.pandoraStacks || 0) + 1;
+  if (fx.pandoraStacks < PANDORA.maxStacks) return;
+  fx.pandoraStacks = 0;
+  fx.pandoraDownStat = PANDORA.pool[Math.floor(Math.random() * PANDORA.pool.length)];
+  fx.pandoraBurstUntil = Date.now() + PANDORA.burstDur * 1000;
+  floatText('📖 마지막 장!');
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4738,7 +4816,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct());
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -4876,7 +4954,7 @@ function weaponSpeed(w) {
   if (w && w.spirit === 'undyingbone') return ANCIENT_SPIRITS.undyingbone.fixedSpeed || 1;
   // 드라우그르(태초의 유물): 보스전 중 "죽음" 상태에서는 공격 자체가 불가능(공속 0)
   if (bossFight.active && hasDraugr() && fx.draugrPhase === 'dead') return 0;
-  return rawWeaponSpeed(w);
+  return rawWeaponSpeed(w) * pandoraStatMult('speed');
 }
 
 /* ===================== 룬 ===================== */
@@ -5664,6 +5742,8 @@ function spawnMonster() {
   if (eqw && hasGenesisEquipped('camazotz')) fx.camazotzStacks = 0;
   // 왓팍의 기생낭(태초의 유물): 대상이 바뀌면 분신 스택 초기화
   if (eqw && hasGenesisEquipped('wapaq')) { fx.wapaqStacks = 0; fx.wapaqNext = 0; }
+  // 판도라의 마지막 책장(태초의 유물): 대상이 바뀌면 지식 스택/발동 상태 초기화
+  if (eqw && hasGenesisEquipped('pandora')) { fx.pandoraStacks = 0; fx.pandoraBurstUntil = 0; fx.pandoraDownStat = null; }
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -6772,7 +6852,7 @@ function attack(w) {
   const e = w.effect ? EFFECTS[w.effect] : null;
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
-    dmg *= 1 + bossDmgBonus();
+    dmg *= (1 + bossDmgBonus()) * pandoraStatMult('bossDmg');
   }
   // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 적이 받는 모든 피해 증가
   if (w.spirit === 'sporeburst' && now < fx.sporeburstUntil) {
@@ -6820,12 +6900,12 @@ function attack(w) {
   const fireFistCount = weaponSpecialCount(w, 'fireFist');
   const fireFistCritChance = fireFistCount * (RUNE_SPECIALS.fireFist.critChance || 0);
   const fireFistCritDamage = fireFistCount * (RUNE_SPECIALS.fireFist.critDamage || 0);
-  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCritChance;
-  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance);
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCritChance + pandoraStackCritChanceBonus();
+  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance');
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage);
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage) * pandoraStatMult('critDamage');
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -7020,6 +7100,8 @@ function attack(w) {
   wapaqStrike(w);
   // 아라크네의 저주받은 실(태초의 유물): 매 공격 시 직조 스택 적립(맹독의 실 발동 중엔 정지)
   arachneOnAttack();
+  // 판도라의 마지막 책장(태초의 유물): 매 공격 시 "지식" 스택 적립, 최대치 도달 시 마지막 장 발동
+  pandoraOnAttack();
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc');
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -7032,13 +7114,13 @@ function attack(w) {
   const sporeActive = w.spirit === 'sporeburst' && now < fx.sporeburstUntil;
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
   const extraChance = Math.min(DMG_CAPS.extraChance,
-    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus);
+    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk');
   // 연타 피해 = 기준 배율(평소 75%, 포자 폭발 활성 중엔 150%) × (1 + 연타 피해 스탯 합계)
   // — 치명타 피해와 마찬가지로 장신구/룬/훈련/인챈트/무기 특성/각성에서 상한 없이 누적된다.
   const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg');
   if (extraChance > 0 && Math.random() < extraChance) {
     const extraDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
-    let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus);
+    let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg');
     // 포자 폭발(고대 에이션트 스피릿): 다른 무기와 달리 연타(추가공격)도 별도로 치명타 판정을 받는다
     if (w.spirit === 'sporeburst' && critChance > 0 && Math.random() < critChance) {
       extraDmg *= critMult;
@@ -7154,6 +7236,9 @@ function resetTimedStacks() {
   fx.draugrRevives = 0;
   fx.ariadneLen = 0;
   fx.ariadneNextTick = 0;
+  fx.pandoraStacks = 0;
+  fx.pandoraBurstUntil = 0;
+  fx.pandoraDownStat = null;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -10681,17 +10766,17 @@ function computeStats() {
   // 그대로 반영되어야 하기 때문.
   const stormBonus = (w && w.effect === 'stormblade') ? spd * ((e && e.critFromSpeed) || 0) : 0;
   const fireFistCount2 = weaponSpecialCount(w, 'fireFist');
-  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0);
-  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * 100;
+  const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0) + pandoraStackCritChanceBonus();
+  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance') * 100;
   const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
-  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0));
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0)) * pandoraStatMult('critDamage');
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
-  const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * 100;
+  const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk') * 100;
   const extraAtkDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
   const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae.extraAtkDmg + awakenStat(w, 'extraAtkDmg');
-  const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * 100;
+  const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * 100;
   // 골드/드랍률은 dropRoll()의 실제 계산식(곱연산)과 맞춘다 — 약탈자의 격노(고대 에이션트
   // 스피릿)의 고정 +50%/스택 보너스가 예전엔 이 화면에 전혀 반영되지 않았음.
   let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);

@@ -3505,7 +3505,38 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'koschei', name: '겹겹이 쌓이는 여정과 나눠 지는 죽음' },
   },
-  null, null, null, null, null,
+  { // floor 15 — 마계 입구 — 데몬 워리어
+    id: 'mephisto',
+    floor: 15,
+    type: 'weapon',
+    name: '메피스토의 핏빛 계약서',
+    subtitle: 'Mephistopheles, Whose Terms Are Never the Same Twice',
+    icon: '🎲',
+    art: 'assets/artifacts/mephisto_contract.svg',
+    lore: `마계 입구에 늘어선 것은 무기가 아니라, 서명을 기다리는 종이 한 장이었다.
+
+조항은 흐릿했다 — 무엇을 얻고, 무엇을 내주는지, 계약서 스스로도 정하지 못한 채였다.
+
+그저 피 한 방울이 떨어지는 순간, 계약의 주사위가 굴러갈 뿐.
+
+어떤 이는 그 한 수로 왕좌에 앉았고, 어떤 이는 같은 한 수로 모든 것을 잃었다.
+
+발자크는 이 계약서를 셀 수 없이 팔아왔다 — 매번 다른 조항으로, 매번 같은 것을 요구하며.
+
+혼을 사고파는 자들은 그를 이렇게 불렀다.
+
+메피스토펠레스(Mephistopheles) — 원하는 모든 것을 주겠다 약속하며, 그 대가는 계약서가 다 쓰이고 나서야 밝히는 자.
+
+이 계약서를 쥔 자는, 매 순간 그와 다시 협상해야 한다.`,
+    effectsText: [
+      '흐릿한 조항: 계약서에 손을 얹을 때마다, 무엇이 적힐지는 아무도 모른다.',
+      '주사위는 던져졌다: 어떤 순간은 왕좌를, 어떤 순간은 대가를 안겨준다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'mephisto', name: '흐릿한 조항과 주사위는 던져졌다' },
+  },
+  null, null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -4188,6 +4219,23 @@ function koscheiSpellProcBonus() {
 function koscheiSpellMultBonus() {
   if (!hasKoschei()) return 0;
   return koscheiStageNum() * KOSCHEI.spellMultPerStage;
+}
+
+// ---------- 메피스토의 핏빛 계약서(태초의 유물) 전용 전투 효과 ----------
+// 적립/주기 없이, 매 공격마다 독립적으로 "행운의 조항"(대박 배율) 또는 "대가의 조항"(페널티
+// 배율) 중 하나가 발동한다. 이 배율은 크리티컬/연타/주문작열 등 모든 계산이 끝나기 전, 최종
+// 피해가 계산되는 가장 앞단에서 곱해져 전체 결과에 균일하게 반영된다. 펀치기계 측정 기준
+// (+17강, 룬 8슬롯 유니크, 훈련레벨 40) 카마소츠 대비 평균 약 102%(개별 시행 변동폭 90~120%대,
+// 도박형 컨셉 특성상 매 측정마다 편차가 큼) — 순수 전투형 태초 기준(90~110%) 충족.
+const MEPHISTO = {
+  luckyChance: 0.40, // 행운의 조항 발동 확률
+  luckyMult: 9.9,    // 행운의 조항: 피해 ×9.9
+  tollMult: 0.5,     // 대가의 조항: 피해 ×0.5
+};
+function hasMephisto() { return hasGenesisEquipped('mephisto'); }
+function mephistoRollMult() {
+  if (!hasMephisto()) return 1;
+  return Math.random() < MEPHISTO.luckyChance ? MEPHISTO.luckyMult : MEPHISTO.tollMult;
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -6986,6 +7034,9 @@ function attack(w) {
     w.goblinstealLastKill = now;
   }
   let dmg = (weaponAtk(w) + subweaponAtk(getEquippedSubweapon())) * (0.9 + Math.random() * 0.2);
+  // 메피스토의 핏빛 계약서(태초의 유물): 매 공격마다 독립적으로 대박/페널티 배율 발동 —
+  // 이후 크리티컬/연타/주문작열 등 모든 계산이 이 배율을 그대로 물려받는다.
+  dmg *= mephistoRollMult();
   const e = w.effect ? EFFECTS[w.effect] : null;
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {

@@ -6675,9 +6675,34 @@ function subGradeAdjustedSuccess(grade, enhance) {
   const exponent = 1 + (grade || 0) * ENH.gradeSuccessExp;
   return Math.max(0.0000001, Math.pow(base / 100, exponent) * 100);
 }
+// 보조무기 강화 확률 보정: 메인 무기(ENH_BONUS_SOURCES/enhTierBonus)와 동일한 원리로 재설계 —
+// 버그 수정: 예전엔 accEff().subEnh(장신구/도감/마일스톤에서 나온 고정 %p 합계)를 그냥 그대로
+// 더했는데, +15 이후 base 자체가 기하급수적으로 작아지는 구간에서는 이 고정 %p가 상대적으로
+// 지나치게 커져서 "강화할수록 확률이 거의 안 내려가는" 것처럼 보이는 문제가 있었다. 메인
+// 무기처럼 각 소스마다 "cap 단계에서 딱 그 %p가 적용되는" 기준점만 두고, 실제 적용값은
+// SUB_ENH.success 표의 굴곡(weight = SUB_ENH.success[현재단계] / SUB_ENH.success[cap])을
+// 가중치로 써서 전 구간에 걸쳐 연속적으로 계산한다. accEff().subEnh는 UI 표시 전용으로만 남긴다.
+const SUB_ENH_BONUS_SOURCES = [
+  { cap: 12, value: 2, has: () => subBossWeaponCodexCount() >= 1 },  // 보스 보조무기 1종 수집
+  { cap: 22, value: 6, has: () => subBossWeaponCodexCount() >= 12 }, // 보스 보조무기 12종 수집(최난도)
+  { cap: 14, value: 2, has: () => { const p = subCodexGradeSetProgress(1); return p.have >= p.need; } },   // 도감: 희귀 등급 세트
+  { cap: 16, value: 2, has: () => { const p = subCodexTypeMasteryProgress('검집'); return p.have >= p.need; } },   // 도감: 검집 타입 마스터리
+  { cap: 16, value: 2, has: () => { const p = subCodexTypeMasteryProgress('화살통'); return p.have >= p.need; } }, // 도감: 화살통 타입 마스터리
+  { cap: 18, value: 6, has: () => S.bossAccs.includes(32) },                          // 헤르마이오의 판결기록 (월드2 13번째 보스장신구)
+  { cap: 16, value: 3, has: () => S.accEquipped.some(a => a.floor === 32) },          // 월드2 13번째 장신구
+  { cap: 18, value: 4, has: () => S.accEquipped.some(a => a.floor === 39) },          // 월드2 20번째(마지막) 장신구
+];
+function subEnhTierBonus(enhance) {
+  let bonus = subEnhanceEventSuccessBonus(enhance);
+  for (const src of SUB_ENH_BONUS_SOURCES) {
+    if (!src.has()) continue;
+    bonus += src.value * (SUB_ENH.success[enhance] / SUB_ENH.success[src.cap]);
+  }
+  return bonus;
+}
 function subSuccessChance(sw) {
   const base = subGradeAdjustedSuccess(sw.grade, sw.enhance);
-  return Math.min(100, base + (accEff().subEnh || 0) * 100 + subEnhanceEventSuccessBonus(sw.enhance));
+  return Math.min(100, base + subEnhTierBonus(sw.enhance));
 }
 function subDestroyChance(sw) {
   const base = SUB_ENH.destroy[sw.enhance] || 0;

@@ -3567,7 +3567,38 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'behemoth', name: '짓누르는 발걸음과 갈라지는 대지' },
   },
-  null, null, null,
+  { // floor 17 — 심연 — 심연의 감시자
+    id: 'azathoth',
+    floor: 17,
+    type: 'weapon',
+    name: '아자토스의 눈먼 변덕',
+    subtitle: 'Azathoth, the Blind Chaos at the Center of All',
+    icon: '🌀',
+    art: 'assets/artifacts/azathoth_whim.svg',
+    lore: `심연 저 밑바닥에는, 보는 것과 보이는 것의 구분조차 없는 무언가가 있었다.
+
+그것은 눈이 아니라, 눈이라 부를 수밖에 없는 혼돈이었다.
+
+이유 없는 피리 소리에 맞춰, 형체 없는 무언가들이 그 둘레를 맴돌며 춤춘다.
+
+무엇이 다음에 일어날지는, 그 자신조차 알지 못한다 — 애초에 알고자 하는 마음이 없었으므로.
+
+한 순간은 압도적인 힘이 되었다가, 한 순간은 아무 일도 일어나지 않는다.
+
+그저 그렇게, 이유 없이.
+
+옛 기록을 조합한 자들은 그 이름을 이렇게 재구성했다.
+
+아자토스(Azathoth) — 무한의 중심에서 잠들어 있는, 맹목의 혼돈.`,
+    effectsText: [
+      '눈먼 변덕: 매 순간 전혀 다른 무언가가 이유 없이 나타난다.',
+      '고요한 틈: 때로는, 아무 일도 일어나지 않는다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'azathoth', name: '눈먼 변덕과 고요한 틈' },
+  },
+  null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -4300,6 +4331,30 @@ function behemothOnAttack(w) {
   fx.behemothHits = 0;
   dealMonDamage(weaponAtk(w) * BEHEMOTH.burstAtkMult);
   floatText('🦶 짓누르는 무게!');
+}
+
+// ---------- 아자토스의 눈먼 변덕(태초의 유물) 전용 전투 효과 ----------
+// 적립/주기 없이, 매 공격마다 서로 다른 종류의 "변덕" 중 하나가 완전히 무작위(각 확률 균등)로
+// 발동한다. 폭주하는 힘(피해 배율)/확정 치명타/확정 연타(+피해 보너스)/즉발 붕괴(공격력 비례
+// 고정 피해)/고요한 순간(아무 효과 없음) 다섯 갈래 중 하나. 메피스토(대박/대가 이분법)와 달리
+// 매번 완전히 다른 종류의 효과가 나타난다는 것이 핵심. 펀치기계 측정 기준(+17강, 룬 8슬롯
+// 유니크, 훈련레벨 40) 카마소츠 대비 평균 약 101%(개별 시행 변동폭 95~107%대) — 순수 전투형
+// 태초 기준(90~110%) 충족.
+const AZATHOTH = {
+  powerMult: 7.4,      // 폭주하는 힘: 피해 ×7.4
+  extraDmgBonus: 10.1, // 확정 연타 발동 시 연타 피해 +1010%p
+  burstAtkMult: 20.2,  // 즉발 붕괴: 공격력의 2020%에 달하는 고정 피해
+};
+function hasAzathoth() { return hasGenesisEquipped('azathoth'); }
+// 이번 공격에 적용될 변덕을 무작위로 뽑는다: 'power'|'crit'|'extra'|'burst'|'calm'. 미장착 시 null.
+function azathothRollWhim() {
+  if (!hasAzathoth()) return null;
+  const r = Math.random();
+  if (r < 0.2) return 'power';
+  if (r < 0.4) return 'crit';
+  if (r < 0.6) return 'extra';
+  if (r < 0.8) return 'burst';
+  return 'calm';
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -7110,6 +7165,10 @@ function attack(w) {
   // 메피스토의 핏빛 계약서(태초의 유물): 매 공격마다 독립적으로 대박/페널티 배율 발동 —
   // 이후 크리티컬/연타/주문작열 등 모든 계산이 이 배율을 그대로 물려받는다.
   dmg *= mephistoRollMult();
+  // 아자토스의 눈먼 변덕(태초의 유물): 이번 공격의 변덕을 미리 뽑아둔다(크리티컬/연타 판정
+  // 지점에서도 참조됨). '폭주하는 힘'이면 여기서 곧바로 피해 배율을 곱해준다.
+  const azathothWhim = azathothRollWhim();
+  if (azathothWhim === 'power') dmg *= AZATHOTH.powerMult;
   const e = w.effect ? EFFECTS[w.effect] : null;
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
@@ -7179,7 +7238,7 @@ function attack(w) {
   // 베헤모스의 짓누르는 발걸음(태초의 유물): 항상 확정 치명타
   const behemothCrit = hasBehemoth();
   let didCrit = false;
-  if (forceCrit || ambushCrit || raijinCrit || behemothCrit || (critChance > 0 && Math.random() < critChance)) {
+  if (forceCrit || ambushCrit || raijinCrit || behemothCrit || azathothWhim === 'crit' || (critChance > 0 && Math.random() < critChance)) {
     dmg *= critMult;
     didCrit = true;
     floatText('💥 치명타!');
@@ -7369,6 +7428,11 @@ function attack(w) {
   pandoraOnAttack();
   // 베헤모스의 짓누르는 발걸음(태초의 유물): 보스전 한정 — 일정 타수마다 공격력 비례 고정 피해 폭발
   behemothOnAttack(w);
+  // 아자토스의 눈먼 변덕(태초의 유물): '즉발 붕괴' 변덕이 뽑히면 공격력 비례 고정 피해가 추가로 터짐
+  if (azathothWhim === 'burst') {
+    dealMonDamage(weaponAtk(w) * AZATHOTH.burstAtkMult);
+    floatText('🌀 눈먼 붕괴!');
+  }
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -7385,9 +7449,10 @@ function attack(w) {
     (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk');
   // 연타 피해 = 기준 배율(평소 75%, 포자 폭발 활성 중엔 150%) × (1 + 연타 피해 스탯 합계)
   // — 치명타 피해와 마찬가지로 장신구/룬/훈련/인챈트/무기 특성/각성에서 상한 없이 누적된다.
-  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0);
+  const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0) + (azathothWhim === 'extra' ? AZATHOTH.extraDmgBonus : 0);
   // 풍신뇌신도(태초의 유물): 풍신 위상 중엔 모든 공격에 확정 연타(추가공격) 발생
-  if (fujinPhaseActive() || (extraChance > 0 && Math.random() < extraChance)) {
+  // 아자토스의 눈먼 변덕(태초의 유물): '확정 연타' 변덕이 뽑히면 이번 공격에 확정 연타 발생
+  if (fujinPhaseActive() || azathothWhim === 'extra' || (extraChance > 0 && Math.random() < extraChance)) {
     const extraDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
     let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg');
     // 포자 폭발(고대 에이션트 스피릿): 다른 무기와 달리 연타(추가공격)도 별도로 치명타 판정을 받는다

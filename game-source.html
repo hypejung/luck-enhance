@@ -4387,20 +4387,25 @@ function azathothRollWhim() {
 }
 
 // ---------- 니드호그의 끝없는 갉음(태초의 유물) 전용 전투 효과 ----------
-// 공격할 때마다 지금 상대하는 대상에게 "부식" 스택이 상한 없이 쌓이고, 스택 1당 그 대상이
-// 받는 모든 피해가 늘어난다(아라크네의 직조 스택과 같은 방식). 다른 태초는 전부 "내 스탯"이
-// 오르지만, 이건 "적의 약점"이 시간에 비례해 무한히 쌓인다는 점이 핵심 — 오래 물고 늘어지는
-// 보스전/레이드일수록 기하급수적으로 강력해진다. 대상 전환·새 전투 시작 시 0으로 초기화.
-// 펀치기계 측정 기준(+17강, 룬 8슬롯 유니크, 훈련레벨 40) 카마소츠 대비 평균 약 103% — 순수
-// 전투형 태초 기준(90~110%) 충족(누적 피해가 시간에 비례해 계속 커지는 구조라 공격 횟수에
-// 민감함 — 처음 0.03으로는 330%까지 폭주해 0.008로 대폭 하향 조정).
+// 공격 여부와 무관하게 시간이 지날수록 지금 상대하는 대상에게 "부식" 스택이 상한 없이 쌓이고,
+// 스택 1당 그 대상이 받는 모든 피해가 늘어난다(아라크네의 직조 스택과 같은 방식). 다른 태초는
+// 전부 "내 스탯"이 오르지만, 이건 "적의 약점"이 시간에 비례해 무한히 쌓인다는 점이 핵심 —
+// 오래 물고 늘어지는 보스전/레이드일수록 기하급수적으로 강력해진다. 대상 전환·새 전투 시작 시
+// 0으로 초기화. 펀치기계 측정 기준(+17강, 룬 8슬롯 유니크, 훈련레벨 40) 카마소츠 대비 평균
+// 약 100% — 순수 전투형 태초 기준(90~110%) 충족.
 const NIDHOGG = {
-  perStackTakenBonus: 0.008, // 부식 스택 1당 대상이 받는 피해 +0.8%p
+  stackInterval: 1,          // 부식 스택이 1개 쌓이는 데 걸리는 시간(초) — 공격 여부와 무관
+  perStackTakenBonus: 0.053, // 부식 스택 1당 대상이 받는 피해 +5.3%p
 };
 function hasNidhogg() { return hasGenesisEquipped('nidhogg'); }
-function nidhoggOnAttack() {
+// tick()에서 매번 호출 — 공격 횟수와 무관하게 시간이 지날수록 부식 스택이 쌓인다.
+function nidhoggTick(now) {
   if (!hasNidhogg()) return;
-  fx.nidhoggStacks = (fx.nidhoggStacks || 0) + 1;
+  if (!fx.nidhoggNextStack) fx.nidhoggNextStack = now + NIDHOGG.stackInterval * 1000;
+  while (now >= fx.nidhoggNextStack) {
+    fx.nidhoggStacks = (fx.nidhoggStacks || 0) + 1;
+    fx.nidhoggNextStack += NIDHOGG.stackInterval * 1000;
+  }
 }
 function nidhoggCorrosionMult() {
   if (!hasNidhogg()) return 1;
@@ -6110,7 +6115,7 @@ function spawnMonster() {
   // 베헤모스의 짓누르는 발걸음(태초의 유물): 대상이 바뀌면 보스전 타격 카운터 초기화
   if (eqw && hasGenesisEquipped('behemoth')) fx.behemothHits = 0;
   // 니드호그의 끝없는 갉음(태초의 유물): 대상이 바뀌면 부식 스택 초기화
-  if (eqw && hasGenesisEquipped('nidhogg')) fx.nidhoggStacks = 0;
+  if (eqw && hasGenesisEquipped('nidhogg')) { fx.nidhoggStacks = 0; fx.nidhoggNextStack = 0; }
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -7057,6 +7062,8 @@ function tick(dt) {
   draugrTick(nowDecay);
   // 아리아드네의 실타래(태초의 유물): 실 성장/폭발 진행
   ariadneTick(nowDecay);
+  // 니드호그의 끝없는 갉음(태초의 유물): 공격 여부와 무관하게 시간이 지날수록 부식 스택 적립
+  nidhoggTick(nowDecay);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -7480,8 +7487,6 @@ function attack(w) {
   arachneOnAttack();
   // 판도라의 마지막 책장(태초의 유물): 매 공격 시 "지식" 스택 적립, 최대치 도달 시 마지막 장 발동
   pandoraOnAttack();
-  // 니드호그의 끝없는 갉음(태초의 유물): 매 공격 시 부식 스택 적립(상한 없음)
-  nidhoggOnAttack();
   // 베헤모스의 짓누르는 발걸음(태초의 유물): 보스전 한정 — 일정 타수마다 공격력 비례 고정 피해 폭발
   behemothOnAttack(w);
   // 아자토스의 눈먼 변덕(태초의 유물): '즉발 붕괴' 변덕이 뽑히면 공격력 비례 고정 피해가 추가로 터짐
@@ -7633,6 +7638,7 @@ function resetTimedStacks() {
   fx.koscheiStart = 0;
   fx.behemothHits = 0;
   fx.nidhoggStacks = 0;
+  fx.nidhoggNextStack = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;

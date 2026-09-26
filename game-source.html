@@ -3536,7 +3536,38 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'mephisto', name: '흐릿한 조항과 주사위는 던져졌다' },
   },
-  null, null, null, null,
+  { // floor 16 — 마계 심부 — 베히모스
+    id: 'behemoth',
+    floor: 16,
+    type: 'weapon',
+    name: '베헤모스의 짓누르는 발걸음',
+    subtitle: 'Behemoth, First of the Ways of God, Whose Every Step Crushes the Earth',
+    icon: '🦶',
+    art: 'assets/artifacts/behemoth_footstep.svg',
+    lore: `마계 심부, 땅 그 자체가 짐승의 모습을 하고 있었다.
+
+발굽 하나가 내려앉을 때마다, 대지는 다시는 예전으로 돌아가지 않았다.
+
+그 짐승은 서두르지 않았다 — 서두를 필요가 없었으므로.
+
+한 걸음, 한 걸음이 이미 무엇으로도 막을 수 없는 무게였다.
+
+옛 기록은 이렇게 전한다 — "그는 신의 솜씨 중 으뜸이니, 그를 만든 이만이 그에게 칼을 겨눌 수 있다."
+
+뼈는 청동관 같고, 다리는 무쇠 막대 같았다고 했다.
+
+사람들은 그를 베헤모스(Behemoth)라 불렀다 — 그 무엇도 서두르게 할 수 없는, 대지 그 자체의 무게.
+
+이 발자국을 이어받은 자는, 다시는 가볍게 걷지 못한다.`,
+    effectsText: [
+      '짓누르는 발걸음: 빠름을 버린 대신, 모든 발걸음은 반드시 급소를 짓밟는다.',
+      '갈라지는 대지: 사냥터에서는 지나간 자리마다 새로운 균열이 이어지고, 강대한 것 앞에서는 그 무게가 한 번에 쏟아진다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'behemoth', name: '짓누르는 발걸음과 갈라지는 대지' },
+  },
+  null, null, null,
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -4236,6 +4267,39 @@ function hasMephisto() { return hasGenesisEquipped('mephisto'); }
 function mephistoRollMult() {
   if (!hasMephisto()) return 1;
   return Math.random() < MEPHISTO.luckyChance ? MEPHISTO.luckyMult : MEPHISTO.tollMult;
+}
+
+// ---------- 베헤모스의 짓누르는 발걸음(태초의 유물) 전용 전투 효과 ----------
+// 공격속도를 고정값에 못박고 초과분은 공격력으로 환산(불멸의 진격 고대 스피릿과 동일 방식) +
+// 연타(추가공격) 완전 봉인 + 항상 확정 치명타. 사냥터(보스 제외)에서는 공격력이 추가로 크게
+// 오르고, 오버킬 데미지만큼 몬스터를 추가로 처치한다(불멸의 진격과 동일 메커니즘). 보스전에서는
+// 대신 치명타 피해가 크게 오르고, 일정 타수마다 공격력에 비례한 고정 피해가 추가로 터진다.
+// 펀치기계 측정 기준(+17강, 룬 8슬롯 유니크, 훈련레벨 40, 보스전 기준) 카마소츠 대비 약 99% —
+// 순수 전투형 태초 기준(90~110%) 충족(사냥터 전용 오버킬 처치는 보스전 수치에 영향 없음).
+const BEHEMOTH = {
+  fixedSpeed: 0.5,          // 고정 공격속도(초당 회수)
+  atkPerExcessSpeed: 3.7,   // 초과 속도 1당 공격력 +370%p
+  huntAtkBonus: 1.5,        // 사냥터(보스 제외) 공격력 +150%p
+  bossCritDmgBonus: 3.9,    // 보스전 치명타 피해 +390%p
+  burstEvery: 20,           // 보스전: 이 타수마다 폭발 발동
+  burstAtkMult: 19.5,       // 폭발 피해 = 무기 공격력 × 1950%
+};
+function hasBehemoth() { return hasGenesisEquipped('behemoth'); }
+function behemothHuntAtkBonus() {
+  if (!hasBehemoth() || bossFight.active) return 0;
+  return BEHEMOTH.huntAtkBonus;
+}
+function behemothBossCritDmgBonus() {
+  return (hasBehemoth() && bossFight.active) ? BEHEMOTH.bossCritDmgBonus : 0;
+}
+// 보스전 전용 타격 카운터 — 일정 타수마다 공격력 비례 고정 피해를 추가로 터뜨린다.
+function behemothOnAttack(w) {
+  if (!hasBehemoth() || !bossFight.active) return;
+  fx.behemothHits = (fx.behemothHits || 0) + 1;
+  if (fx.behemothHits < BEHEMOTH.burstEvery) return;
+  fx.behemothHits = 0;
+  dealMonDamage(weaponAtk(w) * BEHEMOTH.burstAtkMult);
+  floatText('🦶 짓누르는 무게!');
 }
 
 // ---------- 고대 무기 (grade 6) ----------
@@ -4968,6 +5032,11 @@ function weaponAtk(w) {
   const undyingExcessBonus = (w.spirit === 'undyingbone')
     ? Math.max(0, rawWeaponSpeed(w) - (ANCIENT_SPIRITS.undyingbone.fixedSpeed || 0)) * (ANCIENT_SPIRITS.undyingbone.atkPerExcessSpeed || 0)
     : 0;
+  // 베헤모스의 짓누르는 발걸음(태초의 유물): 공격속도를 고정값에 못박는 대신, 원래 쌓였을
+  // 초과 속도만큼을 공격력으로 환산해 되돌려준다. 사냥터(보스 제외)에서는 추가로 공격력 자체도 크게 증가.
+  const behemothExcessBonus = hasBehemoth()
+    ? Math.max(0, rawWeaponSpeed(w) - BEHEMOTH.fixedSpeed) * BEHEMOTH.atkPerExcessSpeed + behemothHuntAtkBonus()
+    : 0;
   // 늑대의 질주(고대 에이션트 스피릿): 공격속도가 빠를수록 공격력도 함께 상승
   const wolfsprintAtkBonus = (w.spirit === 'wolfsprint') ? weaponSpeed(w) * (ANCIENT_SPIRITS.wolfsprint.atkPerSpeed || 0) : 0;
   // 약탈자의 격노(고대 에이션트 스피릿): 처치마다 쌓이는 영구 스택만큼 공격력도 함께 상승
@@ -4995,7 +5064,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus() + behemothExcessBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -5131,6 +5200,8 @@ function rawWeaponSpeed(w) {
 function weaponSpeed(w) {
   // 불멸의 진격(고대 에이션트 스피릿): 실질 공격속도를 고정값으로 못박는다(초과분은 weaponAtk로 환산됨)
   if (w && w.spirit === 'undyingbone') return ANCIENT_SPIRITS.undyingbone.fixedSpeed || 1;
+  // 베헤모스의 짓누르는 발걸음(태초의 유물): 실질 공격속도를 고정값으로 못박는다(초과분은 weaponAtk로 환산됨)
+  if (hasBehemoth()) return BEHEMOTH.fixedSpeed;
   // 드라우그르(태초의 유물): 보스전 중 "죽음" 상태에서는 공격 자체가 불가능(공속 0)
   if (bossFight.active && hasDraugr() && fx.draugrPhase === 'dead') return 0;
   // 코셰이의 마지막 바늘(태초의 유물): 죽음 상태에서는 공격 자체가 불가능(공속 0)
@@ -5929,6 +6000,8 @@ function spawnMonster() {
   if (eqw && hasGenesisEquipped('fujinraijin')) fx.fujinRaijinStart = 0;
   // 코셰이의 마지막 바늘(태초의 유물): 대상이 바뀌면 단계 순환을 1단계부터 다시 시작
   if (eqw && hasGenesisEquipped('koschei')) fx.koscheiStart = 0;
+  // 베헤모스의 짓누르는 발걸음(태초의 유물): 대상이 바뀌면 보스전 타격 카운터 초기화
+  if (eqw && hasGenesisEquipped('behemoth')) fx.behemothHits = 0;
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -7093,7 +7166,7 @@ function attack(w) {
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0)) * pandoraStatMult('critDamage');
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus()) * pandoraStatMult('critDamage');
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -7103,8 +7176,10 @@ function attack(w) {
   if (ambushCrit) fx.ambushReady = false;
   // 풍신뇌신도(태초의 유물): 뇌신 위상 중엔 모든 공격이 확정 치명타
   const raijinCrit = raijinPhaseActive();
+  // 베헤모스의 짓누르는 발걸음(태초의 유물): 항상 확정 치명타
+  const behemothCrit = hasBehemoth();
   let didCrit = false;
-  if (forceCrit || ambushCrit || raijinCrit || (critChance > 0 && Math.random() < critChance)) {
+  if (forceCrit || ambushCrit || raijinCrit || behemothCrit || (critChance > 0 && Math.random() < critChance)) {
     dmg *= critMult;
     didCrit = true;
     floatText('💥 치명타!');
@@ -7274,7 +7349,7 @@ function attack(w) {
   // 불멸의 진격(고대 에이션트 스피릿): 사냥터 일반/엘리트 몬스터 한정(보스·토벌전 제외),
   // 오버킬(처치 후 남는 피해량 ÷ 몬스터 최대체력)만큼 실제 처치 판정을 추가로 돌린다
   // (보상 배수 지급이 아니라 dropRoll 등 정식 처치 로직을 그 횟수만큼 진짜로 실행).
-  if (w.spirit === 'undyingbone' && !bossFight.active && BN.gte(dmg, mon.hp)) {
+  if ((w.spirit === 'undyingbone' || hasBehemoth()) && !bossFight.active && BN.gte(dmg, mon.hp)) {
     const monHpFull = BN.eq(mon.maxHp, 0) ? BN.from(1) : mon.maxHp;
     const overkill = BN.sub(dmg, mon.hp);
     // 무기가 극도로 강해지면 처치 수가 천문학적으로 커질 수 있어 상한을 둔다(성능 보호 목적)
@@ -7292,6 +7367,8 @@ function attack(w) {
   arachneOnAttack();
   // 판도라의 마지막 책장(태초의 유물): 매 공격 시 "지식" 스택 적립, 최대치 도달 시 마지막 장 발동
   pandoraOnAttack();
+  // 베헤모스의 짓누르는 발걸음(태초의 유물): 보스전 한정 — 일정 타수마다 공격력 비례 고정 피해 폭발
+  behemothOnAttack(w);
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -7303,7 +7380,8 @@ function attack(w) {
   // (포자 폭발 활성 중엔 +70%p 고정 가산 — 상한 자체가 100%로 풀려서 별도 상한 해제는 불필요)
   const sporeActive = w.spirit === 'sporeburst' && now < fx.sporeburstUntil;
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
-  const extraChance = Math.min(DMG_CAPS.extraChance,
+  // 베헤모스의 짓누르는 발걸음(태초의 유물): 연타(추가공격)가 완전히 불가능해진다
+  const extraChance = hasBehemoth() ? 0 : Math.min(DMG_CAPS.extraChance,
     (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk');
   // 연타 피해 = 기준 배율(평소 75%, 포자 폭발 활성 중엔 150%) × (1 + 연타 피해 스탯 합계)
   // — 치명타 피해와 마찬가지로 장신구/룬/훈련/인챈트/무기 특성/각성에서 상한 없이 누적된다.
@@ -7432,6 +7510,7 @@ function resetTimedStacks() {
   fx.pandoraDownStat = null;
   fx.fujinRaijinStart = 0;
   fx.koscheiStart = 0;
+  fx.behemothHits = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -10962,11 +11041,11 @@ function computeStats() {
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0) + pandoraStackCritChanceBonus();
   const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance') * 100;
   const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
-  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0) + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0)) * pandoraStatMult('critDamage');
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0) + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus()) * pandoraStatMult('critDamage');
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
-  const extraChance = Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk') * 100;
+  const extraChance = hasBehemoth() ? 0 : Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk') * 100;
   const extraAtkDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
   const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0);
   const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * 100;

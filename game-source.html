@@ -12303,16 +12303,21 @@ function init() {
   // 되는데, 이걸 그대로 "자리 비움(오프라인)"으로 처리하면 다른 탭을 오가며 방치 플레이하는
   // 흔한 PC 사용 패턴에서 매번 오프라인 효율(70%)·재료 미지급 페널티를 억울하게 맞는다.
   // 모바일은 탭 전환이 곧 화면 자체를 벗어나는 것과 사실상 같으므로(다른 앱으로 전환·화면
-  // 꺼짐 등) 기존처럼 오프라인 보상 대상으로 취급한다. 브라우저를 완전히 닫는 경우
-  // (beforeunload/pagehide)는 기기와 무관하게 그대로 오프라인 보상 대상이다 — 그 시점엔
-  // 탭 자체가 사라지므로 온라인 루프가 이어질 수 없기 때문.
+  // 꺼짐 등) 기존처럼 오프라인 보상 대상으로 취급한다.
+  // PC에서도 "창 자체를 최소화"한 경우는 진짜 자리 비움이므로 오프라인 대상으로 잡아야 한다 —
+  // Page Visibility API(document.hidden)만으로는 "같은 창의 다른 탭을 보는 중"과 "창을
+  // 최소화함"을 구분할 수 없어서(둘 다 hidden=true), 크롬 계열에서 창을 최소화하면
+  // window.outerWidth/outerHeight가 0이 되는 특성을 대신 이용해 최소화 여부를 판별한다.
+  // 브라우저를 완전히 닫는 경우(beforeunload/pagehide)는 기기와 무관하게 그대로 오프라인
+  // 보상 대상이다 — 그 시점엔 탭 자체가 사라지므로 온라인 루프가 이어질 수 없기 때문.
   const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
+  const isWindowMinimized = () => window.outerWidth === 0 || window.outerHeight === 0;
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
-      if (isMobileDevice()) markLeave();
-      else if (!resetting) { save(); syncUpload(); } // PC: 안전을 위한 저장/동기화만, 자리비움 기록은 안 함
-    } else if (isMobileDevice()) {
-      grantOffline();
+      if (isMobileDevice() || isWindowMinimized()) markLeave();
+      else if (!resetting) { save(); syncUpload(); } // PC 탭 전환: 안전을 위한 저장/동기화만, 자리비움 기록은 안 함
+    } else {
+      grantOffline(); // S.lastSeen이 없으면(위에서 자리비움 기록을 안 한 경우) 내부에서 조용히 무시됨
     }
   });
   window.addEventListener('beforeunload', markLeave);

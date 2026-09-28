@@ -362,6 +362,12 @@
     border-radius: 8px; padding: 8px 12px; margin-bottom: 6px; font-size: 14px;
   }
   .invitem.equipped { border-color: var(--gold); background: #2d2a1a; }
+  /* 프리셋 탭: 현재 장착 구성과 완전히 일치하는 프리셋에 빛나는 테두리 표시 */
+  @keyframes presetActiveGlow {
+    0%, 100% { box-shadow: 0 0 6px 1px rgba(108,240,194,.5); }
+    50% { box-shadow: 0 0 16px 4px rgba(108,240,194,.95); }
+  }
+  .invitem.presetActive { border-color: var(--prim); animation: presetActiveGlow 1.6s ease-in-out infinite; }
   .invitem .wn { font-weight: bold; }
   .invitem .wi { color: var(--sub); font-size: 12px; }
   .invitem .btns { display: flex; gap: 6px; }
@@ -11892,7 +11898,28 @@ function loadPreset(idx) {
     }
   }
   log(`📥 <b>${p.name}</b>을(를) 불러왔습니다.${w ? ` ${gradeTag(w)} 장착.` : ''}${runeNote}${subNote}`, 'lg-prim');
-  renderAll(); renderSubweaponTab(); save();
+  renderAll(); renderSubweaponTab(); renderPresetTab(); save();
+}
+// 현재 장착 구성(무기/룬/장신구/보조무기)이 이 프리셋에 저장된 구성과 완전히 일치하는지 —
+// 장비 하나라도 다르면 false. 프리셋 탭에서 "지금 이걸 끼고 있다"는 표시(빛나는 테두리)에 쓰인다.
+function presetMatchesCurrent(p) {
+  if (!p || p.weaponId == null) return false;
+  if (p.weaponId !== S.equipped) return false;
+  if ('subWeaponId' in p && p.subWeaponId !== S.subEquipped) return false;
+  const cur = Array.isArray(S.accEquipped) ? S.accEquipped : [];
+  const saved = Array.isArray(p.accEquipped) ? p.accEquipped : [];
+  if (cur.length !== saved.length) return false;
+  const normAcc = arr => arr.map(a => `${a.floor}:${a.grade}`).sort();
+  const curAcc = normAcc(cur), savedAcc = normAcc(saved);
+  for (let i = 0; i < curAcc.length; i++) if (curAcc[i] !== savedAcc[i]) return false;
+  if (Array.isArray(p.runeIds)) {
+    const w = getEquipped();
+    const curRuneIds = (w && Array.isArray(w.runes)) ? w.runes.map(r => r.id) : [];
+    if (curRuneIds.length !== p.runeIds.length) return false;
+    const a = [...curRuneIds].sort((x, y) => x - y), b = [...p.runeIds].sort((x, y) => x - y);
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 function renamePreset(idx, newName) {
   const p = S.presets[idx];
@@ -11938,7 +11965,7 @@ function renderPresetTab() {
       }
       summary = `${gradeTag(w)}${accNames.length ? ` · 📿 ${accNames.join(', ')}` : ' · 장신구 없음'}${Array.isArray(p2.runeIds) ? ` · 🔮 룬 ${p2.runeIds.length}개` : ''}${subSummary}`;
     }
-    div.className = 'invitem';
+    div.className = presetMatchesCurrent(p2) ? 'invitem presetActive' : 'invitem';
     div.innerHTML = `
       <div style="flex:1;min-width:0;">
         <input type="text" value="${p2.name}" maxlength="20" data-preset-name="${idx}"

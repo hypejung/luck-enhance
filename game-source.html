@@ -3627,7 +3627,35 @@ const GENESIS_ARTIFACTS = [
     dmgMultOverride: null,
     uniqueSkill: { key: 'nidhogg', name: '끝없는 갉음과 깊어지는 균열' },
   },
-  null,
+  { // floor 19 — 신들의 영역 — 몰락한 신
+    id: 'lucifer',
+    floor: 19,
+    type: 'weapon',
+    name: '루시퍼의 타락한 광휘',
+    subtitle: "Lucifer, Who Traded Heaven's Fortune for a Moment of Flame",
+    icon: '⭐',
+    art: 'assets/artifacts/lucifer_radiance.svg',
+    lore: `신들의 영역, 가장 높은 곳에서 가장 먼저 떨어진 자가 있었다.
+
+그는 한때 빛 그 자체였다 — 다른 모든 빛이 그에게서 비롯되었다고도 했다.
+
+그러나 어느 순간, 그는 스스로 그 광휘를 내던졌다.
+
+천상의 모든 부와 안온함 대신, 한순간 활활 타오르는 불꽃을 택한 것이다.
+
+떨어지는 동안에도 그는 웃었다고 전해진다 — 잃는 것보다 타오르는 순간이 더 값지다는 듯이.
+
+사람들은 그를 루시퍼(Lucifer)라 불렀다 — 빛을 나르는 자, 그리고 그 빛을 스스로 버린 자.
+
+이 광휘를 물려받은 자는, 평온과 파멸 사이를 반복해서 오간다.`,
+    effectsText: [
+      '거두어진 광휘: 평온한 동안은, 그저 은은한 빛만이 감돈다.',
+      '타오르는 대가: 아주 가끔, 그 빛이 통제를 벗어나 활활 타오른다 — 그 대가는 가진 것에서 빠져나간다.',
+    ],
+    speedOverride: null,
+    dmgMultOverride: null,
+    uniqueSkill: { key: 'lucifer', name: '거두어진 광휘와 타오르는 대가' },
+  },
 ];
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
@@ -4412,6 +4440,40 @@ function nidhoggCorrosionMult() {
   return 1 + (fx.nidhoggStacks || 0) * NIDHOGG.perStackTakenBonus;
 }
 
+// ---------- 루시퍼의 타락한 광휘(태초의 유물) 전용 전투 효과 ----------
+// 평시(천사 상태)엔 안전한 공격력 보너스만 상시 적용된다. 매 공격마다 낮은 확률로 자동으로
+// "타락"이 발동해 일정 시간 동안 공격력/치명타 피해가 크게 오르지만, 그 대가로 지속되는 동안
+// 매초 보유 골드가 비율만큼 실제로 줄어든다(이 게임에서 유일하게 "진짜 리스크"를 지불하는
+// 태초). 수치는 전부 밸런스 미확정 1차 초안(TODO) — 펀치기계 측정 후 조정 예정.
+const LUCIFER = {
+  angelAtkBonus: 1.0,        // 천사 상태(상시) 공격력 +100%p
+  fallChance: 0.05,          // 공격마다 타락 발동 확률
+  fallDur: 6,                // 타락 지속시간(초)
+  fallAtkBonus: 2.5,         // 타락 중 추가 공격력 +250%p
+  fallCritDmgBonus: 1.5,     // 타락 중 추가 치명타 피해 +150%p
+  fallGoldDrainPerSec: 0.01, // 타락 중 매초 보유 골드의 1% 소모
+};
+function hasLucifer() { return hasGenesisEquipped('lucifer'); }
+function luciferFallActive() { return hasLucifer() && !!fx.luciferFallUntil && Date.now() < fx.luciferFallUntil; }
+function luciferAtkBonus() {
+  if (!hasLucifer()) return 0;
+  return LUCIFER.angelAtkBonus + (luciferFallActive() ? LUCIFER.fallAtkBonus : 0);
+}
+function luciferCritDmgBonus() { return luciferFallActive() ? LUCIFER.fallCritDmgBonus : 0; }
+// 공격마다 확률로 타락 발동(이미 타락 중이면 재발동하지 않음)
+function luciferOnAttack() {
+  if (!hasLucifer() || luciferFallActive()) return;
+  if (Math.random() < LUCIFER.fallChance) {
+    fx.luciferFallUntil = Date.now() + LUCIFER.fallDur * 1000;
+    floatText('🔥 타락!');
+  }
+}
+// tick()에서 매번 호출 — 타락 중일 때만 경과 시간(dt)에 비례해 보유 골드를 실시간으로 소모한다.
+function luciferGoldDrainTick(dt) {
+  if (!luciferFallActive()) return;
+  S.gold = BN.mul(S.gold, Math.max(0, 1 - LUCIFER.fallGoldDrainPerSec * dt));
+}
+
 // ---------- 고대 무기 (grade 6) ----------
 // 태초의 유물과 같은 방식(사냥터별 초저확률 처치 판정)으로 얻는 초레어 "무기"이다.
 // 태초보다는 약 12배 흔하게 잡아서 신화-태초 사이의 간극을 메운다. 사냥터마다 최대
@@ -5174,7 +5236,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus() + behemothExcessBonus) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus() + behemothExcessBonus + luciferAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -6116,6 +6178,8 @@ function spawnMonster() {
   if (eqw && hasGenesisEquipped('behemoth')) fx.behemothHits = 0;
   // 니드호그의 끝없는 갉음(태초의 유물): 대상이 바뀌면 부식 스택 초기화
   if (eqw && hasGenesisEquipped('nidhogg')) { fx.nidhoggStacks = 0; fx.nidhoggNextStack = 0; }
+  // 루시퍼의 타락한 광휘(태초의 유물): 대상이 바뀌면 타락 상태 초기화
+  if (eqw && hasGenesisEquipped('lucifer')) fx.luciferFallUntil = 0;
   // 유니크 몬스터 판정 (정예 사냥꾼 룬 특수효과로 확률 상승)
   const eliteBonus = weaponSpecialCount(getEquipped(), 'elitehunter') * RUNE_SPECIALS.elitehunter.bonus;
   mon.unique = Math.random() < UNIQUE_CHANCE + eliteBonus;
@@ -7089,6 +7153,8 @@ function tick(dt) {
   ariadneTick(nowDecay);
   // 니드호그의 끝없는 갉음(태초의 유물): 공격 여부와 무관하게 시간이 지날수록 부식 스택 적립
   nidhoggTick(nowDecay);
+  // 루시퍼의 타락한 광휘(태초의 유물): 타락 상태 중 매초 보유 골드 소모
+  luciferGoldDrainTick(dt);
   // 필멸 파훼의 룬(도서관 전용): 같은 대상을 계속 공격 중이면 주기적으로 스택 적립(최대치까지)
   if (weaponSpecialCount(w, 'mortalRune') > 0) {
     const rune = RUNE_SPECIALS.mortalRune;
@@ -7311,7 +7377,7 @@ function attack(w) {
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus()) * pandoraStatMult('critDamage');
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage');
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -7519,6 +7585,8 @@ function attack(w) {
     dealMonDamage(weaponAtk(w) * AZATHOTH.burstAtkMult);
     floatText('🌀 눈먼 붕괴!');
   }
+  // 루시퍼의 타락한 광휘(태초의 유물): 매 공격마다 낮은 확률로 자동 타락 발동
+  luciferOnAttack();
   // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
   if (spellProc > 0 && Math.random() < spellProc) {
@@ -7664,6 +7732,7 @@ function resetTimedStacks() {
   fx.behemothHits = 0;
   fx.nidhoggStacks = 0;
   fx.nidhoggNextStack = 0;
+  fx.luciferFallUntil = 0;
   const w = getEquipped();
   if (w && w.spirit === 'wolfsprint') w.wolfsprintStacks = 0;
   if (w && w.spirit === 'goblinsteal') w.goblinstealStacks = 0;
@@ -11194,7 +11263,7 @@ function computeStats() {
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0) + pandoraStackCritChanceBonus();
   const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance') * 100;
   const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
-  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0) + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus()) * pandoraStatMult('critDamage');
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0) + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage');
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;

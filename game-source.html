@@ -646,10 +646,14 @@
         <button class="primary big enhFxBtn" id="enhBtn">강화하기</button>
         <div id="enhFxOverlay" class="enhFxOverlay"></div>
       </div>
+      <!-- autoEnhanceBox는 반드시 가장 위에 둔다: 진행 중일 때 "중지" 버튼을 담고 있는데,
+           바로 아래 awakeningBox가 +20강에서 1줄 안내문 -> 5줄 버튼 목록으로 갑자기 커지면서
+           이 박스를 아래로 밀어내면, 자동 강화 중 같은 자리를 계속 누르던 사용자가 그 순간
+           엉뚱한 위치를 누르게 되어 "중지가 안 된다"는 버그로 체감된다. -->
+      <div id="autoEnhanceBox" style="margin-top:8px;"></div>
       <div id="advancedEnhanceBox" style="margin-top:8px;"></div>
       <div id="awakeningBox" style="margin-top:8px;"></div>
       <div id="ariadneBox" style="margin-top:8px;"></div>
-      <div id="autoEnhanceBox" style="margin-top:8px;"></div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
         강화 실패 시 <span class="warn">유지 / 단계 -1</span> 중 하나 · <span class="warn">+10 이상</span>부터 실패 시 <span class="warn">파괴</span> 위험! 자세한 규칙은 📘 가이드 탭 참고.
       </div>
@@ -10299,10 +10303,10 @@ function renderEnhance() {
         : isGenesisWeapon(w)
           ? `🌌 태초 무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%, 고급 강화 시 유지 확률 상승)</span>${matNote} · 현재 <b>+${w.enhance}</b>`
           : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
+  renderAutoEnhance(w, maxed);
   renderAdvancedEnhance(w, maxed);
   renderAwakening(w, maxed);
   renderAriadneBox(w);
-  renderAutoEnhance(w, maxed);
 }
 
 // 강화기 상단의 "강화 대상 선택" 바 — 기본은 장착 무기, 가방에서 다른 무기를 골라

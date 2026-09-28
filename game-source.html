@@ -12299,9 +12299,21 @@ function init() {
     save();
     syncUpload();
   };
+  // PC는 브라우저 창의 여러 탭 중 하나를 잠깐 보고 있는 것만으로도 document.hidden이 true가
+  // 되는데, 이걸 그대로 "자리 비움(오프라인)"으로 처리하면 다른 탭을 오가며 방치 플레이하는
+  // 흔한 PC 사용 패턴에서 매번 오프라인 효율(70%)·재료 미지급 페널티를 억울하게 맞는다.
+  // 모바일은 탭 전환이 곧 화면 자체를 벗어나는 것과 사실상 같으므로(다른 앱으로 전환·화면
+  // 꺼짐 등) 기존처럼 오프라인 보상 대상으로 취급한다. 브라우저를 완전히 닫는 경우
+  // (beforeunload/pagehide)는 기기와 무관하게 그대로 오프라인 보상 대상이다 — 그 시점엔
+  // 탭 자체가 사라지므로 온라인 루프가 이어질 수 없기 때문.
+  const isMobileDevice = () => /Android|iPhone|iPad|iPod|Mobi/i.test(navigator.userAgent);
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) markLeave();
-    else grantOffline();
+    if (document.hidden) {
+      if (isMobileDevice()) markLeave();
+      else if (!resetting) { save(); syncUpload(); } // PC: 안전을 위한 저장/동기화만, 자리비움 기록은 안 함
+    } else if (isMobileDevice()) {
+      grantOffline();
+    }
   });
   window.addEventListener('beforeunload', markLeave);
   window.addEventListener('pagehide', markLeave);

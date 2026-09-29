@@ -1365,7 +1365,9 @@ const SUBWEAPON_TYPES = [
   { mainType: '도끼',   name: '도끼걸이', icon: '🪝',
     passive: { bossDmg: 0.08 },                passiveDesc: '보스 피해량 +8%' },
   { mainType: '창',     name: '창꽂이', icon: '🗄️',
-    passive: { critDamage: 0.10 },             passiveDesc: '치명타 피해 +10%p' },
+    // 치명타 피해 단일 특화 타입 — 쌍검 벨트(치명타 확률+피해 복합, 피해 10%p)와 겹치지 않도록
+    // 단일 특화답게 확실히 더 높게 잡는다.
+    passive: { critDamage: 0.20 },             passiveDesc: '치명타 피해 +20%p' },
   { mainType: '활',     name: '화살통', icon: '🎯',
     passive: { speed: 0.05 },                  passiveDesc: '공격속도 +5%' },
   { mainType: '지팡이', name: '마도서', icon: '📖',

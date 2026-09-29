@@ -2486,6 +2486,7 @@ const HONOR_SHOP = [
   { id: 'weaponEssence',  name: '📜 무기의 정수 50개', cost: 10 },
   { id: 'awakenEssence',  name: '💠 각성의 정수 30개', cost: 10 },
   { id: 'raidTokens',     name: '🎫 토벌의 증표 5개', cost: 5 },
+  { id: 'worldTreeLeaf',  name: '🍃 세계수의 잎 100개', cost: 3, desc: '고급 강화 재료 부족분을 대신 낼 수 있습니다(1개=재료 1개, 무기/보조무기 구분 없음).' },
 ];
 
 // ---------- 패치노트 ----------
@@ -2618,7 +2619,7 @@ const ANCIENT_SEAL_DROP_CHANCE = 0.003;
 const ANCIENT_SEAL_SLOTS = 3;
 const ANCIENT_SEALS = [
   { id: 'slimeCore', floor: 0, name: '잠식하는 핵의 인장',
-    desc: '고급 재료를 사냥터 구간 제한 없이 어디서 얻은 것이든 강화에 사용할 수 있다.' },
+    desc: '고급 재료(에픽급)를 처치할 때마다 확정으로, 그것도 더 많이 획득한다.' },
   { id: 'vampireLord', floor: 1, name: '흡혈군주의 인장',
     desc: '오프라인 사냥에 적용되는 최대 시간이 4시간 늘어난다.' },
   { id: 'sporeMother', floor: 2, name: '포자모의 인장',
@@ -5146,6 +5147,7 @@ function newState() {
     allinLossStreak: 0, // 올인 도박 연속 손실 횟수 (이스터에그용)
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
     raidTokens: BN.from(0),     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
+    worldTreeLeaf: BN.from(0),  // 세계수의 잎 (명예의 정수 상점 전용) — 고급 재료 부족분을 1:1로 대체
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
     punch: { best: BN.from(0), last: BN.from(0) }, // 펀치기계: 연습용, 횟수 제한 없음
     ancientSeals: [],  // 보유한 고대의 인장 id 목록
@@ -5819,24 +5821,16 @@ function highMatsNeeded(enhance) {
   const need = enhance >= HIGH_MAT_START ? (enhance - (HIGH_MAT_START - 1)) * HIGH_MAT_MULT : 0;
   return Math.round(need * enhanceEventCostMult(enhance)); // 강화데이: 20강 이하 50%, 초과 30% 할인
 }
-// 무기 등급별로 사용 가능한 고급 재료의 사냥터 구간(0-index 층 범위)이 정해져 있다.
-// 일반~레어: 1~6단계, 에픽~유니크: 7~12단계, 레전더리~신화: 13~19단계, 태초: 20단계
-function highMatFloorRange(grade) {
-  if (grade <= 1) return [0, 5];
-  if (grade <= 3) return [6, 11];
-  if (grade <= 5) return [12, 18];
-  return [19, 19];
+// 고급 재료 통합: 메인 무기는 등급·사냥터 구분 없이 전체 사냥터(푸른세계+황혼국)의 고급
+// 재료를 그대로 인정한다. 보조무기 고급강화만 황혼국(월드2, 21층 이상) 재료로 한정한다 —
+// 보조무기 자체가 월드2 전용 장비라서다. world2Only 인자로 이 둘을 구분한다.
+function highMatFloorRangeFor(world2Only) {
+  return world2Only ? [WORLD2_START_FLOOR, FLOORS.length - 1] : [0, FLOORS.length - 1];
 }
-function highMatFloorLabel(grade) {
-  if (sealEquippedHas('slimeCore')) return '전체 사냥터';
-  const [lo, hi] = highMatFloorRange(grade);
-  return lo === hi ? `${hi + 1}단계` : `${lo + 1}~${hi + 1}단계`;
-}
-// 잠식하는 핵의 인장: 등급별 사냥터 구간 제한을 무시하고 전체 사냥터의 고급 재료를 사용
-function highMatFloorRangeFor(grade) { return sealEquippedHas('slimeCore') ? [0, 19] : highMatFloorRange(grade); }
-// 보유 고급 재료 수 (등급별 허용 사냥터 구간의 3번째(에픽급) 재료 = matGrade 2)
-function countHighMats(grade) {
-  const [lo, hi] = highMatFloorRangeFor(grade);
+function highMatFloorLabel(world2Only) { return world2Only ? '황혼국(21층 이상)' : '전체 사냥터'; }
+// 보유 고급 재료 수 (인정 사냥터 구간의 3번째(에픽급) 재료 = matGrade 2)
+function countHighMats(world2Only) {
+  const [lo, hi] = highMatFloorRangeFor(world2Only);
   let n = 0;
   for (const key in S.mats) {
     const [f, g] = key.split('|').map(Number);
@@ -5844,9 +5838,9 @@ function countHighMats(grade) {
   }
   return n;
 }
-// 고급 재료 소모: 등급별 허용 구간 내에서 낮은 사냥터(저티어) 재료부터
-function consumeHighMats(grade, n) {
-  const [lo, hi] = highMatFloorRangeFor(grade);
+// 고급 재료 소모: 인정 구간 내에서 낮은 사냥터(저티어) 재료부터
+function consumeHighMats(world2Only, n) {
+  const [lo, hi] = highMatFloorRangeFor(world2Only);
   const keys = Object.keys(S.mats).filter(k => {
     const [f, g] = k.split('|').map(Number);
     return g >= 2 && f >= lo && f <= hi && S.mats[k] > 0;
@@ -5865,26 +5859,32 @@ function consumeHighMats(grade, n) {
   }
   return n <= 0;
 }
-// 고급 재료 부족분을 토벌의 증표로 대신 지불 가능 (토벌의 증표가 훨씬 구하기 어려우므로
-// 1개로 고급 재료 100개 상당을 대체 — 순수 재료 파밍보다 훨씬 유리한 환율).
+// 고급 재료 부족분은 1차로 🍃 세계수의 잎(1개=재료 1개, 명예의 정수 상점에서 구매), 그래도
+// 부족하면 🎫 토벌의 증표(1개=재료 100개, 훨씬 구하기 어려운 만큼 유리한 환율)로 대신 낼 수 있다.
 const RAID_TOKEN_TO_MAT = 100;
 function tokensForShortfall(shortfall) { return Math.ceil(shortfall / RAID_TOKEN_TO_MAT); }
-// 고급 재료 필요량에 대한 현재 상태(보유 재료 + 부족분을 토큰으로 대체 가능한지) 요약
-function highMatStatus(grade, need) {
-  const have = countHighMats(grade);
-  if (need <= 0) return { ok: true, have, need: 0, shortfall: 0, tokensNeed: 0, tokensHave: S.raidTokens };
+// 고급 재료 필요량에 대한 현재 상태(보유 재료 + 잎/토큰으로 부족분을 대체 가능한지) 요약
+function highMatStatus(world2Only, need) {
+  const have = countHighMats(world2Only);
+  if (need <= 0) return { ok: true, have, need: 0, shortfall: 0, leavesUsed: 0, leavesHave: S.worldTreeLeaf, tokensNeed: 0, tokensHave: S.raidTokens };
   const shortfall = Math.max(0, need - have);
-  const tokensNeed = tokensForShortfall(shortfall);
+  const leavesUsed = Math.min(shortfall, BN.toNumber(S.worldTreeLeaf));
+  const afterLeaves = shortfall - leavesUsed;
+  const tokensNeed = tokensForShortfall(afterLeaves);
   const tokensHave = S.raidTokens;
-  return { ok: shortfall === 0 || BN.gte(tokensHave, tokensNeed), have, need, shortfall, tokensNeed, tokensHave };
+  return { ok: afterLeaves === 0 || BN.gte(tokensHave, tokensNeed), have, need, shortfall, leavesUsed, leavesHave: S.worldTreeLeaf, tokensNeed, tokensHave };
 }
-// 고급 재료를 최대한 소모하고, 부족분은 토벌의 증표로 대체 소모
-function consumeHighMatsWithTokens(grade, need) {
-  const have = countHighMats(grade);
+// 고급 재료를 최대한 소모하고, 부족분은 세계수의 잎 → 토벌의 증표 순으로 대체 소모
+function consumeHighMatsWithTokens(world2Only, need) {
+  const have = countHighMats(world2Only);
   const useMats = Math.min(have, need);
-  if (useMats > 0) consumeHighMats(grade, useMats);
+  if (useMats > 0) consumeHighMats(world2Only, useMats);
   const shortfall = need - useMats;
-  if (shortfall > 0) S.raidTokens = BN.sub(S.raidTokens, tokensForShortfall(shortfall));
+  if (shortfall <= 0) return;
+  const leavesUsed = Math.min(shortfall, BN.toNumber(S.worldTreeLeaf));
+  if (leavesUsed > 0) S.worldTreeLeaf = BN.sub(S.worldTreeLeaf, leavesUsed);
+  const afterLeaves = shortfall - leavesUsed;
+  if (afterLeaves > 0) S.raidTokens = BN.sub(S.raidTokens, tokensForShortfall(afterLeaves));
 }
 
 // 재료 판매가 (사냥터 골드 기준: 일반 1.5배 / 레어 4배 / 에픽 10배)
@@ -6355,6 +6355,9 @@ function sealMatSlot(slot) {
   if (slot < 2 && sealEquippedHas('swampHeart') && Math.random() < 0.10) return slot + 1;
   return slot;
 }
+// 에픽(고급) 재료 킬당 기본 획득량. 잠식하는 핵의 인장 장착 시 추가로 더 얻는다.
+const MAT_EPIC_BASE_AMOUNT = 3;
+const MAT_EPIC_SEAL_BONUS_AMOUNT = 3;
 function dropMaterials(isU, luck, matMult) {
   const f = S.floor;
   matMult = matMult || 1;
@@ -6370,10 +6373,14 @@ function dropMaterials(isU, luck, matMult) {
     addMat(f, sealMatSlot(1));
   }
   // 에픽(최고) 재료 — "운빨강화" 개편으로 골드/강화 시행 횟수가 크게 늘어난 만큼
-  // 고급 재료 파밍이 병목이 되지 않도록 기본 확률을 상향(3%→15%)
-  const epicChance = (0.15 + luck * 0.3) * (isU ? 8 : 1) * matMult;
-  if (Math.random() < Math.min(0.8, epicChance)) {
-    addMat(f, 2);
+  // 고급 재료 파밍이 병목이 되지 않도록 기본 확률을 상향(3%→15%→20%), 개당 획득량도 상향(1개→3개).
+  // 잠식하는 핵의 인장: 등급별 구간 제한 해제 효과가 강화 재료 통합으로 무의미해져서,
+  // 대신 이 재료를 매번 확정으로, 그것도 더 많이 얻는 효과로 교체했다.
+  const epicSeal = sealEquippedHas('slimeCore');
+  const epicBaseAmount = MAT_EPIC_BASE_AMOUNT + (epicSeal ? MAT_EPIC_SEAL_BONUS_AMOUNT : 0);
+  const epicChance = epicSeal ? 1 : Math.min(0.8, (0.20 + luck * 0.3) * (isU ? 8 : 1) * matMult);
+  if (Math.random() < epicChance) {
+    addMat(f, 2, epicBaseAmount);
   }
 }
 
@@ -6425,14 +6432,15 @@ function rollMatJackpot(w, slot) {
   }
   return bonus;
 }
-function addMat(f, matSlot) {
+function addMat(f, matSlot, baseAmount) {
+  baseAmount = baseAmount || 1;
   const key = f + '|' + matSlot;
   // 끝없는 탐욕(글러트니의 목걸이): 아이템 획득 시 10% 확률로 10배 획득
-  const gluttonyBonus = (hasGenesisEquipped('gluttony') && Math.random() < 0.1) ? 10 : 1;
+  const gluttonyMult = (hasGenesisEquipped('gluttony') && Math.random() < 0.1) ? 10 : 1;
   const w = getEquipped();
   const slotName = MAT_SLOT_NAMES[matSlot];
   const harvestBonus = rollMatBonus(w, slotName) + rollMatJackpot(w, slotName);
-  const bonus = gluttonyBonus + harvestBonus;
+  const bonus = baseAmount * gluttonyMult + harvestBonus;
   // 재료 자동판매 필터: 체크된 재료는 획득 즉시 골드로 자동 판매
   if (S.matAutoSell && S.matAutoSell[key]) {
     const price = matSellPrice(f, matSlot) * bonus;
@@ -6444,7 +6452,7 @@ function addMat(f, matSlot) {
   const tierIdx = Math.min(3, Math.floor((f % 20) / 5));
   const actualGrade = MAT_TIERS[tierIdx][matSlot];
   const gname = GRADES[actualGrade].name;
-  const bonusTag = gluttonyBonus > 1 ? ` <span class="lg-prim">(끝없는 탐욕! ×10)</span>` : '';
+  const bonusTag = gluttonyMult > 1 ? ` <span class="lg-prim">(끝없는 탐욕! ×10)</span>` : '';
   const harvestTag = harvestBonus > 0 ? ` <span class="lg-prim">(수확 보너스 +${harvestBonus})</span>` : '';
   log(`🌿 재료 획득: <span class="grade-${gname}">${name}</span>${bonusTag}${harvestTag} (보유 ${S.mats[key]})`);
 }
@@ -6806,15 +6814,16 @@ function trySubEnhance(advanced, targetSubweapon) {
   // 일반 강화는 고급 재료 소모가 없고, 고급 강화를 선택했을 때만 소모한다(이미 메인 무기
   // 강화/토벌전 등으로 수급 중인 재료를 그대로 재사용 — 별도 수급처를 새로 만들지 않는다).
   const matNeed = advanced ? subAdvancedEnhMatCost(sw) : 0;
-  const matSt = highMatStatus(sw.grade, matNeed);
+  const matSt = highMatStatus(true, matNeed);
   if (!matSt.ok) {
-    log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개) — ${highMatFloorLabel(sw.grade)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
+    log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🍃 세계수의 잎 ${matSt.shortfall}개(보유 ${fmt(matSt.leavesHave)}개) 또는 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개) — ${highMatFloorLabel(true)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
     return;
   }
   S.gold = BN.sub(S.gold, cost);
   if (matNeed > 0) {
-    consumeHighMatsWithTokens(sw.grade, matNeed);
-    if (matSt.shortfall > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
+    consumeHighMatsWithTokens(true, matNeed);
+    if (matSt.leavesUsed > 0) log(`🍃 고급 재료 부족분 ${matSt.leavesUsed}개를 세계수의 잎으로 대체했습니다.`, 'lg-prim');
+    if (matSt.tokensNeed > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
   }
   renderTop();
   subEnhanceRevealPending = true;
@@ -8658,20 +8667,21 @@ function tryEnhance(advanced, targetWeapon) {
     log(`무기의 정수가 부족합니다! (필요 ${essenceNeed}, 보유 ${fmt(S.weaponEssence)}) — 고대의 도서관에서 획득하세요`, 'lg-bad');
     return;
   }
-  // +15 이상: 고급 재료 필요 (무기 등급별로 사용 가능한 사냥터 구간이 다름). 고급 강화는 배수 소모.
-  // 재료가 부족하면 그 부족분만큼 토벌의 증표로 대신 낼 수 있다(highMatStatus 참고).
+  // +15 이상: 고급 재료 필요 (등급·사냥터 구분 없이 통합된 하나의 풀). 고급 강화는 배수 소모.
+  // 재료가 부족하면 그 부족분만큼 세계수의 잎 → 토벌의 증표 순으로 대신 낼 수 있다(highMatStatus 참고).
   const matNeed = highMatsNeeded(w.enhance) * (advanced ? advancedEnhMult() : 1);
-  const matSt = highMatStatus(w.grade, matNeed);
+  const matSt = highMatStatus(false, matNeed);
   if (!matSt.ok) {
-    log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개) — ${highMatFloorLabel(w.grade)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
+    log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🍃 세계수의 잎 ${matSt.shortfall}개(보유 ${fmt(matSt.leavesHave)}개) 또는 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개) — ${highMatFloorLabel(false)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
     return;
   }
   if (freeThisTry) { fx.freeEnhance = false; log('🕯️ 끝나지 않은 맹세 발동! 이번 강화는 무료입니다.', 'lg-prim'); }
   S.gold = BN.sub(S.gold, cost);
   if (essenceNeed > 0) S.weaponEssence = BN.sub(S.weaponEssence, essenceNeed);
   if (matNeed > 0) {
-    consumeHighMatsWithTokens(w.grade, matNeed);
-    if (matSt.shortfall > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
+    consumeHighMatsWithTokens(false, matNeed);
+    if (matSt.leavesUsed > 0) log(`🍃 고급 재료 부족분 ${matSt.leavesUsed}개를 세계수의 잎으로 대체했습니다.`, 'lg-prim');
+    if (matSt.tokensNeed > 0) log(`🎫 고급 재료 부족분을 토벌의 증표 ${matSt.tokensNeed}개로 대체했습니다.`, 'lg-prim');
   }
   renderTop(); // 골드/재료 차감은 즉시 반영 — 강화 판정 자체만 연출 시간만큼 미룬다
   enhanceRevealPending = true;
@@ -8866,11 +8876,11 @@ function autoEnhanceTick() {
   }
   const matNeed = highMatsNeeded(cur.enhance);
   if (matNeed > 0) {
-    const matSt = highMatStatus(cur.grade, matNeed);
+    const matSt = highMatStatus(false, matNeed);
     if (!matSt.ok) {
       const target = autoEnhanceTarget;
       stopAutoEnhance();
-      log(`⚙️ 고급 재료가 부족해 자동 강화(목표 +${target})를 중지했습니다. (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개)`, 'lg-bad');
+      log(`⚙️ 고급 재료가 부족해 자동 강화(목표 +${target})를 중지했습니다. (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🍃 세계수의 잎 ${matSt.shortfall}개(보유 ${fmt(matSt.leavesHave)}개) 또는 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개)`, 'lg-bad');
       return;
     }
   }
@@ -9883,6 +9893,10 @@ function buyHonorShop(id) {
     S.honorEssence = BN.sub(S.honorEssence, item.cost);
     S.raidTokens = BN.add(S.raidTokens, 5);
     log('🎫 [명예의 정수 상점] 토벌의 증표 +5개 획득!', 'lg-good');
+  } else if (id === 'worldTreeLeaf') {
+    S.honorEssence = BN.sub(S.honorEssence, item.cost);
+    S.worldTreeLeaf = BN.add(S.worldTreeLeaf, 100);
+    log('🍃 [명예의 정수 상점] 세계수의 잎 +100개 획득!', 'lg-good');
   }
   renderTop(); renderWorldRaidTab(); save();
 }
@@ -10269,10 +10283,10 @@ function renderEnhance() {
   // 나란히 비교할 수 없어 오해를 준다(둘 다 "실패 전체 대비 %"로 통일).
   const downgradeChance = maxed ? 0 : Math.round((100 - dChance) * 0.35 * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
-  const matSt = highMatStatus(w.grade, matNeed);
+  const matSt = highMatStatus(false, matNeed);
   const matOk = matSt.ok;
   const matText = matNeed > 0
-    ? `<div>고급 재료 (${highMatFloorLabel(w.grade)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matSt.have}/${matSt.need}</b>${matSt.shortfall > 0 ? ` <span style="font-size:11px;color:${matSt.ok ? '#7de08a' : '#ff7a7a'}">(부족분 🎫${matSt.tokensNeed}개로 대체, 보유 🎫${fmt(matSt.tokensHave)})</span>` : ''}</div>`
+    ? `<div>고급 재료 (${highMatFloorLabel(false)})<b style="color:${matOk ? '#7de08a' : '#ff7a7a'}">${matSt.have}/${matSt.need}</b>${matSt.shortfall > 0 ? ` <span style="font-size:11px;color:${matSt.ok ? '#7de08a' : '#ff7a7a'}">(부족분 🍃${matSt.shortfall}개 대체 가능, 보유 🍃${fmt(matSt.leavesHave)}·🎫${fmt(matSt.tokensHave)})</span>` : ''}</div>`
     : '';
   const essenceNeed = maxed ? 0 : essenceCostFor(w);
   const essenceOk = BN.gte(S.weaponEssence, essenceNeed);
@@ -10301,7 +10315,7 @@ function renderEnhance() {
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${matText}${essenceText}`;
   const matNote = matNeed > 0 && !matOk
-    ? ` · <span class="warn">고급 재료 부족 (${highMatFloorLabel(w.grade)} 재료 ${matNeed}개 필요, 🎫${matSt.tokensNeed}개 더 있으면 대체 가능)</span>` : '';
+    ? ` · <span class="warn">고급 재료 부족 (${highMatFloorLabel(false)} 재료 ${matNeed}개 필요, 🍃 또는 🎫${matSt.tokensNeed}개 더 있으면 대체 가능)</span>` : '';
   $('enhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${w.enhance}</b>`
     : isFist(w)
@@ -10360,10 +10374,10 @@ function renderAdvancedEnhance(w, maxed) {
     return;
   }
   const matNeed = advancedEnhMatCost(w);
-  const matSt = highMatStatus(w.grade, matNeed);
+  const matSt = highMatStatus(false, matNeed);
   const goldNeed = advancedEnhGoldCost(w);
   const affordable = matSt.ok && BN.gte(S.gold, goldNeed) && !enhanceRevealPending;
-  const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🎫${matSt.tokensNeed}개로 대체` : '';
+  const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🍃${matSt.shortfall}개 대체 가능` : '';
   // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대는 "초기화" 확률을,
   // 그 외 등급은 "파괴" 확률을 절반으로 낮춘다는 걸 정확히 표기한다.
   const riskLabel = isGenesisWeapon(w) ? '하락' : isAncientWeapon(w) ? '초기화' : '파괴';
@@ -10869,14 +10883,14 @@ function renderSubAdvancedEnhance(sw, maxed) {
     return;
   }
   const matNeed = subAdvancedEnhMatCost(sw);
-  const matSt = highMatStatus(sw.grade, matNeed);
+  const matSt = highMatStatus(true, matNeed);
   const goldNeed = subAdvancedEnhGoldCost(sw);
   const affordable = matSt.ok && BN.gte(S.gold, goldNeed) && !subEnhanceRevealPending;
-  const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🎫${matSt.tokensNeed}개로 대체` : '';
+  const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🍃${matSt.shortfall}개 대체 가능` : '';
   const advRiskValue = Math.round(subDestroyChance(sw) * ADVANCED_ENH_DESTROY_MULT * 10) / 10;
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="subAdvancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
-      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 ${advRiskValue}%로 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
+      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 ${advRiskValue}%로 절반, 💰 ${fmt(goldNeed)} + ${highMatFloorLabel(true)} 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
     </button>`;
   const btn = $('subAdvancedEnhBtn');
   if (btn) btn.onclick = () => trySubEnhance(true);
@@ -11475,7 +11489,7 @@ const GUIDE_SECTIONS = [
     icon: '🔨', title: '강화 시스템',
     body: `강화 실패 시 결과는 <b>유지</b> / <b>단계 -1(하락)</b> 중 하나이며, <b>+10강 이상</b>부터는 실패 시 <b>파괴</b>(맨손·고대 무기는 파괴 대신 <b>+0 초기화</b>, 태초 무기는 파괴·초기화 없이 하락만) 위험도 생깁니다.
     <br><br><b>+10강 이후</b>부터는 강화 1회당 공격력 상승폭이 점점 커지고, 등급이 높을수록 <b>+15강 이상</b> 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다.
-    <br><br><b>+15강</b>부터는 무기 등급에 따라 지정된 사냥터 구간의 고급 재료가 필요합니다: 일반~레어 1~6단계 / 에픽~유니크 7~12단계 / 레전더리~신화 13~19단계 / 고대·태초 20단계. 같은 단계부터 골드 5배·고급 재료 50배를 쓰는 <b>고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
+    <br><br><b>+15강</b>부터는 고급 재료(에픽급)가 필요합니다 — 등급·사냥터 구분 없이 통합된 하나의 재료 풀로, 푸른세계·황혼국 어디서 얻은 것이든 그대로 사용할 수 있습니다(단, 보조무기 고급 강화는 황혼국 재료만 인정). 부족하면 명예의 정수 상점의 🍃 세계수의 잎(1개=재료 1개) 또는 🎫 토벌의 증표(1개=재료 100개)로 대신 낼 수 있습니다. 같은 단계부터 골드 3배·고급 재료 30배를 쓰는 <b>고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
     <br><br><b>룬</b>은 +15강 이상 강화한 무기에만 장착 가능하며, 슬롯 수는 무기 등급에 따라 일반 1개부터 신화 6개, 고대 8개, 태초 10개까지 늘어납니다.
     <br><br><b>태초/고대 무기</b>는 강화 시 골드 외에 "무기의 정수"도 함께 소모합니다.`,
   },
@@ -11593,7 +11607,7 @@ const GUIDE_SECTIONS = [
     body: `토벌전에서 승리할 때마다 아주 낮은 확률(단계별 약 0.3%)로 그 단계 전용 인장을 하나 발견합니다 — 즉 1단계 토벌전에서는 항상 1번 인장만, 20단계 토벌전에서는 항상 20번 인장만 나옵니다. 이미 보유한 인장이 다시 나오면 대신 골드로 환급됩니다.
     <br><br>발견한 인장은 <b>보유만 해도 목록에 남지만</b>, 실제 효과를 받으려면 가방 탭에서 <b>장착</b>해야 합니다. 동시에 장착할 수 있는 인장은 최대 <b>3개</b>이며, 장착한 것들의 효과가 전부 함께 적용됩니다.
     <br><br><table class="guide-table"><tr><th>단계</th><th>인장</th><th>효과</th></tr>
-    <tr><td>1</td><td>잠식하는 핵의 인장</td><td>고급 재료를 사냥터 구간 제한 없이 어디서 얻은 것이든 강화에 사용 가능</td></tr>
+    <tr><td>1</td><td>잠식하는 핵의 인장</td><td>고급 재료(에픽급) 확정 획득 + 획득량 추가 증가</td></tr>
     <tr><td>2</td><td>흡혈군주의 인장</td><td>오프라인 사냥 최대 적용 시간 +4시간</td></tr>
     <tr><td>3</td><td>포자모의 인장</td><td>무기 드롭 시 15% 확률로 같은 무기 1개 추가 드롭</td></tr>
     <tr><td>4</td><td>늑대왕의 인장</td><td>한 사냥터에서 쉬지 않고 사냥할수록 공격속도 서서히 상승(최대 1시간 지속 시 +25%p, 사냥터 이동/자리 비움 시 초기화)</td></tr>

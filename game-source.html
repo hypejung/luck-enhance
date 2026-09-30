@@ -8497,7 +8497,7 @@ function fleeBoss() {
 const ADVANCED_ENH_MAT_MULT = 30;
 const ADVANCED_ENH_GOLD_MULT = 3;
 const ADVANCED_ENH_DESTROY_MULT = 0.5;
-function advancedEnhEligible(w) { return !isFist(w) && highMatsNeeded(w.enhance) > 0; }
+function advancedEnhEligible(w) { return highMatsNeeded(w.enhance) > 0; }
 // 맹세기사의 인장: 고급 강화 재료 배수 30% 감소
 function advancedEnhMult() { return sealEquippedHas('oathKnight') ? Math.round(ADVANCED_ENH_MAT_MULT * 0.7) : ADVANCED_ENH_MAT_MULT; }
 function advancedEnhMatCost(w) { return highMatsNeeded(w.enhance) * advancedEnhMult(); }
@@ -8770,7 +8770,7 @@ function resolveEnhance(w, advanced) {
       playEnhancePanelReveal('enhMainPanel', 'crack');
       if (isFist(w)) {
         w.enhance = 0;
-        log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (초기화 확률이었음: ${dChance}%)`, 'lg-bad');
+        log(`💢 맨손 강화 실패... 주먹이 부러져 +0으로 초기화! (초기화 확률이었음: ${dChance}%)${advTag}`, 'lg-bad');
       } else if (sealEquippedHas('undyingFortress') && Math.random() < 0.4) {
         // 불멸성채의 인장: 40% 확률로 초기화 대신 단계 -1 하락으로 경감
         w.enhance = Math.max(0, w.enhance - 1);
@@ -10405,7 +10405,7 @@ function renderAdvancedEnhance(w, maxed) {
   const box = $('advancedEnhanceBox');
   if (!box) return;
   if (maxed || !advancedEnhEligible(w)) {
-    box.innerHTML = isFist(w) ? '' : `<div style="font-size:12px;color:var(--sub);text-align:center;">🛠️ 고급 강화는 고급 재료가 필요한 <b style="color:var(--unique)">+15</b> 이상부터 사용할 수 있습니다.</div>`;
+    box.innerHTML = `<div style="font-size:12px;color:var(--sub);text-align:center;">🛠️ 고급 강화는 고급 재료가 필요한 <b style="color:var(--unique)">+15</b> 이상부터 사용할 수 있습니다.</div>`;
     return;
   }
   const matNeed = advancedEnhMatCost(w);
@@ -10413,9 +10413,9 @@ function renderAdvancedEnhance(w, maxed) {
   const goldNeed = advancedEnhGoldCost(w);
   const affordable = matSt.ok && BN.gte(S.gold, goldNeed) && !enhanceRevealPending;
   const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🍃${matSt.shortfall}개 대체 가능` : '';
-  // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대는 "초기화" 확률을,
+  // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대·맨손은 "초기화" 확률을,
   // 그 외 등급은 "파괴" 확률을 절반으로 낮춘다는 걸 정확히 표기한다.
-  const riskLabel = isGenesisWeapon(w) ? '하락' : isAncientWeapon(w) ? '초기화' : '파괴';
+  const riskLabel = isGenesisWeapon(w) ? '하락' : (isAncientWeapon(w) || isFist(w)) ? '초기화' : '파괴';
   // resolveEnhance()의 advanced 분기 공식과 동일하게 계산 — 태초는 baseStayChance 0.90(유지 확률
   // 상승, 하락 10%), 그 외는 dChance*ADVANCED_ENH_DESTROY_MULT(0.5)를 그대로 재사용.
   const advRiskValue = isGenesisWeapon(w)

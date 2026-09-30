@@ -1168,6 +1168,10 @@ function isAncientWeapon(w) { return !!w && w.grade === 6; }
 // 다른 타입의 확률/상시 스탯형 특성과 결이 다르게, 묵직하고 예측 가능한 한방을 표현한다.
 const BLUNT_SMASH_EVERY = 5;
 const BLUNT_SMASH_MULT = 2.5;
+// 파쇄의 리듬/주문 작렬처럼 독립적으로 치명타 판정을 받는 무기특성 폭발 효과들의 치명타 피해
+// 배율: 기본 배율(보통 1.5배)은 그대로 반영하되, 치명타 피해 스탯(룬/훈련/장신구/각성 등)으로
+// 얻은 "추가 상승분"만 이 비율만큼만 깎아서 반영한다(스탯 몰빵으로 너무 커지는 것 방지).
+const EFFECT_CRIT_DMG_SCALE = 0.5;
 const WEAPON_TYPES = [
   { name: '단검',   icon: '🗡️', speed: 1.8,  dmgMult: 0.68, trait: { extra: 0.10, extraAtkDmg: 0.40 }, traitDesc: '연타 확률 +10%p, 연타 피해 +40%p' },
   { name: '검',     icon: '⚔️', speed: 1.2,  dmgMult: 0.90, trait: { atk: 0.15 },                       traitDesc: '공격력 +15%' },
@@ -6597,6 +6601,16 @@ function subweaponAtk(sw) {
 }
 // 패시브 = 종류 고유 효과(SUBWEAPON_TYPES[].passive) × 등급 배율 × 강화로 쌓인 증폭
 function subweaponPassiveMult(sw) { return 1 + 0.10 * subPassiveTier(sw.enhance); } // +30강 기준 최대 2배
+// 확률형 패시브(치명타 확률/연타 확률/주문 작렬 확률)는 다른 확률 원천과 합산되면 쉽게
+// 상한(100%)에 닿거나 낭비되므로, 위 곡선과 달리 +23강(tier8) 전까지는 완만하게, +23강부터는
+// 가파르게 올라가도록 별도 곡선을 쓴다. 같은 tier(subPassiveTier, 3강마다 +1)를 공유하되
+// tier7(+22강)까지는 3강당 +0.02배, tier8~10(+23~30강)은 3강당 +0.28배로 기울기만 다르게 잡아
+// tier10(+29~30강) 최종치는 기존 곡선(2.0배)과 거의 같은 1.98배에 도달한다.
+function subweaponChanceMult(sw) {
+  const tier = subPassiveTier(sw.enhance);
+  return tier <= 7 ? 1 + 0.02 * tier : 1.14 + 0.28 * (tier - 7);
+}
+const SUB_CHANCE_PASSIVE_KEYS = ['critChance', 'extraAtk', 'spellProc'];
 // ampBonus(=accEff().subAmp)는 호출부에서 넘겨받는다 — accEff() 내부에서 이 함수를 호출할 때
 // 그 안에서 다시 accEff()를 부르면 무한 재귀가 되므로, accEff()는 그 시점까지 이미 누적된
 // eff.subAmp(장신구 등 gear 소스)를 그대로 넘기고, 그 외 호출부는 accEff().subAmp를 넘긴다.
@@ -6604,9 +6618,11 @@ function subweaponPassiveEff(sw, ampBonus) {
   if (!sw) return {};
   const t = SUBWEAPON_TYPES[sw.typeIdx];
   if (!t) return {};
-  const amp = subGradeMult(sw.grade) * subweaponPassiveMult(sw) * (1 + (ampBonus || 0));
+  const grade = subGradeMult(sw.grade);
+  const normalAmp = grade * subweaponPassiveMult(sw) * (1 + (ampBonus || 0));
+  const chanceAmp = grade * subweaponChanceMult(sw) * (1 + (ampBonus || 0));
   const eff = {};
-  for (const [k, v] of Object.entries(t.passive)) eff[k] = v * amp;
+  for (const [k, v] of Object.entries(t.passive)) eff[k] = v * (SUB_CHANCE_PASSIVE_KEYS.includes(k) ? chanceAmp : normalAmp);
   return eff;
 }
 // 액티브 "결전의 기백" 위력/지속시간 — 위력은 등급 배율, 지속시간은 초 단위라 등급 배율 없이 강화만 반영.
@@ -7418,6 +7434,10 @@ function attack(w) {
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
     (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage');
+  // 파쇄의 리듬/주문 작렬 전용 치명타 배율: 기본 배율은 그대로, 스탯으로 얻은 추가 상승분만
+  // EFFECT_CRIT_DMG_SCALE만큼만 반영한다.
+  const critMultBase = (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5);
+  const effectCritMult = critMultBase + (critMult - critMultBase) * EFFECT_CRIT_DMG_SCALE;
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -7565,13 +7585,17 @@ function attack(w) {
       }
     }
   }
-  // 파쇄의 리듬(둔기 특성): 매 BLUNT_SMASH_EVERY번째 공격이 강타로 적중해 고정 피해 추가
+  // 파쇄의 리듬(둔기 특성): 매 BLUNT_SMASH_EVERY번째 공격이 강타로 적중해 고정 피해 추가.
+  // 독립적으로 치명타 판정을 받는다(다른 공속 빠른 무기 종류 대비 메리트 보강).
   if (w.type === '둔기') {
     fx.bluntSmashCount = (fx.bluntSmashCount || 0) + 1;
     if (fx.bluntSmashCount >= BLUNT_SMASH_EVERY) {
       fx.bluntSmashCount = 0;
-      dealMonDamage(weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus')));
-      floatText('🔨 파쇄!');
+      let smashDmg = weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus'));
+      let smashCrit = false;
+      if (critChance > 0 && Math.random() < critChance) { smashDmg *= effectCritMult; smashCrit = true; }
+      dealMonDamage(smashDmg);
+      floatText(smashCrit ? '🔨 파쇄 치명타!' : '🔨 파쇄!');
     }
   }
   // 거인의 진군(고대 에이션트 스피릿): 매 공격마다 "짓밟기" 피해가 누적 가산되고,
@@ -7630,12 +7654,17 @@ function attack(w) {
   }
   // 루시퍼의 타락한 광휘(태초의 유물): 매 공격마다 낮은 확률로 자동 타락 발동
   luciferOnAttack();
-  // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
+  // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬.
+  // preCritDmg(치명타 배율 적용 전 데미지) 기준으로 계산한 뒤 독립적으로 치명타 판정을 받는다
+  // (다른 공속 빠른 무기 종류 대비 메리트 보강 — 이전엔 본 타격이 우연히 치명타였을 때만
+  // 덩달아 커졌을 뿐, 스스로 치명타를 노릴 수는 없었다).
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
   if (spellProc > 0 && Math.random() < spellProc) {
-    const spellDmg = dmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus());
+    let spellDmg = preCritDmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus());
+    let spellCrit = false;
+    if (critChance > 0 && Math.random() < critChance) { spellDmg *= effectCritMult; spellCrit = true; }
     dealMonDamage(spellDmg);
-    floatText('🔮 주문 작렬!');
+    floatText(spellCrit ? '🔮 주문 작렬 치명타!' : '🔮 주문 작렬!');
   }
   // 연타 확률 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
   // (포자 폭발 활성 중엔 +70%p 고정 가산 — 상한 자체가 100%로 풀려서 별도 상한 해제는 불필요)

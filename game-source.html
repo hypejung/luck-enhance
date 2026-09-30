@@ -2473,7 +2473,7 @@ function worldRaidBossGoldRef() {
   const f = WORLD2_START_FLOOR - 1;
   const e = w.effect ? EFFECTS[w.effect] : null;
   const ae = accEff();
-  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold + awakenStat(w, 'gold'));
   goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
   if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
   const killsPerHour = weaponSpeed(w) * 3600;
@@ -2748,7 +2748,7 @@ function raidGoldReward(stage) {
   const w = getEquipped();
   const e = w && w.effect ? EFFECTS[w.effect] : null;
   const ae = accEff();
-  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold + awakenStat(w, 'gold'));
   goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
   if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
   const killsPerHour = weaponSpeed(w) * 3600;
@@ -3704,11 +3704,13 @@ function grantGenesisArtifact(artifact) {
   renderInventory(); renderTop(); save();
 }
 // 사냥터별 유물이 아직 없다면 극희박한 확률로 드랍 시도. kindMult: 1=일반, 5=엘리트, 10=보스
-// 태초/고대 공통: 드롭률 보너스(장신구/도감/각인 등 accEff().luck에 합산되는 전부)를 반영하고,
-// 그 사냥터의 보스 세트(보스 장신구 보유 + 그 층 보스무기 장착, bossSetFloor())를 갖췄으면 3배.
+// 태초/고대 공통: 드롭률 보너스(장신구/도감/각인 등 accEff().luck + 각성의 드롭률 스탯)를
+// 반영하고, 그 사냥터의 보스 세트(보스 장신구 보유 + 그 층 보스무기 장착, bossSetFloor())를
+// 갖췄으면 3배.
 function genesisAncientDropMult(floorIdx) {
   const setMatch = bossSetFloor() === floorIdx || subBossSetFloor() === floorIdx;
-  return (1 + accEff().luck) * (setMatch ? 3 : 1);
+  const w = getEquipped();
+  return (1 + accEff().luck + awakenStat(w, 'luck')) * (setMatch ? 3 : 1);
 }
 function rollGenesisArtifact(floorIdx, kindMult) {
   const artifact = GENESIS_ARTIFACTS[floorIdx];
@@ -6945,7 +6947,8 @@ const SUBWEAPON_DROP_CHANCE = 0.0015;
 const SUBWEAPON_DROP_TABLE = [[0, 45], [1, 28], [2, 15], [3, 8], [4, 3], [5, 1]]; // 등급별 확률(%), 신화 1%
 function rollSubweaponDrop(floorIdx, kindMult) {
   if (floorIdx < WORLD2_START_FLOOR) return; // 월드2 전용
-  const luckMul = (1 + accEff().luck) * (1 + (accEff().subDropRate || 0));
+  const w = getEquipped();
+  const luckMul = (1 + accEff().luck + awakenStat(w, 'luck')) * (1 + (accEff().subDropRate || 0));
   if (Math.random() >= SUBWEAPON_DROP_CHANCE * kindMult * luckMul) return;
   const grade = wrand(SUBWEAPON_DROP_TABLE);
   const sw = makeSubweapon(grade, Math.floor(Math.random() * SUBWEAPON_TYPES.length));
@@ -8356,7 +8359,7 @@ function endBossFight(win) {
     const ae = accEff();
     // 해당 층 몬스터를 "원킷" 기준으로 1시간(3600초) 동안 사냥했을 때 벌 수 있는 골드와 동일하게 산출
     // (평시 사냥 골드 배율 스택과 동일하게: 무기 효과 골드% + 장신구 골드% + 전능의 룬 + 글러트니 유물)
-    let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
+    let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold + awakenStat(w, 'gold'));
     goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
     if (hasGenesisEquipped('gluttony')) goldMul *= (1 + hungerBonusPct()) * 10;
     // 레드캡(태초의 유물): 보스전 중 쌓은 전리품 스택 비례로 처치 보상 상승
@@ -8395,7 +8398,7 @@ function endBossFight(win) {
     // 보스 무기/보조무기 드롭 — 1~20층은 기존처럼 고정 신화 무기(WEAPON_BOSS_NAMES),
     // 21~40층(월드2)은 메인 무기가 아니라 그 층 전용 "보스 보조무기"(SUBWEAPON_BOSS_NAMES)가 나온다.
     if (f < WORLD2_START_FLOOR) {
-      if (Math.random() < BOSS.weaponDrop * (1 + accEff().luck)) {
+      if (Math.random() < BOSS.weaponDrop * (1 + accEff().luck + awakenStat(w, 'luck'))) {
         const bw = WEAPON_BOSS_NAMES[f];
         const t = WEAPON_TYPES.find(x => x.name === bw.type);
         const pool = Object.keys(EFFECTS).filter(k => EFFECTS[k].grade === 5);
@@ -8408,7 +8411,7 @@ function endBossFight(win) {
         addWeapon(nw);
         log(`💎 <b>신화 보스무기 드롭!</b> ${gradeTag(nw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
       }
-    } else if (Math.random() < BOSS.subweaponDrop * (1 + accEff().luck)) {
+    } else if (Math.random() < BOSS.subweaponDrop * (1 + accEff().luck + awakenStat(w, 'luck'))) {
       const idx = f - WORLD2_START_FLOOR;
       if (S.subBossCodexSeen[idx]) {
         log(`보스 보조무기는 이미 보유 중이라 골드로 대체 지급됩니다.`);
@@ -8424,7 +8427,7 @@ function endBossFight(win) {
       }
     }
     // 신화 보스장신구 드롭 (1~20/21~40 공용 — BOSS_ACCS는 이미 40개로 확장됨)
-    if (Math.random() < BOSS.accDrop * (1 + accEff().luck)) {
+    if (Math.random() < BOSS.accDrop * (1 + accEff().luck + awakenStat(w, 'luck'))) {
       if (S.bossAccs.some(bf => bf === f)) {
         log(`보스 장신구는 이미 보유 중이라 골드로 대체 지급됩니다.`);
         S.gold = BN.add(S.gold, Math.floor(floorGold(f) * 10));
@@ -11379,9 +11382,10 @@ function computeStats() {
   const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0);
   const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * 100;
   // 골드/드랍률은 dropRoll()의 실제 계산식(곱연산)과 맞춘다 — 약탈자의 격노(고대 에이션트
-  // 스피릿)의 고정 +50%/스택 보너스가 예전엔 이 화면에 전혀 반영되지 않았음.
-  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold);
-  let dropMul = (e && e.drop ? 1 + e.drop : 1) * (1 + ae.luck);
+  // 스피릿)의 고정 +50%/스택 보너스와 각성(탐욕의 각성 등)의 골드/드롭률 스탯이 예전엔 이
+  // 화면에 전혀 반영되지 않았음.
+  let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold + awakenStat(w, 'gold'));
+  let dropMul = (e && e.drop ? 1 + e.drop : 1) * (1 + ae.luck + awakenStat(w, 'luck'));
   if (w && w.spirit === 'goblinsteal') {
     const spirit = ANCIENT_SPIRITS.goblinsteal;
     const stacks = Math.min(spirit.stackMax || 0, w.goblinstealStacks || 0);
@@ -12424,7 +12428,7 @@ function init() {
       return;
     }
     const e = w && w.effect ? EFFECTS[w.effect] : null;
-    const goldMul = (1 + accEff().gold) * (1 + (e && e.gold ? e.gold : 0));
+    const goldMul = (1 + accEff().gold + awakenStat(w, 'gold')) * (1 + (e && e.gold ? e.gold : 0));
     // 신들의 영역(20층) 고대 세트 보너스: 오프라인 효율 +10%p 추가 (1~20층 결부형이라 월드1 한정)
     const offlineEff = Math.min(1, 0.7 + (isWorld1BonusActive() ? codexOfflineBonus() : 0));
     const gold = Math.floor(floorGold(S.floor) * goldMul * kills * offlineEff);

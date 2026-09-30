@@ -713,7 +713,7 @@
       <div class="panel enhSuspensePanel" id="gloveEnhPanel">
         <h3>🧤 장갑 강화기</h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
-          장착 중인 장갑을 강화합니다. 토벌전 21단계 이상 보스의 방해 효과를 약하게 만드는 의복 · 강화에 🧵 강철실 필요
+          장착 중인 장갑을 강화합니다. 토벌전 21단계·도서관 21서고 이상 👹 보스 패턴을 약하게 만드는 의복 · 강화에 🧵 강철실 필요
         </div>
         <div id="gloveenhweapon" class="enhWeaponBox"></div>
         <div id="gloveenhstat" class="enhStatGrid"></div>
@@ -2566,8 +2566,8 @@ function disruptionSummaryHtml(list) {
     const c = DISRUPT_COUNTERS[d.counter];
     return `${d.icon} <b>${d.name}</b>: ${d.desc(e.base)} <span style="color:var(--unique)">(대응 ${c.icon} ${c.name})</span>`;
   });
-  if (list.length >= 3) parts.push(`🔥 <b>광폭화</b>: 체력 ${fmtRate(BOSS_ENRAGE_HP)} 이하에서 모든 방해 효과 ×${BOSS_ENRAGE_MULT}`);
-  return `<div class="wi" style="color:#ffb37a">⚠️ 보스 방해 — ${parts.join(' · ')}</div>`;
+  if (list.length >= 3) parts.push(`🔥 <b>광폭화</b>: 체력 ${fmtRate(BOSS_ENRAGE_HP)} 이하에서 모든 패턴 ×${BOSS_ENRAGE_MULT}`);
+  return `<div class="wi" style="color:#ffb37a">👹 보스 패턴 — ${parts.join(' · ')}</div>`;
 }
 // 전투 중 상태(토벌전 21단계 이상에서만 non-null). equippedGenesisSkill()/weaponSpecialCount()가
 // 스크립트 초반에도 불릴 수 있어서 TDZ 오류가 없도록 var로 둔다.
@@ -2692,7 +2692,7 @@ function bossDisruptionTick(dt) {
   if (bd.enrageable && !bd.enraged && BN.lte(mon.hp, BN.mul(mon.maxHp, BOSS_ENRAGE_HP))) {
     bd.enraged = true;
     floatText('🔥 광폭화!');
-    log(`🔥 보스가 <b>광폭화</b>했습니다! 모든 방해 효과가 ${BOSS_ENRAGE_MULT}배로 강해집니다.`, 'lg-bad');
+    log(`🔥 보스가 <b>광폭화</b>했습니다! 모든 패턴이 ${BOSS_ENRAGE_MULT}배로 강해집니다.`, 'lg-bad');
   }
   if (bdHas('regen')) bdHealBoss(BN.toNumber(mon.maxHp) * bdStrength('regen') * dt);
   for (const e of bd.list) {
@@ -2718,7 +2718,7 @@ function bossDisruptionStatusHtml() {
   if (bd.weakenTotal > 0) parts.push(`🕸️ 약화 -${fmtRate(bd.weakenTotal)}`);
   if (bd.enraged) parts.push('🔥 광폭화');
   const icons = bd.list.map(e => `${DISRUPTIONS[e.key].icon}${DISRUPTIONS[e.key].name}`).join(' ');
-  return `<div style="font-size:12px;color:#ffb37a;">보스 방해: ${icons}</div>` +
+  return `<div style="font-size:12px;color:#ffb37a;">👹 보스 패턴: ${icons}</div>` +
     (parts.length ? `<div style="font-size:12px;color:#ff7a7a;">${parts.join(' · ')}</div>` : '');
 }
 
@@ -3011,18 +3011,22 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...' }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 6.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 10.
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '고대의 도서관 심층 서고 개방',
+    version: 6, versionLabel: '1.0.5', title: '토벌전·도서관 확장 + 신규 시스템 👹보스 패턴 & 🧤장갑',
     changes: [
-      { id: 1, date: '2026-09-30', text: '📖 고대의 도서관 21~40서고가 열렸습니다. 5서고마다 새로운 테마의 서고와 수호자가 기다립니다.' },
-      { id: 2, date: '2026-09-30', text: '📕 금서의 저주: 21서고부터 서고마다 보스 방해 효과가 걸리고, 초기화 주기(수·일)마다 조합이 바뀝니다.' },
-      { id: 3, date: '2026-09-30', text: '🎁 21서고 이상 승리 시 강철실, 금서의 페이지, 장갑, 비전서 낱장을 얻을 수 있습니다.' },
-      { id: 4, date: '2026-09-30', text: '🪡 장갑 자수 추가: 금서의 페이지와 무기의 정수로 장갑에 대응 스탯을 하나 더 수놓을 수 있습니다.' },
-      { id: 5, date: '2026-09-30', text: '📚 비전서 I~IV 추가: 낱장을 모아 완성하면 고강화 성공 확률이 영구히 오릅니다.' },
-      { id: 6, date: '2026-09-30', text: '📉 21서고 이상에서는 무기의 정수·각성의 정수 보상의 증가폭이 완만해집니다.' },
+      { id: 1, date: '2026-09-30', text: '🚩 토벌전 21~40단계가 열렸습니다. 바로 앞 단계를 클리어하면 다음 단계에 도전할 수 있습니다.' },
+      { id: 2, date: '2026-09-30', text: '📖 고대의 도서관 21~40서고가 열렸습니다. 5서고마다 새로운 테마의 서고와 수호자가 기다립니다.' },
+      { id: 3, date: '2026-09-30', text: '👹 신규 시스템 \'보스 패턴\': 토벌전 21단계·도서관 21서고부터 보스가 회피·보호막·스턴·시간 잠식 등 15가지 패턴으로 공격을 방해합니다. 패턴이 3개인 보스는 체력이 낮아지면 광폭화합니다.' },
+      { id: 4, date: '2026-09-30', text: '🧤 신규 장비 \'장갑\': 8종의 장갑이 대응 스탯으로 보스 패턴을 약하게 만듭니다(100%면 무효). 🎒 가방 → 🧤 장갑에서 장착하세요.' },
+      { id: 5, date: '2026-09-30', text: '🧵 장갑 강화 재료 \'강철실\' 추가: 토벌전 21단계·도서관 21서고 이상 승리 시 획득합니다.' },
+      { id: 6, date: '2026-09-30', text: '📕 금서의 저주: 도서관 21서고부터는 초기화 주기(수·일)마다 서고별 보스 패턴 조합이 바뀝니다.' },
+      { id: 7, date: '2026-09-30', text: '🎁 도서관 21서고 이상 승리 시 강철실, 금서의 페이지, 장갑, 비전서 낱장을 얻을 수 있습니다.' },
+      { id: 8, date: '2026-09-30', text: '🪡 장갑 자수 추가: 금서의 페이지와 무기의 정수로 장갑에 대응 스탯을 하나 더 수놓을 수 있습니다.' },
+      { id: 9, date: '2026-09-30', text: '📚 비전서 I~IV 추가: 낱장을 모아 완성하면 고강화 성공 확률이 영구히 오릅니다.' },
+      { id: 10, date: '2026-09-30', text: '📉 도서관 21서고 이상에서는 무기의 정수·각성의 정수 보상의 증가폭이 완만해집니다.' },
     ],
   },
 ];
@@ -8760,13 +8764,13 @@ function renderLibraryBox() {
       <div class="invitem">
         <div><div class="wn">${band ? band.icon : '📖'} <span class="grade-태초">제${depth + 1}서고</span>${band ? ` <span style="font-size:12px;color:var(--sub)">${band.hall}</span>` : ''}${depth === S.library.best ? ' <span style="color:var(--unique);font-size:12px">(신규 기록)</span>' : ''}</div>
         <div class="wi">HP ${fmt(hp)} · 보상: 📜 ${fmt(essence)} / 💠 ${fmt(awaken)}${extReward}${cleared ? ' <span style="color:var(--sub)">(이번 주기 클리어함)</span>' : ''}</div>
-        ${band ? disruptionSummaryHtml(libraryDisruptionList(depth)).replace('보스 방해', '📕 금서의 저주(이번 주기)') : ''}</div>
+        ${band ? disruptionSummaryHtml(libraryDisruptionList(depth)).replace('👹 보스 패턴', '📕 금서의 저주(이번 주기)') : ''}</div>
         <div class="btns"><button class="lib-challenge-btn" data-depth="${depth}"></button></div>
       </div>`);
   }
   box.innerHTML = `
     <div style="font-size:13px;margin-bottom:8px;">최고 기록: <b style="color:var(--gold)">제${S.library.best}서고 돌파</b> · 이번 주기 도전: <b>${S.library.count}/${LIBRARY.weeklyTotal}</b></div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">현재 기록 이하의 서고 중 원하는 곳을 골라 도전하세요. 21서고부터는 초기화 주기마다 서고별 📕 금서의 저주(방해 효과)가 바뀝니다. 자세한 규칙은 📘 가이드 탭 참고.</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">현재 기록 이하의 서고 중 원하는 곳을 골라 도전하세요. 21서고부터는 초기화 주기마다 서고별 📕 금서의 저주(👹 보스 패턴)가 바뀝니다. 자세한 규칙은 📘 가이드 탭 참고.</div>
     ${S.library.best >= LIBRARY_EXT.start ? `<div style="font-size:13px;margin-bottom:8px;">📄 금서의 페이지 <b>${fmt(S.forbiddenPages || 0)}장</b> · 🧵 강철실 <b>${fmt(S.steelThread || 0)}개</b></div>` : ''}
     ${rows.reverse().join('')}
     ${arcaneTomesHtml()}
@@ -12244,12 +12248,41 @@ const GUIDE_SECTIONS = [
     <br><br>판매·파괴가 불가능하고, 강화 실패는 유지/하락만 있을 뿐 파괴나 초기화는 없습니다. 대신 강화 시 골드 외에 "무기의 정수"가 추가로 필요합니다(고대 무기보다 소모량이 훨씬 큽니다).`,
   },
   {
-    icon: '🧤', title: '토벌전 21단계+ · 보스 방해 · 장갑',
-    body: `토벌전 <b>21~40단계</b>는 황혼국 사냥터를 모두 해금하고, <b>바로 앞 단계를 클리어</b>해야 도전할 수 있습니다. 이 구간 보스는 공격을 방해하는 효과를 1~3개 가지고 있고, 토벌전 목록에서 미리 확인할 수 있습니다.
-    <br><br>유저에게는 체력이 없는 대신 <b>제한시간(120초)이 체력</b> 역할을 합니다 — "시간 잠식"이나 "가시 반격" 같은 보스 공격은 남은 시간을 깎습니다. 다른 효과들은 공격을 빗나가게 하거나(회피·암흑), 피해를 줄이거나(웅크리기·예언), 체력을 되돌리거나(재생·역행), 대신 맞아주는 분신·보호막을 두르거나, 공격을 멈추게 합니다(스턴·탈진·봉인·약화 저주·흩어짐). 효과가 3개인 보스는 체력이 30% 이하가 되면 <b>광폭화</b>해서 모든 방해가 1.5배 강해집니다. 보조무기의 <b>결전의 기백</b>은 봉인에 막히지 않습니다.
-    <br><br>이 방해를 약하게 만드는 장비가 <b>🧤 장갑</b>(1칸)입니다. 장갑 8종은 각각 대응 스탯 2개(주 스탯 + 절반 수치의 보조 스탯)를 가지며, 대응 스탯 X%는 해당 방해 효과를 X% 약하게 만듭니다(100%면 무효). 보스마다 필요한 스탯이 다르니 🎒 가방 → 🧤 장갑에서 바꿔 끼고, 프리셋에도 함께 저장해두세요.
-    <br><br>장갑은 토벌전 21단계 이상 승리 시 30%, 도서관 21서고 이상 승리 시 50% 확률로 얻고(절반은 그 보스를 막는 종류), 강화에는 골드와 함께 <b>🧵 강철실</b>(토벌전 21단계·도서관 21서고 이상 보상)이 필요합니다. +15부터는 강철실 30배로 파괴 확률을 절반으로 낮추는 고급 강화도 가능합니다.
-    <br><br><b>🪡 자수</b>: 도서관 21서고 이상에서 얻는 <b>📄 금서의 페이지</b> 1장과 무기의 정수로, 장갑에 대응 스탯 하나를 무작위로 수놓습니다(장갑 등급이 높을수록 값이 큼, 신화 10~20%). 장갑마다 1칸이며 다시 수놓으면 덮어쓰고, 같은 장갑에 수놓을수록 정수 비용이 오릅니다. 주 스탯과 같은 스탯이 나오면 그만큼 더해집니다.`,
+    icon: '🚩', title: '토벌전 21~40단계',
+    body: `토벌전 <b>21~40단계</b>는 황혼국 사냥터를 모두 해금하고, <b>바로 앞 단계를 클리어</b>해야 한 단계씩 도전할 수 있습니다. 도전 횟수는 1~20단계와 같은 하루 횟수를 함께 씁니다.
+    <br><br>이 구간 보스는 전부 <b>👹 보스 패턴</b>(1~3개)을 가지고 있고, 토벌전 목록에서 보스마다 어떤 패턴을 쓰는지 미리 확인할 수 있습니다. 패턴에 맞는 <b>🧤 장갑</b>을 끼고 도전하세요.
+    <br><br>승리 보상: 골드 · 🎫 토벌의 증표 · <b>🧵 강철실</b>(21단계 10개부터 단계가 오를수록 증가) · 30% 확률로 <b>🧤 장갑</b>(단계가 높을수록 높은 등급, 절반은 그 보스의 패턴을 막는 종류).`,
+  },
+  {
+    icon: '👹', title: '보스 패턴 (신규 시스템)',
+    body: `토벌전 21단계 · 고대의 도서관 21서고부터 보스가 <b>패턴</b>으로 여러분의 공격을 방해합니다. 기존 1~20단계 · 사냥터 · 펀치기계에는 없습니다.
+    <br><br>유저에게는 체력이 없는 대신 <b>제한시간(120초)이 체력</b> 역할을 합니다 — "시간 잠식"이나 "가시 반격" 같은 공격형 패턴은 남은 시간을 깎습니다. 패턴이 3개인 보스는 체력이 ${fmtRate(BOSS_ENRAGE_HP)} 이하가 되면 <b>🔥 광폭화</b>해서 모든 패턴이 ${BOSS_ENRAGE_MULT}배 강해집니다. 전투 중에는 HP 바 아래에 지금 걸린 패턴 상태(분신 수, 보호막, 스턴 남은 시간 등)가 표시됩니다.
+    <br><br>모든 패턴은 <b>🧤 장갑의 대응 스탯</b>으로 약하게 만들 수 있습니다 — 대응 스탯 X%면 그 패턴이 X% 약해지고, <b>100%면 완전히 무효</b>입니다. 보조무기의 <b>결전의 기백</b>은 봉인에 막히지 않습니다.
+    <table class="guide-table">
+      <tr><th>패턴</th><th>효과 (패턴 1~2개 보스)</th><th>대응 스탯</th></tr>
+      ${Object.values(DISRUPTIONS).map(d => `<tr><td>${d.icon} ${d.name}</td><td>${d.desc(d.v[0])}${d.v[1] !== d.v[0] ? ` <span style="color:var(--sub)">(3개 보스: ${d.v[1] < 1 ? fmtRate(d.v[1], 1) : d.v[1] + '초'})</span>` : ''}</td><td>${DISRUPT_COUNTERS[d.counter].icon} ${DISRUPT_COUNTERS[d.counter].name}</td></tr>`).join('')}
+    </table>
+    <br>토벌전 보스의 패턴은 보스마다 고정이고, 도서관 21서고 이상은 <b>📕 금서의 저주</b>로 초기화 주기마다 서고별 패턴 조합이 바뀝니다(📖 고대의 도서관 항목 참고).`,
+  },
+  {
+    icon: '🧤', title: '장갑 (신규 장비)',
+    body: `보스 패턴을 약하게 만드는 새 장비입니다. <b>1칸</b>만 장착할 수 있고, 🎒 아이템 → 가방 → 🧤 장갑에서 장착·판매, 🔨 강화기 → 🧤 장갑에서 강화합니다. 전투 프리셋에도 함께 저장됩니다.
+    <br><br><b>종류</b>: 8종이 있고, 종류마다 <b>주 스탯</b>과 절반 수치의 <b>보조 스탯</b>이 정해져 있습니다. 보스마다 필요한 스탯이 다르니 여러 종류를 모아두고 바꿔 끼는 것이 좋습니다. 장갑에는 보조무기의 절반 수준 공격력도 붙어 있습니다.
+    <table class="guide-table">
+      <tr><th>장갑 (신화 이름)</th><th>대응 스탯 → 막는 패턴</th></tr>
+      ${GLOVE_TYPES.map(t => {
+        const line = (label, c) => `${label} ${DISRUPT_COUNTERS[c].icon}<b>${DISRUPT_COUNTERS[c].name}</b> → ${Object.values(DISRUPTIONS).filter(d => d.counter === c).map(d => d.name).join(', ')}`;
+        return `<tr><td>${t.icon} ${t.names[5]}</td><td>${line('주', t.main)}<br><span style="color:var(--sub)">${line('보조', t.sub)}</span></td></tr>`;
+      }).join('')}
+    </table>
+    <br><b>등급과 강화</b>: 등급이 높을수록 대응 스탯이 크고, 강화 3단계마다 더 오릅니다.
+    <table class="guide-table">
+      <tr><th>등급</th><th>주 스탯 +0 → +30</th><th>🪡 자수 값</th></tr>
+      ${[0, 1, 2, 3, 4, 5].map(gr => `<tr><td><span class="grade-${GRADES[gr].name}">${GRADES[gr].name}</span></td><td>${fmtRate(gloveStats({ typeIdx: 0, grade: gr, enhance: 0 }).accuracy, 1)} → ${fmtRate(gloveStats({ typeIdx: 0, grade: gr, enhance: 30 }).accuracy, 1)}</td><td>${EMBROIDERY.ranges[gr].map(v => fmtRate(v)).join('~')}</td></tr>`).join('')}
+    </table>
+    <br><b>획득</b>: 토벌전 21단계 이상 승리 시 30%, 도서관 21서고 이상 승리 시 50% 확률(도서관 쪽이 등급이 더 높음). 절반은 그 보스의 패턴을 막는 종류가 나옵니다.
+    <br><br><b>강화</b>: 골드와 <b>🧵 강철실</b>(토벌전 21단계·도서관 21서고 이상 보상)이 필요합니다. 성공·파괴 확률은 보조무기와 같고, +15부터는 강철실 30배로 파괴 확률을 절반으로 낮추는 고급 강화를 쓸 수 있습니다. 강화는 장착 중인 장갑만 할 수 있습니다.
+    <br><br><b>🪡 자수</b>: 도서관 21서고 이상에서 얻는 <b>📄 금서의 페이지</b> 1장과 📜 무기의 정수로, 장갑에 대응 스탯 하나를 무작위로 수놓습니다(장갑마다 1칸). 다시 수놓으면 기존 자수를 덮어쓰고, 같은 장갑에 수놓을수록 정수 비용이 오릅니다. 주 스탯과 같은 스탯이 나오면 그대로 더해져서, 신화 +30 장갑이면 최대 80%까지 올릴 수 있습니다.`,
   },
   {
     icon: '📖', title: '고대의 도서관',
@@ -12257,7 +12290,7 @@ const GUIDE_SECTIONS = [
     <br><br>현재까지의 최고 기록 이하 서고 중 원하는 곳을 골라 도전하는 방식이라, 이미 깬 서고도 재도전(파밍)할 수 있습니다. 다만 승패와 무관하게 도전 횟수가 소모되고, <b>클리어한 서고는 다음 초기화 전까지 다시 도전할 수 없습니다</b>(실패한 시도는 잠기지 않아 같은 주기에 재도전 가능).
     <br><br>보상은 태초/고대 무기 강화에 쓰는 <b>무기의 정수</b>, 각성 시스템에 쓰는 <b>각성의 정수</b>, 그리고 도서관 전용 룬과 고대의 유물이 확률적으로 함께 나옵니다.
     <br><br>월드2(황혼국) 사냥터 보스를 처치해도 무기의 정수를 보조로 얻을 수 있습니다 — 쿨타임 1시간마다 반복 가능한 대신, 1회당 보상은 도서관보다 확실히 낮습니다.
-    <br><br><b>21~40서고</b>: 20서고를 돌파하면 이어지는 심층 서고입니다(40서고가 끝). 5서고마다 테마가 바뀌고, 서고마다 <b>📕 금서의 저주</b>(보스 방해 효과 — 21~30서고 2개, 31~40서고 3개+광폭화)가 걸려 있습니다. 저주 조합은 <b>초기화 주기마다 서고별로 새로 바뀌며</b>, 한 서고의 저주끼리는 대응 스탯이 겹치지 않으니 서고에 맞춰 🧤 장갑을 바꿔 끼세요.
+    <br><br><b>21~40서고</b>: 20서고를 돌파하면 이어지는 심층 서고입니다(40서고가 끝). 5서고마다 테마가 바뀌고, 서고마다 <b>📕 금서의 저주</b>(👹 보스 패턴 — 21~30서고 2개, 31~40서고 3개+광폭화)가 걸려 있습니다. 저주 조합은 <b>초기화 주기마다 서고별로 새로 바뀌며</b>, 한 서고의 저주끼리는 대응 스탯이 겹치지 않으니 서고에 맞춰 🧤 장갑을 바꿔 끼세요.
     <br><br>이 구간 승리 보상: 🧵 강철실, 📄 금서의 페이지(장갑 자수 재료), 50% 확률로 🧤 장갑, 40% 확률로 <b>📜 비전서 낱장</b>. 비전서는 5서고 구간마다 한 권(낱장 5장)씩 총 4권이고, 이미 가진 낱장이 나오면 금서의 페이지 3장으로 바뀝니다.
     <br><br><b>📚 비전서를 완성하면 고강화 확률이 영구히 오릅니다</b>(메인 무기). 권마다 정해진 강화 단계까지는 표시된 %p가 그대로 더해지고, 그보다 높은 단계에서는 점점 줄어듭니다 — 뒤쪽 권일수록 더 높은 강화까지 힘을 씁니다. 월드3에서 같은 방식의 수집 보상이 추가되면, 전부 모았을 때 강화데이 기준 태초 무기 +29→+30 확률이 약 5%가 되도록 설계되어 있습니다.`,
   },

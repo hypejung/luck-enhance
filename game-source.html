@@ -709,6 +709,23 @@
         <div class="panelFxOverlay"></div>
       </div>
     </div>
+    <div id="enhGlovePanels" style="display:none">
+      <div class="panel enhSuspensePanel" id="gloveEnhPanel">
+        <h3>🧤 장갑 강화기</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
+          장착 중인 장갑을 강화합니다. 토벌전 21단계 이상 보스의 방해 효과를 약하게 만드는 의복 · 강화에 🧵 강철실 필요
+        </div>
+        <div id="gloveenhweapon" class="enhWeaponBox"></div>
+        <div id="gloveenhstat" class="enhStatGrid"></div>
+        <div class="enhrates" id="gloveenhrates"></div>
+        <div id="gloveEnhFxZone" class="enhFxZone">
+          <button class="primary big enhFxBtn" id="gloveEnhBtn">강화하기</button>
+          <div id="gloveEnhFxOverlay" class="enhFxOverlay"></div>
+        </div>
+        <div id="gloveAdvancedEnhanceBox" style="margin-top:8px;"></div>
+        <div class="panelFxOverlay"></div>
+      </div>
+    </div>
   </div>
 
   <!-- 능력치 -->
@@ -840,6 +857,15 @@
           <button id="subAutoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
         </div>
         <div id="subinvlist"></div>
+      </div>
+    </div>
+    <div id="invGlovePanels" style="display:none">
+      <div class="panel">
+        <h3>🧤 보유 장갑 <span style="font-size:12px;color:var(--sub)" id="gloveinvcount"></span></h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
+          🧵 강철실 보유: <b id="gloveSteelCount" style="color:var(--gold)"></b> · 장갑은 1개만 장착할 수 있고, 토벌전 21단계 이상 승리 시 30% 확률로 획득합니다. 자세한 내용은 📘 가이드 탭 참고.
+        </div>
+        <div id="gloveinvlist"></div>
       </div>
     </div>
   </div>
@@ -1042,7 +1068,7 @@
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">땅 밑에 잠들어 있던 무언가가, 다시 눈을 떴다.
         사냥터마다 스며든 낯선 기운이 익숙한 몬스터의 그림자를 빌려 스스로를 드러낸다 — 원래 무엇이었는지는, 이제 아무도 기억하지 못한다.</div>
-        <div>사냥터별로 하루 1회, 전체 합산 하루 <b style="color:var(--unique)">3회</b>까지 도전할 수 있고,
+        <div>사냥터별로 하루 1회, 전체 합산 하루 <b style="color:var(--unique)">4회</b>까지 도전할 수 있고,
         <b style="color:#ff7a7a">도전을 시작하면 승패와 무관하게 그 횟수가 소모</b>됩니다.</div>
       </div>
       <div id="raidStatus" style="margin-bottom:10px;"></div>
@@ -1052,6 +1078,7 @@
           <div id="raidMonName"></div>
           <div id="raidHpBarWrap"><div id="raidHpBar"></div></div>
           <div id="raidHpText"></div>
+          <div id="raidDisruptBar"></div>
         </div>
         <div id="raidTimer" style="text-align:center;font-weight:bold;margin:6px 0;"></div>
         <button class="big danger" id="raidFleeBtn" style="width:100%;">🏳️ 토벌전 포기</button>
@@ -2439,7 +2466,424 @@ const RAID_MONSTERS = [
   { name: '천 개의 눈을 뜬 심연의 포식자', emoji: '👁️', flavor: '눈을 감는 순간, 이미 그 앞에 와있는 존재.' },
   { name: '위엄을 삼킨 태초의 화룡', emoji: '🐲', flavor: '모든 용의 위엄을 집어삼켜 스스로 신화가 된 존재.' },
   { name: '몰락조차 초월한 태초의 잔영', emoji: '😇', flavor: '신이었던 것의, 신을 넘어선 마지막 잔영.' },
+  // ---- 21~40단계: 황혼국 사냥터의 몬스터가 거대화된 존재들. 각자 공격을 방해하는 수단을 지닌다
+  // (BOSS_DISRUPTIONS 참고). ----
+  { name: '천 겹의 안개를 두른 늑대 목자', emoji: '🐺', flavor: '안개가 짙어질수록 무리는 늘어나고, 목자는 어디에도 없다.' },
+  { name: '들판을 뒤덮은 허수아비 군단', emoji: '🌾', flavor: '어느 것이 진짜인지 묻는 순간, 이미 전부가 진짜다.' },
+  { name: '모든 굶주림이 모인 유민의 행렬', emoji: '👤', flavor: '끝없이 이어지는 행렬 앞에서, 휘두르는 팔부터 지쳐간다.' },
+  { name: '끝나지 않는 장례의 망령 행렬', emoji: '⚰️', flavor: '곡소리가 길어질수록, 산 자의 힘이 조금씩 무덤으로 스며든다.' },
+  { name: '명령만 남은 불굴의 초소', emoji: '🏴', flavor: '지킬 것을 잊은 채 방패만 들고 선, 끝나지 않는 보초.' },
+  { name: '삯으로 시간을 거두는 망자의 뱃사공', emoji: '🚣', flavor: '건너는 값은 동전이 아니라, 남은 시간이다.' },
+  { name: '물에 불어 끝없이 부푸는 시장의 망령', emoji: '🐟', flavor: '베어낸 자리에 물이 차오르고, 망령은 다시 부푼다.' },
+  { name: '가라앉은 종을 울리는 심해의 사제', emoji: '🔔', flavor: '물속에서 울리는 종소리는, 다음에 올 일격을 미리 알고 있다.' },
+  { name: '천 개의 사슬을 늘어뜨린 수몰 감옥', emoji: '⛓️', flavor: '사슬이 감기는 순간, 손에 쥔 모든 권능이 잠든다.' },
+  { name: '물의 장막을 두른 심해의 여왕', emoji: '🏰', flavor: '장막 너머의 여왕과, 물결 위에 비친 수많은 여왕.' },
+  { name: '스스로를 끝없이 고쳐 짓는 미완의 공방', emoji: '🤖', flavor: '부서지는 속도보다 고쳐지는 속도가 빠른, 완성되지 않는 기계.' },
+  { name: '배관을 삼킨 폭주 증기 괴수', emoji: '💨', flavor: '뿜어낸 증기가 시야를 덮고, 뜨거운 숨이 팔을 무겁게 짓누른다.' },
+  { name: '판결을 되감는 태엽의 처형대', emoji: '⚙️', flavor: '내려친 판결은 태엽이 감기듯 없던 일이 된다.' },
+  { name: '모든 수를 계산하는 예언의 대기관', emoji: '🕍', flavor: '가장 날카로운 일격조차, 이미 계산된 결과에 지나지 않는다.' },
+  { name: '깨어나선 안 될 최초의 폭주 코어', emoji: '🗿', flavor: '단단한 외피를 두드릴 때마다, 되돌아오는 가시가 시간을 긁어낸다.' },
+  { name: '시간을 부수고 흩뿌린 균열의 군주', emoji: '🌌', flavor: '부서진 시간의 조각들이, 도전자의 남은 시간마저 삼킨다.' },
+  { name: '무너진 도시를 끌고 떠도는 부유 폐허', emoji: '🏛️', flavor: '떠다니는 잔해 사이로 본체는 숨고, 무게는 서서히 쌓인다.' },
+  { name: '멈추지 않고 울리는 부서진 시계탑', emoji: '⏳', flavor: '종이 울릴 때마다 몸이 굳고, 초침은 도전자의 시간만 앞당긴다.' },
+  { name: '꺼진 별빛으로 수를 헤아리는 별의 파수꾼', emoji: '⭐', flavor: '꺼진 별 하나하나가 파수꾼의 또 다른 모습이 되어 반짝인다.' },
+  { name: '모든 것을 황혼에 가두는 종언의 사도', emoji: '🌆', flavor: '끝을 되감고, 쌓아온 것을 흩뜨리고, 휘두른 칼끝을 되돌려준다.' },
 ];
+// 21단계(index 20)부터는 체력·골드를 단계당 고정 배율로, 토벌의 증표는 완만한 배율로 늘린다
+// (20단계까지 쓰는 가속형 공식을 그대로 40단계까지 늘리면 보상이 폭주함). 목표 화력은
+// "40단계 ≈ 태초 +30 + 신화 +27 보조무기(결전의 기백 포함) + 장갑"으로 역산했다.
+const RAID_EXT_START = 20;
+const RAID_EXT = { hpGrowth: 2.1, goldGrowth: 2.1, tokenGrowth: 1.1, steelBase: 10, steelGrowth: 1.1 };
+// 21단계부터는 사냥터 해금뿐 아니라 바로 앞 단계 토벌전을 클리어해야 도전할 수 있다.
+function raidStageLocked(stage) {
+  if (stage >= S.unlocked) return true;
+  return stage >= RAID_EXT_START && (S.raidMaxCleared || 0) < stage;
+}
+function raidSteelReward(stage) {
+  if (stage < RAID_EXT_START) return 0;
+  return Math.round(RAID_EXT.steelBase * Math.pow(RAID_EXT.steelGrowth, stage - RAID_EXT_START));
+}
+
+// ---------- 보스 방해 효과 (토벌전 21단계 이상) ----------
+// 유저 HP가 없는 게임이라 "보스의 공격"은 남은 제한시간을 깎는 것으로 표현한다. 모든 효과는
+// 장갑의 대응 스탯으로 "X% 약하게" 만들 수 있고(100%면 무효), 타이머는 실제 시계가 아니라
+// bossFight.elapsed(전투 경과 시간) 기준이다.
+const DISRUPT_COUNTERS = {
+  accuracy: { name: '명중', icon: '🎯' }, pierce: { name: '관통', icon: '🗡️' },
+  insight: { name: '간파', icon: '👁️' }, shatter: { name: '파쇄', icon: '🔨' },
+  wound: { name: '상처', icon: '🩸' }, endure: { name: '버팀', icon: '🧱' },
+  resist: { name: '저항', icon: '🧿' }, focus: { name: '집중', icon: '🧠' },
+};
+const fmtRate = (v, d = 0) => `${+(v * 100).toFixed(d)}%`;
+// v: [효과 1~2개 보스 값, 효과 3개 보스 값]. 지속시간형(암흑·스턴·탈진·봉인)은 v가 초 단위.
+const DISRUPTIONS = {
+  evasion:   { name: '회피', icon: '🌫️', counter: 'accuracy', v: [0.25, 0.30], desc: v => `공격이 ${fmtRate(v)} 확률로 빗나감` },
+  guard:     { name: '웅크리기', icon: '🛡️', counter: 'pierce', v: [0.30, 0.35], desc: v => `받는 피해 -${fmtRate(v)}` },
+  foresight: { name: '예언', icon: '🔮', counter: 'insight', v: [0.60, 0.60], desc: v => `치명타 추가 피해 ${fmtRate(v)} 무시` },
+  illusion:  { name: '환영 분신', icon: '🪞', counter: 'insight', v: [0.02, 0.015], every: 30, count: 4, desc: v => `30초마다 분신 4개(각각 최대 체력 ${fmtRate(v, 1)}) — 분신부터 부숴야 하고 초과 피해는 버려짐` },
+  shield:    { name: '보호막', icon: '🧊', counter: 'shatter', v: [0.05, 0.04], every: 20, desc: v => `20초마다 최대 체력 ${fmtRate(v)} 보호막` },
+  regen:     { name: '재생', icon: '♻️', counter: 'wound', v: [0.0025, 0.0025], desc: v => `매초 최대 체력 ${fmtRate(v, 2)} 회복` },
+  rewind:    { name: '역행', icon: '⏪', counter: 'wound', v: [0.50, 0.60], every: 20, window: 10, desc: v => `20초마다 최근 10초 동안 받은 피해의 ${fmtRate(v)} 복구` },
+  timeDrain: { name: '시간 잠식', icon: '⏳', counter: 'endure', v: [4, 3], every: 10, desc: v => `10초마다 남은 시간 -${v}초` },
+  thorns:    { name: '가시 반격', icon: '🌵', counter: 'endure', v: [3, 2.5], every: 10, desc: v => `10초마다 남은 시간 -(치명타 확률 × ${v}초)` },
+  blind:     { name: '암흑', icon: '🌑', counter: 'resist', v: [10, 8], every: 20, miss: 0.5, desc: v => `20초마다 ${v}초 동안 공격 50% 빗나감` },
+  stun:      { name: '스턴', icon: '💫', counter: 'resist', v: [3, 3], every: 15, desc: v => `15초마다 ${v}초 동안 공격 불가` },
+  exhaust:   { name: '탈진', icon: '😮‍💨', counter: 'resist', v: [10, 8], every: 20, slow: 0.5, desc: v => `20초마다 ${v}초 동안 공격속도 -50%` },
+  seal:      { name: '봉인', icon: '🔇', counter: 'resist', v: [8, 6], every: 20, desc: v => `20초마다 ${v}초 동안 룬 특수효과·무기 특수효과·고대 스피릿·태초 효과 정지` },
+  weaken:    { name: '약화 저주', icon: '🕸️', counter: 'resist', v: [0.04, 0.03], every: 10, desc: v => `10초마다 공격력 -${fmtRate(v)} 누적` },
+  scatter:   { name: '흩어짐', icon: '🌀', counter: 'focus', v: [0.5, 0.5], every: 10, desc: v => `10초마다 전투 스택 ${fmtRate(v)} 제거` },
+};
+// 토벌전 단계(index) → 방해 효과. [key, 값 덮어쓰기] 형태로 보스별 수치를 따로 줄 수 있다.
+// 효과가 3개인 보스는 체력 30% 이하에서 광폭화(모든 방해 효과 ×BOSS_ENRAGE_MULT).
+const BOSS_DISRUPTIONS = {
+  20: ['evasion'], 21: ['illusion'], 22: ['exhaust'], 23: ['weaken'], 24: ['guard'],
+  25: ['timeDrain', 'blind'], 26: ['regen', 'scatter'], 27: ['stun', 'foresight'], 28: ['seal', 'guard'], 29: ['shield', 'illusion'],
+  30: [['regen', 0.003], 'shield'], 31: ['exhaust', 'blind'], 32: ['rewind', 'stun'], 33: ['foresight', 'scatter'], 34: ['guard', 'thorns'],
+  35: ['timeDrain', 'rewind', 'seal'], 36: ['shield', 'evasion', 'weaken'], 37: ['stun', 'exhaust', 'timeDrain'],
+  38: ['foresight', 'illusion', 'blind'], 39: ['rewind', 'scatter', 'thorns'],
+};
+const BOSS_ENRAGE_MULT = 1.5;
+const BOSS_ENRAGE_HP = 0.3;
+function bossDisruptionList(stage) {
+  const raw = BOSS_DISRUPTIONS[stage];
+  if (!raw) return [];
+  const tier = raw.length >= 3 ? 1 : 0;
+  return raw.map(r => {
+    const [key, over] = Array.isArray(r) ? r : [r, null];
+    return { key, base: over != null ? over : DISRUPTIONS[key].v[tier] };
+  });
+}
+function bossDisruptionSummaryHtml(stage) {
+  const list = bossDisruptionList(stage);
+  if (!list.length) return '';
+  const parts = list.map(e => {
+    const d = DISRUPTIONS[e.key];
+    const c = DISRUPT_COUNTERS[d.counter];
+    return `${d.icon} <b>${d.name}</b>: ${d.desc(e.base)} <span style="color:var(--unique)">(대응 ${c.icon} ${c.name})</span>`;
+  });
+  if (list.length >= 3) parts.push(`🔥 <b>광폭화</b>: 체력 ${fmtRate(BOSS_ENRAGE_HP)} 이하에서 모든 방해 효과 ×${BOSS_ENRAGE_MULT}`);
+  return `<div class="wi" style="color:#ffb37a">⚠️ 보스 방해 — ${parts.join(' · ')}</div>`;
+}
+// 전투 중 상태(토벌전 21단계 이상에서만 non-null). equippedGenesisSkill()/weaponSpecialCount()가
+// 스크립트 초반에도 불릴 수 있어서 TDZ 오류가 없도록 var로 둔다.
+var bd = null;
+function startBossDisruption(stage) {
+  const list = bossDisruptionList(stage);
+  if (!list.length) { bd = null; return; }
+  const next = {};
+  for (const e of list) if (DISRUPTIONS[e.key].every) next[e.key] = DISRUPTIONS[e.key].every;
+  bd = {
+    list, next, enrageable: list.length >= 3, enraged: false,
+    shieldHp: 0, illusions: [], rewindLog: [],
+    stunUntil: 0, blindUntil: 0, exhaustUntil: 0, sealUntil: 0, weakenTotal: 0,
+  };
+}
+function bdHas(key) { return !!(bd && bd.list.some(e => e.key === key)); }
+// 효과 세기 = 기준값 × 광폭화 × (1 - 장갑 대응 스탯)
+function bdStrength(key) {
+  if (!bd) return 0;
+  const e = bd.list.find(x => x.key === key);
+  if (!e) return 0;
+  const counter = Math.min(1, gloveCounterValue(DISRUPTIONS[key].counter));
+  return e.base * (bd.enraged ? BOSS_ENRAGE_MULT : 1) * (1 - counter);
+}
+const bdActiveFor = until => !!(bd && bossFight.elapsed < until);
+function bdSealed() { return bdActiveFor(bd ? bd.sealUntil : 0); }
+function bdStunned() { return bdActiveFor(bd ? bd.stunUntil : 0); }
+function bdSpeedMult() { return bdActiveFor(bd ? bd.exhaustUntil : 0) ? 1 - DISRUPTIONS.exhaust.slow : 1; }
+// 회피와 암흑을 합친 빗나감 판정 (둘 다 있으면 독립 확률로 합성)
+function bdRollMiss() {
+  if (!bd) return false;
+  const ev = Math.min(0.95, bdStrength('evasion'));
+  const bl = bdActiveFor(bd.blindUntil) ? DISRUPTIONS.blind.miss : 0;
+  const miss = 1 - (1 - ev) * (1 - bl);
+  return miss > 0 && Math.random() < miss;
+}
+// 예언: 치명타 배율 중 "추가분"만 줄인다
+function bdForesightMult(critMult) {
+  const f = Math.min(1, bdStrength('foresight'));
+  return f > 0 ? 1 + (critMult - 1) * (1 - f) : critMult;
+}
+// 봉인 중엔 w.effect/w.spirit이 없는 것처럼 보이는 사본으로 전투를 돌린다(원본 무기는 그대로)
+function bdCombatView(w) {
+  if (!w || !bdSealed()) return w;
+  return { ...w, effect: null, spirit: null };
+}
+function bdHealBoss(n) {
+  if (n > 0) mon.hp = BN.min(mon.maxHp, BN.add(mon.hp, n));
+}
+// dealMonDamage()에서 호출: 웅크리기·약화 → 분신 → 보호막 순으로 처리하고 본체가 받을 피해를 돌려준다
+function bdFilterDamage(amount) {
+  amount *= (1 - Math.min(0.95, bdStrength('guard'))) * Math.max(0.1, 1 - bd.weakenTotal);
+  if (bd.illusions.length) {
+    bd.illusions[0] -= amount;
+    if (bd.illusions[0] <= 0) {
+      bd.illusions.shift();
+      floatText(bd.illusions.length ? `🪞 분신 파괴! (남은 ${bd.illusions.length})` : '🪞 분신 전멸!');
+    }
+    return 0;
+  }
+  if (bd.shieldHp > 0) {
+    const absorbed = Math.min(bd.shieldHp, amount);
+    bd.shieldHp -= absorbed;
+    amount -= absorbed;
+    if (bd.shieldHp <= 0) floatText('🧊 보호막 파괴!');
+  }
+  if (amount > 0 && bdHas('rewind')) {
+    const t = Math.floor(bossFight.elapsed * 2) / 2;
+    const last = bd.rewindLog[bd.rewindLog.length - 1];
+    if (last && last.t === t) last.a += amount; else bd.rewindLog.push({ t, a: amount });
+  }
+  return amount;
+}
+const BD_SCATTER_FX_KEYS = ['frenzyStacks', 'accelStacks', 'mortalStacks', 'camazotzStacks', 'wapaqStacks', 'poisonStacks', 'stigma', 'arachneWeaveStacks'];
+const BD_SCATTER_WEAPON_KEYS = ['wolfsprintStacks', 'goblinstealStacks', 'rageStacks', 'stompStacks'];
+function bdTrigger(key) {
+  const d = DISRUPTIONS[key];
+  const s = bdStrength(key);
+  const t = bossFight.elapsed;
+  const maxHp = BN.toNumber(mon.maxHp);
+  if (key === 'timeDrain') {
+    bossFight.timeLeft -= s;
+    floatText(`⏳ 시간 잠식 -${s.toFixed(1)}초`);
+  } else if (key === 'thorns') {
+    const loss = (computeStats().critChance / 100) * s;
+    if (loss > 0) { bossFight.timeLeft -= loss; floatText(`🌵 가시 반격 -${loss.toFixed(1)}초`); }
+  } else if (key === 'blind') {
+    bd.blindUntil = t + s; floatText('🌑 암흑!');
+  } else if (key === 'stun') {
+    bd.stunUntil = t + s; floatText('💫 스턴!');
+  } else if (key === 'exhaust') {
+    bd.exhaustUntil = t + s; floatText('😮‍💨 탈진!');
+  } else if (key === 'seal') {
+    bd.sealUntil = t + s; floatText('🔇 봉인!');
+  } else if (key === 'weaken') {
+    bd.weakenTotal = Math.min(0.9, bd.weakenTotal + s);
+    floatText(`🕸️ 약화 저주 -${fmtRate(bd.weakenTotal)}`);
+  } else if (key === 'scatter') {
+    const keep = 1 - Math.min(1, s);
+    for (const k of BD_SCATTER_FX_KEYS) if (fx[k] > 0) fx[k] = Math.floor(fx[k] * keep);
+    const w = getEquipped();
+    if (w) for (const k of BD_SCATTER_WEAPON_KEYS) if (w[k] > 0) w[k] = Math.floor(w[k] * keep);
+    floatText('🌀 흩어짐!');
+  } else if (key === 'shield') {
+    bd.shieldHp = maxHp * s;
+    if (bd.shieldHp > 0) floatText('🧊 보호막!');
+  } else if (key === 'illusion') {
+    const hp = maxHp * s;
+    bd.illusions = hp > 0 ? Array(d.count).fill(hp) : [];
+    if (bd.illusions.length) floatText(`🪞 분신 ${d.count}개 등장!`);
+  } else if (key === 'rewind') {
+    const from = t - d.window;
+    const recent = bd.rewindLog.filter(x => x.t >= from).reduce((sum, x) => sum + x.a, 0);
+    bd.rewindLog = bd.rewindLog.filter(x => x.t >= from);
+    const heal = recent * s;
+    if (heal > 0) { bdHealBoss(heal); floatText('⏪ 역행!'); }
+  }
+}
+// tick()에서 보스전 타이머 처리 직후 호출
+function bossDisruptionTick(dt) {
+  if (!bd || !bossFight.active || !bossFight.isRaid) return;
+  if (bd.enrageable && !bd.enraged && BN.lte(mon.hp, BN.mul(mon.maxHp, BOSS_ENRAGE_HP))) {
+    bd.enraged = true;
+    floatText('🔥 광폭화!');
+    log(`🔥 보스가 <b>광폭화</b>했습니다! 모든 방해 효과가 ${BOSS_ENRAGE_MULT}배로 강해집니다.`, 'lg-bad');
+  }
+  if (bdHas('regen')) bdHealBoss(BN.toNumber(mon.maxHp) * bdStrength('regen') * dt);
+  for (const e of bd.list) {
+    const d = DISRUPTIONS[e.key];
+    if (!d.every) continue;
+    while (bossFight.elapsed >= bd.next[e.key]) {
+      bd.next[e.key] += d.every;
+      bdTrigger(e.key);
+    }
+  }
+}
+// 전투 화면용 현재 방해 상태 한 줄
+function bossDisruptionStatusHtml() {
+  if (!bd) return '';
+  const t = bossFight.elapsed;
+  const parts = [];
+  if (bd.illusions.length) parts.push(`🪞 분신 ${bd.illusions.length}개`);
+  if (bd.shieldHp > 0) parts.push(`🧊 보호막 ${fmt(bd.shieldHp)}`);
+  if (t < bd.stunUntil) parts.push(`💫 스턴 ${(bd.stunUntil - t).toFixed(1)}초`);
+  if (t < bd.blindUntil) parts.push(`🌑 암흑 ${(bd.blindUntil - t).toFixed(1)}초`);
+  if (t < bd.exhaustUntil) parts.push(`😮‍💨 탈진 ${(bd.exhaustUntil - t).toFixed(1)}초`);
+  if (t < bd.sealUntil) parts.push(`🔇 봉인 ${(bd.sealUntil - t).toFixed(1)}초`);
+  if (bd.weakenTotal > 0) parts.push(`🕸️ 약화 -${fmtRate(bd.weakenTotal)}`);
+  if (bd.enraged) parts.push('🔥 광폭화');
+  const icons = bd.list.map(e => `${DISRUPTIONS[e.key].icon}${DISRUPTIONS[e.key].name}`).join(' ');
+  return `<div style="font-size:12px;color:#ffb37a;">보스 방해: ${icons}</div>` +
+    (parts.length ? `<div style="font-size:12px;color:#ff7a7a;">${parts.join(' · ')}</div>` : '');
+}
+
+// ---------- 장갑 (의복, 1칸) ----------
+// 보조무기 방식: 종류마다 주 스탯/보조 스탯(보스 방해 대응 스탯)이 고정이고, 등급 배율
+// (SUBWEAPON_GRADE_MULT) × 3강마다 오르는 배율(1 + 0.1 × tier)로 성장한다. 신화 +30 주 스탯 60%.
+// names: 일반~신화(0~5) 등급별 이름.
+const GLOVE_TYPES = [
+  { icon: '🏹', main: 'accuracy', sub: 'insight', names: ['가죽 사냥장갑', '예리한 사냥장갑', '추적자의 장갑', '바람을 읽는 궁사장갑', '매의 눈 사냥장갑', '오리온의 사냥 장갑'] },
+  { icon: '🥊', main: 'pierce', sub: 'shatter', names: ['천 붕대', '단단한 붕대', '투기장의 붕대', '철권 투사의 붕대', '부서진 턱의 붕대', '헤라클레스의 권투 붕대'] },
+  { icon: '🔮', main: 'insight', sub: 'accuracy', names: ['낡은 점술 장갑', '신비한 점술 장갑', '수정구 점술 장갑', '운명을 읽는 장갑', '별점 치는 비단장갑', '카산드라의 예언 장갑'] },
+  { icon: '⛏️', main: 'shatter', sub: 'wound', names: ['광부 장갑', '튼튼한 광부 장갑', '곡괭이꾼의 장갑', '암반 파쇄 장갑', '심층 광맥 장갑', '헤파이스토스의 대장장이 장갑'] },
+  { icon: '🔪', main: 'wound', sub: 'pierce', names: ['앞치마 장갑', '피 묻은 장갑', '백정의 장갑', '뼈 가르는 장갑', '피웅덩이 가죽장갑', '히드라 독의 장갑'] },
+  { icon: '🧱', main: 'endure', sub: 'resist', names: ['초병 장갑', '굳건한 초병 장갑', '성문지기의 장갑', '철벽 파수 장갑', '무너지지 않는 성벽 장갑', '아틀라스의 장갑'] },
+  { icon: '🧘', main: 'resist', sub: 'focus', names: ['수련 붕대', '정갈한 수련 붕대', '산사의 붕대', '번뇌를 끊는 붕대', '고요한 수행자의 붕대', '달마의 수행 붕대'] },
+  { icon: '⏳', main: 'focus', sub: 'endure', names: ['태엽공 장갑', '정밀한 태엽공 장갑', '시계공의 장갑', '톱니를 맞추는 장갑', '멈춘 초침의 장갑', '모이라이의 실장갑'] },
+];
+const GLOVE_MAIN_BASE = 0.0375;
+const GLOVE_ATK_MULT = 0.5; // 보조무기 공격력(SUBWEAPON_ATK_MULT) 대비
+const GLOVE_BAG_MAX = 60;
+// 강화 골드는 "그 강화 단계를 밀 때쯤 도는 토벌전 1회 골드의 약 10%" 기준으로 역산한 곡선
+const GLOVE_ENH = { goldBase: 2.3e13, goldGrowth: 1.64, advancedSteelMult: 30, advancedGoldMult: 3, advancedMinLevel: 15 };
+const GLOVE_DROP_CHANCE = 0.3;
+const GLOVE_DROP_GRADES = [ // [시작 단계(index), 등급 가중치]
+  [20, [[1, 40], [2, 35], [3, 20], [4, 5]]],
+  [25, [[2, 35], [3, 35], [4, 25], [5, 5]]],
+  [30, [[3, 35], [4, 45], [5, 20]]],
+  [35, [[4, 60], [5, 40]]],
+];
+function getEquippedGlove() { return (S && Array.isArray(S.gloves) ? S.gloves : []).find(g => g.id === S.gloveEquipped) || null; }
+function gloveStats(g) {
+  const t = GLOVE_TYPES[g.typeIdx];
+  const main = GLOVE_MAIN_BASE * subGradeMult(g.grade) * (1 + 0.10 * subPassiveTier(g.enhance));
+  return { [t.main]: main, [t.sub]: main / 2 };
+}
+function gloveCounterValue(key) {
+  const g = getEquippedGlove();
+  return g ? (gloveStats(g)[key] || 0) : 0;
+}
+function gloveAtk(g) {
+  if (!g) return 0;
+  return GRADES[g.grade].atk * SUBWEAPON_ATK_MULT * GLOVE_ATK_MULT * enhAtkMult(g.enhance, g.grade);
+}
+function gloveName(g) { return GLOVE_TYPES[g.typeIdx].names[g.grade] || GLOVE_TYPES[g.typeIdx].names[0]; }
+function gloveGradeTag(g) {
+  const gname = GRADES[g.grade].name;
+  return `<span class="grade-${gname}">${gname} ${GLOVE_TYPES[g.typeIdx].icon} [${gloveName(g)}] +${g.enhance}</span>`;
+}
+function gloveStatText(g) {
+  return Object.entries(gloveStats(g)).map(([k, v]) => `${DISRUPT_COUNTERS[k].icon} ${DISRUPT_COUNTERS[k].name} ${fmtRate(v, 1)}`).join(' · ');
+}
+function gloveSellPrice(g) { return Math.round(20 * subGradeMult(g.grade) * (1 + g.enhance * 0.3)); }
+function glovePower(g) { return g.grade * 1000 + g.enhance; }
+function addGlove(g) {
+  if (!Array.isArray(S.gloves)) S.gloves = [];
+  if (S.gloves.length >= GLOVE_BAG_MAX) {
+    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped);
+    const weakest = [...sellable].sort((a, b) => glovePower(a) - glovePower(b))[0];
+    if (!weakest || glovePower(weakest) > glovePower(g)) {
+      S.gold = BN.add(S.gold, gloveSellPrice(g));
+      log(`🧤 장갑 가방이 가득 차서 새 장갑을 자동 판매: ${gloveGradeTag(g)}`);
+      return;
+    }
+    S.gold = BN.add(S.gold, gloveSellPrice(weakest));
+    S.gloves = S.gloves.filter(x => x.id !== weakest.id);
+    log(`🧤 장갑 가방이 가득 차서 가장 약한 장갑 자동 판매: ${gloveGradeTag(weakest)}`);
+  }
+  S.gloves.push(g);
+}
+// 토벌전 21단계 이상 승리 시: 절반은 그 보스의 방해 효과를 주 스탯으로 막는 장갑, 절반은 8종 무작위
+function rollGloveDrop(stage) {
+  if (stage < RAID_EXT_START || Math.random() >= GLOVE_DROP_CHANCE) return;
+  const band = [...GLOVE_DROP_GRADES].reverse().find(([s]) => stage >= s)[1];
+  const grade = wrand(band);
+  const counters = bossDisruptionList(stage).map(e => DISRUPTIONS[e.key].counter);
+  const matching = GLOVE_TYPES.map((t, i) => i).filter(i => counters.includes(GLOVE_TYPES[i].main));
+  const pool = matching.length && Math.random() < 0.5 ? matching : GLOVE_TYPES.map((t, i) => i);
+  const g = { id: uid++, typeIdx: pool[Math.floor(Math.random() * pool.length)], grade, enhance: 0 };
+  addGlove(g);
+  log(`🧤 <b>장갑 획득!</b> ${gloveGradeTag(g)} — ${gloveStatText(g)}`, grade >= 4 ? 'lg-prim' : 'lg-good');
+}
+function equipGlove(id) {
+  if (!(S.gloves || []).some(g => g.id === id)) return;
+  S.gloveEquipped = id;
+  renderGloveInventory(); renderEnhance(); save();
+}
+function unequipGlove() {
+  S.gloveEquipped = null;
+  renderGloveInventory(); renderEnhance(); save();
+}
+function sellGlove(id) {
+  if (id === S.gloveEquipped) { log('장착 중인 장갑은 판매할 수 없습니다. 먼저 해제하세요.', 'lg-bad'); return; }
+  const g = (S.gloves || []).find(x => x.id === id);
+  if (!g) return;
+  S.gloves = S.gloves.filter(x => x.id !== id);
+  S.gold = BN.add(S.gold, gloveSellPrice(g));
+  log(`판매: ${gloveGradeTag(g)} → +${fmt(gloveSellPrice(g))} 골드`);
+  renderGloveInventory(); renderTop(); save();
+}
+// ---- 장갑 강화 (확률·파괴 확률은 보조무기 표 재사용) ----
+function gloveSteelCost(enh) { return enh < 10 ? 1 : enh < 20 ? 3 : 8; }
+function gloveEnhanceCost(g) {
+  return Math.round(GLOVE_ENH.goldBase * Math.pow(GLOVE_ENH.goldGrowth, g.enhance) * enhanceEventCostMult(g.enhance));
+}
+function gloveSuccessChance(g) {
+  return Math.min(100, subGradeAdjustedSuccess(g.grade, g.enhance) + subEnhanceEventSuccessBonus(g.enhance));
+}
+function gloveDestroyChance(g) {
+  let chance = SUB_ENH.destroy[g.enhance] || 0;
+  if (enhanceEventActive()) chance = Math.round(chance * ENHANCE_EVENT.destroyMult * 10) / 10;
+  return chance;
+}
+function gloveTryCost(g, advanced) {
+  return {
+    gold: gloveEnhanceCost(g) * (advanced ? GLOVE_ENH.advancedGoldMult : 1),
+    steel: gloveSteelCost(g.enhance) * (advanced ? GLOVE_ENH.advancedSteelMult : 1),
+  };
+}
+let gloveEnhanceRevealPending = false;
+function tryGloveEnhance(advanced) {
+  if (gloveEnhanceRevealPending) return;
+  const g = getEquippedGlove();
+  if (!g) { log('장착된 장갑이 없습니다.', 'lg-bad'); return; }
+  if (g.enhance >= SUB_ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
+  if (advanced && g.enhance < GLOVE_ENH.advancedMinLevel) { log(`고급 강화는 +${GLOVE_ENH.advancedMinLevel} 이상부터 사용할 수 있습니다.`, 'lg-bad'); return; }
+  const cost = gloveTryCost(g, advanced);
+  if (BN.lt(S.gold, cost.gold)) { log(`골드가 부족합니다 (${fmt(cost.gold)} 필요)`, 'lg-bad'); return; }
+  if (BN.lt(S.steelThread, cost.steel)) { log(`🧵 강철실이 부족합니다 (${fmt(cost.steel)}개 필요, 보유 ${fmt(S.steelThread)}개) — 토벌전 21단계 이상에서 획득하세요`, 'lg-bad'); return; }
+  S.gold = BN.sub(S.gold, cost.gold);
+  S.steelThread = BN.sub(S.steelThread, cost.steel);
+  renderTop();
+  gloveEnhanceRevealPending = true;
+  startEnhanceCharge('gloveEnhPanel');
+  const btn = $('gloveEnhBtn'); if (btn) btn.disabled = true;
+  if (S.enhanceFxEnabled) setTimeout(() => resolveGloveEnhance(g, advanced), enhanceSuspenseDelay());
+  else resolveGloveEnhance(g, advanced);
+}
+function resolveGloveEnhance(g, advanced) {
+  gloveEnhanceRevealPending = false;
+  stopEnhanceCharge('gloveEnhPanel');
+  const advTag = advanced ? ' <span style="color:var(--unique)">[고급 강화]</span>' : '';
+  const attemptLevel = g.enhance;
+  const chance = gloveSuccessChance(g);
+  if (Math.random() * 100 < chance) {
+    g.enhance++;
+    playEnhanceFx('success', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
+    playEnhancePanelReveal('gloveEnhPanel', 'success');
+    log(`✨ 장갑 강화 성공! ${gloveGradeTag(g)} (확률 ${chance.toFixed(2)}%)${advTag}`, 'lg-good');
+  } else {
+    const dChance = gloveDestroyChance(g) * (advanced ? ADVANCED_ENH_DESTROY_MULT : 1);
+    if (Math.random() * 100 < dChance) {
+      playEnhanceFx('destroy', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
+      playEnhancePanelReveal('gloveEnhPanel', 'crack');
+      log(`💥 장갑이 파괴되었습니다!! ${gloveGradeTag(g)} (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
+      S.gloves = S.gloves.filter(x => x.id !== g.id);
+      if (S.gloveEquipped === g.id) S.gloveEquipped = null;
+    } else if (Math.random() < 1 - 0.5 * enhanceEventDowngradeMult(g.enhance)) {
+      playEnhanceFx('fail', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
+      playEnhancePanelReveal('gloveEnhPanel', 'dust');
+      log(`😮‍💨 장갑 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
+    } else {
+      g.enhance = Math.max(0, g.enhance - 1);
+      playEnhanceFx('fail', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
+      playEnhancePanelReveal('gloveEnhPanel', 'dust');
+      log(`❌ 장갑 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
+    }
+  }
+  renderEnhance(); renderGloveInventory(); renderTop();
+  save();
+}
 
 // ---------- 주간 통합 레이드: 세계수의 단말마 (푸른세계) ----------
 // 니드호그가 갉아온 세계수 뿌리가 이미 돌이킬 수 없이 썩었고, 그걸 지키던 루멘 아르카(20층
@@ -2662,10 +3106,19 @@ function raidEnsureDay() {
   const today = todayKey();
   if (S.raid.day !== today) { S.raid.day = today; S.raid.count = 0; S.raid.done = {}; S.osirisRaidRefundToday = 0; }
 }
-function raidHp(stage) { return BN.floor(BN.mul(BN.pow(RAID.hpGrowth, stage), RAID.baseHp)); }
+function raidHp(stage) {
+  if (stage >= RAID_EXT_START) {
+    return BN.floor(BN.mul(raidHp(RAID_EXT_START - 1), BN.pow(RAID_EXT.hpGrowth, stage - RAID_EXT_START + 1)));
+  }
+  return BN.floor(BN.mul(BN.pow(RAID.hpGrowth, stage), RAID.baseHp));
+}
 // 화룡의 인장: 하루 총 도전 횟수 +1
 function effectiveRaidDailyTotal() { return RAID.dailyTotal + (sealEquippedHas('dragonKing') ? 1 : 0); }
-function raidTokenReward(stage) { return Math.round(RAID.tokenBase * raidAccelMult(stage, RAID.tokenGrowthBase, RAID.tokenGrowthLinear)); }
+function raidTokenReward(stage) {
+  const s = Math.min(stage, RAID_EXT_START - 1);
+  const base = RAID.tokenBase * raidAccelMult(s, RAID.tokenGrowthBase, RAID.tokenGrowthLinear);
+  return Math.round(base * Math.pow(RAID_EXT.tokenGrowth, Math.max(0, stage - s)));
+}
 // 토벌전 골드 보상도 일반 사냥과 동일하게 "골드 획득률" 계열 보너스(장비 효과/장신구/전능룬/
 // 글러트니 등)가 그대로 적용된다 — 고강화 구간 비용을 감당하려면 토벌전 수입 자체를 플레이어가
 // 장비 투자로 키울 수 있는 레버가 필요하다고 판단해 다시 반영(이전엔 별도 콘텐츠로 분리했었음).
@@ -2681,7 +3134,8 @@ function raidGoldReward(stage) {
   // 라는 전제로 설계됐는데, FLOOR_CAP을 40으로 올렸을 때 실수로 floorGold(39)를 참조하게 되면서
   // 토벌전 골드 보상 전체가 약 1,111배 부풀려졌던 버그를 수정.
   const base = Math.floor(floorGold(WORLD2_START_FLOOR - 1) * killsPerHour * goldMul) * RAID.baseGoldMult;
-  return Math.floor(base * raidAccelMult(stage, RAID.goldGrowthBase, RAID.goldGrowthLinear));
+  const s = Math.min(stage, RAID_EXT_START - 1);
+  return Math.floor(base * raidAccelMult(s, RAID.goldGrowthBase, RAID.goldGrowthLinear) * Math.pow(RAID_EXT.goldGrowth, Math.max(0, stage - s)));
 }
 
 // ---------- 고대의 도서관 (토벌전보다 상위 컨텐츠, 주 2회 초기화 · 서고 선택형) ----------
@@ -3603,6 +4057,7 @@ const GENESIS_ARTIFACTS = [
 // "보유 여부" 체크 — 도감/중복 드랍 방지 용도. 실제 전투 효과 발동 여부는 hasGenesisEquipped()로 별도 판정한다.
 function hasGenesis(id) { return !!(S && S.genesisOwned && S.genesisOwned.includes(id)); }
 function equippedGenesisSkill() {
+  if (bdSealed()) return null; // 보스 방해(봉인): 태초 효과 정지
   const w = getEquipped();
   return (w && isGenesisWeapon(w)) ? w.genesisSkill : null;
 }
@@ -5079,6 +5534,7 @@ function newState() {
     codexSeen: {},     // 무기 도감에 등록된 항목: { codexKey: true }
     raidTokens: BN.from(0),     // 토벌의 증표 (토벌전 보상, 각인 재설정 재료)
     worldTreeLeaf: BN.from(0),  // 세계수의 잎 (명예의 정수 상점 전용) — 고급 재료 부족분을 1:1로 대체
+    steelThread: BN.from(0),    // 강철실 (토벌전 21단계 이상 보상) — 장갑 강화 전용 재료
     raid: { day: null, count: 0, done: {} }, // 토벌전 일일 제한: day=날짜키, count=오늘 도전 횟수, done={stage:day}
     punch: { best: BN.from(0), last: BN.from(0) }, // 펀치기계: 연습용, 횟수 제한 없음
     ancientSeals: [],  // 보유한 고대의 인장 id 목록
@@ -5102,6 +5558,8 @@ function newState() {
     subCodexSeen: {},      // 일반 보조무기 도감(월드2): 키 `g{grade}_{타입명}` — 8타입×6등급(0~5) 48종
     subweapons: [],        // 보유 보조무기 목록: [{id, typeIdx, grade, enhance, activeTiming}, ...]
     subEquipped: null,     // 장착 중인 보조무기 id
+    gloves: [],            // 보유 장갑 목록: [{id, typeIdx, grade, enhance}, ...]
+    gloveEquipped: null,   // 장착 중인 장갑 id
     weeklyRaid: { week: null, count: 0, best: BN.from(0), nickname: '', nicknameLocked: false, title: null, claimedWeek: null }, // 세계수의 단말마: week=주차키, count=이번 주 도전 횟수(최대 3), best=이번 주 최고 데미지, nicknameLocked=이번 주 첫 입장 시 닉네임 확정 여부(주간 초기화마다 다시 풀림), title=지난 주 순위로 획득해 이번 주 기록에 붙는 칭호, claimedWeek=마지막으로 정산받은 주차키
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
   };
@@ -5379,6 +5837,7 @@ function weaponRuneStat(w, statKey) {
 // 장착된 무기의 룬 슬롯 중 특정 특수효과를 가진 룬의 개수 (여러 개 장착하면 중첩)
 function weaponSpecialCount(w, specialKey) {
   if (!w || !Array.isArray(w.runes)) return 0;
+  if (bdSealed()) return 0; // 보스 방해(봉인): 룬 특수효과 정지
   return w.runes.filter(r => r.grade >= 4 && r.key === specialKey).length;
 }
 function weaponHasSpecial(w, specialKey) { return weaponSpecialCount(w, specialKey) > 0; }
@@ -6072,6 +6531,11 @@ function dealMonDamage(amount) {
   amount = amount * draugrRevivalMult();
   // 니드호그의 끝없는 갉음(태초의 유물): 부식 스택에 비례해 대상이 받는 모든 피해 증폭(상한 없음)
   amount = amount * nidhoggCorrosionMult();
+  // 보스 방해 효과(토벌전 21단계 이상): 웅크리기·약화 저주 감쇠 → 환영 분신 → 보호막 순으로 먼저 받아낸다
+  if (bd && bossFight.active && bossFight.isRaid) {
+    amount = bdFilterDamage(amount);
+    if (amount <= 0) return;
+  }
   if (bossFight.active && bossFight.isPunch) punchDealtOverflow = BN.add(punchDealtOverflow, amount);
   if (bossFight.active && bossFight.isWeeklyRaid) weeklyRaidDealtOverflow = BN.add(weeklyRaidDealtOverflow, amount);
   // 천구(태초의 유물): 만월이 떠있는 동안 입힌 모든 피해를 누적(다른 무기로 바꾸면 더 이상 쌓이지 않음)
@@ -7044,8 +7508,12 @@ function tick(dt) {
     else if (bossFight.isLibrary) renderLibraryBattleHP();
     else if (bossFight.isWeeklyRaid) renderWorldRaidBattleHP();
     if (bossFight.timeLeft <= 0) { endBossFight(false); return; }
+    if (bd) {
+      bossDisruptionTick(dt);
+      if (bossFight.timeLeft <= 0) { endBossFight(false); return; }
+    }
   }
-  const w = getEquipped();
+  const w = bdCombatView(getEquipped());
   if (!w) return;
   // 시간이 지나야 서서히 줄어드는 스택(광란/가속 각인/늑대의 질주/약탈자의 격노)은 사냥터
   // 자동사냥이 꺼져 있어도 계속 흘러야 한다 — "사냥을 멈추면 스택도 빠진다"가 성립하려면
@@ -7262,7 +7730,7 @@ function tick(dt) {
       }
     }
   }
-  mon.atkTimer += dt * weaponSpeed(w);
+  if (!bdStunned()) mon.atkTimer += dt * weaponSpeed(w) * bdSpeedMult();
   while (mon.atkTimer >= 1) {
     mon.atkTimer -= 1;
     attack(w);
@@ -7280,6 +7748,8 @@ function tick(dt) {
 }
 
 function attack(w) {
+  // 보스 방해(회피·암흑): 빗나가면 이번 공격의 모든 판정이 통째로 사라진다
+  if (bdRollMiss()) { floatText('MISS'); return; }
   const now = Date.now();
   // 인과율의 룬(도서관 전용): 이전 공격에서 남겨둔 "잔향" 피해를 이번 공격 시작 시 그대로 적용
   if (fx.causalityEcho) {
@@ -7297,7 +7767,7 @@ function attack(w) {
     w.goblinstealStacks = Math.min(ANCIENT_SPIRITS.goblinsteal.stackMax || 0, (w.goblinstealStacks || 0) + 1);
     w.goblinstealLastKill = now;
   }
-  let dmg = (weaponAtk(w) + subweaponAtk(getEquippedSubweapon())) * (0.9 + Math.random() * 0.2);
+  let dmg = (weaponAtk(w) + subweaponAtk(getEquippedSubweapon()) + gloveAtk(getEquippedGlove())) * (0.9 + Math.random() * 0.2);
   // 메피스토의 핏빛 계약서(태초의 유물): 매 공격마다 독립적으로 대박/페널티 배율 발동 —
   // 이후 크리티컬/연타/주문작열 등 모든 계산이 이 배율을 그대로 물려받는다.
   dmg *= mephistoRollMult();
@@ -7365,7 +7835,8 @@ function attack(w) {
   // 파쇄의 리듬/주문 작렬 전용 치명타 배율: 기본 배율은 그대로, 스탯으로 얻은 추가 상승분만
   // EFFECT_CRIT_DMG_SCALE만큼만 반영한다.
   const critMultBase = (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5);
-  const effectCritMult = critMultBase + (critMult - critMultBase) * EFFECT_CRIT_DMG_SCALE;
+  const effectCritMult = bdForesightMult(critMultBase + (critMult - critMultBase) * EFFECT_CRIT_DMG_SCALE);
+  critMult = bdForesightMult(critMult); // 보스 방해(예언): 치명타 추가분만 깎는다
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -7677,6 +8148,7 @@ function bossDmgBonus() {
 // 초기화한다. 사냥터에서 미리 쌓아온 스택을 그대로 들고 보스전·토벌전에 들어가면 불공평하므로,
 // 보스전·토벌전은 항상 스택 0인 상태에서 새로 시작한다.
 function resetTimedStacks() {
+  bd = null; // 보스 방해 상태는 토벌전 21단계 이상 시작 시에만 다시 켜진다(startBossDisruption)
   bossFight.elapsed = 0;
   bossFight.subActiveUsed = false;
   bossFight.dmgBonus = 0;
@@ -7819,6 +8291,7 @@ function startRaidFight(stage) {
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   raidEnsureDay();
   if (stage >= S.unlocked) { log('아직 해금되지 않은 사냥터의 토벌전입니다.', 'lg-bad'); return; }
+  if (raidStageLocked(stage)) { log(`토벌전 ${stage}단계를 먼저 클리어해야 도전할 수 있습니다.`, 'lg-bad'); return; }
   // unlimitedAttempts: 테스트 계정 전용 필드(정상 플레이로는 절대 붙지 않음) — 일일 제한 무시
   if (!S.unlimitedAttempts && S.raid.done[stage]) { log('이 단계 토벌전은 오늘 이미 도전했습니다.', 'lg-bad'); return; }
   if (!S.unlimitedAttempts && S.raid.count >= effectiveRaidDailyTotal()) { log(`오늘 토벌전 도전 횟수를 모두 사용했습니다. (일일 ${effectiveRaidDailyTotal()}회)`, 'lg-bad'); return; }
@@ -7826,6 +8299,7 @@ function startRaidFight(stage) {
   S.raid.done[stage] = S.raid.day;
   S.raid.count++;
   resetTimedStacks();
+  startBossDisruption(stage);
   bossFight.active = true;
   bossFight.isRaid = true;
   bossFight.raidStage = stage;
@@ -7853,6 +8327,7 @@ function endRaidFight(win) {
   const stage = bossFight.raidStage;
   const rm = RAID_MONSTERS[stage];
   bossFight.isRaid = false;
+  bd = null;
   $('raidMonEmoji').classList.remove('boss-glow');
   if (win) {
     onGenesisHungerKill(); // 끝없는 허기(글러트니): 토벌전 처치도 스택 적립 대상
@@ -7860,12 +8335,15 @@ function endRaidFight(win) {
     const redcapMult = redcapBossRewardMult();
     const tokens = Math.round(raidTokenReward(stage) * redcapMult);
     const gold = Math.floor(raidGoldReward(stage) * redcapMult);
+    const steel = Math.round(raidSteelReward(stage) * redcapMult);
     S.gold = BN.add(S.gold, gold);
     S.raidTokens = BN.add(S.raidTokens, tokens);
-    log(`🏆 <b>토벌전 승리!</b> <span class="grade-고대">${rm.name}</span> 격파! +${fmt(gold)} 골드, 🎫 토벌의 증표 +${tokens}개`, 'lg-prim');
+    if (steel > 0) S.steelThread = BN.add(S.steelThread, steel);
+    log(`🏆 <b>토벌전 승리!</b> <span class="grade-고대">${rm.name}</span> 격파! +${fmt(gold)} 골드, 🎫 토벌의 증표 +${fmt(tokens)}개${steel > 0 ? `, 🧵 강철실 +${fmt(steel)}개` : ''}`, 'lg-prim');
     $('raidMonEmoji').classList.add('boss-appear');
     setTimeout(() => $('raidMonEmoji').classList.remove('boss-appear'), 700);
     rollAncientSeal(stage, redcapBossAncientMult());
+    rollGloveDrop(stage);
     // 고대의 도서관 해금 조건(토벌전 특정 단계 클리어)을 위한 영구 최고 기록
     S.raidMaxCleared = Math.max(S.raidMaxCleared || 0, stage + 1);
     tryUnlockWorld2(); // 20층 처치 조건은 이미 채워둔 상태로 토벌전 9단계를 지금 막 깼을 수도 있으니 즉시 재확인
@@ -8586,14 +9064,16 @@ function renderRaidTab() {
   list.innerHTML = '';
   for (let stage = 0; stage < RAID_MONSTERS.length; stage++) {
     const rm = RAID_MONSTERS[stage];
-    const locked = stage >= S.unlocked;
+    const locked = raidStageLocked(stage);
     const usedToday = !S.unlimitedAttempts && !!S.raid.done[stage];
+    const steel = raidSteelReward(stage);
     const div = document.createElement('div');
     div.className = 'invitem';
     div.innerHTML = `
       <div><div class="wn">${rm.emoji} <span class="grade-고대">${stage + 1}단계 — ${rm.name}</span></div>
       <div class="wi" style="font-style:italic;">${rm.flavor}</div>
-      <div class="wi">HP ${fmt(raidHp(stage))} · 보상: 💰 ${fmt(raidGoldReward(stage))} + 🎫 ${raidTokenReward(stage)}개</div></div>
+      ${bossDisruptionSummaryHtml(stage)}
+      <div class="wi">HP ${fmt(raidHp(stage))} · 보상: 💰 ${fmt(raidGoldReward(stage))} + 🎫 ${fmt(raidTokenReward(stage))}개${steel > 0 ? ` + 🧵 ${fmt(steel)}개` : ''}</div></div>
       <div class="btns"></div>`;
     const btn = document.createElement('button');
     if (locked) { btn.textContent = '🔒 미해금'; btn.disabled = true; }
@@ -10102,6 +10582,8 @@ function renderRaidBattleHP() {
   $('raidHpBar').style.width = hpBarPct() + '%';
   $('raidHpText').textContent = `${fmt(mon.hp)} / ${fmt(mon.maxHp)}`;
   $('raidTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
+  const bar = $('raidDisruptBar');
+  if (bar) bar.innerHTML = bossDisruptionStatusHtml();
 }
 function renderPunchBattleHP() {
   const elapsed = Math.max(0, PUNCH_TIME_LIMIT - bossFight.timeLeft);
@@ -10213,12 +10695,15 @@ function toggleEnhanceFx(checked) {
   S.enhanceFxEnabled = !!checked;
   save();
 }
+const EQUIP_TABS_WITH_GLOVE = [{ v: 'weapon', label: '⚔️ 무기' }, { v: 'subweapon', label: '🗡️ 보조무기' }, { v: 'glove', label: '🧤 장갑' }];
 function renderEnhance() {
-  renderEquipSubTabBar('enhSubTabBar', enhSubTab, (v) => { enhSubTab = v; renderEnhance(); });
+  renderEquipSubTabBar('enhSubTabBar', enhSubTab, (v) => { enhSubTab = v; renderEnhance(); }, EQUIP_TABS_WITH_GLOVE);
   const fxToggle = $('enhFxToggle'); if (fxToggle) fxToggle.checked = S.enhanceFxEnabled;
   $('enhWeaponPanels').style.display = enhSubTab === 'weapon' ? '' : 'none';
   $('enhSubweaponPanels').style.display = enhSubTab === 'subweapon' ? '' : 'none';
+  $('enhGlovePanels').style.display = enhSubTab === 'glove' ? '' : 'none';
   if (enhSubTab === 'subweapon') { renderSubEquippedBox(); return; }
+  if (enhSubTab === 'glove') { renderGloveEnhance(); return; }
   const w = getEnhanceTarget();
   renderEnhTargetBar();
   const box = $('enhweapon');
@@ -10568,10 +11053,12 @@ function renderAncientSealList() {
   }
 }
 function renderInventory() {
-  renderEquipSubTabBar('invSubTabBar', invSubTab, (v) => { invSubTab = v; renderInventory(); });
+  renderEquipSubTabBar('invSubTabBar', invSubTab, (v) => { invSubTab = v; renderInventory(); }, EQUIP_TABS_WITH_GLOVE);
   $('invWeaponPanels').style.display = invSubTab === 'weapon' ? '' : 'none';
   $('invSubweaponPanels').style.display = invSubTab === 'subweapon' ? '' : 'none';
+  $('invGlovePanels').style.display = invSubTab === 'glove' ? '' : 'none';
   if (invSubTab === 'subweapon') { renderSubInventory(); return; }
+  if (invSubTab === 'glove') { renderGloveInventory(); return; }
   const list = $('invlist');
   $('invcount').textContent = `(${S.weapons.length}/${S.unlimitedBag ? 500 : 60})`;
   setupAutoSellControls();
@@ -10990,6 +11477,87 @@ function renderSubInventory() {
     }
     list.appendChild(div);
   }
+}
+
+/* ===================== 장갑 가방 / 강화기 ===================== */
+function renderGloveInventory() {
+  const list = $('gloveinvlist');
+  if (!list) return;
+  const gloves = S.gloves || [];
+  const countEl = $('gloveinvcount');
+  if (countEl) countEl.textContent = `(${gloves.length}/${GLOVE_BAG_MAX})`;
+  const steelEl = $('gloveSteelCount');
+  if (steelEl) steelEl.textContent = `${fmt(S.steelThread || 0)}개`;
+  if (!gloves.length) {
+    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 장갑이 없습니다. 토벌전 21단계 이상에서 승리하면 획득할 수 있습니다.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  for (const g of [...gloves].sort((a, b) => glovePower(b) - glovePower(a))) {
+    const equipped = g.id === S.gloveEquipped;
+    const div = document.createElement('div');
+    div.className = 'invitem' + (equipped ? ' equipped' : '');
+    div.innerHTML = `
+      <div><div class="wn">${gloveGradeTag(g)}${equipped ? ' <span style="color:var(--unique);font-size:12px">✅ 장착중</span>' : ''}</div>
+      <div class="wi">${gloveStatText(g)} · 공격력 ${fmt(gloveAtk(g))}</div></div>
+      <div class="btns"></div>`;
+    const btns = div.querySelector('.btns');
+    if (equipped) {
+      const un = document.createElement('button');
+      un.className = 'danger'; un.textContent = '장착해제';
+      un.onclick = unequipGlove;
+      btns.appendChild(un);
+    } else {
+      const sell = document.createElement('button');
+      sell.textContent = '판매'; sell.onclick = () => sellGlove(g.id);
+      btns.appendChild(sell);
+      const eq = document.createElement('button');
+      eq.className = 'primary'; eq.textContent = '장착'; eq.onclick = () => equipGlove(g.id);
+      btns.appendChild(eq);
+    }
+    list.appendChild(div);
+  }
+}
+function renderGloveEnhance() {
+  const box = $('gloveenhweapon');
+  if (!box) return;
+  const g = getEquippedGlove();
+  const btn = $('gloveEnhBtn');
+  if (!g) {
+    box.innerHTML = '<div style="color:var(--sub)">장착된 장갑이 없습니다. 🎒 가방 → 🧤 장갑에서 장착하세요.</div>';
+    $('gloveenhstat').innerHTML = ''; $('gloveenhrates').innerHTML = ''; $('gloveAdvancedEnhanceBox').innerHTML = '';
+    btn.disabled = true; btn.textContent = '강화하기';
+    return;
+  }
+  const maxed = g.enhance >= SUB_ENH.maxLevel;
+  const cost = gloveTryCost(g, false);
+  const chance = maxed ? 0 : gloveSuccessChance(g);
+  const dChance = maxed ? 0 : gloveDestroyChance(g);
+  const next = maxed ? null : { ...g, enhance: g.enhance + 1 };
+  box.innerHTML = `<div class="enhWepTitle">${gloveGradeTag(g)}</div>
+    <div style="font-size:12px;color:var(--sub)">🧤 대응 스탯: ${gloveStatText(g)}</div>
+    ${next ? `<div style="color:var(--gold);font-size:12px;margin-top:2px;">🔜 다음 강화(+${next.enhance}): ${gloveStatText(next)}</div>` : ''}`;
+  $('gloveenhstat').innerHTML = `
+    <div>공격력<b>${fmt(gloveAtk(g))}</b></div>
+    <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(gloveAtk(next))}</b></div>
+    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : `${fmt(cost.gold)} + 🧵${cost.steel}`}</b></div>
+    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>`;
+  $('gloveenhrates').innerHTML = maxed
+    ? `🏆 최대 강화 달성! <b>+${g.enhance}</b>`
+    : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`;
+  btn.innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost.gold)} + 🧵 ${cost.steel} (성공 ${chance.toFixed(1)}% / 파괴 ${dChance.toFixed(1)}%)</span>`;
+  btn.disabled = maxed || gloveEnhanceRevealPending;
+  btn.onclick = () => { if (!maxed) tryGloveEnhance(false); };
+  const adv = $('gloveAdvancedEnhanceBox');
+  if (maxed || g.enhance < GLOVE_ENH.advancedMinLevel) {
+    adv.innerHTML = maxed ? '' : `<div style="font-size:12px;color:var(--sub);text-align:center;">🛠️ 고급 강화는 <b style="color:var(--unique)">+${GLOVE_ENH.advancedMinLevel}</b> 이상부터 사용할 수 있습니다.</div>`;
+    return;
+  }
+  const ac = gloveTryCost(g, true);
+  const affordable = BN.gte(S.gold, ac.gold) && BN.gte(S.steelThread || 0, ac.steel) && !gloveEnhanceRevealPending;
+  adv.innerHTML = `<button class="${affordable ? 'primary' : ''}" id="gloveAdvEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
+    🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 ${(dChance * ADVANCED_ENH_DESTROY_MULT).toFixed(1)}%로 절반, 💰 ${fmt(ac.gold)} + 🧵 ${ac.steel} 소모)</span></button>`;
+  $('gloveAdvEnhBtn').onclick = () => tryGloveEnhance(true);
 }
 
 /* ===================== 룬 상점/인벤토리 ===================== */
@@ -11467,6 +12035,13 @@ const GUIDE_SECTIONS = [
     <br><br>판매·파괴가 불가능하고, 강화 실패는 유지/하락만 있을 뿐 파괴나 초기화는 없습니다. 대신 강화 시 골드 외에 "무기의 정수"가 추가로 필요합니다(고대 무기보다 소모량이 훨씬 큽니다).`,
   },
   {
+    icon: '🧤', title: '토벌전 21단계+ · 보스 방해 · 장갑',
+    body: `토벌전 <b>21~40단계</b>는 황혼국 사냥터를 모두 해금하고, <b>바로 앞 단계를 클리어</b>해야 도전할 수 있습니다. 이 구간 보스는 공격을 방해하는 효과를 1~3개 가지고 있고, 토벌전 목록에서 미리 확인할 수 있습니다.
+    <br><br>유저에게는 체력이 없는 대신 <b>제한시간(120초)이 체력</b> 역할을 합니다 — "시간 잠식"이나 "가시 반격" 같은 보스 공격은 남은 시간을 깎습니다. 다른 효과들은 공격을 빗나가게 하거나(회피·암흑), 피해를 줄이거나(웅크리기·예언), 체력을 되돌리거나(재생·역행), 대신 맞아주는 분신·보호막을 두르거나, 공격을 멈추게 합니다(스턴·탈진·봉인·약화 저주·흩어짐). 효과가 3개인 보스는 체력이 30% 이하가 되면 <b>광폭화</b>해서 모든 방해가 1.5배 강해집니다. 보조무기의 <b>결전의 기백</b>은 봉인에 막히지 않습니다.
+    <br><br>이 방해를 약하게 만드는 장비가 <b>🧤 장갑</b>(1칸)입니다. 장갑 8종은 각각 대응 스탯 2개(주 스탯 + 절반 수치의 보조 스탯)를 가지며, 대응 스탯 X%는 해당 방해 효과를 X% 약하게 만듭니다(100%면 무효). 보스마다 필요한 스탯이 다르니 🎒 가방 → 🧤 장갑에서 바꿔 끼고, 프리셋에도 함께 저장해두세요.
+    <br><br>장갑은 21단계 이상 승리 시 30% 확률로 얻고(절반은 그 보스를 막는 종류), 강화에는 골드와 함께 21단계 이상 보상인 <b>🧵 강철실</b>이 필요합니다. +15부터는 강철실 30배로 파괴 확률을 절반으로 낮추는 고급 강화도 가능합니다.`,
+  },
+  {
     icon: '📖', title: '고대의 도서관',
     body: `매주 <b>수요일·일요일 자정</b>에 초기화되며, 주기당 <b>3회</b> 도전할 수 있습니다.
     <br><br>현재까지의 최고 기록 이하 서고 중 원하는 곳을 골라 도전하는 방식이라, 이미 깬 서고도 재도전(파밍)할 수 있습니다. 다만 승패와 무관하게 도전 횟수가 소모되고, <b>클리어한 서고는 다음 초기화 전까지 다시 도전할 수 없습니다</b>(실패한 시도는 잠기지 않아 같은 주기에 재도전 가능).
@@ -11837,6 +12412,8 @@ function savePreset(idx) {
     // 보조무기는 룬이 없어서 id 참조만 저장하면 충분하다. 장착 중이 아니면 null(=해제 상태 저장).
     const sw = getEquippedSubweapon();
     p.subWeaponId = sw ? sw.id : null;
+    const gl = getEquippedGlove();
+    p.gloveId = gl ? gl.id : null;
     log(`💾 <b>${p.name}</b>에 현재 무기(${gradeTag(w)}), 장신구 ${p.accEquipped.length}개, 룬 ${p.runeIds.length}개${sw ? `, 보조무기(${subweaponGradeTag(sw)})` : ''}를 저장했습니다.`, 'lg-good');
     renderPresetTab(); save();
   };
@@ -11887,6 +12464,12 @@ function loadPreset(idx) {
       else { S.subEquipped = null; subNote = ' (보조무기를 찾을 수 없어 해제됨: 판매·파괴됨)'; }
     }
   }
+  // 장갑도 보조무기와 같은 방식으로 복원(장갑 도입 이전에 저장된 프리셋은 gloveId가 없어서 건드리지 않음)
+  if ('gloveId' in p) {
+    if (p.gloveId == null) S.gloveEquipped = null;
+    else if ((S.gloves || []).some(g => g.id === p.gloveId)) S.gloveEquipped = p.gloveId;
+    else { S.gloveEquipped = null; subNote += ' (장갑을 찾을 수 없어 해제됨: 판매·파괴됨)'; }
+  }
   log(`📥 <b>${p.name}</b>을(를) 불러왔습니다.${w ? ` ${gradeTag(w)} 장착.` : ''}${runeNote}${subNote}`, 'lg-prim');
   renderAll(); renderSubweaponTab(); renderPresetTab(); save();
 }
@@ -11896,6 +12479,7 @@ function presetMatchesCurrent(p) {
   if (!p || p.weaponId == null) return false;
   if (p.weaponId !== S.equipped) return false;
   if ('subWeaponId' in p && p.subWeaponId !== S.subEquipped) return false;
+  if ('gloveId' in p && p.gloveId !== (S.gloveEquipped ?? null)) return false;
   const cur = Array.isArray(S.accEquipped) ? S.accEquipped : [];
   const saved = Array.isArray(p.accEquipped) ? p.accEquipped : [];
   if (cur.length !== saved.length) return false;
@@ -11952,6 +12536,10 @@ function renderPresetTab() {
       if (p2.subWeaponId != null) {
         const sw = (S.subweapons || []).find(x => x.id === p2.subWeaponId);
         subSummary = sw ? ` · 🗡️ ${subweaponGradeTag(sw)}` : ' · <span style="color:#ff7a7a">보조무기를 찾을 수 없음</span>';
+      }
+      if (p2.gloveId != null) {
+        const gl = (S.gloves || []).find(x => x.id === p2.gloveId);
+        subSummary += gl ? ` · ${gloveGradeTag(gl)}` : ' · <span style="color:#ff7a7a">장갑을 찾을 수 없음</span>';
       }
       summary = `${gradeTag(w)}${accNames.length ? ` · 📿 ${accNames.join(', ')}` : ' · 장신구 없음'}${Array.isArray(p2.runeIds) ? ` · 🔮 룬 ${p2.runeIds.length}개` : ''}${subSummary}`;
     }

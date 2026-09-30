@@ -7565,13 +7565,17 @@ function attack(w) {
       }
     }
   }
-  // 파쇄의 리듬(둔기 특성): 매 BLUNT_SMASH_EVERY번째 공격이 강타로 적중해 고정 피해 추가
+  // 파쇄의 리듬(둔기 특성): 매 BLUNT_SMASH_EVERY번째 공격이 강타로 적중해 고정 피해 추가.
+  // 독립적으로 치명타 판정을 받는다(다른 공속 빠른 무기 종류 대비 메리트 보강).
   if (w.type === '둔기') {
     fx.bluntSmashCount = (fx.bluntSmashCount || 0) + 1;
     if (fx.bluntSmashCount >= BLUNT_SMASH_EVERY) {
       fx.bluntSmashCount = 0;
-      dealMonDamage(weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus')));
-      floatText('🔨 파쇄!');
+      let smashDmg = weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus'));
+      let smashCrit = false;
+      if (critChance > 0 && Math.random() < critChance) { smashDmg *= critMult; smashCrit = true; }
+      dealMonDamage(smashDmg);
+      floatText(smashCrit ? '🔨 파쇄 치명타!' : '🔨 파쇄!');
     }
   }
   // 거인의 진군(고대 에이션트 스피릿): 매 공격마다 "짓밟기" 피해가 누적 가산되고,
@@ -7630,12 +7634,17 @@ function attack(w) {
   }
   // 루시퍼의 타락한 광휘(태초의 유물): 매 공격마다 낮은 확률로 자동 타락 발동
   luciferOnAttack();
-  // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬
+  // 지팡이 특성: 마력(공격력)에 비례한 주문을 확률적으로 작렬.
+  // preCritDmg(치명타 배율 적용 전 데미지) 기준으로 계산한 뒤 독립적으로 치명타 판정을 받는다
+  // (다른 공속 빠른 무기 종류 대비 메리트 보강 — 이전엔 본 타격이 우연히 치명타였을 때만
+  // 덩달아 커졌을 뿐, 스스로 치명타를 노릴 수는 없었다).
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
   if (spellProc > 0 && Math.random() < spellProc) {
-    const spellDmg = dmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus());
+    let spellDmg = preCritDmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus());
+    let spellCrit = false;
+    if (critChance > 0 && Math.random() < critChance) { spellDmg *= critMult; spellCrit = true; }
     dealMonDamage(spellDmg);
-    floatText('🔮 주문 작렬!');
+    floatText(spellCrit ? '🔮 주문 작렬 치명타!' : '🔮 주문 작렬!');
   }
   // 연타 확률 = 무기 효과 + 룬 스탯 + 무기 종류 특성 + 장신구/훈련 합산, 최종치는 상한 적용
   // (포자 폭발 활성 중엔 +70%p 고정 가산 — 상한 자체가 100%로 풀려서 별도 상한 해제는 불필요)

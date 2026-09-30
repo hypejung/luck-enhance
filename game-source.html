@@ -3011,9 +3011,21 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...' }] }
-// 마지막으로 발행한 버전: v1.0.4 (version 5). 마지막으로 쓴 change id: 없음(다음은 1).
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 6.
 const PATCH_NOTE_TTL_DAYS = 3;
-const PATCH_NOTES = [];
+const PATCH_NOTES = [
+  {
+    version: 6, versionLabel: '1.0.5', title: '고대의 도서관 심층 서고 개방',
+    changes: [
+      { id: 1, date: '2026-09-30', text: '📖 고대의 도서관 21~40서고가 열렸습니다. 5서고마다 새로운 테마의 서고와 수호자가 기다립니다.' },
+      { id: 2, date: '2026-09-30', text: '📕 금서의 저주: 21서고부터 서고마다 보스 방해 효과가 걸리고, 초기화 주기(수·일)마다 조합이 바뀝니다.' },
+      { id: 3, date: '2026-09-30', text: '🎁 21서고 이상 승리 시 강철실, 금서의 페이지, 장갑, 비전서 낱장을 얻을 수 있습니다.' },
+      { id: 4, date: '2026-09-30', text: '🪡 장갑 자수 추가: 금서의 페이지와 무기의 정수로 장갑에 대응 스탯을 하나 더 수놓을 수 있습니다.' },
+      { id: 5, date: '2026-09-30', text: '📚 비전서 I~IV 추가: 낱장을 모아 완성하면 고강화 성공 확률이 영구히 오릅니다.' },
+      { id: 6, date: '2026-09-30', text: '📉 21서고 이상에서는 무기의 정수·각성의 정수 보상의 증가폭이 완만해집니다.' },
+    ],
+  },
+];
 function patchChangeActive(c, now) {
   const written = new Date(c.date + 'T00:00:00').getTime();
   return now < written + PATCH_NOTE_TTL_DAYS * 86400000;

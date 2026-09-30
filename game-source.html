@@ -6601,6 +6601,16 @@ function subweaponAtk(sw) {
 }
 // 패시브 = 종류 고유 효과(SUBWEAPON_TYPES[].passive) × 등급 배율 × 강화로 쌓인 증폭
 function subweaponPassiveMult(sw) { return 1 + 0.10 * subPassiveTier(sw.enhance); } // +30강 기준 최대 2배
+// 확률형 패시브(치명타 확률/연타 확률/주문 작렬 확률)는 다른 확률 원천과 합산되면 쉽게
+// 상한(100%)에 닿거나 낭비되므로, 위 곡선과 달리 +23강(tier8) 전까지는 완만하게, +23강부터는
+// 가파르게 올라가도록 별도 곡선을 쓴다. 같은 tier(subPassiveTier, 3강마다 +1)를 공유하되
+// tier7(+22강)까지는 3강당 +0.02배, tier8~10(+23~30강)은 3강당 +0.28배로 기울기만 다르게 잡아
+// tier10(+29~30강) 최종치는 기존 곡선(2.0배)과 거의 같은 1.98배에 도달한다.
+function subweaponChanceMult(sw) {
+  const tier = subPassiveTier(sw.enhance);
+  return tier <= 7 ? 1 + 0.02 * tier : 1.14 + 0.28 * (tier - 7);
+}
+const SUB_CHANCE_PASSIVE_KEYS = ['critChance', 'extraAtk', 'spellProc'];
 // ampBonus(=accEff().subAmp)는 호출부에서 넘겨받는다 — accEff() 내부에서 이 함수를 호출할 때
 // 그 안에서 다시 accEff()를 부르면 무한 재귀가 되므로, accEff()는 그 시점까지 이미 누적된
 // eff.subAmp(장신구 등 gear 소스)를 그대로 넘기고, 그 외 호출부는 accEff().subAmp를 넘긴다.
@@ -6608,9 +6618,11 @@ function subweaponPassiveEff(sw, ampBonus) {
   if (!sw) return {};
   const t = SUBWEAPON_TYPES[sw.typeIdx];
   if (!t) return {};
-  const amp = subGradeMult(sw.grade) * subweaponPassiveMult(sw) * (1 + (ampBonus || 0));
+  const grade = subGradeMult(sw.grade);
+  const normalAmp = grade * subweaponPassiveMult(sw) * (1 + (ampBonus || 0));
+  const chanceAmp = grade * subweaponChanceMult(sw) * (1 + (ampBonus || 0));
   const eff = {};
-  for (const [k, v] of Object.entries(t.passive)) eff[k] = v * amp;
+  for (const [k, v] of Object.entries(t.passive)) eff[k] = v * (SUB_CHANCE_PASSIVE_KEYS.includes(k) ? chanceAmp : normalAmp);
   return eff;
 }
 // 액티브 "결전의 기백" 위력/지속시간 — 위력은 등급 배율, 지속시간은 초 단위라 등급 배율 없이 강화만 반영.

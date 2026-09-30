@@ -1168,6 +1168,10 @@ function isAncientWeapon(w) { return !!w && w.grade === 6; }
 // 다른 타입의 확률/상시 스탯형 특성과 결이 다르게, 묵직하고 예측 가능한 한방을 표현한다.
 const BLUNT_SMASH_EVERY = 5;
 const BLUNT_SMASH_MULT = 2.5;
+// 파쇄의 리듬/주문 작렬처럼 독립적으로 치명타 판정을 받는 무기특성 폭발 효과들의 치명타 피해
+// 배율: 기본 배율(보통 1.5배)은 그대로 반영하되, 치명타 피해 스탯(룬/훈련/장신구/각성 등)으로
+// 얻은 "추가 상승분"만 이 비율만큼만 깎아서 반영한다(스탯 몰빵으로 너무 커지는 것 방지).
+const EFFECT_CRIT_DMG_SCALE = 0.5;
 const WEAPON_TYPES = [
   { name: '단검',   icon: '🗡️', speed: 1.8,  dmgMult: 0.68, trait: { extra: 0.10, extraAtkDmg: 0.40 }, traitDesc: '연타 확률 +10%p, 연타 피해 +40%p' },
   { name: '검',     icon: '⚔️', speed: 1.2,  dmgMult: 0.90, trait: { atk: 0.15 },                       traitDesc: '공격력 +15%' },
@@ -7418,6 +7422,10 @@ function attack(w) {
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
     (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage');
+  // 파쇄의 리듬/주문 작렬 전용 치명타 배율: 기본 배율은 그대로, 스탯으로 얻은 추가 상승분만
+  // EFFECT_CRIT_DMG_SCALE만큼만 반영한다.
+  const critMultBase = (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5);
+  const effectCritMult = critMultBase + (critMult - critMultBase) * EFFECT_CRIT_DMG_SCALE;
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -7573,7 +7581,7 @@ function attack(w) {
       fx.bluntSmashCount = 0;
       let smashDmg = weaponAtk(w) * (BLUNT_SMASH_MULT + subweaponPassiveValue('smashMultBonus'));
       let smashCrit = false;
-      if (critChance > 0 && Math.random() < critChance) { smashDmg *= critMult; smashCrit = true; }
+      if (critChance > 0 && Math.random() < critChance) { smashDmg *= effectCritMult; smashCrit = true; }
       dealMonDamage(smashDmg);
       floatText(smashCrit ? '🔨 파쇄 치명타!' : '🔨 파쇄!');
     }
@@ -7642,7 +7650,7 @@ function attack(w) {
   if (spellProc > 0 && Math.random() < spellProc) {
     let spellDmg = preCritDmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus());
     let spellCrit = false;
-    if (critChance > 0 && Math.random() < critChance) { spellDmg *= critMult; spellCrit = true; }
+    if (critChance > 0 && Math.random() < critChance) { spellDmg *= effectCritMult; spellCrit = true; }
     dealMonDamage(spellDmg);
     floatText(spellCrit ? '🔮 주문 작렬 치명타!' : '🔮 주문 작렬!');
   }

@@ -167,6 +167,7 @@
   .patchnote-changes { font-size: 13px; line-height: 1.6; margin: 0; padding-left: 18px; }
   .patchnote-changes .patchnote-new { margin-left: 6px; vertical-align: 1px; }
   .patchnote-empty { font-size: 13px; color: var(--sub); text-align: center; padding: 14px 0; }
+  .bossacc-stage { display: inline-block; font-size: 12px; font-weight: bold; color: var(--gold); background: var(--panel2); border: 1px solid var(--gold); border-radius: 6px; padding: 0 6px; margin-right: 4px; }
 
   .guide-card {
     background: var(--panel2); border: 1px solid var(--border);
@@ -12157,18 +12158,44 @@ function renderBossAccs() {
     return;
   }
   // 세트 효과 파트너는 월드1=메인 보스무기(bossSetFloor), 월드2=보스 보조무기(subBossSetFloor)로 다르다.
-  const activeSetFloor = accSubTab === 'world1' ? bossSetFloor() : subBossSetFloor();
+  const world1 = accSubTab === 'world1';
+  const activeSetFloor = world1 ? bossSetFloor() : subBossSetFloor();
   box.innerHTML = '';
   for (const f of owned) {
     const b = BOSS_ACCS[f];
     if (!b) continue;
     // 세트 효과는 장비 조건(보스무기+보스장신구)뿐 아니라 실제로 그 사냥터에서 사냥 중이어야 발동한다.
     const setOn = activeSetFloor === f && S.floor === f;
+    // 황혼국은 21층부터지만 세계별로 1단계부터 다시 센다.
+    const stage = world1 ? f + 1 : f - WORLD2_START_FLOOR + 1;
+    const partners = (world1 ? S.weapons : (S.subweapons || [])).filter(x => x.bossFloor === f);
+    const best = partners.sort((a, c) => c.enhance - a.enhance)[0];
     const div = document.createElement('div');
     div.className = 'invitem equipped';
     div.innerHTML = `
-      <div><div class="wn"><span class="grade-신화">신화 👹 [${b.name}]</span> <span style="color:var(--unique);font-size:12px">✅ 상시 장착중</span>${setOn ? ' <span style="color:var(--unique);font-size:12px">✨ 세트 발동중!</span>' : ''}</div>
+      <div><div class="wn"><span class="bossacc-stage">${stage}단계 · ${FLOORS[f].name}</span> <span class="grade-신화">신화 👹 [${b.name}]</span> <span style="color:var(--unique);font-size:12px">✅ 상시 장착중</span>${setOn ? ' <span style="color:var(--unique);font-size:12px">✨ 세트 발동중!</span>' : ''}</div>
       <div class="wi">${accEffText(b.eff)} · 세트 효과: ${FLOORS[f].name}에서 공격력 +30%, 골드 +50%, 드롭률 +50%, 고대·태초 무기 드롭률 3배</div></div>`;
+    if (best) {
+      const partnerLabel = world1 ? '보스 무기' : '보스 보조무기';
+      const isOn = best.id === (world1 ? S.equipped : S.subEquipped);
+      const btns = document.createElement('div');
+      const btn = document.createElement('button');
+      btn.textContent = isOn ? `장착중 +${best.enhance}` : `${world1 ? '⚔️' : '🗡️'} 세트 장착 +${best.enhance}`;
+      btn.title = `${partnerLabel} 중 강화 단계가 가장 높은 것을 장착합니다`;
+      btn.style.whiteSpace = 'nowrap';
+      btn.disabled = isOn;
+      if (!isOn) btn.className = 'primary';
+      btn.onclick = () => {
+        if (world1) S.equipped = best.id;
+        else S.subEquipped = best.id;
+        log(`👹 세트 ${partnerLabel} 장착: ${world1 ? gradeTag(best) : subweaponGradeTag(best)}`, 'lg-good');
+        renderAll();
+        if (!world1) renderSubweaponTab();
+        save();
+      };
+      btns.appendChild(btn);
+      div.appendChild(btns);
+    }
     box.appendChild(div);
   }
 }

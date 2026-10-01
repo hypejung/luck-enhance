@@ -3006,8 +3006,8 @@ const HONOR_SHOP = [
   { id: 'runeBoxAncient', name: '🌌 고대 룬박스 1개', cost: 25 },
   { id: 'weaponEssence',  name: '📜 무기의 정수 50개', cost: 10 },
   { id: 'awakenEssence',  name: '💠 각성의 정수 30개', cost: 10 },
-  { id: 'raidTokens',     name: '🎫 토벌의 증표 5개', cost: 5 },
-  { id: 'worldTreeLeaf',  name: '🍃 세계수의 잎 100개', cost: 3, desc: '고급 강화 재료 부족분을 대신 낼 수 있습니다(1개=재료 1개, 무기/보조무기 구분 없음).' },
+  { id: 'raidTokens',     name: '🎫 토벌의 증표 50개', cost: 5 },
+  { id: 'worldTreeLeaf',  name: '🍃 세계수의 잎 10000개', cost: 3, desc: '고급 강화 재료 부족분을 대신 낼 수 있습니다(1개=재료 1개, 무기/보조무기 구분 없음).' },
 ];
 
 // ---------- 패치노트 ----------
@@ -10566,12 +10566,12 @@ function buyHonorShop(id) {
     log('💠 [명예의 정수 상점] 각성의 정수 +30 획득!', 'lg-good');
   } else if (id === 'raidTokens') {
     S.honorEssence = BN.sub(S.honorEssence, item.cost);
-    S.raidTokens = BN.add(S.raidTokens, 5);
-    log('🎫 [명예의 정수 상점] 토벌의 증표 +5개 획득!', 'lg-good');
+    S.raidTokens = BN.add(S.raidTokens, 50);
+    log('🎫 [명예의 정수 상점] 토벌의 증표 +50개 획득!', 'lg-good');
   } else if (id === 'worldTreeLeaf') {
     S.honorEssence = BN.sub(S.honorEssence, item.cost);
-    S.worldTreeLeaf = BN.add(S.worldTreeLeaf, 100);
-    log('🍃 [명예의 정수 상점] 세계수의 잎 +100개 획득!', 'lg-good');
+    S.worldTreeLeaf = BN.add(S.worldTreeLeaf, 10000);
+    log('🍃 [명예의 정수 상점] 세계수의 잎 +10000개 획득!', 'lg-good');
   }
   renderTop(); renderWorldRaidTab(); save();
 }

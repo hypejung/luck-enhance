@@ -2766,7 +2766,7 @@ function gloveCounterValue(key) {
 // 장갑마다 1칸. 다시 수놓으면 기존 자수를 덮어쓴다. 정수 비용은 그 장갑에 수놓은 횟수만큼 오른다.
 const EMBROIDERY = {
   pageCost: 1, essenceBase: 50000, essenceGrowth: 1.2, growthCap: 20,
-  ranges: [[0.01, 0.03], [0.02, 0.05], [0.04, 0.08], [0.06, 0.11], [0.08, 0.15], [0.10, 0.20]], // 등급(일반~신화)별 값 범위
+  ranges: [[0.02, 0.06], [0.04, 0.10], [0.08, 0.16], [0.12, 0.22], [0.16, 0.30], [0.20, 0.40]], // 등급(일반~신화)별 값 범위
 };
 function embroideryEssenceCost(g) {
   return Math.round(EMBROIDERY.essenceBase * Math.pow(EMBROIDERY.essenceGrowth, Math.min(EMBROIDERY.growthCap, g.embroCount || 0)));

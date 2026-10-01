@@ -1846,7 +1846,7 @@ const CODEX_ANCIENT_SETS = [
   { stat: 'critDamage', value: 0.20 },    // 7  거미둥지·독거미
   { stat: 'bossDmg', value: 0.20 },       // 8  고대유적·골렘파수병
   { stat: 'luck', value: 0.30 },          // 9  늪지대·리저드맨
-  { stat: 'enh', value: 5 },              // 10 저주받은성·해골기사
+  { stat: 'enh', value: 9, cap: 22 },     // 10 저주받은성·해골기사 — 실제 적용값은 ENH_BONUS_SOURCES와 같아야 한다
   { stat: 'atk', value: 0.15 },           // 11 미궁·미노타우르스
   { stat: 'critChance', value: 0.10 },    // 12 어둠의탑·암흑마법사
   { stat: 'speed', value: 0.20 },         // 13 하늘섬·와이번
@@ -1984,8 +1984,11 @@ function codexOfflineBonus() {
   const prog = codexAncientSetProgress(19);
   return (prog.need > 0 && prog.have >= prog.need) ? (CODEX_ANCIENT_SETS[19].value || 0) : 0;
 }
+// 강화확률 보너스 표기: "강화확률(기준 단계) +%p" — 기준 단계(cap)에서 딱 그 %p가 더해진다는 뜻
+function enhBonusText(value, cap) { return cap != null ? `🔨 강화확률(${cap}) +${value}%p` : `🔨 강화확률 +${value}%p`; }
 // 도감 보너스 표시용 스탯 텍스트 포맷 (accEffText와 동일한 표기 규칙)
-function codexStatText(stat, value) {
+function codexStatText(stat, value, cap) {
+  if (stat === 'enh') return enhBonusText(value, cap);
   const map = {
     gold: v => `💰 골드 +${Math.round(v * 100)}%`,
     atk: v => `⚔️ 공격력 +${Math.round(v * 100)}%`,
@@ -2042,7 +2045,7 @@ function renderCodexBonuses() {
     const prog = codexAncientSetProgress(f);
     if (!prog.need) continue;
     const label = `[고대] ${FLOORS[f].name} 완전 수집`;
-    const effText = codexStatText(set.stat, set.value);
+    const effText = codexStatText(set.stat, set.value, set.cap);
     if (prog.have >= prog.need) active.push({ grade: 6, label, effText });
     else pending.push({ grade: 6, label, effText, have: prog.have, need: prog.need });
   }
@@ -2064,7 +2067,7 @@ function renderCodexBonuses() {
   const totals = codexBonusEff();
   const totalLines = Object.entries(totals)
     .filter(([, v]) => Math.abs(v) > 1e-9)
-    .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v).replace(' ', ' 총 ')}</div>`)
+    .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v, k === 'enh' ? CODEX_ANCIENT_SETS[10].cap : undefined).replace(' ', ' 총 ')}</div>`)
     .join('');
   const totalHtml = totalLines || '<div style="color:var(--sub);font-size:13px;">아직 합산될 효과가 없습니다.</div>';
   box.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">📊 현재 도감 효과 합계</div>${totalHtml}
@@ -3471,14 +3474,14 @@ const BOSS_ACCS = [
   { name: '리저드 제왕의 진주', eff: { gold: 0.24 } },
   { name: '기수의 파멸 장갑',   eff: { speed: 0.27 } },
   { name: '제왕의 황금 나침반', eff: { atk: 0.31 } },
-  { name: '대현자의 금서',      eff: { enh: 4 } },
+  { name: '대현자의 금서',      eff: { enh: 6, enhCap: 18 } },
   { name: '여왕의 폭풍 깃털',   eff: { luck: 0.39 } },
   { name: '리치킹의 영혼 반지', eff: { gold: 0.44 } },
   { name: '데몬로드의 계약서',  eff: { atk: 0.50 } },
   { name: '베히모스의 대퇴골',  eff: { speed: 0.57 } },
   { name: '심연의 밀봉 인장',   eff: { luck: 0.64 } },
   { name: '용왕의 심장',        eff: { atk: 0.72 } },
-  { name: '신왕의 태초 인장',   eff: { gold: 0.55, luck: 0.55, enh: 9 } },
+  { name: '신왕의 태초 인장',   eff: { gold: 0.55, luck: 0.55, enh: 3, enhCap: 22 } },
   // ---- 월드2(21~40층) 보스장신구 — 1~20층과 같은 성장폭을 그대로 재사용, 다만 13번째/
   // 마지막 자리는 강화확률 대신 보조무기 강화확률/증폭으로 채워서 보조무기 효과를 끌어올린다.
   { name: '그레이헐트의 안개 목걸이', eff: { gold: 0.08 } },
@@ -5411,8 +5414,8 @@ const ACC_STAT_EFF = { atk: 1.0, speed: 1.0, gold: 1.05, luck: 0.95, critChance:
 function genAccessories() {
   const list = [];
   for (let f = 0; f < ACC_NAMES.length; f++) {
-    if (f === 12) { list.push({ name: ACC_NAMES[f], eff: { enh: 3 } }); continue; }
-    if (f === 19) { list.push({ name: ACC_NAMES[f], eff: { gold: 0.20, luck: 0.20, enh: 4 } }); continue; }
+    if (f === 12) { list.push({ name: ACC_NAMES[f], eff: { enh: 3, enhCap: 16 } }); continue; }
+    if (f === 19) { list.push({ name: ACC_NAMES[f], eff: { gold: 0.20, luck: 0.20, enh: 4, enhCap: 18 } }); continue; }
     // 월드2도 13번째/마지막 자리는 특수 장신구로 — 강화확률 자리는 보조무기 강화확률로 대체.
     if (f === 32) { list.push({ name: ACC_NAMES[f], eff: { subEnh: 0.03 } }); continue; }
     if (f === 39) { list.push({ name: ACC_NAMES[f], eff: { subAmp: 0.20, subEnh: 0.04 } }); continue; }
@@ -8832,10 +8835,9 @@ function arcaneTomesHtml() {
     const have = arcaneTomeCount(i);
     const done = have >= ARCANE_TOME_PAGES;
     const leaves = Array.from({ length: ARCANE_TOME_PAGES }, (_, k) => (S.arcanePages[i] || [])[k] ? '📜' : '▫️').join('');
-    const at = [src.cap, 29].map(e => `+${e}→${e + 1} +${flatBonusAt(src, e).toFixed(2)}%p`).join(' · ');
     return `<div style="font-size:11px;padding:6px;border:1px solid ${done ? 'var(--gold)' : 'var(--border)'};border-radius:6px;${done ? 'background:#2a2a1a;' : ''}">
       <b style="color:${done ? 'var(--gold)' : 'var(--text)'}">${b.icon} ${b.tome}</b> ${leaves} (${have}/${ARCANE_TOME_PAGES})
-      <div style="color:var(--sub)">${21 + i * 5}~${25 + i * 5}서고 · 완성 시 강화 확률 +${src.value}%p (+${src.cap}강까지 그대로, 그 위로는 점점 감소: ${at})</div></div>`;
+      <div style="color:var(--sub)">${21 + i * 5}~${25 + i * 5}서고 · 완성 시 ${enhBonusText(src.value, src.cap)}</div></div>`;
   }).join('');
   return `<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
     <div style="font-size:13px;margin-bottom:6px;">📚 비전서 (${LIBRARY_BANDS.filter((b, i) => arcaneTomeComplete(i)).length}/${LIBRARY_BANDS.length}권 완성)</div>
@@ -10190,7 +10192,7 @@ function renderSubCodexBonuses() {
   }
   const totalLines = Object.entries(totals)
     .filter(([, v]) => Math.abs(v) > 1e-9)
-    .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v).replace(' ', ' 총 ')}</div>`)
+    .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v, k === 'enh' ? CODEX_ANCIENT_SETS[10].cap : undefined).replace(' ', ' 총 ')}</div>`)
     .join('');
   const totalHtml = totalLines || '<div style="color:var(--sub);font-size:13px;">아직 합산될 효과가 없습니다.</div>';
   listBox.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">📊 현재 보조무기 도감 효과 합계</div>${totalHtml}
@@ -12138,7 +12140,8 @@ function computeStats() {
     bossBonus: bossDmgBonus() * 100,
     goldBonus: (goldMul - 1) * 100,
     dropBonus: (dropMul - 1) * 100,
-    enhBonus: ae.enh,
+    // 장착 무기의 현재 강화 단계에서 실제로 더해지는 강화확률 보너스(소스마다 기준 단계가 달라 단순 합산은 무의미)
+    enhBonus: w && w.enhance < ENH.maxLevel ? enhTierBonus(w.enhance) : 0,
     speedAccBonus: ae.speed * 100,
   };
 }
@@ -12161,7 +12164,7 @@ function renderStats() {
       <div class="statcell"><div class="sl">보스 피해량 보너스</div><div class="sv">+${s.bossBonus.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">골드 획득 보너스</div><div class="sv">+${s.goldBonus.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">아이템 드롭률 보너스</div><div class="sv">+${s.dropBonus.toFixed(0)}%</div></div>
-      <div class="statcell"><div class="sl">강화 성공확률 보너스</div><div class="sv">+${s.enhBonus.toFixed(0)}%p</div></div>
+      <div class="statcell"><div class="sl">강화확률 보너스(+${w.enhance}→+${Math.min(ENH.maxLevel, w.enhance + 1)})</div><div class="sv">+${s.enhBonus.toFixed(2)}%p</div></div>
       <div class="statcell"><div class="sl">공격속도 보너스(장신구)</div><div class="sv">+${s.speedAccBonus.toFixed(0)}%</div></div>
     </div>
     <div style="margin-top:10px;font-size:12px;color:var(--sub)">장착 무기: ${gradeTag(w)}</div>`;
@@ -12266,7 +12269,8 @@ const GUIDE_SECTIONS = [
     <br><br><b>+10강 이후</b>부터는 강화 1회당 공격력 상승폭이 점점 커지고, 등급이 높을수록 <b>+15강 이상</b> 성공 확률이 훨씬 가파르게 낮아지는 대신 성공 시 보상은 더 큽니다.
     <br><br><b>+15강</b>부터는 고급 재료(에픽급)가 필요합니다 — 등급·사냥터 구분 없이 통합된 하나의 재료 풀로, 푸른세계·황혼국 어디서 얻은 것이든 그대로 사용할 수 있습니다(단, 보조무기 고급 강화는 황혼국 재료만 인정). 부족하면 명예의 정수 상점의 🍃 세계수의 잎(1개=재료 1개) 또는 🎫 토벌의 증표(1개=재료 100개)로 대신 낼 수 있습니다. 같은 단계부터 골드 3배·고급 재료 30배를 쓰는 <b>고급 강화</b>로 파괴 확률을 절반으로 낮출 수 있습니다.
     <br><br><b>룬</b>은 +15강 이상 강화한 무기에만 장착 가능하며, 슬롯 수는 무기 등급에 따라 일반 1개부터 신화 6개, 고대 8개, 태초 10개까지 늘어납니다.
-    <br><br><b>태초/고대 무기</b>는 강화 시 골드 외에 "무기의 정수"도 함께 소모합니다.`,
+    <br><br><b>태초/고대 무기</b>는 강화 시 골드 외에 "무기의 정수"도 함께 소모합니다.
+    <br><br><b>강화확률 보너스 표기</b>: <b>강화확률(20) +5%p</b>는 +20강에서 +5%p가 더해진다는 뜻입니다. 그보다 높은 강화에서는 효과가 점점 줄어듭니다.`,
   },
   {
     icon: '✨', title: '강화데이 이벤트',
@@ -12324,7 +12328,7 @@ const GUIDE_SECTIONS = [
     <br><br>월드2(황혼국) 사냥터 보스를 처치해도 무기의 정수를 보조로 얻을 수 있습니다 — 쿨타임 1시간마다 반복 가능한 대신, 1회당 보상은 도서관보다 확실히 낮습니다.
     <br><br><b>21~40서고</b>: 20서고를 돌파하면 이어지는 심층 서고입니다(40서고가 끝). 5서고마다 테마가 바뀌고, 서고마다 <b>📕 금서의 저주</b>(👹 보스 패턴 — 21~30서고 2개, 31~40서고 3개+광폭화)가 걸려 있습니다. 저주 조합은 <b>초기화 주기마다 서고별로 새로 바뀌며</b>, 한 서고의 저주끼리는 대응 스탯이 겹치지 않으니 서고에 맞춰 🧤 장갑을 바꿔 끼세요.
     <br><br>이 구간 승리 보상: 🧵 강철실, 📄 금서의 페이지(장갑 자수 재료), 50% 확률로 🧤 장갑, 40% 확률로 <b>📜 비전서 낱장</b>. 비전서는 5서고 구간마다 한 권(낱장 5장)씩 총 4권이고, 이미 가진 낱장이 나오면 금서의 페이지 3장으로 바뀝니다.
-    <br><br><b>📚 비전서를 완성하면 고강화 확률이 영구히 오릅니다</b>(메인 무기). 권마다 정해진 강화 단계까지는 표시된 %p가 그대로 더해지고, 그보다 높은 단계에서는 점점 줄어듭니다 — 뒤쪽 권일수록 더 높은 강화까지 힘을 씁니다. 월드3에서 같은 방식의 수집 보상이 추가되면, 전부 모았을 때 강화데이 기준 태초 무기 +29→+30 확률이 약 5%가 되도록 설계되어 있습니다.`,
+    <br><br><b>📚 비전서를 완성하면 메인 무기 강화확률이 영구히 오릅니다.</b> 권마다 강화확률(24)~(27) 보너스를 주며, 뒤쪽 권일수록 더 높은 강화까지 힘을 씁니다.`,
   },
   {
     icon: '💠', title: '각성 시스템',
@@ -12542,7 +12546,7 @@ function accEffText(eff) {
   if (eff.atk) parts.push(`⚔️ 공격력 +${Math.round(eff.atk * 100)}%`);
   if (eff.speed) parts.push(`⚡ 공속 +${Math.round(eff.speed * 100)}%`);
   if (eff.luck) parts.push(`🍀 행운(드롭률) +${Math.round(eff.luck * 100)}%`);
-  if (eff.enh) parts.push(`🔨 강화 확률 +${eff.enh}%p`);
+  if (eff.enh) parts.push(enhBonusText(eff.enh, eff.enhCap));
   if (eff.critChance) parts.push(`💥 치명타 확률 +${(eff.critChance * 100).toFixed(1)}%p`);
   if (eff.critDamage) parts.push(`💢 치명타 피해 +${Math.round(eff.critDamage * 100)}%p`);
   if (eff.extraAtk) parts.push(`⚡ 연타 확률 +${(eff.extraAtk * 100).toFixed(1)}%p`);

@@ -2619,6 +2619,7 @@ function bdHealBoss(n) {
 }
 // dealMonDamage()에서 호출: 웅크리기·약화 → 분신 → 보호막 순으로 처리하고 본체가 받을 피해를 돌려준다
 function bdFilterDamage(amount) {
+  if (!(amount > 0)) return 0;
   amount *= (1 - Math.min(0.95, bdStrength('guard'))) * Math.max(0.1, 1 - bd.weakenTotal);
   if (bd.illusions.length) {
     bd.illusions[0] -= amount;
@@ -6666,6 +6667,9 @@ const mon = { hp: BN.from(0), maxHp: BN.from(0), atkTimer: 0, spawnTimer: 0, dea
 // 별도로 누적"하는 방식으로 측정한다 — mon.hp 차감과 무관하게 punchDealtOverflow가 정확한
 // 총합을 갖는다.
 function dealMonDamage(amount) {
+  // 공진 파쇄·신성한 일격처럼 빅넘버({m,e})로 넘어오는 피해는 숫자로 바꿔서 받는다 — 그대로 곱하면
+  // NaN이 되어 보스전 피해가 0으로 사라지고, 보스 패턴(보호막·분신·역행) 수치까지 NaN으로 오염된다.
+  if (typeof amount === 'object' && amount !== null) amount = BN.toNumber(amount);
   // 네피림(태초의 유물): 오크 샤먼이 소환된 동안엔 적이 받는 모든 피해가 배율만큼 증폭된다.
   amount = amount * nephilimTakenMult();
   // 아라크네(태초의 유물): 직조 스택에 비례해 대상이 받는 모든 피해 증폭
@@ -7828,7 +7832,12 @@ function tick(dt) {
   }
   // 출혈(레전더리 치명타) 지속 피해 처리
   if (fx.bleeds && fx.bleeds.length) {
-    for (const b of fx.bleeds) { mon.hp = BN.sub(mon.hp, b.dmgPerSec * dt); b.remain -= dt; }
+    for (const b of fx.bleeds) {
+      // 출혈도 보스 패턴(웅크리기·분신·보호막 등)을 거친다
+      const d = (bd && bossFight.active && (bossFight.isRaid || bossFight.isLibrary)) ? bdFilterDamage(b.dmgPerSec * dt) : b.dmgPerSec * dt;
+      if (d > 0) mon.hp = BN.sub(mon.hp, d);
+      b.remain -= dt;
+    }
     fx.bleeds = fx.bleeds.filter(b => b.remain > 0);
     attacked = true;
     if (BN.lte(mon.hp, 0)) {

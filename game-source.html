@@ -2520,28 +2520,28 @@ const DISRUPT_COUNTERS = {
 const fmtRate = (v, d = 0) => `${+(v * 100).toFixed(d)}%`;
 // v: [효과 1~2개 보스 값, 효과 3개 보스 값]. 지속시간형(암흑·스턴·탈진·봉인)은 v가 초 단위.
 const DISRUPTIONS = {
-  evasion:   { name: '회피', icon: '🌫️', counter: 'accuracy', v: [0.25, 0.30], desc: v => `공격이 ${fmtRate(v)} 확률로 빗나감` },
-  guard:     { name: '웅크리기', icon: '🛡️', counter: 'pierce', v: [0.30, 0.35], desc: v => `받는 피해 -${fmtRate(v)}` },
-  foresight: { name: '예언', icon: '🔮', counter: 'insight', v: [0.60, 0.60], desc: v => `치명타 추가 피해 ${fmtRate(v)} 무시` },
-  illusion:  { name: '환영 분신', icon: '🪞', counter: 'insight', v: [0.02, 0.015], every: 30, count: 4, desc: v => `30초마다 분신 4개(각각 최대 체력 ${fmtRate(v, 1)}) — 분신부터 부숴야 하고 초과 피해는 버려짐` },
-  shield:    { name: '보호막', icon: '🧊', counter: 'shatter', v: [0.05, 0.04], every: 20, desc: v => `20초마다 최대 체력 ${fmtRate(v)} 보호막` },
-  regen:     { name: '재생', icon: '♻️', counter: 'wound', v: [0.0025, 0.0025], desc: v => `매초 최대 체력 ${fmtRate(v, 2)} 회복` },
-  rewind:    { name: '역행', icon: '⏪', counter: 'wound', v: [0.50, 0.60], every: 20, window: 10, desc: v => `20초마다 최근 10초 동안 받은 피해의 ${fmtRate(v)} 복구` },
-  timeDrain: { name: '시간 잠식', icon: '⏳', counter: 'endure', v: [4, 3], every: 10, desc: v => `10초마다 남은 시간 -${v}초` },
-  thorns:    { name: '가시 반격', icon: '🌵', counter: 'endure', v: [3, 2.5], every: 10, desc: v => `10초마다 남은 시간 -(치명타 확률 × ${v}초)` },
-  blind:     { name: '암흑', icon: '🌑', counter: 'resist', v: [10, 8], every: 20, miss: 0.5, desc: v => `20초마다 ${v}초 동안 공격 50% 빗나감` },
-  stun:      { name: '스턴', icon: '💫', counter: 'resist', v: [3, 3], every: 15, desc: v => `15초마다 ${v}초 동안 공격 불가` },
-  exhaust:   { name: '탈진', icon: '😮‍💨', counter: 'resist', v: [10, 8], every: 20, slow: 0.5, desc: v => `20초마다 ${v}초 동안 공격속도 -50%` },
-  seal:      { name: '봉인', icon: '🔇', counter: 'resist', v: [8, 6], every: 20, desc: v => `20초마다 ${v}초 동안 룬 특수효과·무기 특수효과·고대 스피릿·태초 효과 정지` },
-  weaken:    { name: '약화 저주', icon: '🕸️', counter: 'resist', v: [0.04, 0.03], every: 10, desc: v => `10초마다 공격력 -${fmtRate(v)} 누적` },
-  scatter:   { name: '흩어짐', icon: '🌀', counter: 'focus', v: [0.5, 0.5], every: 10, desc: v => `10초마다 전투 스택 ${fmtRate(v)} 제거` },
+  evasion:   { name: '회피', icon: '🌫️', counter: 'accuracy', v: [0.32, 0.28], desc: v => `공격이 ${fmtRate(v)} 확률로 빗나감` },
+  guard:     { name: '웅크리기', icon: '🛡️', counter: 'pierce', v: [0.32, 0.28], desc: v => `받는 피해 -${fmtRate(v)}` },
+  foresight: { name: '예언', icon: '🔮', counter: 'insight', v: [0.60, 0.55], desc: v => `치명타 추가 피해 ${fmtRate(v)} 무시` },
+  illusion:  { name: '환영 분신', icon: '🪞', counter: 'insight', v: [0.032, 0.027], every: 30, count: 4, desc: v => `30초마다 분신 4개(각각 최대 체력 ${fmtRate(v, 1)}) — 분신부터 부숴야 하고 초과 피해는 버려짐` },
+  shield:    { name: '보호막', icon: '🧊', counter: 'shatter', v: [0.08, 0.07], every: 20, desc: v => `20초마다 최대 체력 ${fmtRate(v)} 보호막` },
+  regen:     { name: '재생', icon: '♻️', counter: 'wound', v: [0.0033, 0.0026], desc: v => `매초 최대 체력 ${fmtRate(v, 2)} 회복` },
+  rewind:    { name: '역행', icon: '⏪', counter: 'wound', v: [0.90, 0.70], every: 20, window: 10, desc: v => `20초마다 최근 10초 동안 받은 피해의 ${fmtRate(v)} 복구` },
+  timeDrain: { name: '시간 잠식', icon: '⏳', counter: 'endure', v: [8, 6], every: 10, desc: v => `10초마다 남은 시간 -${v}초` },
+  thorns:    { name: '가시 반격', icon: '🌵', counter: 'endure', v: [6, 5], flat: 3, every: 10, desc: v => `10초마다 남은 시간 -(3초 + 치명타 확률 × ${v}초)` },
+  blind:     { name: '암흑', icon: '🌑', counter: 'resist', v: [9, 7], every: 15, miss: 0.6, desc: v => `15초마다 ${v}초 동안 공격 60% 빗나감` },
+  stun:      { name: '스턴', icon: '💫', counter: 'resist', v: [4, 3], every: 10, desc: v => `10초마다 ${v}초 동안 공격 불가` },
+  exhaust:   { name: '탈진', icon: '😮‍💨', counter: 'resist', v: [10, 8], every: 15, slow: 0.6, desc: v => `15초마다 ${v}초 동안 공격속도 -60%` },
+  seal:      { name: '봉인', icon: '🔇', counter: 'resist', v: [10, 8], every: 15, desc: v => `15초마다 ${v}초 동안 룬 특수효과·무기 특수효과·고대 스피릿·태초 효과 정지` },
+  weaken:    { name: '약화 저주', icon: '🕸️', counter: 'resist', v: [0.09, 0.07], every: 10, desc: v => `10초마다 공격력 -${fmtRate(v)} 누적` },
+  scatter:   { name: '흩어짐', icon: '🌀', counter: 'focus', v: [0.7, 0.6], every: 10, desc: v => `10초마다 전투 스택 ${fmtRate(v)} 제거` },
 };
 // 토벌전 단계(index) → 방해 효과. [key, 값 덮어쓰기] 형태로 보스별 수치를 따로 줄 수 있다.
 // 효과가 3개인 보스는 체력 30% 이하에서 광폭화(모든 방해 효과 ×BOSS_ENRAGE_MULT).
 const BOSS_DISRUPTIONS = {
   20: ['evasion'], 21: ['illusion'], 22: ['exhaust'], 23: ['weaken'], 24: ['guard'],
   25: ['timeDrain', 'blind'], 26: ['regen', 'scatter'], 27: ['stun', 'foresight'], 28: ['seal', 'guard'], 29: ['shield', 'illusion'],
-  30: [['regen', 0.003], 'shield'], 31: ['exhaust', 'blind'], 32: ['rewind', 'stun'], 33: ['foresight', 'scatter'], 34: ['guard', 'thorns'],
+  30: ['regen', 'shield'], 31: ['exhaust', 'blind'], 32: ['rewind', 'stun'], 33: ['foresight', 'scatter'], 34: ['guard', 'thorns'],
   35: ['timeDrain', 'rewind', 'seal'], 36: ['shield', 'evasion', 'weaken'], 37: ['stun', 'exhaust', 'timeDrain'],
   38: ['foresight', 'illusion', 'blind'], 39: ['rewind', 'scatter', 'thorns'],
 };
@@ -2653,7 +2653,9 @@ function bdTrigger(key) {
     bossFight.timeLeft -= s;
     floatText(`⏳ 시간 잠식 -${s.toFixed(1)}초`);
   } else if (key === 'thorns') {
-    const loss = (computeStats().critChance / 100) * s;
+    // 고정분(flat)은 기준값 대비 같은 비율로 약해진다(장갑 대응·광폭화 동일 적용)
+    const e = bd.list.find(x => x.key === 'thorns');
+    const loss = (d.flat / e.base + computeStats().critChance / 100) * s;
     if (loss > 0) { bossFight.timeLeft -= loss; floatText(`🌵 가시 반격 -${loss.toFixed(1)}초`); }
   } else if (key === 'blind') {
     bd.blindUntil = t + s; floatText('🌑 암흑!');
@@ -2725,7 +2727,7 @@ function bossDisruptionStatusHtml() {
 
 // ---------- 장갑 (의복, 1칸) ----------
 // 보조무기 방식: 종류마다 주 스탯/보조 스탯(보스 방해 대응 스탯)이 고정이고, 등급 배율
-// (SUBWEAPON_GRADE_MULT) × 3강마다 오르는 배율(1 + 0.1 × tier)로 성장한다. 신화 +30 주 스탯 60%.
+// (SUBWEAPON_GRADE_MULT) × 3강마다 오르는 배율(1 + 0.1 × tier)로 성장한다. 신화 +30 주 스탯 80%.
 // names: 일반~신화(0~5) 등급별 이름.
 const GLOVE_TYPES = [
   { icon: '🏹', main: 'accuracy', sub: 'insight', names: ['가죽 사냥장갑', '예리한 사냥장갑', '추적자의 장갑', '바람을 읽는 궁사장갑', '매의 눈 사냥장갑', '오리온의 사냥 장갑'] },
@@ -2737,7 +2739,7 @@ const GLOVE_TYPES = [
   { icon: '🧘', main: 'resist', sub: 'focus', names: ['수련 붕대', '정갈한 수련 붕대', '산사의 붕대', '번뇌를 끊는 붕대', '고요한 수행자의 붕대', '달마의 수행 붕대'] },
   { icon: '⏳', main: 'focus', sub: 'endure', names: ['태엽공 장갑', '정밀한 태엽공 장갑', '시계공의 장갑', '톱니를 맞추는 장갑', '멈춘 초침의 장갑', '모이라이의 실장갑'] },
 ];
-const GLOVE_MAIN_BASE = 0.0375;
+const GLOVE_MAIN_BASE = 0.05; // 신화 +30 주 스탯 80%
 const GLOVE_ATK_MULT = 0.5; // 보조무기 공격력(SUBWEAPON_ATK_MULT) 대비
 const GLOVE_BAG_MAX = 60;
 // 강화 골드는 "그 강화 단계를 밀 때쯤 도는 토벌전 1회 골드의 약 10%" 기준으로 역산한 곡선

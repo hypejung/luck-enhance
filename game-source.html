@@ -2496,7 +2496,9 @@ const RAID_MONSTERS = [
 // (20단계까지 쓰는 가속형 공식을 그대로 40단계까지 늘리면 보상이 폭주함). 목표 화력은
 // "40단계 ≈ 태초 +30 + 신화 +27 보조무기(결전의 기백 포함) + 장갑"으로 역산했다.
 const RAID_EXT_START = 20;
-const RAID_EXT = { hpGrowth: 2.1, goldGrowth: 2.1, tokenGrowth: 1.1, steelBase: 10, steelGrowth: 1.1 };
+// 체력: 21~30단계 단계당 ×2.1, 31~40단계는 ×1.92 — 보스 패턴 재조정 후 시뮬레이션으로
+// "풀세팅 + 태초 +30 + 신화 +27 보조무기 + 신화 +30 장갑·자수 = 40단계 클리어(여유 약 15%)"에 맞춘 값.
+const RAID_EXT = { hpGrowth: 2.1, hpGrowthLate: 1.92, lateStart: 30, goldGrowth: 2.1, tokenGrowth: 1.1, steelBase: 10, steelGrowth: 1.1 };
 // 21단계부터는 사냥터 해금뿐 아니라 바로 앞 단계 토벌전을 클리어해야 도전할 수 있다.
 function raidStageLocked(stage) {
   if (stage >= S.unlocked) return true;
@@ -3173,6 +3175,9 @@ function raidEnsureDay() {
   if (S.raid.day !== today) { S.raid.day = today; S.raid.count = 0; S.raid.done = {}; S.osirisRaidRefundToday = 0; }
 }
 function raidHp(stage) {
+  if (stage >= RAID_EXT.lateStart) {
+    return BN.floor(BN.mul(raidHp(RAID_EXT.lateStart - 1), BN.pow(RAID_EXT.hpGrowthLate, stage - RAID_EXT.lateStart + 1)));
+  }
   if (stage >= RAID_EXT_START) {
     return BN.floor(BN.mul(raidHp(RAID_EXT_START - 1), BN.pow(RAID_EXT.hpGrowth, stage - RAID_EXT_START + 1)));
   }
@@ -3229,11 +3234,12 @@ const LIBRARY = {
   runeDropChance: 0.15,
   relicDropChance: 0.10,
 };
-// 21~40서고(깊이 20~39): 체력은 20서고 기준 서고당 ×1.65(30서고 ≈ 토벌전 40단계, 31~40서고는
+// 21~40서고(깊이 20~39): 체력은 20서고 기준 서고당 ×1.52/×1.65(30서고 ≈ 토벌전 40단계, 31~40서고는
 // 월드3 이후 성장을 기다리는 장기 목표). 정수는 이미 남아돌아서 서고당 ×1.1로 완화하고, 대신
 // 강철실·장갑·금서의 페이지·비전서 낱장을 준다. 방해 효과는 초기화 주기마다 서고별로 새로 뽑힌다.
 const LIBRARY_EXT = {
-  start: 20, maxDepth: 40, hpGrowth: 1.65, rewardGrowth: 1.1,
+  // 체력: 21~30서고 ×1.52(30서고 ≈ 토벌전 40단계), 31~40서고 ×1.65(월드3 이후 목표)
+  start: 20, maxDepth: 40, hpGrowth: 1.52, hpGrowthLate: 1.65, lateStart: 30, rewardGrowth: 1.1,
   steelBase: 40, steelGrowth: 1.1,
   gloveDropChance: 0.5,
   pageDropChance: 0.4,   // 비전서 낱장
@@ -3256,6 +3262,7 @@ const LIBRARY_GLOVE_GRADES = [
 ];
 function libraryBand(depth) { return depth >= LIBRARY_EXT.start ? LIBRARY_BANDS[Math.min(3, Math.floor((depth - LIBRARY_EXT.start) / 5))] : null; }
 function libraryHp(depth) {
+  if (depth >= LIBRARY_EXT.lateStart) return BN.floor(BN.mul(libraryHp(LIBRARY_EXT.lateStart - 1), BN.pow(LIBRARY_EXT.hpGrowthLate, depth - LIBRARY_EXT.lateStart + 1)));
   if (depth >= LIBRARY_EXT.start) return BN.floor(BN.mul(libraryHp(LIBRARY_EXT.start - 1), BN.pow(LIBRARY_EXT.hpGrowth, depth - LIBRARY_EXT.start + 1)));
   return BN.floor(BN.mul(raidHp(LIBRARY.baseHpStage), BN.pow(LIBRARY.hpGrowth, depth)));
 }
@@ -12293,7 +12300,7 @@ const GUIDE_SECTIONS = [
     </table>
     <br><b>획득</b>: 토벌전 21단계 이상 승리 시 30%, 도서관 21서고 이상 승리 시 50% 확률(도서관 쪽이 등급이 더 높음). 절반은 그 보스의 패턴을 막는 종류가 나옵니다.
     <br><br><b>강화</b>: 골드와 <b>🧵 강철실</b>(토벌전 21단계·도서관 21서고 이상 보상)이 필요합니다. 성공·파괴 확률은 보조무기와 같고, +15부터는 강철실 30배로 파괴 확률을 절반으로 낮추는 고급 강화를 쓸 수 있습니다. 강화는 장착 중인 장갑만 할 수 있습니다.
-    <br><br><b>🪡 자수</b>: 도서관 21서고 이상에서 얻는 <b>📄 금서의 페이지</b> 1장과 📜 무기의 정수로, 장갑에 대응 스탯 하나를 무작위로 수놓습니다(장갑마다 1칸). 다시 수놓으면 기존 자수를 덮어쓰고, 같은 장갑에 수놓을수록 정수 비용이 오릅니다. 주 스탯과 같은 스탯이 나오면 그대로 더해져서, 신화 +30 장갑이면 최대 80%까지 올릴 수 있습니다.`,
+    <br><br><b>🪡 자수</b>: 도서관 21서고 이상에서 얻는 <b>📄 금서의 페이지</b> 1장과 📜 무기의 정수로, 장갑에 대응 스탯 하나를 무작위로 수놓습니다(장갑마다 1칸). 다시 수놓으면 기존 자수를 덮어쓰고, 같은 장갑에 수놓을수록 정수 비용이 오릅니다. 주 스탯과 같은 스탯이 나오면 그대로 더해져서, 신화 +30 장갑(주 스탯 80%)이면 그 패턴을 완전히 무효로 만들 수도 있습니다. 보통은 장갑이 못 막는 두 번째 패턴의 스탯을 노리는 것이 좋습니다.`,
   },
   {
     icon: '📖', title: '고대의 도서관',

@@ -5477,7 +5477,7 @@ const RUNE_SPECIALS = {
   timedilation: { name: '시간 왜곡',       grade: 5, bonus: 20,  desc: '보스전 제한시간 +20초' },
   bossrush:     { name: '보스 러시',       grade: 5, mult: 0.5,  desc: '보스 재도전 쿨타임 50% 감소' },
   midastouch:   { name: '미다스의 손',     grade: 6, proc: 0.08, desc: '몬스터 처치 시 8% 확률로 랜덤박스(전체 등급, 신화 포함) 즉시 획득. 장착 중에는 랜덤박스·룬박스를 열 때 가장 좋은 등급이 나올 확률이 2배로 오른다(늘어난 만큼 낮은 등급에서 비율대로 차감)' },
-  divinestrike: { name: '신벌',            grade: 6, proc: 0.02, bossDmgPct: 0.01, bossCapPct: 0.10, desc: '공격 시 2% 확률로 몬스터 즉시 처치 (보스는 대신 최대 체력의 1% 고정 피해, 한 전투당 최대 체력의 10%까지)' },
+  divinestrike: { name: '신벌',            grade: 6, proc: 0.02, bossDmgPct: 0.01, bossCapPct: 0.10, desc: '공격 시 2% 확률로 몬스터 즉시 처치 (보스는 대신 최대 체력의 1% 고정 피해, 한 전투당 최대 체력의 10%까지 · 펀치기계와 레이드에서는 발동하지 않음)' },
   omnirune:     { name: '전능의 룬',       grade: 6, trainCostMult: 0.7, goldMult: 1.5, desc: '능력치 훈련 비용 -30%, 골드 획득 +50%' },
   elitehunter:  { name: '정예 사냥꾼',     grade: 5, bonus: 0.02, desc: '엘리트(유니크) 몬스터 출현 확률 +2%p' },
   luckygambler: { name: '도박의 신',       grade: 6, proc: 0.25, desc: '도박장에서 손해가 나오면 25% 확률로 즉시 재도전(더 나은 결과가 나올 때까지는 아니고 한 번 더 굴림)' },
@@ -7971,7 +7971,10 @@ function attack(w) {
   // 신벌(룬 특수효과): 일반 몬스터는 즉시 처치, 보스는 최대 체력의 1% 고정 피해로 대체.
   // 여러 개 장착하면 합산 확률로 판정(1-(1-p)^n). 화면 텍스트로만 알림.
   const divineCount = weaponSpecialCount(w, 'divinestrike');
-  if (divineCount > 0 && Math.random() < 1 - Math.pow(1 - RUNE_SPECIALS.divinestrike.proc, divineCount)) {
+  // 펀치기계·주간 통합 레이드는 거대한 더미에 누적 피해를 재는 컨텐츠라 최대 체력 비례 피해가 무의미하게
+  // 폭주한다 — 두 곳에서는 신벌이 아예 발동하지 않는다.
+  const divineBlocked = bossFight.active && (bossFight.isPunch || bossFight.isWeeklyRaid);
+  if (divineCount > 0 && !divineBlocked && Math.random() < 1 - Math.pow(1 - RUNE_SPECIALS.divinestrike.proc, divineCount)) {
     if (bossFight.active) {
       // 최대 체력 비례라 보스 체력 성장과 무관하게 통하므로, 한 보스전당 총량을 최대 체력의 bossCapPct로 제한
       const maxHpN = BN.toNumber(mon.maxHp);
@@ -12357,7 +12360,7 @@ const GUIDE_SECTIONS = [
       <tr><td><span class="grade-신화">신화</span></td><td>낙인 폭발의 룬</td><td>치명타 표식 후 3초 내 재적중 시 공격력 200% 추가 피해</td><td>도서관 전용</td></tr>
       <tr><td><span class="grade-신화">신화</span></td><td>심층 지식의 룬</td><td>룬 합성 성공 확률 +15%p</td><td>도서관 전용</td></tr>
       <tr><td><span class="grade-고대">고대</span></td><td>미다스의 손</td><td>처치 시 8% 확률로 랜덤박스 즉시 획득, 장착 중엔 박스 최고 등급 확률 2배</td><td></td></tr>
-      <tr><td><span class="grade-고대">고대</span></td><td>신벌</td><td>공격 시 2% 확률로 즉시 처치(보스는 최대체력 1% 고정 피해, 한 전투당 최대체력 10%까지)</td><td></td></tr>
+      <tr><td><span class="grade-고대">고대</span></td><td>신벌</td><td>공격 시 2% 확률로 즉시 처치(보스는 최대체력 1% 고정 피해, 한 전투당 최대체력 10%까지 · 펀치기계·레이드 제외)</td><td></td></tr>
       <tr><td><span class="grade-고대">고대</span></td><td>전능의 룬</td><td>훈련 비용 -30%, 골드 획득 +50%</td><td></td></tr>
       <tr><td><span class="grade-고대">고대</span></td><td>도박의 신</td><td>도박장 손해 시 25% 확률로 즉시 재도전</td><td></td></tr>
       <tr><td><span class="grade-고대">고대</span></td><td>대풍요의 룬</td><td>재료 획득 시 확률적으로 +3~+30개 추가</td><td></td></tr>

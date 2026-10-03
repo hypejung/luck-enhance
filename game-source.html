@@ -1031,7 +1031,7 @@
       <div class="panel">
         <h3>🗡️ 보조무기 도감</h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-          월드2(황혼국) 보조무기 컬렉션입니다. 일반 보조무기(등급×타입), 보스 보조무기, 고대 보조무기, 황혼의 유산 네 트랙으로 나뉘며, 전부 월드 구분 없이 항상 적용됩니다. 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
+          월드2(황혼국) 보조무기 컬렉션입니다. 일반 보조무기(등급×타입), 보스 보조무기, 고대 보조무기, 태초 보조무기, 황혼의 유산 다섯 트랙으로 나뉘며, 전부 월드 구분 없이 항상 적용됩니다. 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
         </div>
         <div id="subCodexGrid"></div>
       </div>
@@ -1498,9 +1498,9 @@ const SUBWEAPON_ACTIVE = {
 };
 // 등급별 0강 기준값 — 일반 50% / 레어 150% / 유니크 250% / 신화 400%(사용자 지정)이고
 // 에픽/레전더리는 그 사이를 보간, 고대/태초(미공개)는 추세만 이어붙인 placeholder.
-const SUBWEAPON_ACTIVE_BASE_DMG = [0.50, 1.50, 2.00, 2.50, 3.25, 4.00, 4.60, 10.00];
+const SUBWEAPON_ACTIVE_BASE_DMG = [0.50, 1.50, 2.00, 2.50, 3.25, 4.00, 4.60, 5.60];
 // 등급별 0강 기준 지속시간 — 신화가 +30강에서 20초에 도달하도록 역산(아래 성장곡선 기준).
-const SUBWEAPON_ACTIVE_BASE_DURATION = [2.5, 3.7, 4.3, 5.6, 6.2, 6.8, 7.4, 12.4];
+const SUBWEAPON_ACTIVE_BASE_DURATION = [2.5, 3.7, 4.3, 5.6, 6.2, 6.8, 7.4, 8.6];
 // 액티브 tier(0~5)별 누적 배율(지속시간용) — 메인 무기 강화 곡선처럼 뒤로 갈수록 기울기가
 // 급해지는 가속형 곱연산(1탱마다 곱해지는 증가율 자체가 커짐). tier0(강화 전)은 배율
 // 1(=기준값 그대로). 전부 밸런스 미확정 임시값(TODO).
@@ -1720,6 +1720,145 @@ const SUB_ANCIENT_ESSENCE = { base: 100, growth: 1.3 };
 function subAncientDef(sw) { return sw && sw.ancientFloor !== undefined ? SUBWEAPON_ANCIENTS[sw.ancientFloor - WORLD2_START_FLOOR] || null : null; }
 function isAncientSubweapon(sw) { return !!subAncientDef(sw); }
 function subAncientEssenceCost(sw) { return isAncientSubweapon(sw) ? Math.ceil(SUB_ANCIENT_ESSENCE.base * Math.pow(SUB_ANCIENT_ESSENCE.growth, sw.enhance)) : 0; }
+
+// ---------- 태초 보조무기 (7등급, 월드2 21~40층 — 5종씩 순차 추가) ----------
+// 구성: 고대처럼 그 층 보스 보조무기 종류로 고정(종류 패시브) + 태초 고유 패시브 1개 +
+// 액티브(결전의 기백의 보스 피해량 폭증 + 태초 고유 액티브 효과, 이름은 보조무기마다 다름).
+// 고유 패시브/액티브의 위력은 종류 패시브와 같은 단계(subPassiveTier, 3강마다 1단계, 0~10)를
+// 따라 커진다 — 0단계는 최대치의 절반, 10단계(+29·30강)에서 p에 적힌 최대치. 횟수·주기·상한 같은
+// 구조는 단계와 무관하게 고정. 플레이어에게 보이는 문구(passiveText/activeText)에는 숫자를
+// 넣지 않고 단계만 표시한다(수치는 이 객체와 코드 주석에만 존재).
+// 획득: 그 층 몬스터 초저확률 드랍(1/6100만, 이미 가진 것은 다시 나오지 않음).
+// 강화: 파괴·초기화 없이 실패 시 유지 또는 하락뿐, 골드 + 무기의 정수 소모. 성공확률은
+// 태초 무기와 같은 방식으로 "가상 등급"(GENESIS_SUB_SUCCESS_GRADE)을 써서 고대보다 관대하게.
+// index = 층 번호 - 21. 아직 설계 전인 층은 null.
+const SUBWEAPON_GENESES = [
+  { id: 'nephele', name: '네펠레의 구름양털 표창집', subtitle: 'Nephele, the Cloud-Mother', icon: '☁️',
+    passiveName: '황금 양털', activeName: '구름의 장막',
+    passiveText: '쏟아지는 표창마다 금빛 털이 쌓여, 걷잡을 수 없이 빛난다.',
+    activeText: '안개 속의 또 다른 손이, 같은 표창을 다시 던진다.',
+    // 연타마다 양털 +1(최대 max, 전투 단위·흩어지지 않음), 양털당 모든 피해 +perStack / 액티브 중 연타를 분신이 한 번 더(cloneFrac)
+    p: { perStack: 0.02, max: 40, cloneFrac: 0.8 },
+    lore: `안개가 걷히지 않는 변경의 마을에는
+아이를 잃을 뻔한 어머니의 이야기가 전해진다.
+
+그녀는 사람이 아니었다.
+구름으로 빚어진 여인이었고,
+버림받던 날 하늘로 돌아갔다.
+
+그러나 자식들이 제물이 되려던 날,
+그녀는 다시 내려왔다.
+황금 털을 두른 숫양 한 마리를 앞세우고.
+
+숫양은 아이들을 등에 태우고 바다를 건넜고,
+어머니는 그 뒤를 안개로 덮어
+누구도 쫓아오지 못하게 했다.
+
+안개는 지금도 마을을 떠나지 않는다.
+무언가를 숨기듯이.
+혹은, 아직도 누군가를 지키듯이.
+
+네펠레(Nephele).` },
+  { id: 'poludnitsa', name: '폴루드니차의 정오 검집', subtitle: 'Poludnitsa, the Lady Midday', icon: '☀️',
+    passiveName: '정오의 낫', activeName: '한낮의 심판',
+    passiveText: '해가 머리 위에 걸리면, 대답하지 못한 자에게 낫이 내려온다.',
+    activeText: '해는 지지 않고, 낫은 쉬지 않는다.',
+    // every초마다 평균 공격 피해 × mult 낫질 / 액티브 중 낫질 주기 activeEvery초(0단계는 2배 길게)
+    p: { every: 12, mult: 18, activeEvery: 2 },
+    lore: `버려진 밭에서 한낮에 일하지 마라.
+해가 머리 위에 걸리는 순간,
+흰 옷을 입은 여인이 이랑 사이로 걸어온다.
+
+그녀는 묻는다.
+대답하지 못하면, 낫이 내려온다.
+
+사람들은 밭을 버리고 떠났지만
+정오는 매일 찾아왔다.
+그녀도 매일 찾아왔다.
+
+이 검집에는 그 낫이 꽂혀 있었다고 한다.
+해가 높아질수록 칼집이 뜨거워진다.
+
+폴루드니차(Poludnitsa), 정오의 여인.` },
+  { id: 'cain', name: '카인의 낙인 쌍검띠', subtitle: 'The Mark of Cain', icon: '🩸',
+    passiveName: '카인의 표식', activeName: '카인의 복수',
+    passiveText: '피를 볼수록 이마의 표식은 깊어지고, 그 무게는 상대가 진다.',
+    activeText: '표식을 건드린 대가는, 한 번으로 끝나지 않는다.',
+    // 치명타 critsPerMark번마다 표식 +1(최대 maxMarks, 전투 단위), 표식당 치명타 피해 ×(1+perMark)
+    // 액티브: 발동 즉시 표식 가득 + 지속 중 치명타 피해의 echoFrac이 1초 간격으로 echoes번 되돌아옴
+    p: { critsPerMark: 8, maxMarks: 7, perMark: 0.06, echoFrac: 0.04, echoes: 7 },
+    lore: `처음으로 형제의 피를 땅에 흘린 자가 있었다.
+땅은 그 피를 삼키지 않고 울부짖었다.
+
+벌은 죽음이 아니었다.
+떠도는 것.
+영원히, 어디에도 머물지 못하는 것.
+
+그리고 이마에 표식이 새겨졌다.
+누구도 그를 해치지 못하게 하는 표식.
+그를 해치는 자는 몇 곱절로 갚음을 받으리라.
+
+유민들의 골목에서 떠도는 자들은 서로의 이마를 보지 않는다.
+거기에 무엇이 새겨져 있을지 알기 때문에.
+
+카인의 표식(The Mark of Cain).` },
+  { id: 'hel', name: '헬의 두 얼굴 도끼걸이', subtitle: 'Hel, Queen of the Dead', icon: '🎭',
+    passiveName: '두 얼굴', activeName: '헬헤임의 문',
+    passiveText: '산 자의 얼굴은 서두르고, 죽은 자의 얼굴은 끝을 재촉한다.',
+    activeText: '영광 없이 죽은 자들이, 여왕의 부름에 일어선다.',
+    // 보스 체력 50% 이상: 공격속도 +speed / 미만: 보스 피해량 ×(1+bossDmg). 체력이 사실상 안 줄어드는
+    // 펀치기계·주간 레이드는 전투 시간의 절반을 기준으로 전환.
+    // 액티브: 지속 중 망자 dead명이 every초마다 각자 평균 공격 피해의 frac로 공격
+    p: { speed: 0.40, bossDmg: 0.60, dead: 6, every: 0.5, frac: 0.5 },
+    lore: `저문 묘지의 문지기들은 여왕의 얼굴을 반만 기억한다.
+
+한쪽은 살아 있는 여인의 얼굴.
+다른 한쪽은 썩어가는 시체의 얼굴.
+
+그녀는 전장에서 죽지 못한 자들,
+병과 늙음으로 스러진 자들을 거두었다.
+영광 없는 죽음은 모두 그녀의 것이었다.
+
+세상의 끝이 오는 날,
+그녀의 군세가 배를 타고 나설 것이라 했다.
+죽은 자들의 손톱으로 엮은 배를.
+
+헬(Hel), 헬헤임의 여왕.` },
+  { id: 'heimdall', name: '헤임달의 걀라르 창꽂이', subtitle: 'Heimdallr, the Watchman', icon: '📯',
+    passiveName: '경계의 눈', activeName: '걀라르호른',
+    passiveText: '그 무엇도 파수꾼의 눈을 속일 수 없다.',
+    activeText: '뿔피리가 울리는 동안, 다가오는 모든 것은 응징받는다.',
+    // 치명타 피해 +critDmg(배율 가산), 예언 패턴 무력화(0단계부터) /
+    // 액티브: 지속 중 every초마다 평균 공격 피해 × mult 강타, 보스 패턴이 발동하면 즉시 한 번 더 울리고 그 패턴 무효
+    p: { critDmg: 1.2, every: 3, mult: 14 },
+    lore: `국경 초소의 마지막 파수꾼은 잠들지 않았다.
+새보다 적게 자고,
+풀이 자라는 소리와 양털이 자라는 소리까지 들었다고 한다.
+
+그는 무지개 다리의 끝을 지켰다.
+아무것도 지나가지 못하게.
+
+그의 허리에는 뿔피리가 하나 걸려 있었다.
+세상이 끝나는 날에만 불기로 약속된 뿔피리.
+
+초소는 무너졌고, 창은 녹슬었지만
+누군가는 아직 그 소리를 기다리고 있다.
+
+헤임달(Heimdallr), 걀라르호른의 주인.` },
+];
+// 그 층 몬스터 1마리당 기본 확률 — 고대 보조무기(1/1400만)보다 약 4.4배 희박(풀세팅 약 39일)
+const SUBWEAPON_GENESIS_BASE_CHANCE = 1 / 61000000;
+// 강화 시 무기의 정수 소모 — 고대 보조무기(100, ×1.3)보다 무겁게
+const SUB_GENESIS_ESSENCE = { base: 150, growth: 1.35 };
+// 강화 성공확률용 가상 등급(태초 무기 GENESIS_ENH.successGradeEquivalent와 같은 값)
+const GENESIS_SUB_SUCCESS_GRADE = 5;
+function subGenesisDef(sw) { return sw && sw.genesisFloor !== undefined ? SUBWEAPON_GENESES[sw.genesisFloor - WORLD2_START_FLOOR] || null : null; }
+function isGenesisSubweapon(sw) { return !!subGenesisDef(sw); }
+function subGenesisEssenceCost(sw) { return isGenesisSubweapon(sw) ? Math.ceil(SUB_GENESIS_ESSENCE.base * Math.pow(SUB_GENESIS_ESSENCE.growth, sw.enhance)) : 0; }
+// 고유 효과 위력 배율: 0단계 0.5 → 10단계 1.0 (종류 패시브의 1+0.1×단계 곡선을 최대치 기준으로 정규화)
+function subGenesisScale(sw) { return (1 + 0.1 * subPassiveTier(sw.enhance)) / 2; }
+function subGenesisTierLabel(sw) { const t = subPassiveTier(sw.enhance); return t >= 10 ? '10단계·최대' : `${t}단계`; }
+function subGenesisNextTierEnh(sw) { const t = subPassiveTier(sw.enhance); return t >= 10 ? null : 3 * (t + 1) - 1; }
 // 카운트 5/10/15/20 — 1~20층 "고대의 유물"과 같은 구조. 파밍 계열 중에서도 특히
 // 보조무기 파밍/뽑기 개선에 집중했다(말씀하신 "새로운 파밍 요소 획득률 개선" 취지).
 // 20단계는 accEff 스탯이 아니라 openSubweaponBox()에서 applySubRelicGradeBoost()로 직접 처리한다
@@ -1766,6 +1905,7 @@ const SUBWEAPON_CODEX_TYPE_MASTERY = [
 ];
 function subweaponCodexKey(sw) {
   if (sw.bossFloor !== undefined) return null;
+  if (sw.genesisFloor !== undefined) return null; // 태초 보조무기는 별도 트랙(S.subGenesisSeen)
   if (sw.ancientFloor !== undefined) return null; // 고대 보조무기는 별도 트랙(S.subAncientSeen) // 보스 보조무기는 별도 트랙(S.subBossCodexSeen)에서 관리
   return `g${sw.grade}_${SUBWEAPON_TYPES[sw.typeIdx].name}`;
 }
@@ -2714,6 +2854,7 @@ function bdRollMiss() {
 }
 // 예언: 치명타 배율 중 "추가분"만 줄인다
 function bdForesightMult(critMult) {
+  if (genesisSubIgnoresForesight()) return critMult; // 태초 보조무기(경계의 눈): 예언 무력화
   const f = Math.min(1, bdStrength('foresight'));
   return f > 0 ? 1 + (critMult - 1) * (1 - f) : critMult;
 }
@@ -2763,6 +2904,7 @@ function bdTrigger(key) {
   const s = bdStrength(key);
   const t = bossFight.elapsed;
   const maxHp = BN.toNumber(mon.maxHp);
+  if (genesisSubOnPattern()) return; // 태초 보조무기(걀라르호른): 액티브 중엔 패턴 무효 + 반격
   if (key !== 'timeDrain' && key !== 'thorns') ancientSubOnPattern(); // 고대 보조무기(허수아비)
   if (key === 'timeDrain') {
     bossFight.timeLeft -= s;
@@ -5808,6 +5950,7 @@ function newState() {
     subBossCodexSeen: [],  // 보스 보조무기 컬렉션(월드2): [true/false, ...] 20개, index = 층 번호(0=21층)
     subRelics: [],         // 황혼의 유산 컬렉션(월드2, 예전 이름 "고대 보조무기"): [true/false, ...] 20개, index = 층 번호(0=21층)
     subAncientSeen: [],    // 고대 보조무기(장착형) 도감: [true/false, ...] 20개, index = 층 번호(0=21층)
+    subGenesisSeen: [],    // 태초 보조무기 도감: [true/false, ...], index = 층 번호(0=21층)
     subCodexSeen: {},      // 일반 보조무기 도감(월드2): 키 `g{grade}_{타입명}` — 8타입×6등급(0~5) 48종
     subweapons: [],        // 보유 보조무기 목록: [{id, typeIdx, grade, enhance, activeTiming}, ...]
     subEquipped: null,     // 장착 중인 보조무기 id
@@ -6810,6 +6953,7 @@ function dealMonDamage(amount) {
     if (amount <= 0) return;
   }
   ancientSubOnDamage(amount); // 고대 보조무기(외상 장부·조종) 누적
+  genesisSubOnDamage(amount); // 태초 보조무기(평균 공격 피해)
   if (bossFight.active && bossFight.isPunch) punchDealtOverflow = BN.add(punchDealtOverflow, amount);
   if (bossFight.active && bossFight.isWeeklyRaid) weeklyRaidDealtOverflow = BN.add(weeklyRaidDealtOverflow, amount);
   // 천구(태초의 유물): 만월이 떠있는 동안 입힌 모든 피해를 누적(다른 무기로 바꾸면 더 이상 쌓이지 않음)
@@ -6835,6 +6979,7 @@ function floorHp(f) { return FLOORS[f].hp; }
 
 function spawnMonster() {
   fx.asub = null; // 고대 보조무기 전투 상태(대상 단위)
+  fx.gsub = null; // 태초 보조무기 전투 상태(대상 단위)
   mon.maxHp = BN.from(floorHp(S.floor));
   mon.hp = mon.maxHp;
   mon.dead = false;
@@ -7007,6 +7152,7 @@ function dropRoll() {
   rollSubweaponRelic(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 고대 보조무기(장착형): 그 층 고유 고대 보조무기 초저확률 드롭 (월드2 전용, 엘리트는 5배)
   rollAncientSubweapon(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
+  rollGenesisSubweapon(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
 
   // 연쇄 처치(룬 특수효과): 장착 개수만큼 독립적으로 확률 판정, 성공 시 처치 보상을 한 번 더 획득
   // 발동 알림은 화면 텍스트로만 — 실제 보상은 재귀 호출된 dropRoll()의 일반 로그로 남음
@@ -7248,7 +7394,8 @@ function addWeapon(w) {
 // 일관되게 커지도록 했다(예전엔 이 배율표만 따로 완만해서 액티브만 세지고 패시브/기본
 // 능력치는 상대적으로 초라했음). 고대/태초는 그 비율을 이어서 추정한 placeholder.
 // 고대(6)는 신화보다 약 15%만 높게 — 고대 보조무기의 나머지 힘은 고유 "고대 효과"가 맡는다(목표: +27 기준 신화 대비 전체 ×1.6)
-const SUBWEAPON_GRADE_MULT = [1, 3, 4, 5, 6.5, 8, 9.2, 20]; // 일반~태초(0~7)
+// 태초(7)는 고대보다 한 단계 위(11.5) — 나머지 힘은 태초 고유 패시브·액티브가 맡는다(목표: +27 기준 신화 대비 전체 ×2.5)
+const SUBWEAPON_GRADE_MULT = [1, 3, 4, 5, 6.5, 8, 9.2, 11.5]; // 일반~태초(0~7)
 function subGradeMult(grade) { return SUBWEAPON_GRADE_MULT[grade] || 1; }
 // 패시브/액티브 차례가 강화 1~30강 중 지금까지 몇 번 돌아왔는지 — subEnhRiseType()과 같은
 // 3주기 규칙을 역산한 공식이라 매 레벨을 순회할 필요가 없다(기본 능력치는 아래처럼 매
@@ -7335,6 +7482,8 @@ function subweaponItemName(sw) {
     const bs = SUBWEAPON_BOSS_NAMES[sw.bossFloor - WORLD2_START_FLOOR];
     if (bs) return bs.name;
   }
+  const gd = subGenesisDef(sw);
+  if (gd) return gd.name;
   const ad = subAncientDef(sw);
   if (ad) return ad.name;
   const t = SUBWEAPON_TYPES[sw.typeIdx];
@@ -7348,6 +7497,8 @@ function subweaponItemName(sw) {
   return type; // 태초(7)는 아직 이름 테이블 없음(추후 설계)
 }
 function subweaponFlavorText(sw) {
+  const gd = subGenesisDef(sw);
+  if (gd) return gd.subtitle;
   const ad = subAncientDef(sw);
   if (ad) return ad.flavor;
   if (sw.bossFloor !== undefined) {
@@ -7389,12 +7540,46 @@ function rollAncientSubweapon(floorIdx, kindMult) {
   log(`🏺🏺🏺 <b class="grade-고대">[고대 보조무기] ${ad.icon} ${ad.name}</b>을(를) 획득했습니다!!! ${ad.flavor}`, 'lg-prim');
   renderTop(); save();
 }
+// 태초 보조무기: 고대와 같은 방식의 초저확률 고정 드랍. 이미 가진 것(가방에 있는 것)은 다시 나오지 않는다.
+function makeGenesisSubweapon(floorIdx) {
+  const subType = SUBWEAPON_BOSS_NAMES[floorIdx - WORLD2_START_FLOOR].subType;
+  const sw = makeSubweapon(7, SUBWEAPON_TYPES.findIndex(t => t.name === subType));
+  sw.genesisFloor = floorIdx;
+  return sw;
+}
+function rollGenesisSubweapon(floorIdx, kindMult) {
+  if (floorIdx < WORLD2_START_FLOOR || !SUBWEAPON_GENESES[floorIdx - WORLD2_START_FLOOR]) return;
+  if ((S.subweapons || []).some(x => x.genesisFloor === floorIdx)) return;
+  if (Math.random() >= SUBWEAPON_GENESIS_BASE_CHANCE * kindMult * genesisAncientDropMult(floorIdx)) return;
+  const sw = makeGenesisSubweapon(floorIdx);
+  addSubweapon(sw);
+  const gd = subGenesisDef(sw);
+  log(`🌟🌟🌟 <b class="grade-태초">[태초 보조무기] ${gd.icon} ${gd.name}</b> — <i>${gd.subtitle}</i> 을(를) 획득했습니다!!!`, 'lg-prim');
+  renderTop(); save();
+}
+// 액티브 이름: 태초 보조무기는 저마다의 이름(결전의 기백 효과 + 고유 효과), 나머지는 "결전의 기백"
+function subweaponActiveName(sw) { const gd = subGenesisDef(sw); return gd ? gd.activeName : SUBWEAPON_ACTIVE.name; }
+// 태초 고유 패시브/액티브 두 줄(숫자 없이 단계만)
+function subGenesisEffectLines(sw) {
+  const gd = subGenesisDef(sw);
+  if (!gd) return '';
+  const tier = subGenesisTierLabel(sw);
+  return `🌟 [${gd.passiveName}] (${tier}) ${gd.passiveText}<br>🌟 [${gd.activeName}] (${tier}) ${gd.activeText}`;
+}
+function subGenesisLoreHtml(sw) {
+  const gd = subGenesisDef(sw);
+  return gd ? `<details style="margin-top:4px"><summary style="cursor:pointer;color:var(--prim)">📜 ${gd.subtitle}</summary><div style="white-space:pre-line;font-size:12px;color:var(--sub);margin-top:4px">${gd.lore}</div></details>` : '';
+}
 const SUBWEAPON_BAG_MAX = 60; // 무기 가방(60)과 동일하게 상향
 function addSubweapon(sw) {
   unlockSubCodexEntry(sw); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록 (무기 도감과 동일한 원칙)
   if (sw.ancientFloor !== undefined) {
     if (!Array.isArray(S.subAncientSeen)) S.subAncientSeen = [];
     S.subAncientSeen[sw.ancientFloor - WORLD2_START_FLOOR] = true;
+  }
+  if (sw.genesisFloor !== undefined) {
+    if (!Array.isArray(S.subGenesisSeen)) S.subGenesisSeen = [];
+    S.subGenesisSeen[sw.genesisFloor - WORLD2_START_FLOOR] = true;
   }
   if (!Array.isArray(S.subweapons)) S.subweapons = [];
   // 자동판매 필터: 무기 가방과 동일한 패턴 — 지정 등급 이하 + 강화0인 새 보조무기는 획득 즉시 자동 판매
@@ -7406,7 +7591,7 @@ function addSubweapon(sw) {
     return;
   }
   if (S.subweapons.length >= SUBWEAPON_BAG_MAX) {
-    const sellable = S.subweapons.filter(x => x.id !== S.subEquipped);
+    const sellable = S.subweapons.filter(x => x.id !== S.subEquipped && !isGenesisSubweapon(x));
     if (sellable.length) {
       const weakest = [...sellable].sort((a, b) => subweaponPower(a) - subweaponPower(b))[0];
       const price = subSellPrice(weakest);
@@ -7438,6 +7623,7 @@ function sellSubweapon(id) {
   if (id === S.subEquipped) { log('장착 중인 보조무기는 판매할 수 없습니다. 먼저 해제하세요.', 'lg-bad'); return; }
   const sw = (S.subweapons || []).find(x => x.id === id);
   if (!sw) return;
+  if (isGenesisSubweapon(sw)) { log('태초 보조무기는 판매할 수 없습니다.', 'lg-bad'); return; }
   const price = subSellPrice(sw);
   S.subweapons = S.subweapons.filter(x => x.id !== id);
   S.gold = BN.add(S.gold, price);
@@ -7500,10 +7686,11 @@ function subEnhTierBonus(enhance) {
   return bonus;
 }
 function subSuccessChance(sw) {
-  const base = subGradeAdjustedSuccess(sw.grade, sw.enhance);
+  const base = subGradeAdjustedSuccess(isGenesisSubweapon(sw) ? GENESIS_SUB_SUCCESS_GRADE : sw.grade, sw.enhance);
   return Math.min(100, base + subEnhTierBonus(sw.enhance));
 }
 function subDestroyChance(sw) {
+  if (isGenesisSubweapon(sw)) return 0; // 태초 보조무기는 파괴·초기화 없음(실패 시 유지 또는 하락뿐)
   const base = SUB_ENH.destroy[sw.enhance] || 0;
   // 메인 무기(effectiveDestroyChance)와 동일하게 "%p 차감" 방식으로 통일 — 예전엔 비율
   // 곱연산(base*(1-reduce))이라 다른 %p 스탯들과 감산 방식이 어긋나 있었다.
@@ -7526,7 +7713,7 @@ function trySubEnhance(advanced, targetSubweapon) {
   const cost = advanced ? subAdvancedEnhGoldCost(sw) : subEnhanceCost(sw);
   if (BN.lt(S.gold, cost)) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
   // 고대 보조무기: 골드 외에 무기의 정수도 소모
-  const essenceNeed = subAncientEssenceCost(sw);
+  const essenceNeed = subAncientEssenceCost(sw) + subGenesisEssenceCost(sw);
   if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) { log(`무기의 정수가 부족합니다! (필요 ${fmt(essenceNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad'); return; }
   // 일반 강화는 고급 재료 소모가 없고, 고급 강화를 선택했을 때만 소모한다(이미 메인 무기
   // 강화/토벌전 등으로 수급 중인 재료를 그대로 재사용 — 별도 수급처를 새로 만들지 않는다).
@@ -7565,13 +7752,16 @@ function resolveSubEnhance(sw, advanced) {
     // 고급 강화: 고급 재료를 30배 소모하는 대신 이번 시도의 파괴 확률이 절반으로 줄어든다
     // (메인 무기 ADVANCED_ENH_DESTROY_MULT와 동일한 원리 재사용).
     const dChance = subDestroyChance(sw) * (advanced ? ADVANCED_ENH_DESTROY_MULT : 1);
-    if (Math.random() * 100 < dChance && isAncientSubweapon(sw)) {
+    // 파괴/초기화 여부는 한 번만 굴린다 — 예전엔 고대 분기와 일반 파괴 분기가 각각 따로 굴려서,
+    // 고대 보조무기가 초기화 판정을 피해도 다음 분기에서 다시 굴려 "파괴"되는 이중 판정 버그가 있었다.
+    const destroyHit = Math.random() * 100 < dChance;
+    if (destroyHit && isAncientSubweapon(sw)) {
       // 고대 보조무기는 파괴되지 않는 대신 +0으로 초기화된다(월드1 고대 무기와 동일)
       sw.enhance = 0;
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'crack');
       log(`🏺💢 고대 보조무기는 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${subweaponGradeTag(sw)} (초기화 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
-    } else if (Math.random() * 100 < dChance) {
+    } else if (destroyHit) {
       playEnhanceFx('destroy', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'crack');
       log(`💥 보조무기가 파괴되었습니다!! ${subweaponGradeTag(sw)} (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
@@ -7579,15 +7769,16 @@ function resolveSubEnhance(sw, advanced) {
       S.subweapons = S.subweapons.filter(x => x.id !== sw.id);
       if (wasEquipped) S.subEquipped = null;
       if (sw.id === subEnhanceTargetId) subEnhanceTargetId = null;
-    } else if (Math.random() < 1 - 0.5 * enhanceEventDowngradeMult(sw.enhance)) {
+    } else if (Math.random() < 1 - (advanced && isGenesisSubweapon(sw) ? 0.25 : 0.5) * enhanceEventDowngradeMult(sw.enhance)) {
+      // 태초 보조무기의 고급 강화: 파괴가 없는 대신 하락 확률(50%)을 절반(25%)으로
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'dust');
-      log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
+      log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨${isGenesisSubweapon(sw) ? '' : ` (파괴 확률이었음: ${dChance.toFixed(1)}%)`}${advTag}`, 'lg-bad');
     } else {
       sw.enhance = Math.max(0, sw.enhance - 1);
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'dust');
-      log(`❌ 보조무기 강화 실패... 단계 하락 (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
+      log(`❌ 보조무기 강화 실패... 단계 하락${isGenesisSubweapon(sw) ? '' : ` (파괴 확률이었음: ${dChance.toFixed(1)}%)`}${advTag}`, 'lg-bad');
     }
   }
   renderEnhance(); renderSubInventory(); renderTop();
@@ -7743,8 +7934,10 @@ function updateSubweaponActive() {
     const dur = subweaponActiveDuration(sw);
     bossFight.dmgBonus = dmgPct;
     bossFight.subActiveEndAt = Date.now() + dur * 1000;
-    floatText('🗡️ 결전의 기백!');
-    log(`🗡️ <b>결전의 기백</b> 발동! 보스 피해량 +${Math.round(dmgPct * 100)}% (${dur.toFixed(1)}초간)`, 'lg-prim');
+    const aname = subweaponActiveName(sw);
+    floatText(`🗡️ ${aname}!`);
+    log(`🗡️ <b>${aname}</b> 발동! 보스 피해량 +${Math.round(dmgPct * 100)}% (${dur.toFixed(1)}초간)`, 'lg-prim');
+    genesisSubOnActivate(); // 태초 보조무기(카인의 복수: 표식 가득)
   }
   // 카이로스의 건틀릿(고대 보조무기): 첫 발동 gap초 뒤 위력 절반으로 한 번 더
   const kad = ancientSubFx();
@@ -8029,6 +8222,139 @@ function ancientSubTick(dt, w) {
         try { dealMonDamage(st.avgAtk * p.frac * weaponSpeed(w) * ancientSubSpeedMult() * lost * dt); } finally { asubNoTrack = false; }
         hit = true;
       }
+    }
+  }
+  if (hit && BN.lte(mon.hp, 0)) return handleKill();
+  return null;
+}
+
+// ---------- 태초 보조무기 전투 효과 ----------
+// 상태는 fx.gsub(전투 단위) — resetTimedStacks()/spawnMonster()에서 초기화한다. 고대 보조무기와
+// 같이 보스 패턴 "봉인" 중에는 고유 효과(패시브·액티브 고유분)가 멈춘다. 위력은 s(0.5~1.0, 강화 단계)배.
+function genesisSubFx() {
+  const sw = getEquippedSubweapon();
+  const gd = subGenesisDef(sw);
+  if (!gd || bdSealed()) return null;
+  return { gd, p: gd.p, s: subGenesisScale(sw) };
+}
+function gsubState() {
+  if (!fx.gsub) fx.gsub = { fleece: 0, atkAcc: 0, avgAtk: 0, sickleT: 0, crits: 0, marks: 0, echoes: [], deadT: 0, hornT: 0 };
+  return fx.gsub;
+}
+// 결전의 기백(+태초 고유 액티브)이 켜져 있는 동안
+function gsubActiveOn() { return bossFight.active && bossFight.dmgBonus > 0 && Date.now() < bossFight.subActiveEndAt; }
+// 태초 효과 자신의 피해는 평균 공격 피해 계산에서 제외(낫질·망자·뿔피리가 서로를 키우는 되먹임 방지)
+let gsubNoTrack = false;
+function gsubDeal(amount) { gsubNoTrack = true; try { dealMonDamage(amount); } finally { gsubNoTrack = false; } }
+function genesisSubOnDamage(amount) {
+  if (!fx.gsub || !bossFight.active || gsubNoTrack) return;
+  fx.gsub.atkAcc += amount;
+}
+// 공격 시작 시: 직전 공격 1회가 실제로 입힌 총 피해(치명타·연타·주문 작렬 등 포함)의 이동 평균
+function genesisSubPreAttack() {
+  const g = genesisSubFx();
+  if (!g) return;
+  const st = gsubState();
+  if (st.atkAcc > 0) { st.avgAtk = st.avgAtk ? st.avgAtk * 0.9 + st.atkAcc * 0.1 : st.atkAcc; st.atkAcc = 0; }
+}
+// 헬(두 얼굴): 후반 얼굴인지 — 체력이 사실상 안 줄어드는 펀치기계·주간 레이드는 전투 시간 절반 기준
+function gsubHelLatePhase() {
+  if (bossFight.isPunch || bossFight.isWeeklyRaid) return bossFight.elapsed >= (bossFight.elapsed + bossFight.timeLeft) / 2;
+  return BN.toNumber(BN.div(mon.hp, mon.maxHp)) < 0.5;
+}
+// 치명타 전 피해 배율
+function genesisSubDmgMult() {
+  const g = genesisSubFx();
+  if (!g) return 1;
+  if (g.gd.id === 'nephele') return 1 + g.p.perStack * g.s * gsubState().fleece;
+  if (g.gd.id === 'hel' && bossFight.active && gsubHelLatePhase()) return 1 + g.p.bossDmg * g.s;
+  return 1;
+}
+function genesisSubSpeedMult() {
+  const g = genesisSubFx();
+  return g && g.gd.id === 'hel' && bossFight.active && !gsubHelLatePhase() ? 1 + g.p.speed * g.s : 1;
+}
+// 치명타 배율 가산(헤임달) — 상한 밖
+function genesisSubCritAdd() {
+  const g = genesisSubFx();
+  return g && g.gd.id === 'heimdall' ? g.p.critDmg * g.s : 0;
+}
+// 치명타 배율 곱(카인의 표식) — 예언 패턴 감쇠 뒤에 곱한다
+function genesisSubCritMult() {
+  const g = genesisSubFx();
+  return g && g.gd.id === 'cain' ? 1 + g.p.perMark * g.s * gsubState().marks : 1;
+}
+function genesisSubIgnoresForesight() {
+  const g = genesisSubFx();
+  return !!(g && g.gd.id === 'heimdall');
+}
+function genesisSubOnHit(didCrit, critDmg) {
+  const g = genesisSubFx();
+  if (!g || g.gd.id !== 'cain' || !didCrit) return;
+  const st = gsubState();
+  st.crits++;
+  if (st.crits >= g.p.critsPerMark) { st.crits = 0; st.marks = Math.min(g.p.maxMarks, st.marks + 1); }
+  if (gsubActiveOn()) {
+    const now = Date.now();
+    for (let i = 1; i <= g.p.echoes; i++) st.echoes.push({ at: now + i * 1000, dmg: critDmg * g.p.echoFrac * g.s });
+  }
+}
+// 연타 발동 후(실제로 들어간 연타 피해 총량을 받는다)
+function genesisSubOnExtra(extraTotal) {
+  const g = genesisSubFx();
+  if (!g || g.gd.id !== 'nephele') return;
+  const st = gsubState();
+  st.fleece = Math.min(g.p.max, st.fleece + 1);
+  if (gsubActiveOn() && extraTotal > 0) { gsubDeal(extraTotal * g.p.cloneFrac * g.s); floatText('☁️ 안개 분신!'); }
+}
+// 결전의 기백 발동 순간
+function genesisSubOnActivate() {
+  const g = genesisSubFx();
+  if (g && g.gd.id === 'cain') { gsubState().marks = g.p.maxMarks; floatText('🩸 표식 각인!'); }
+}
+// 보스 패턴 발동 직전(bdTrigger) — true를 돌려주면 그 패턴은 무효
+function genesisSubOnPattern() {
+  const g = genesisSubFx();
+  if (!g || g.gd.id !== 'heimdall' || !gsubActiveOn()) return false;
+  const st = gsubState();
+  if (st.avgAtk > 0) gsubDeal(st.avgAtk * g.p.mult * g.s);
+  floatText('📯 걀라르호른! 패턴 무효');
+  return true;
+}
+// tick()에서 매 틱 호출. 처치가 일어나면 handleKill() 결과를 돌려준다.
+function genesisSubTick(dt) {
+  const g = genesisSubFx();
+  if (!g || !bossFight.active) return null;
+  const st = gsubState();
+  const p = g.p, s = g.s;
+  const on = gsubActiveOn();
+  let hit = false;
+  if (g.gd.id === 'poludnitsa') {
+    st.sickleT += dt;
+    const every = on ? p.activeEvery / s : p.every;
+    while (st.sickleT >= every) {
+      st.sickleT -= every;
+      if (st.avgAtk > 0) { gsubDeal(st.avgAtk * p.mult * s); floatText('☀️ 정오의 낫!'); hit = true; }
+    }
+  } else if (g.gd.id === 'hel' && on) {
+    st.deadT += dt;
+    while (st.deadT >= p.every) {
+      st.deadT -= p.every;
+      if (st.avgAtk > 0) { gsubDeal(st.avgAtk * p.frac * s * p.dead); hit = true; }
+    }
+  } else if (g.gd.id === 'heimdall' && on) {
+    st.hornT += dt;
+    while (st.hornT >= p.every) {
+      st.hornT -= p.every;
+      if (st.avgAtk > 0) { gsubDeal(st.avgAtk * p.mult * s); floatText('📯 걀라르호른!'); hit = true; }
+    }
+  } else if (g.gd.id === 'cain' && st.echoes.length) {
+    const now = Date.now();
+    const due = st.echoes.filter(r => r.at <= now);
+    if (due.length) {
+      st.echoes = st.echoes.filter(r => r.at > now);
+      gsubDeal(due.reduce((a, r) => a + r.dmg, 0));
+      hit = true;
     }
   }
   if (hit && BN.lte(mon.hp, 0)) return handleKill();
@@ -8338,7 +8664,8 @@ function tick(dt) {
   }
   // 고대 보조무기: 지연 피해·주기 효과
   if (ancientSubTick(dt, w) === 'boss') return;
-  if (!bdStunned()) mon.atkTimer += dt * weaponSpeed(w) * bdSpeedMult() * ancientSubSpeedMult();
+  if (genesisSubTick(dt) === 'boss') return; // 태초 보조무기: 낫질·망자·뿔피리·복수
+  if (!bdStunned()) mon.atkTimer += dt * weaponSpeed(w) * bdSpeedMult() * ancientSubSpeedMult() * genesisSubSpeedMult();
   while (mon.atkTimer >= 1) {
     mon.atkTimer -= 1;
     attack(w);
@@ -8360,6 +8687,7 @@ function attack(w) {
   if (bdRollMiss()) { floatText('MISS'); ancientSubOnMiss(); return; }
   const now = Date.now();
   const asubForce = ancientSubPreAttack(); // 고대 보조무기: 예정된 명중·코어 폭주
+  genesisSubPreAttack(); // 태초 보조무기: 평균 공격 피해 갱신
   // 인과율의 룬(도서관 전용): 이전 공격에서 남겨둔 "잔향" 피해를 이번 공격 시작 시 그대로 적용
   if (fx.causalityEcho) {
     dealMonDamage(fx.causalityEcho);
@@ -8390,6 +8718,7 @@ function attack(w) {
     dmg *= (1 + bossDmgBonus()) * pandoraStatMult('bossDmg');
   }
   dmg *= ancientSubDmgMult() * (1 + (asubForce.bonus || 0)); // 고대 보조무기(허수아비·뱃삯·족쇄·미완성 설계·황혼·정각의 종·예정된 명중)
+  dmg *= genesisSubDmgMult(); // 태초 보조무기(황금 양털·두 얼굴)
   // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 적이 받는 모든 피해 증가
   if (w.spirit === 'sporeburst' && now < fx.sporeburstUntil) {
     dmg *= 1 + (ANCIENT_SPIRITS.sporeburst.enemyDmgTakenBonus || 0);
@@ -8454,10 +8783,11 @@ function attack(w) {
     (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage');
   // 파쇄의 리듬/주문 작렬 전용 치명타 배율: 기본 배율은 그대로, 스탯으로 얻은 추가 상승분만
   // EFFECT_CRIT_DMG_SCALE만큼만 반영한다.
-  critMult += ancientSubCritDmgBonus(); // 고대 보조무기(등불·미완성 설계): 상한 밖 추가 치명타 피해
+  critMult += ancientSubCritDmgBonus() + genesisSubCritAdd(); // 고대 보조무기(등불·미완성 설계)·태초 보조무기(경계의 눈): 상한 밖 추가 치명타 피해
   const critMultBase = (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5);
   const effectCritMult = bdForesightMult(critMultBase + (critMult - critMultBase) * EFFECT_CRIT_DMG_SCALE);
   critMult = bdForesightMult(critMult); // 보스 방해(예언): 치명타 추가분만 깎는다
+  critMult *= genesisSubCritMult(); // 태초 보조무기(카인의 표식): 표식만큼 치명타 피해 증폭
   const preCritDmg = dmg; // 연타(추가공격) 계산용 — 치명타 배율이 적용되기 전 기본 데미지
   // 처단자(레전더리 보스): 보스전 시작 후 첫 타격은 무조건 치명타
   const forceCrit = bossFight.active && w.effect === 'executioner' && fx.executionerReady;
@@ -8483,6 +8813,7 @@ function attack(w) {
     floatText('🔮 운명 역전!');
   }
   ancientSubOnHit(w, didCrit, dmg, preCritDmg); // 고대 보조무기(군령·수압·재심·별자리)
+  genesisSubOnHit(didCrit, dmg); // 태초 보조무기(카인의 표식·복수)
   // 낙인 폭발의 룬(도서관 전용): 치명타 적중 시 표식을 남기고, 표식이 남아있는 동안 다시
   // 치명타가 적중하면 표식을 터뜨려 고정 피해를 추가로 입힌다.
   if (didCrit && weaponSpecialCount(w, 'brandRune') > 0) {
@@ -8720,6 +9051,7 @@ function attack(w) {
     const extraHits = bloodThirstActive ? (ANCIENT_SPIRITS.bloodtribute.extraAtkHits - 1) : 1;
     dealMonDamage(extraDmg * extraHits);
     floatText(bloodThirstActive ? '🦇 광란!' : '⚡ 연타!');
+    genesisSubOnExtra(extraDmg * extraHits); // 태초 보조무기(황금 양털·구름의 장막)
     // 여운 증폭의 룬(도서관 전용): 연타 발동 시 확률적으로 연타가 한 번 더 즉시 발동
     if (weaponSpecialCount(w, 'echoRune') > 0 && Math.random() < RUNE_SPECIALS.echoRune.proc) {
       dealMonDamage(extraDmg * extraHits);
@@ -8778,6 +9110,7 @@ function bossDmgBonus() {
 // 보스전·토벌전은 항상 스택 0인 상태에서 새로 시작한다.
 function resetTimedStacks() {
   fx.asub = null; // 고대 보조무기 전투 상태
+  fx.gsub = null; // 태초 보조무기 전투 상태
   fx.divineBossDealt = 0; // 신벌 룬: 보스전당 누적 피해(상한 판정용)
   bd = null; // 보스 방해 상태는 토벌전 21단계 이상 시작 시에만 다시 켜진다(startBossDisruption)
   bossFight.elapsed = 0;
@@ -10587,6 +10920,19 @@ function renderSubCodex() {
         : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${21 + i}층</div>`).join('')}</div>`;
     box.appendChild(section);
   }
+  // 3-2) 태초 보조무기(장착형) — 획득한 적 있는 것만 이름 공개, 아직 설계 전인 층은 표시하지 않음
+  {
+    const section = document.createElement('div');
+    section.className = 'codex-section';
+    const seen = S.subGenesisSeen || [];
+    const list = SUBWEAPON_GENESES.map((g, i) => ({ g, i })).filter(x => x.g);
+    section.innerHTML = `<div class="codex-section-title grade-태초">태초 보조무기
+      <span class="codex-section-count">${list.filter(x => seen[x.i]).length}/${list.length}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">${list.map(({ g, i }) => seen[i]
+        ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a1a2a;" title="${g.subtitle}"><b class="grade-태초">${g.icon} ${g.name}</b><div style="color:var(--sub)">${21 + i}층 · ${g.passiveName} · ${g.activeName}</div></div>`
+        : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${21 + i}층</div>`).join('')}</div>`;
+    box.appendChild(section);
+  }
   // 4) 황혼의 유산(수집품, 20종) — 고대의 유물(도서관 탭)과 동일한 카드 나열 스타일
   {
     const section = document.createElement('div');
@@ -10721,6 +11067,7 @@ function migrate(d) {
   for (let i = 0; i < 4; i++) if (!Array.isArray(d.arcanePages[i])) d.arcanePages[i] = [];
   if (!Array.isArray(d.relics)) d.relics = [];
   if (!Array.isArray(d.subAncientSeen)) d.subAncientSeen = [];
+  if (!Array.isArray(d.subGenesisSeen)) d.subGenesisSeen = [];
   if (!Array.isArray(d.subBossCodexSeen)) d.subBossCodexSeen = [];
   if (!Array.isArray(d.subRelics)) d.subRelics = [];
   if (!Array.isArray(d.subweapons)) d.subweapons = [];
@@ -10988,9 +11335,11 @@ function buildSnapshot() {
   if (sw) {
     const pe = subweaponPassiveEff(sw, accEff().subAmp);
     const passive = Object.entries(pe).map(([k, v]) => { const d = SUB_PASSIVE_STAT_LABELS[k]; return `${d ? d.label : k} +${(v * 100).toFixed(1)}${d ? d.unit : '%'}`; }).join(', ');
-    snap.sub = [stripTags(subweaponGradeTag(sw)), `패시브: ${passive}`, `결전의 기백 발동: ${sw.activeTiming || 0}초`];
+    snap.sub = [stripTags(subweaponGradeTag(sw)), `패시브: ${passive}`, `${subweaponActiveName(sw)} 발동: ${sw.activeTiming || 0}초`];
     const ad = subAncientDef(sw);
     if (ad) snap.sub.push(`고대 효과: ${ad.fxName}`);
+    const gd = subGenesisDef(sw);
+    if (gd) snap.sub.push(`태초 효과: ${gd.passiveName} · ${gd.activeName} (${subGenesisTierLabel(sw)})`);
   }
   const g = getEquippedGlove();
   if (g) snap.glove = [stripTags(gloveGradeTag(g)), gloveStatText(g)];
@@ -12140,9 +12489,11 @@ function renderSubAdvancedEnhance(sw, maxed) {
   const affordable = matSt.ok && BN.gte(S.gold, goldNeed) && !subEnhanceRevealPending;
   const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🍃${matSt.shortfall}개 대체 가능` : '';
   const advRiskValue = Math.round(subDestroyChance(sw) * ADVANCED_ENH_DESTROY_MULT * 10) / 10;
+  // 태초 보조무기는 파괴가 없으므로 고급 강화가 "하락 확률 절반"으로 작동한다(태초 무기와 같은 대응)
+  const advRiskText = isGenesisSubweapon(sw) ? '하락 확률 절반' : `파괴 확률 ${advRiskValue}%로 절반`;
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="subAdvancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
-      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(파괴 확률 ${advRiskValue}%로 절반, 💰 ${fmt(goldNeed)} + ${highMatFloorLabel(true)} 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
+      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${advRiskText}, 💰 ${fmt(goldNeed)} + ${highMatFloorLabel(true)} 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
     </button>`;
   const btn = $('subAdvancedEnhBtn');
   if (btn) btn.onclick = () => trySubEnhance(true);
@@ -12178,7 +12529,8 @@ function renderSubEquippedBox() {
   box.innerHTML = `<div class="enhWepTitle">${subweaponGradeTag(sw)}</div>
     ${flavor ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px;font-style:italic">${flavor}</div>` : ''}
     <div style="font-size:12px;color:var(--sub)">🗡️ ${t.name} 패시브: ${passiveText || '없음'}</div>
-    <div style="font-size:12px;color:var(--sub)">⚡ 액티브 "${SUBWEAPON_ACTIVE.name}": 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (전투당 1회)</div>
+    <div style="font-size:12px;color:var(--sub)">⚡ 액티브 "${subweaponActiveName(sw)}": 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (전투당 1회)</div>
+    ${isGenesisSubweapon(sw) ? `<div style="font-size:12px;color:var(--prim)">${subGenesisEffectLines(sw)}</div>${subGenesisNextTierEnh(sw) != null ? `<div style="font-size:12px;color:var(--sub)">🔜 다음 단계: +${subGenesisNextTierEnh(sw)}강</div>` : ''}<div style="font-size:12px;color:var(--sub)">📜 강화 시 무기의 정수 ${fmt(subGenesisEssenceCost(sw))}개 소모 · 파괴·초기화 없음 (실패 시 유지 또는 하락)</div>${subGenesisLoreHtml(sw)}` : ''}
     ${isAncientSubweapon(sw) ? `<div style="font-size:12px;color:var(--gold)">${subAncientEffectLine(sw)}</div><div style="font-size:12px;color:var(--sub)">📜 강화 시 무기의 정수 ${fmt(subAncientEssenceCost(sw))}개 소모 · 실패 시 파괴 대신 +0 초기화</div>` : ''}
     <div style="font-size:12px;color:var(--sub);margin-top:2px;">
       발동 시점: <input type="number" min="${SUBWEAPON_ACTIVE.timingMin}" max="${SUBWEAPON_ACTIVE.timingMax}" value="${sw.activeTiming}" id="subActiveTimingInput" style="width:60px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 6px;">초 (0~120)
@@ -12257,7 +12609,8 @@ function renderSubInventory() {
       ? `<div class="wi" style="margin-top:4px;padding:6px 8px;background:var(--panel2);border-radius:6px">
           ${flavor ? `<div style="font-style:italic;margin-bottom:4px">${flavor}</div>` : ''}
           🗡️ [${t ? t.name : ''} 패시브] ${passiveText || '없음'}<br>
-          ⚡ [${SUBWEAPON_ACTIVE.name}] 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (보스 계열 전투당 1회)
+          ⚡ [${subweaponActiveName(sw)}] 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (보스 계열 전투당 1회)
+          ${isGenesisSubweapon(sw) ? `<br><span style="color:var(--prim)">${subGenesisEffectLines(sw)}</span>${subGenesisLoreHtml(sw)}` : ''}
           ${isAncientSubweapon(sw) ? `<br><span style="color:var(--gold)">${subAncientEffectLine(sw)}</span>` : ''}
         </div>`
       : '';
@@ -12276,10 +12629,12 @@ function renderSubInventory() {
       eqBtn.textContent = '장착';
       eqBtn.onclick = () => equipSubweapon(sw.id);
       btns.appendChild(eqBtn);
-      const sellBtn = document.createElement('button');
-      sellBtn.textContent = '판매';
-      sellBtn.onclick = () => sellSubweapon(sw.id);
-      btns.appendChild(sellBtn);
+      if (!isGenesisSubweapon(sw)) { // 태초 보조무기는 판매 불가
+        const sellBtn = document.createElement('button');
+        sellBtn.textContent = '판매';
+        sellBtn.onclick = () => sellSubweapon(sw.id);
+        btns.appendChild(sellBtn);
+      }
     }
     list.appendChild(div);
   }

@@ -9325,9 +9325,12 @@ function renderWorldRaidLeaderboardBox() {
       const rank = i + 1;
       const mine = e.id === myId;
       return `<div class="invitem${mine ? ' equipped' : ''}">
-        <div><div class="wn">#${rank} ${e.nickname || '(익명)'} ${worldRaidTitleBadge(e.title)}</div>
-        <div class="wi">데미지 ${fmt(e.dmg)}</div></div></div>`;
+        <div><div class="wn">#${rank} <a href="#" class="raid-build-link" data-idx="${i}" style="color:inherit;text-decoration:underline dotted;">${escHtml(e.nickname || '(익명)')}</a> ${worldRaidTitleBadge(e.title)}</div>
+        <div class="wi">데미지 ${fmt(e.dmg)} · <span style="color:var(--sub)">이름을 누르면 세팅 보기</span></div></div></div>`;
     }).join('');
+    el.querySelectorAll('.raid-build-link').forEach(a => {
+      a.onclick = ev => { ev.preventDefault(); showRaidBuild(lb.entries[+a.dataset.idx]); };
+    });
   }
 }
 function renderWorldRaidTab() {
@@ -10475,8 +10478,11 @@ function renderCodexDetail(ent, key) {
 }
 // 도감 아이콘 클릭(터치) 시 뜨는 팝업 — 커서 호버가 없는 모바일에서도 설명을 바로 볼 수 있게 함
 function showCodexPopup(html) {
+  // 도감 탭 안에 있는 요소라, 다른 탭(레이드 순위 세팅 보기 등)에서도 보이도록 처음 띄울 때 body 바로 아래로 옮긴다
+  const pop = $('codexPopup');
+  if (pop.parentElement !== document.body) document.body.appendChild(pop);
   $('codexPopupContent').innerHTML = html;
-  $('codexPopup').hidden = false;
+  pop.hidden = false;
 }
 function hideCodexPopup() { $('codexPopup').hidden = true; }
 
@@ -10931,11 +10937,104 @@ async function fetchWeeklyRaidEntries(wk) {
     clearTimeout(timer);
   }
 }
+// ---------- 레이드 순위: 다른 유저 세팅 보기 ----------
+// 기록을 갱신할 때 그 기록을 낸 세팅 요약(평문)을 weeklyRaid/{주차}/builds/{참가자 id}에 따로 올린다.
+// 순위 기록(entries)과 경로를 분리해서, 이 업로드가 실패해도 순위 기록에는 영향이 없게 한다.
+// 다른 유저가 올린 데이터라 화면에 그릴 때는 항상 escHtml로 이스케이프한다.
+function stripTags(h) { return String(h == null ? '' : h).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim(); }
+function escHtml(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function countedNames(names) {
+  const m = {};
+  for (const n of names) if (n) m[n] = (m[n] || 0) + 1;
+  return Object.entries(m).map(([n, c]) => c > 1 ? `${n} ×${c}` : n);
+}
+function buildSnapshot() {
+  const w = getEquipped();
+  const st = computeStats();
+  const snap = { v: 1, at: Date.now() };
+  snap.stats = [
+    `${atkLabel(w)} ${fmt(st.atk)}`, `공격속도 ${st.spd.toFixed(2)}/초`,
+    `치명타 ${st.critChance.toFixed(1)}% · 피해 ${st.critMultPct.toFixed(0)}%`,
+    `연타 ${st.extraChance.toFixed(1)}% · 피해 ${st.extraAtkDmgPct.toFixed(0)}%`,
+    `보스 피해량 +${st.bossBonus.toFixed(0)}%`,
+  ];
+  snap.training = Object.keys(TRAINING).map(k => `${TRAINING[k].name} Lv.${trainingLevel(k)}`);
+  if (w) {
+    const lines = [stripTags(gradeTag(w))];
+    if (w.effect && EFFECTS[w.effect]) lines.push(`특수효과: ${EFFECTS[w.effect].name}`);
+    if (w.spirit && ANCIENT_SPIRITS[w.spirit]) lines.push(`에이션트 스피릿: ${ANCIENT_SPIRITS[w.spirit].name}`);
+    if (Array.isArray(w.runes) && w.runes.length) lines.push(`룬: ${countedNames(w.runes.map(r => runeName(r))).join(', ')}`);
+    if (Array.isArray(w.awakening) && w.awakening.some(Boolean)) lines.push(...w.awakening.map((a, i) => a ? `각성 ★${i + 1}: ${awakenSlotLabel(a)}` : null).filter(Boolean));
+    snap.weapon = lines;
+  }
+  const sw = getEquippedSubweapon();
+  if (sw) {
+    const pe = subweaponPassiveEff(sw, accEff().subAmp);
+    const passive = Object.entries(pe).map(([k, v]) => { const d = SUB_PASSIVE_STAT_LABELS[k]; return `${d ? d.label : k} +${(v * 100).toFixed(1)}${d ? d.unit : '%'}`; }).join(', ');
+    snap.sub = [stripTags(subweaponGradeTag(sw)), `패시브: ${passive}`, `결전의 기백 발동: ${sw.activeTiming || 0}초`];
+    const ad = subAncientDef(sw);
+    if (ad) snap.sub.push(`고대 효과: ${ad.fxName}`);
+  }
+  const g = getEquippedGlove();
+  if (g) snap.glove = [stripTags(gloveGradeTag(g)), gloveStatText(g)];
+  snap.accs = (S.accEquipped || []).map(a => `${GRADES[a.grade] ? GRADES[a.grade].name : ''} ${ACCESSORIES[a.floor] ? ACCESSORIES[a.floor].name : ''}`.trim());
+  snap.seals = (S.sealEquipped || []).map(id => (ANCIENT_SEALS.find(x => x.id === id) || {}).name).filter(Boolean);
+  const totals = codexBonusEff();
+  snap.collections = [
+    `보스장신구 ${(S.bossAccs || []).length}/${ACCESSORIES.length}`,
+    `고대의 유물 ${relicCollectedCount()}/${RELICS.length}`,
+    `보스 보조무기 ${subBossWeaponCodexCount()}/${SUBWEAPON_BOSS_NAMES.length}`,
+    `황혼의 유산 ${subRelicCollectedCount()}/${SUBWEAPON_RELICS.length}`,
+    `비전서 ${LIBRARY_BANDS.filter((b, i) => arcaneTomeComplete(i)).length}/${LIBRARY_BANDS.length}권`,
+    ...Object.entries(totals).filter(([, v]) => Math.abs(v) > 1e-9).map(([k, v]) => `무기 도감: ${stripTags(codexStatText(k, v, k === 'enh' ? CODEX_ANCIENT_SETS[10].cap : undefined))}`),
+  ];
+  return snap;
+}
+function uploadWeeklyRaidBuild() {
+  let snap;
+  try { snap = buildSnapshot(); } catch (e) { console.error('세팅 요약 생성 실패:', e); return; }
+  fetch(`${SYNC_DB_URL}/weeklyRaid/${weekKey()}/builds/${raidParticipantId()}.json`, { method: 'PUT', body: JSON.stringify(snap) })
+    .then(res => { if (!res.ok) throw new Error('http ' + res.status); })
+    .catch(err => console.error('세팅 요약 업로드 실패(순위 기록에는 영향 없음):', err));
+}
+async function fetchWeeklyRaidBuild(wk, id) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(`${SYNC_DB_URL}/weeklyRaid/${wk}/builds/${encodeURIComponent(id)}.json`, { signal: ctrl.signal });
+    if (!res.ok) throw new Error('http ' + res.status);
+    return await res.json();
+  } finally { clearTimeout(timer); }
+}
+function raidBuildHtml(entry, snap) {
+  const head = `<div style="font-size:15px;font-weight:bold;margin-bottom:2px;">${escHtml(entry.nickname || '(익명)')}</div>
+    <div style="color:var(--sub);margin-bottom:8px;">데미지 ${fmt(entry.dmg)}${snap && snap.at ? ` · 기록 당시 세팅 (${escHtml(new Date(snap.at).toLocaleString())})` : ''}</div>`;
+  if (!snap || typeof snap !== 'object') {
+    return head + '<div style="color:var(--sub);">아직 세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.</div>';
+  }
+  const sec = (title, lines) => {
+    const arr = Array.isArray(lines) ? lines.filter(x => x != null && x !== '') : [];
+    return `<div style="margin-top:8px;"><b>${title}</b>${arr.length ? arr.map(l => `<div style="font-size:12px;">· ${escHtml(l)}</div>`).join('') : '<div style="font-size:12px;color:var(--sub);">없음</div>'}</div>`;
+  };
+  return head + sec('📊 능력치', snap.stats) + sec('🏋️ 훈련', snap.training) + sec('⚔️ 무기', snap.weapon)
+    + sec('🗡️ 보조무기', snap.sub) + sec('🧤 장갑', snap.glove) + sec('📿 장신구', snap.accs)
+    + sec('🌫️ 고대의 인장', snap.seals) + sec('📖 컬렉션', snap.collections);
+}
+async function showRaidBuild(entry) {
+  showCodexPopup(raidBuildHtml(entry, null).replace('아직 세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.', '세팅 정보를 불러오는 중...'));
+  try {
+    const snap = await fetchWeeklyRaidBuild(weekKey(), entry.id);
+    showCodexPopup(raidBuildHtml(entry, snap));
+  } catch (e) {
+    showCodexPopup(raidBuildHtml(entry, null).replace('아직 세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.', '세팅 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'));
+  }
+}
 let worldRaidUploadBusy = false;
 function uploadWeeklyRaidRecord() {
   if (!syncConfigured()) return;
   if (worldRaidUploadBusy) return;
   worldRaidUploadBusy = true;
+  uploadWeeklyRaidBuild(); // 이 기록을 낸 세팅 요약(별도 경로, 실패해도 순위 기록과 무관)
   const dmg = BN.from(S.weeklyRaid.best);
   fetch(`${SYNC_DB_URL}/weeklyRaid/${weekKey()}/entries/${raidParticipantId()}.json`, {
     method: 'PUT',

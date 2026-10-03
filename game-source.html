@@ -1431,7 +1431,8 @@ const SUBWEAPON_TYPES = [
   { mainType: '활',     name: '화살통', icon: '🎯',
     passive: { speed: 0.05 },                  passiveDesc: '공격속도 +5%' },
   { mainType: '지팡이', name: '마도서', icon: '📖',
-    passive: { spellProc: 0.03 },              passiveDesc: '주문 작렬 확률 +3%p' },
+    // 신화 +30 기준 주문 작렬 확률 +75%p(지팡이 기본 25%와 합쳐 확정 작렬), 주문 작렬 피해 +160%p
+    passive: { spellProc: 0.75 / 15.84, spellMultBonus: 0.10 }, passiveDesc: '주문 작렬 확률 +4.7%p, 주문 작렬 피해 +10%p' },
   { mainType: '둔기',   name: '건틀릿', icon: '🧤',
     passive: { smashMultBonus: 0.10 },         passiveDesc: '파쇄의 리듬 강타 배율 +10%p' },
 ];
@@ -1447,6 +1448,7 @@ const SUB_PASSIVE_STAT_LABELS = {
   bossDmg: { label: '보스 피해량', unit: '%' },
   spellProc: { label: '주문 작렬 확률', unit: '%p' },
   smashMultBonus: { label: '파쇄의 리듬 강타 배율', unit: '%p' },
+  spellMultBonus: { label: '주문 작렬 피해', unit: '%p' },
 };
 // 등급별 작명 규칙 — 메인 무기와 완전히 동일한 체계를 재사용하되, 레전더리/신화는
 // (메인 무기와 달리) 타입당 3변형이 아니라 1개만 둔다. 신화는 그 종류와 짝을 이루는
@@ -1656,7 +1658,7 @@ const SUBWEAPON_ANCIENTS = [
     desc: p => `시간 잠식·가시 반격으로 잃은 시간의 ${fmtRate(p.refund)}를 돌려받고, 잃은 시간 1초당 공격력 +${fmtRate(p.atkPerSec, 1)}` },
   { name: '모네타의 외상 장부', icon: '📒', fx: 'ledger', fxName: '외상 장부',
     flavor: '갚지 않은 빚은, 물에 잠겨도 불어난다.',
-    p: { every: 10, interest: 0.32 },
+    p: { every: 10, interest: 0.25 },
     desc: p => `보스전에서 ${p.every}초마다, 그동안 준 피해의 ${fmtRate(p.interest)}를 이자로 추가 피해` },
   { name: '이스의 수몰종 건틀릿', icon: '🔔', fx: 'ysbell', fxName: '수중의 종소리',
     flavor: '바다에 삼켜진 도시 이스의 종은, 지금도 물속에서 울린다.',
@@ -1688,7 +1690,7 @@ const SUBWEAPON_ANCIENTS = [
     desc: p => `${p.every}번째 공격마다 치명타와 연타가 반드시 함께 발동하고, 그 공격의 피해 +${fmtRate(p.bonus)}` },
   { name: '골렘의 에메트 마도서', icon: '💠', fx: 'core', fxName: '코어 과부하',
     flavor: '이마의 글자가 달아오를수록, 인형은 주인의 말을 듣지 않는다.',
-    p: { perStage: 0.15, max: 10, burst: 3 },
+    p: { perStage: 0.08, max: 10, burst: 3 },
     desc: p => `주문 작렬이 터질 때마다 코어 1단계 상승(최대 ${p.max}), 단계당 주문 작렬 피해 +${fmtRate(p.perStage)}. ${p.max}단계가 되면 다음 ${p.burst}번의 공격이 반드시 주문 작렬로 터지고 0단계로 식음` },
   { name: '카이로스의 건틀릿', icon: '⏳', fx: 'kairos', fxName: '부서진 초침',
     flavor: '지나간 기회는 다시 오지 않는다 — 이 건틀릿을 낀 자에게만은.',
@@ -6353,7 +6355,7 @@ function accEff() {
   // (accEff() 안에서 accEff()를 다시 부르면 무한 재귀가 되므로).
   const swPassive = subweaponPassiveEff(getEquippedSubweapon(), eff.subAmp);
   for (const [k, v] of Object.entries(swPassive)) {
-    if (k === 'spellProc' || k === 'smashMultBonus') continue;
+    if (k === 'spellProc' || k === 'smashMultBonus' || k === 'spellMultBonus') continue;
     eff[k] = (eff[k] || 0) + v;
   }
   // 보조무기 자체 공격력(subweaponAtk)은 %가 아니라 절대 데미지값이라 여기(accEff)가 아니라
@@ -8676,7 +8678,7 @@ function attack(w) {
   // 덩달아 커졌을 뿐, 스스로 치명타를 노릴 수는 없었다).
   const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
   if (asubForce.spell || (spellProc > 0 && Math.random() < spellProc)) {
-    let spellDmg = preCritDmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus()) * ancientSubSpellMult();
+    let spellDmg = preCritDmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus() + subweaponPassiveValue('spellMultBonus')) * ancientSubSpellMult();
     ancientSubOnSpell(asubForce.coreForced); // 고대 보조무기(코어 과부하)
     let spellCrit = false;
     if (critChance > 0 && Math.random() < critChance) { spellDmg *= effectCritMult; spellCrit = true; }

@@ -1631,7 +1631,7 @@ const SUBWEAPON_ANCIENTS = [
     desc: p => `연타가 터질 때마다 양 스택 +1(최대 ${p.max}), 스택당 연타 피해 +${fmtRate(p.perStack)}. ${p.decaySec}초간 연타가 없으면 절반이 흩어짐` },
   { name: '쿠에비코의 허수아비 검집', icon: '🌾', fx: 'scarecrow', fxName: '대신 맞는 허수아비',
     flavor: '한 걸음도 걷지 못했지만, 들판에 내린 모든 재앙을 대신 맞아냈다.',
-    p: { perHit: 0.17, dur: 10, max: 20 },
+    p: { perHit: 0.19, dur: 10, max: 20 },
     desc: p => `보스 패턴에 당할 때마다 ${p.dur}초간 공격력 +${fmtRate(p.perHit)} (최대 ${p.max}중첩)` },
   { name: '헤스티아의 등불 쌍검띠', icon: '🏮', fx: 'lamp', fxName: '꺼지지 않는 등불',
     flavor: '집을 잃은 이들이 마지막까지 지켜낸 불씨. 밤이 깊을수록 더 밝게 타오른다.',
@@ -1648,7 +1648,7 @@ const SUBWEAPON_ANCIENTS = [
   { name: '카론의 오볼 화살통', icon: '🪙', fx: 'ferry', fxName: '뱃삯',
     flavor: '건너지 못한 자들의 뱃삯이, 화살촉이 되어 되돌아온다.',
     p: { refund: 0.4, atkPerSec: 0.017 },
-    desc: p => `시간 잠식·가시 반격으로 잃은 시간의 ${fmtRate(p.refund)}를 돌려받고, 잃은 시간 1초당 공격력 +${fmtRate(p.atkPerSec)}` },
+    desc: p => `시간 잠식·가시 반격으로 잃은 시간의 ${fmtRate(p.refund)}를 돌려받고, 잃은 시간 1초당 공격력 +${fmtRate(p.atkPerSec, 1)}` },
   { name: '모네타의 외상 장부', icon: '📒', fx: 'ledger', fxName: '외상 장부',
     flavor: '갚지 않은 빚은, 물에 잠겨도 불어난다.',
     p: { every: 10, interest: 0.32 },
@@ -1691,8 +1691,8 @@ const SUBWEAPON_ANCIENTS = [
     desc: p => `결전의 기백이 한 전투에 2번 발동 (첫 발동 ${p.gap}초 뒤, 위력 ${fmtRate(p.power)})` },
   { name: '바벨의 잔해 표창집', icon: '🪨', fx: 'babel', fxName: '떠도는 잔해',
     flavor: '하늘에 닿지 못한 탑의 파편은, 빗나간 뜻까지 기어이 과녁에 닿게 한다.',
-    p: { frac: 2.4 },
-    desc: p => `회피·암흑으로 빗나가거나 스턴·탈진으로 놓친 공격마다 기본 피해의 ${fmtRate(p.frac)}를 잔해가 대신 입힘` },
+    p: { frac: 0.4 },
+    desc: p => `회피·암흑으로 빗나가거나 스턴·탈진으로 놓친 공격마다 평균 공격 피해의 ${fmtRate(p.frac)}를 잔해가 대신 입힘` },
   { name: '호라이의 정각 검집', icon: '🕰️', fx: 'horai', fxName: '정각의 종',
     flavor: '정각마다 문이 열리면, 그동안 쌓인 순간들이 한꺼번에 쏟아진다.',
     p: { every: 10, perAttack: 0.7, maxMult: 60 },
@@ -7770,7 +7770,7 @@ function asubState() {
     sheep: 0, sheepLast: 0, scare: [], lastMissTrig: -1, ferryLost: 0, ledgerAcc: 0, ledgerNext: 0,
     dealtTotal: 0, bansheeDone: {}, waves: [], shackle: 0, pressure: 0,
     daedalus: { atk: 0, speed: 0, critDmg: 0, extra: 0 }, daedalusNext: 0, valveStore: 0, valveNext: 0,
-    retrials: [], antiCount: 0, core: 0, coreBurst: 0, kairosDone: false, lastHit: 0,
+    retrials: [], antiCount: 0, core: 0, coreBurst: 0, kairosDone: false, lastHit: 0, atkAcc: 0, avgAtk: 0,
     horaiCount: 0, horaiPending: 0, horaiNext: 0, stars: 0, orderExt: 0,
   };
   return fx.asub;
@@ -7781,6 +7781,8 @@ function ancientSubPreAttack() {
   const out = { crit: false, extra: false, spell: false };
   if (!ad) return out;
   const st = asubState();
+  // 떠도는 잔해: 직전 공격 1회가 실제로 입힌 총 피해(메아리·치명타·연타 등 포함)의 이동 평균
+  if (ad.fx === 'babel' && st.atkAcc > 0) { st.avgAtk = st.avgAtk ? st.avgAtk * 0.9 + st.atkAcc * 0.1 : st.atkAcc; st.atkAcc = 0; }
   if (ad.fx === 'antikythera') {
     st.antiCount++;
     if (st.antiCount >= ad.p.every) { st.antiCount = 0; out.crit = true; out.extra = true; out.bonus = ad.p.bonus; floatText('🔭 예정된 명중!'); }
@@ -7900,7 +7902,7 @@ function ancientSubOnMiss() {
   const ad = ancientSubFx();
   if (!ad) return;
   const st = asubState();
-  if (ad.fx === 'babel' && st.lastHit > 0) { dealMonDamage(st.lastHit * ad.p.frac); floatText('🪨 잔해!'); }
+  if (ad.fx === 'babel' && st.avgAtk > 0) { asubNoTrack = true; try { dealMonDamage(st.avgAtk * ad.p.frac); } finally { asubNoTrack = false; } floatText('🪨 잔해!'); }
   if (ad.fx === 'scarecrow') ancientSubOnPattern(true);
 }
 // 보스 패턴에 당했을 때(bdTrigger, 빗나감): 허수아비 중첩 — 빗나감은 1초에 한 번만 센다
@@ -7932,10 +7934,12 @@ function ancientSubPressureMult() {
   return ad && ad.fx === 'pressure' ? 1 + ad.p.perStack * asubState().pressure : 1;
 }
 // dealMonDamage()가 본체에 피해를 줄 때마다(장부·조종용 누적)
+let asubNoTrack = false; // 잔해 자신의 피해는 평균 공격 피해 계산에서 제외
 function ancientSubOnDamage(amount) {
   if (!fx.asub || !bossFight.active) return;
   fx.asub.dealtTotal += amount;
   fx.asub.ledgerAcc += amount;
+  if (!asubNoTrack) fx.asub.atkAcc += amount;
 }
 let asubBypass = false; // 압력 밸브 분출: 보스 패턴 필터를 거치지 않는 직접 피해
 function ancientSubDirect(amount) { asubBypass = true; try { dealMonDamage(amount); } finally { asubBypass = false; } }
@@ -8011,10 +8015,14 @@ function ancientSubTick(dt, w) {
       }
     } else if (ad.fx === 'shackle' && (bdStunned() || (bd && bdActiveFor(bd.blindUntil)))) {
       st.shackle = Math.min(p.max, st.shackle + p.perSecWhileHeld * dt);
-    } else if (ad.fx === 'babel' && st.lastHit > 0) {
+    } else if (ad.fx === 'babel' && st.avgAtk > 0) {
       // 스턴·탈진으로 놓친 공격: 잃은 공격 수만큼 잔해가 대신 맞힌다
       const lost = bdStunned() ? 1 : (bdSpeedMult() < 1 ? 1 - bdSpeedMult() : 0);
-      if (lost > 0) { dealMonDamage(st.lastHit * p.frac * weaponSpeed(w) * lost * dt); hit = true; }
+      if (lost > 0) {
+        asubNoTrack = true;
+        try { dealMonDamage(st.avgAtk * p.frac * weaponSpeed(w) * ancientSubSpeedMult() * lost * dt); } finally { asubNoTrack = false; }
+        hit = true;
+      }
     }
   }
   if (hit && BN.lte(mon.hp, 0)) return handleKill();

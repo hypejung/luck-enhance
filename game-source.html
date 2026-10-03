@@ -1235,7 +1235,7 @@ const WEAPON_TYPES = [
   { name: '도끼',   icon: '🪓', speed: 0.8,  dmgMult: 1.35, trait: { bossDmg: 0.25 },                   traitDesc: '보스 피해량 +25%' },
   { name: '창',     icon: '🔱', speed: 1.0,  dmgMult: 1.10, trait: { critChance: 0.10, critDamage: 0.30 }, traitDesc: '치명타 확률 +10%p, 치명타 피해 +30%p' },
   { name: '활',     icon: '🏹', speed: 1.4,  dmgMult: 0.78, trait: { speedAmp: 0.20 },                  traitDesc: '모든 공격속도 증가량 +20%' },
-  { name: '지팡이', icon: '🪄', speed: 0.9,  dmgMult: 1.25, trait: { spellProc: 0.25, spellMult: 3 },   traitDesc: '공격력은 "마력"으로 작용, 25% 확률로 주문 작렬(피해 3배)' },
+  { name: '지팡이', icon: '🪄', speed: 0.9,  dmgMult: 1.25, trait: { spellProc: 0.25, spellMult: 3 },   traitDesc: '공격력은 "마력"으로 작용, 25% 확률로 주문 작렬(피해 3배). 주문 작렬 확률이 100%를 넘으면 넘친 만큼 주문 작렬 피해 증가' },
   { name: '둔기',   icon: '🔨', speed: 0.65, dmgMult: 1.65, trait: {},                                  traitDesc: `파쇄의 리듬: 매 ${BLUNT_SMASH_EVERY}번째 공격이 강타로 적중해 무기 공격력의 ${Math.round(BLUNT_SMASH_MULT * 100)}% 고정 피해 추가` },
 ];
 // 태초 무기 전용 "종류". WEAPON_TYPES 배열에는 넣지 않는다 — genWeapon() 등이 이 배열을
@@ -8676,9 +8676,13 @@ function attack(w) {
   // preCritDmg(치명타 배율 적용 전 데미지) 기준으로 계산한 뒤 독립적으로 치명타 판정을 받는다
   // (다른 공속 빠른 무기 종류 대비 메리트 보강 — 이전엔 본 타격이 우연히 치명타였을 때만
   // 덩달아 커졌을 뿐, 스스로 치명타를 노릴 수는 없었다).
-  const spellProc = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
+  // 확률이 100%를 넘으면 넘친 확률을 1:1로 주문 작렬 피해에 더한다(넘친 1%p = 피해 +1%p) —
+  // 코셰이·마도서처럼 확률원이 겹칠 때 낭비되는 몫이 없도록.
+  const spellProcRaw = typeTrait(w, 'spellProc') + subweaponPassiveValue('spellProc') + koscheiSpellProcBonus();
+  const spellProc = Math.min(1, spellProcRaw);
+  const spellOverflow = Math.max(0, spellProcRaw - 1);
   if (asubForce.spell || (spellProc > 0 && Math.random() < spellProc)) {
-    let spellDmg = preCritDmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus() + subweaponPassiveValue('spellMultBonus')) * ancientSubSpellMult();
+    let spellDmg = preCritDmg * ((typeTrait(w, 'spellMult') || 1) + koscheiSpellMultBonus() + subweaponPassiveValue('spellMultBonus') + spellOverflow) * ancientSubSpellMult();
     ancientSubOnSpell(asubForce.coreForced); // 고대 보조무기(코어 과부하)
     let spellCrit = false;
     if (critChance > 0 && Math.random() < critChance) { spellDmg *= effectCritMult; spellCrit = true; }

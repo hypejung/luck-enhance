@@ -627,6 +627,7 @@
   <!-- 사냥터 -->
   <div id="tab-hunt">
     <div class="panel">
+      <div class="content-preset-bar" data-cp="hunt"></div>
       <div id="huntSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
       <div id="floorbar">
         <div id="floortitle"></div>
@@ -751,6 +752,7 @@
         <div id="punchTimer" style="text-align:center;font-weight:bold;margin:6px 0;"></div>
         <button class="big danger" id="punchFleeBtn" style="width:100%;">🏳️ 측정 중단</button>
       </div>
+      <div class="content-preset-bar" data-cp="punch"></div>
       <div id="punchBox"></div>
     </div>
     <div class="panel">
@@ -1067,6 +1069,7 @@
   <div id="tab-raid" style="display:none">
     <div class="panel">
       <h3>🚩 토벌전</h3>
+      <div class="content-preset-bar" data-cp="raid"></div>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">땅 밑에 잠들어 있던 무언가가, 다시 눈을 떴다.
         사냥터마다 스며든 낯선 기운이 익숙한 몬스터의 그림자를 빌려 스스로를 드러낸다 — 원래 무엇이었는지는, 이제 아무도 기억하지 못한다.</div>
@@ -1092,6 +1095,7 @@
   <div id="tab-library" style="display:none">
     <div class="panel">
       <h3>📖 고대의 도서관</h3>
+      <div class="content-preset-bar" data-cp="library"></div>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">고대의 존재에게 패배한 자들의 기록만이 이 서고에 남는다.
         한 번 발을 들이면 서고는 끝없이 이어지고, 그 안의 지식은 갈수록 무겁고 위험해진다.</div>
@@ -1116,6 +1120,7 @@
   <div id="tab-worldraid" style="display:none">
     <div class="panel">
       <h3>🌳 세계수의 단말마</h3>
+      <div class="content-preset-bar" data-cp="worldraid"></div>
       <img src="assets/raid/groma.jpg" alt="그르마, 뿌리 끝의 절규" style="width:100%;border-radius:10px;border:1px solid var(--border);margin-bottom:10px;display:block;" onerror="this.style.display='none'">
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">니드호그가 끝없이 갉아온 세계수의 뿌리는 이미 돌이킬 수 없이 썩었다. 그 뿌리를 지키던 루멘 아르카조차 신성을 버리고 등을 돌렸다 — 세계수는 스스로를 지킬 힘조차 잃은 것이다.
@@ -5792,6 +5797,7 @@ function newState() {
     // 슬롯 자체는 항상 5개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
     presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null })),
     presetSlots: 3,
+    contentPresets: {},  // 컨텐츠별 지정 프리셋: { hunt|raid|library|worldraid|punch: 프리셋 index }
     raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
     awakeningEssence: BN.from(0),   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
     library: { week: null, count: 0, best: 0, done: {} }, // 고대의 도서관: 초기화 주기(수·일 자정)별 도전 횟수 + 최고 깊이 기록 + 이번 주기 클리어한 서고(재도전 잠금)
@@ -10730,6 +10736,7 @@ function migrate(d) {
   // 프리셋 슬롯을 5개로 확장하면서, 기존에 3개만 있던 세이브는 나머지를 빈 슬롯으로 채운다.
   while (d.presets.length < 5) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null });
   if (typeof d.presetSlots !== 'number' || d.presetSlots < 3) d.presetSlots = 3;
+  if (!d.contentPresets || typeof d.contentPresets !== 'object' || Array.isArray(d.contentPresets)) d.contentPresets = {};
   // 이전 버전 호환: 보조무기 프리셋 필드가 없던 세이브는 채워넣는다.
   for (const p of d.presets) if (!('subWeaponId' in p)) p.subWeaponId = null;
   if (!Array.isArray(d.sealEquipped)) d.sealEquipped = [];
@@ -12763,7 +12770,7 @@ function renderGamble() {
 }
 
 function renderAll() {
-  renderTop(); renderFloorUI(); renderMonster();
+  renderTop(); renderFloorUI(); renderMonster(); renderContentPresetBars();
   renderEnhance(); renderCraft(); renderAccTab(); renderInventory(); renderBoxes(); renderRuneTab(); renderStats();
   renderEggBadges();
 }
@@ -12792,6 +12799,7 @@ function switchTab(name) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'preset') renderPresetTab();
+  if (['hunt', 'raid', 'library', 'worldraid', 'stats'].includes(name)) renderContentPresetBars();
   if (name === 'library') renderLibraryTab();
   if (name === 'worldraid') renderWorldRaidTab();
   if (name === 'enhance') renderEnhance();
@@ -13348,7 +13356,47 @@ function renamePreset(idx, newName) {
   p.name = name;
   save();
 }
+// ---------- 컨텐츠별 프리셋 ----------
+// 사냥터·토벌전·도서관·레이드·펀치기계마다 쓸 프리셋을 하나씩 지정해두고, 각 화면 위쪽의
+// "적용" 버튼으로 바로 불러온다(불러오기 자체는 프리셋 탭의 loadPreset과 완전히 같음).
+const CONTENT_PRESET_LABELS = { hunt: '사냥터', raid: '토벌전', library: '도서관', worldraid: '레이드', punch: '펀치기계' };
+function contentPresetIdx(key) {
+  const idx = S.contentPresets ? S.contentPresets[key] : null;
+  if (idx == null || idx >= S.presetSlots || !S.presets[idx] || S.presets[idx].weaponId == null) return null;
+  return idx;
+}
+function setContentPreset(key, idx) {
+  if (!S.contentPresets || typeof S.contentPresets !== 'object') S.contentPresets = {};
+  if (idx == null || idx === '') delete S.contentPresets[key]; else S.contentPresets[key] = +idx;
+  renderContentPresetBars(); save();
+}
+function applyContentPreset(key) {
+  const idx = contentPresetIdx(key);
+  if (idx == null) { log(`${CONTENT_PRESET_LABELS[key]}에 지정된 프리셋이 없습니다. 먼저 프리셋을 골라주세요.`, 'lg-bad'); return; }
+  if (bossFight.active) { log('전투 중에는 프리셋을 바꿀 수 없습니다.', 'lg-bad'); return; }
+  loadPreset(idx);
+  renderContentPresetBars();
+}
+function renderContentPresetBars() {
+  document.querySelectorAll('.content-preset-bar').forEach(el => {
+    const key = el.dataset.cp;
+    const cur = contentPresetIdx(key);
+    const opts = S.presets.slice(0, S.presetSlots).map((p, i) => p.weaponId == null ? '' :
+      `<option value="${i}" ${cur === i ? 'selected' : ''}>${escHtml(p.name)}</option>`).join('');
+    const active = cur != null && presetMatchesCurrent(S.presets[cur]);
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;margin-bottom:8px;padding:6px 8px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;">
+      <span>🎯 ${CONTENT_PRESET_LABELS[key]} 프리셋</span>
+      <select class="cp-select" style="background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:3px 6px;font-size:12px;max-width:140px;">
+        <option value="">지정 안 함</option>${opts}
+      </select>
+      <button class="cp-apply primary" style="padding:4px 10px;font-size:12px;" ${cur == null || active ? 'disabled' : ''}>${active ? '✅ 적용 중' : '적용'}</button>
+    </div>`;
+    el.querySelector('.cp-select').onchange = ev => setContentPreset(key, ev.target.value);
+    el.querySelector('.cp-apply').onclick = () => applyContentPreset(key);
+  });
+}
 function renderPresetTab() {
+  renderContentPresetBars(); // 프리셋 저장·불러오기·이름 변경 시 각 컨텐츠 화면의 지정 표시도 갱신
   const box = $('presetList');
   if (!box) return;
   box.innerHTML = '';

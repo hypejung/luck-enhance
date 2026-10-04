@@ -823,6 +823,9 @@
       <div class="guide-card" id="autoSellFilterCard" style="margin-bottom:8px;">
         <div class="guide-head" id="autoSellFilterToggle">🔍 판매 필터(종류/효과)<span class="guide-arrow">▾</span></div>
         <div class="guide-body" id="autoSellFilterBody" hidden>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px;">
+            <input type="checkbox" id="autoSellBossCheck"> 👹 보스 무기도 판매 <span style="font-size:11px;color:var(--sub)">(끄면 필터에 걸려도 보스 무기는 남김)</span>
+          </label>
           <div style="margin-bottom:6px;color:var(--sub);">무기 종류</div>
           <div id="autoSellTypeList" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;"></div>
           <div style="margin-bottom:6px;color:var(--sub);">무기 효과</div>
@@ -5915,6 +5918,7 @@ function newState() {
     autoSellGrade: null, // 이 등급 이하 + 강화0 무기는 획득 즉시 자동판매 (null=끔)
     autoSellTypes: [],   // 이 무기 종류(들) + 강화0인 무기는 획득 즉시 자동판매
     autoSellEffects: [], // 이 무기 효과(들) + 강화0인 무기는 획득 즉시 자동판매
+    autoSellBoss: false, // 보스 무기도 자동판매·일괄 정리 대상에 포함할지 (false=필터에 걸려도 보스 무기는 남김)
     ariadneTarget: null, // 아리아드네의 실타래(태초의 유물): 플레이어가 설정한 목표 실 길이(1~120, null=기본 최대)
     runeAutoSellGrade: null, // 이 등급 이하 룬은 획득 즉시 자동판매 (null=끔)
     subAutoSellGrade: null, // 이 등급 이하 + 강화0 보조무기는 획득 즉시 자동판매 (null=끔)
@@ -7349,8 +7353,9 @@ function openBox(idx, src) {
 }
 
 // 자동판매 필터 판정: 등급 이하 / 선택한 무기 종류 / 선택한 무기 효과 중 하나라도 걸리면 대상
-// (강화 0단계 + 태초·고대 제외는 호출부에서 별도로 체크).
+// (강화 0단계 + 태초·고대 제외는 호출부에서 별도로 체크). 보스 무기는 "보스 무기도 판매"를 켰을 때만 대상.
 function autoSellFilterMatch(w) {
+  if (w.bossFloor !== undefined && !S.autoSellBoss) return false;
   if (S.autoSellGrade != null && w.grade <= S.autoSellGrade) return true;
   if (S.autoSellTypes && S.autoSellTypes.includes(w.type)) return true;
   if (S.autoSellEffects && w.effect && S.autoSellEffects.includes(w.effect)) return true;
@@ -12107,6 +12112,7 @@ function setupAutoSellControls() {
       body.hidden = !willOpen;
       $('autoSellFilterCard').classList.toggle('open', willOpen);
     };
+    $('autoSellBossCheck').onchange = e => { S.autoSellBoss = e.target.checked; save(); };
     const typeBox = $('autoSellTypeList');
     typeBox.innerHTML = WEAPON_TYPES.map(t => `
       <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
@@ -12135,6 +12141,7 @@ function setupAutoSellControls() {
     });
   }
   sel.value = S.autoSellGrade == null ? '' : String(S.autoSellGrade);
+  $('autoSellBossCheck').checked = !!S.autoSellBoss;
   $('autoSellTypeList').querySelectorAll('input[data-type]').forEach(cb => {
     cb.checked = (S.autoSellTypes || []).includes(cb.dataset.type);
   });

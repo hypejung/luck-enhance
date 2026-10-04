@@ -858,8 +858,18 @@
         <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
           🗑️ 자동판매:
           <select id="subAutoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
-          이하 + 강화 0인 보조무기 획득 시 즉시 판매
+          이하, 또는 아래 필터에 걸리는 보조무기는 강화 0단계일 때 획득 즉시 판매
           <button id="subAutoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
+        </div>
+        <div class="guide-card" id="subAutoSellFilterCard" style="margin-bottom:8px;">
+          <div class="guide-head" id="subAutoSellFilterToggle">🔍 판매 필터(종류)<span class="guide-arrow">▾</span></div>
+          <div class="guide-body" id="subAutoSellFilterBody" hidden>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:10px;">
+              <input type="checkbox" id="subAutoSellBossCheck"> 👹 보스 보조무기도 판매 <span style="font-size:11px;color:var(--sub)">(끄면 필터에 걸려도 보스 보조무기는 남김)</span>
+            </label>
+            <div style="margin-bottom:6px;color:var(--sub);">보조무기 종류</div>
+            <div id="subAutoSellTypeList" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
         </div>
         <div id="subinvlist"></div>
       </div>
@@ -5922,6 +5932,8 @@ function newState() {
     ariadneTarget: null, // 아리아드네의 실타래(태초의 유물): 플레이어가 설정한 목표 실 길이(1~120, null=기본 최대)
     runeAutoSellGrade: null, // 이 등급 이하 룬은 획득 즉시 자동판매 (null=끔)
     subAutoSellGrade: null, // 이 등급 이하 + 강화0 보조무기는 획득 즉시 자동판매 (null=끔)
+    subAutoSellTypes: [],   // 이 보조무기 종류(들) + 강화0인 보조무기는 획득 즉시 자동판매
+    subAutoSellBoss: false, // 보스 보조무기도 자동판매·일괄 정리 대상에 포함할지
     genesisOwned: [],  // 보유한 태초의 유물 id 목록
     weaponEssence: BN.from(0),  // 무기의 정수 — 태초 무기 강화 전용 재화 (고대의 도서관 컨텐츠에서 획득 예정)
     eggs: {},          // 달성한 이스터에그: { eggId: true }
@@ -7587,12 +7599,12 @@ function addSubweapon(sw) {
     S.subGenesisSeen[sw.genesisFloor - WORLD2_START_FLOOR] = true;
   }
   if (!Array.isArray(S.subweapons)) S.subweapons = [];
-  // 자동판매 필터: 무기 가방과 동일한 패턴 — 지정 등급 이하 + 강화0인 새 보조무기는 획득 즉시 자동 판매
-  // (고대 이상은 자동판매 대상에서 항상 제외)
-  if (S.subAutoSellGrade != null && sw.grade < 6 && sw.grade <= S.subAutoSellGrade && sw.enhance === 0) {
+  // 자동판매 필터: 무기 가방과 동일한 패턴 — 등급/종류 필터에 걸리고 강화0인 새 보조무기는 획득 즉시 자동 판매
+  // (고대 이상은 자동판매 대상에서 항상 제외, 보스 보조무기는 "보스 보조무기도 판매"를 켰을 때만)
+  if (sw.enhance === 0 && subAutoSellFilterMatch(sw)) {
     const price = subSellPrice(sw);
     S.gold = BN.add(S.gold, price);
-    log(`🗑️ 자동판매(${GRADES[sw.grade].name} 이하): ${subweaponGradeTag(sw)} → +${fmt(price)} 골드`);
+    log(`🗑️ 자동판매: ${subweaponGradeTag(sw)} → +${fmt(price)} 골드`);
     return;
   }
   if (S.subweapons.length >= SUBWEAPON_BAG_MAX) {
@@ -12561,7 +12573,17 @@ function renderSubEquippedBox() {
   renderSubAdvancedEnhance(sw, maxed);
   renderSubAutoEnhance(sw, maxed);
 }
-// 보조무기 자동판매 등급 선택 UI — 가방 무기의 setupAutoSellControls()와 동일한 패턴.
+// 보조무기 자동판매 필터 판정: 등급 이하 / 선택한 종류 중 하나라도 걸리면 대상(강화 0단계는 호출부에서 체크).
+// 고대·태초는 항상 제외, 보스 보조무기는 "보스 보조무기도 판매"를 켰을 때만.
+function subAutoSellFilterMatch(sw) {
+  if (sw.grade >= 6) return false;
+  if (sw.bossFloor !== undefined && !S.subAutoSellBoss) return false;
+  if (S.subAutoSellGrade != null && sw.grade <= S.subAutoSellGrade) return true;
+  const t = SUBWEAPON_TYPES[sw.typeIdx];
+  if (t && S.subAutoSellTypes && S.subAutoSellTypes.includes(t.name)) return true;
+  return false;
+}
+// 보조무기 자동판매 등급·필터 UI — 가방 무기의 판매 필터와 동일한 패턴.
 function setupSubAutoSellControls() {
   const sel = $('subAutoSellSelect');
   if (!sel) return;
@@ -12573,8 +12595,8 @@ function setupSubAutoSellControls() {
       save();
     };
     $('subAutoSellCleanBtn').onclick = () => {
-      if (S.subAutoSellGrade == null) { log('먼저 자동판매 등급을 선택하세요.', 'lg-bad'); return; }
-      const targets = (S.subweapons || []).filter(sw => sw.id !== S.subEquipped && sw.grade <= S.subAutoSellGrade && sw.enhance === 0);
+      if (S.subAutoSellGrade == null && !(S.subAutoSellTypes || []).length) { log('먼저 자동판매 등급이나 판매 필터를 선택하세요.', 'lg-bad'); return; }
+      const targets = (S.subweapons || []).filter(sw => sw.id !== S.subEquipped && sw.enhance === 0 && subAutoSellFilterMatch(sw));
       if (!targets.length) { log('정리할 보조무기가 없습니다.'); return; }
       let total = 0;
       for (const sw of targets) total += subSellPrice(sw);
@@ -12584,8 +12606,32 @@ function setupSubAutoSellControls() {
       log(`🗑️ 보조무기 가방 일괄 정리: ${targets.length}개 판매 → +${fmt(total)} 골드`, 'lg-good');
       renderSubweaponTab(); renderTop(); save();
     };
+    $('subAutoSellFilterToggle').onclick = () => {
+      const body = $('subAutoSellFilterBody');
+      const willOpen = body.hidden;
+      body.hidden = !willOpen;
+      $('subAutoSellFilterCard').classList.toggle('open', willOpen);
+    };
+    $('subAutoSellBossCheck').onchange = e => { S.subAutoSellBoss = e.target.checked; save(); };
+    const typeBox = $('subAutoSellTypeList');
+    typeBox.innerHTML = SUBWEAPON_TYPES.map(t => `
+      <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+        <input type="checkbox" data-subtype="${t.name}"> ${t.icon} ${t.name}
+      </label>`).join('');
+    typeBox.querySelectorAll('input[data-subtype]').forEach(cb => {
+      cb.onchange = () => {
+        const set = new Set(S.subAutoSellTypes || []);
+        if (cb.checked) set.add(cb.dataset.subtype); else set.delete(cb.dataset.subtype);
+        S.subAutoSellTypes = [...set];
+        save();
+      };
+    });
   }
   sel.value = S.subAutoSellGrade == null ? '' : String(S.subAutoSellGrade);
+  $('subAutoSellBossCheck').checked = !!S.subAutoSellBoss;
+  $('subAutoSellTypeList').querySelectorAll('input[data-subtype]').forEach(cb => {
+    cb.checked = (S.subAutoSellTypes || []).includes(cb.dataset.subtype);
+  });
 }
 function renderSubInventory() {
   const list = $('subinvlist');

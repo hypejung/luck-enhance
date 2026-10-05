@@ -1077,6 +1077,14 @@
       <div id="enchantBox"></div>
     </div>
     <div class="panel">
+      <h3>✨ 무기 에디셔널 각인</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        일반 각인이 있는 무기에 3줄짜리 각인을 하나 더 새깁니다. 옵션 종류와 수치 범위는 같지만 높은 수치와 승급이
+        훨씬 드물고, 비용은 일반 각인의 1.5배입니다.
+      </div>
+      <div id="addEnchantBox"></div>
+    </div>
+    <div class="panel">
       <h3>🗡️ 보조무기 각인</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <b style="color:var(--unique)">+15 이상</b> 강화한 장착 보조무기에 각인을 새길 수 있습니다. 비용·등급·승급 규칙은 무기 각인과 같고,
@@ -1084,6 +1092,17 @@
         드롭률은 다른 월드(1~20층)에서 사냥할 때 절반만 적용됩니다.
       </div>
       <div id="subEnchantBox"></div>
+    </div>
+    <div class="panel">
+      <h3>✨ 보조무기 에디셔널 각인</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        일반 각인이 있는 보조무기에 3줄짜리 각인을 하나 더 새깁니다. 높은 수치와 승급이 훨씬 드물고, 비용은 1.5배입니다.
+      </div>
+      <div id="subAddEnchantBox"></div>
+    </div>
+    <div class="panel">
+      <h3>🎲 삼중 재설정</h3>
+      <div id="enchantTripleBox"></div>
     </div>
   </div>
 
@@ -3294,12 +3313,12 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 17.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 21.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '🏺 고대 보조무기 등장 · ⚒️ 보조무기 각인',
+    version: 6, versionLabel: '1.0.5', title: '⚒️ 각인 확장 · 🏺 고대 보조무기 등장',
     changes: [
       { id: 12, date: '2026-10-03', text: '🏺 고대 보조무기 20종 등장: 월드2 21~40층마다 그 층에만 있는 고대 보조무기가 아주 낮은 확률로 드롭됩니다.' },
       { id: 13, date: '2026-10-03', text: '✨ 고대 보조무기에는 종류 패시브·결전의 기백 위에 저마다 고유한 고대 효과가 붙습니다. (📘 가이드 → 고대 보조무기)' },
@@ -3307,6 +3326,10 @@ const PATCH_NOTES = [
       { id: 15, date: '2026-10-03', text: '🏷️ 기존 수집품 "고대 보조무기"는 이름이 "황혼의 유산"으로 바뀌었습니다. (수집 현황·보너스는 그대로)' },
       { id: 16, date: '2026-10-03', quiet: true, text: '🛡️ 월드2(21~40층)에서 사냥 중일 때 도감의 강화 파괴 확률 감소가 적용되지 않던 문제를 고쳤습니다. 이제 사냥 위치와 상관없이 적용됩니다.' },
       { id: 17, date: '2026-10-05', text: '⚒️ 보조무기 각인 추가: 대장장이에서 +15 이상 보조무기에 각인을 새길 수 있습니다. (드롭률·골드·보스 피해량·보조무기 효과 증폭·액티브 피해량·액티브 지속시간)' },
+      { id: 18, date: '2026-10-05', text: '📜 각인이 3줄로 늘어났습니다: 첫 줄은 각인 등급, 아래 두 줄은 한 단계 아래 등급(각각 드물게 같은 등급)으로 뜹니다. 기존 각인은 다음 재설정부터 3줄이 됩니다.' },
+      { id: 19, date: '2026-10-05', text: '✨ 에디셔널 각인 추가: 일반 각인이 있는 무기·보조무기에 3줄짜리 각인을 하나 더 새길 수 있습니다. (비용 1.5배, 높은 수치·승급은 더 드묾)' },
+      { id: 20, date: '2026-10-05', text: '🔁 각인 자동 재설정: 줄마다 원하는 옵션과 최소 수치를 정해두면 자동으로 돌리다가, 조건에 맞는 결과가 나오면 멈추고 ❓로 보여줍니다. 확인 후 사용하거나 버릴 수 있습니다.' },
+      { id: 21, date: '2026-10-05', text: '🎲 삼중 재설정(계정당 1회 구매): 한 번에 각인 결과 3개를 뽑아 그중 하나를 고를 수 있습니다.' },
     ],
   },
 ];
@@ -5975,6 +5998,8 @@ function newState() {
     // 슬롯 자체는 항상 PRESET_MAX_SLOTS(10)개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
     presets: Array.from({ length: PRESET_MAX_SLOTS }, (_, i) => i + 1).map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null })),
     presetSlots: 3,
+    enchantTriple: false, // 삼중 재설정 구매 여부(계정당 1회)
+    enchantAuto: {},      // 각인 자동 재설정 조건: { wMain|wAdd|sMain|sAdd: { lines: [{key, min} ×3], triple } }
     contentPresets: {},  // 컨텐츠별 지정 프리셋: { hunt|raid|library|worldraid|punch: 프리셋 index }
     raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
     awakeningEssence: BN.from(0),   // 각성의 정수 (고대의 도서관 전용 재화, 무기 각성 시스템)
@@ -6535,15 +6560,17 @@ function accEff() {
   for (const src of [subBossMilestoneEff(), subRelicMilestoneEff(), subCodexBonusEff()]) {
     for (const k of Object.keys(src)) eff[k] = (eff[k] || 0) + (k === 'luck' ? luckFor(src[k], 'w2') : src[k]);
   }
-  // 보조무기 각인(21~40층 소스): 장착 보조무기의 각인 2줄. 보조무기 증폭(subAmp)이 아래 패시브
-  // 계산에 들어가야 하므로 패시브보다 먼저 더한다.
+  // 보조무기 각인·에디셔널 각인(21~40층 소스): 보조무기 증폭(subAmp)이 아래 패시브 계산에
+  // 들어가야 하므로 패시브보다 먼저 더한다.
   const enchantSw = S && getEquippedSubweapon();
-  if (enchantSw && enchantSw.enchant) {
-    for (const line of enchantSw.enchant.lines) {
-      const opt = SUB_ENCHANT_OPTIONS[line.key];
-      if (!opt) continue;
-      const v = line.value / opt.div;
-      eff[opt.stat] = (eff[opt.stat] || 0) + (opt.stat === 'luck' ? luckFor(v, 'w2') : v);
+  if (enchantSw) {
+    for (const [kind, en] of [['sMain', enchantSw.enchant], ['sAdd', enchantSw.addEnchant]]) {
+      if (!en) continue;
+      for (const line of en.lines) {
+        const st = enchantLineStat(kind, line);
+        if (!st) continue;
+        eff[st.stat] = (eff[st.stat] || 0) + (st.stat === 'luck' ? luckFor(st.value, 'w2') : st.value);
+      }
     }
   }
   // 장착 중인 보조무기의 패시브(공용 스탯 키만) — spellProc/smashMultBonus는 여기 없는 별도
@@ -6559,14 +6586,18 @@ function accEff() {
   // 무기 각인: 장착 무기에 새겨진 각인 2줄의 효과 합산 (파괴되면 함께 사라짐). 전투 스탯은
   // 월드 구분 없이 적용되지만, 골드 획득·드롭률처럼 파밍 계열 옵션이 뽑혔다면 다른 1~20층
   // 소스(장신구 등)와 동일하게 월드2 사냥 중엔 그 줄만 적용되지 않는다.
+  // 에디셔널 각인도 같은 규칙으로 더한다.
   const enchantW = S && getEquipped();
-  if (enchantW && enchantW.enchant) {
-    for (const line of enchantW.enchant.lines) {
-      const opt = ENCHANT_OPTIONS[line.key];
-      if (!opt) continue;
-      if (opt.stat === 'luck') { eff.luck += luckFor(line.value / 100, 'w1'); continue; }
-      if (!world1 && WORLD1_UTILITY_KEYS.includes(opt.stat)) continue;
-      eff[opt.stat] += line.value / 100;
+  if (enchantW) {
+    for (const [kind, en] of [['wMain', enchantW.enchant], ['wAdd', enchantW.addEnchant]]) {
+      if (!en) continue;
+      for (const line of en.lines) {
+        const st = enchantLineStat(kind, line);
+        if (!st) continue;
+        if (st.stat === 'luck') { eff.luck += luckFor(st.value, 'w1'); continue; }
+        if (!world1 && WORLD1_UTILITY_KEYS.includes(st.stat)) continue;
+        eff[st.stat] += st.value;
+      }
     }
   }
   // 고대의 인장: 층 결부형 컨셉(각 인장이 특정 사냥터 보스 테마)이라 월드1 한정
@@ -10020,69 +10051,8 @@ const ENCHANT_OPTIONS = {
   extraAtkDmg: { name: '연타 피해', stat: 'extraAtkDmg', unit: '%p', ranges: [[2, 5], [3.5, 9], [6, 15], [10.5, 26], [18, 45], [31.5, 79], [55, 137.5]] },
 };
 const ENCHANT_OPTION_KEYS = Object.keys(ENCHANT_OPTIONS);
-// 등급 내에서 최댓값에 가까울수록 확률이 낮아지도록 저치 편향 분포로 값을 뽑는다.
-function rollEnchantLine(grade) {
-  const key = ENCHANT_OPTION_KEYS[Math.floor(Math.random() * ENCHANT_OPTION_KEYS.length)];
-  const [min, max] = ENCHANT_OPTIONS[key].ranges[grade - 1];
-  const t = Math.pow(Math.random(), 2);
-  const value = Math.round((min + (max - min) * t) * 10) / 10;
-  return { key, grade, value };
-}
-function rollEnchantLines(grade) {
-  if (grade <= 1) return [rollEnchantLine(grade), rollEnchantLine(grade)];
-  const top = rollEnchantLine(grade);
-  const isDeviation = Math.random() < ENCHANT_DEVIATION_CHANCE;
-  const bottom = rollEnchantLine(isDeviation ? grade : grade - 1);
-  return [top, bottom];
-}
-function enchantLineText(line) {
-  const opt = ENCHANT_OPTIONS[line.key];
-  return `<span class="grade-${GRADES[line.grade].name}">[${GRADES[line.grade].name}]</span> ${opt.name} +${line.value}${opt.unit}`;
-}
-function grantEnchant(w) {
-  if (!w || isFist(w)) { log('맨손에는 각인을 부여할 수 없습니다.', 'lg-bad'); return; }
-  if (w.enhance < ENCHANT_MIN_ENHANCE) { log(`각인은 +${ENCHANT_MIN_ENHANCE} 이상 무기부터 부여할 수 있습니다.`, 'lg-bad'); return; }
-  if (w.enchant) { log('이미 각인이 부여된 무기입니다.', 'lg-bad'); return; }
-  const tokenCost = ENCHANT_TOKEN_COST[1];
-  const goldCost = enchantGoldCost(1);
-  if (BN.lt(S.raidTokens, tokenCost)) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
-  if (BN.lt(S.gold, goldCost)) { log(`골드가 부족합니다 (${fmt(goldCost)} 필요)`, 'lg-bad'); return; }
-  S.raidTokens = BN.sub(S.raidTokens, tokenCost);
-  S.gold = BN.sub(S.gold, goldCost);
-  w.enchant = { grade: 1, lines: rollEnchantLines(1), pity: 0 };
-  log(`⚒️ <b>각인 부여!</b> ${gradeTag(w)}에 <span class="grade-레어">레어</span> 각인이 새겨졌습니다.`, 'lg-prim');
-  renderBlacksmith(); renderTop(); save();
-}
-function resetEnchant(w) {
-  if (!w || !w.enchant) return;
-  const grade = w.enchant.grade;
-  const tokenCost = ENCHANT_TOKEN_COST[grade];
-  const goldCost = enchantGoldCost(grade);
-  if (BN.lt(S.raidTokens, tokenCost)) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return; }
-  if (BN.lt(S.gold, goldCost)) { log(`골드가 부족합니다 (${fmt(goldCost)} 필요)`, 'lg-bad'); return; }
-  S.raidTokens = BN.sub(S.raidTokens, tokenCost);
-  S.gold = BN.sub(S.gold, goldCost);
-  const ceiling = ENCHANT_CEILING[grade];
-  const canPromote = grade < ENCHANT_MAX_GRADE;
-  // 천장(확정 승급)과 별개로, 매 재설정마다 낮은 확률로 천장 전이라도 즉시 승급을 시도한다.
-  const earlyPromote = canPromote && Math.random() < enchantEarlyPromoteChance(grade);
-  if (canPromote && ceiling != null && (earlyPromote || w.enchant.pity + 1 >= ceiling)) {
-    w.enchant.grade = grade + 1;
-    w.enchant.pity = 0;
-    w.enchant.lines = rollEnchantLines(w.enchant.grade);
-    const tag = earlyPromote ? ' (조기 승급!)' : '';
-    log(`✨ <b>각인 등급 승급!</b>${tag} ${gradeTag(w)}의 각인이 <span class="grade-${GRADES[w.enchant.grade].name}">${GRADES[w.enchant.grade].name}</span> 등급이 되었습니다!`, 'lg-prim');
-  } else {
-    w.enchant.pity++;
-    w.enchant.lines = rollEnchantLines(grade);
-    const need = canPromote ? ceiling : null;
-    log(`⚒️ 각인 재설정: 효과가 변경되었습니다.${need ? ` (${w.enchant.pity}/${need})` : ''}`, 'lg-good');
-  }
-  renderBlacksmith(); renderTop(); save();
-}
-// ---------- 보조무기 각인 ----------
-// 메인 무기 각인과 같은 구조(+15 이상, 2줄, 레어~태초, 조기 승급/천장, 🎫 토벌의 증표 + 골드)를
-// 그대로 쓰되, 옵션은 파밍·보조무기 계열 6종만. 전투 스탯(공격력·치명타 등)이 각인 하나만큼 통째로
+// ---------- 보조무기 각인 옵션 ----------
+// 보조무기 각인은 파밍·보조무기 계열 6종만. 전투 스탯(공격력·치명타 등)이 각인 하나만큼 통째로
 // 더 쌓이지 않게 하려는 것. 액티브 위력/지속시간은 강화 수치를 넘지 않게 낮게 잡았다 —
 // 태초 각인 한 줄 최대가 액티브 위력 +55%p(강화 후반 한 단계 정도), 지속시간 +2초(보조무기
 // 도감 마일스톤 2개분) 수준. 드롭률은 21~40층 소스라 월드1에서는 절반만 적용(accEff 참고).
@@ -10098,124 +10068,357 @@ const SUB_ENCHANT_OPTIONS = {
   subActiveDuration: { name: '액티브 지속시간',     stat: 'subActiveDuration', unit: '초', div: 1,   dec: 2, ranges: scaleEnchantRanges(2 / 137.5, 2) },
 };
 const SUB_ENCHANT_OPTION_KEYS = Object.keys(SUB_ENCHANT_OPTIONS);
-function rollSubEnchantLine(grade) {
-  const key = SUB_ENCHANT_OPTION_KEYS[Math.floor(Math.random() * SUB_ENCHANT_OPTION_KEYS.length)];
-  const opt = SUB_ENCHANT_OPTIONS[key];
+// ---------- 각인 엔진 (무기/보조무기 × 일반/에디셔널) ----------
+// 네 종류가 같은 규칙을 공유하고 설정값만 다르다.
+// - 3줄: 첫 줄은 각인 등급, 둘째·셋째 줄은 한 단계 아래 등급이며 각각 deviation 확률로 각인 등급("이탈").
+//   레어(1등급)는 3줄 모두 레어. 예전 2줄 각인은 다음 재설정/승급 때부터 3줄로 뽑힌다.
+// - 값은 범위 안에서 저치 편향(random^skew)으로 뽑는다. 에디셔널은 skew가 커서 높은 값이 훨씬 드물다.
+// - 승급: 천장(ENCHANT_CEILING × ceilMult) 또는 재설정마다 조기 승급(기본 확률 × earlyMult).
+// - 비용: 등급별 증표·골드 × costMult(에디셔널 1.5배, 증표는 올림).
+// - 에디셔널 각인은 일반 각인이 있어야 부여할 수 있다.
+const ENCHANT_KINDS = {
+  wMain: { target: 'weapon', field: 'enchant',    label: '무기 각인',              boxId: 'enchantBox',       options: ENCHANT_OPTIONS,     deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: 1 },
+  wAdd:  { target: 'weapon', field: 'addEnchant', label: '무기 에디셔널 각인',     boxId: 'addEnchantBox',    options: ENCHANT_OPTIONS,     deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 },
+  sMain: { target: 'sub',    field: 'enchant',    label: '보조무기 각인',          boxId: 'subEnchantBox',    options: SUB_ENCHANT_OPTIONS, deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: 1 },
+  sAdd:  { target: 'sub',    field: 'addEnchant', label: '보조무기 에디셔널 각인', boxId: 'subAddEnchantBox', options: SUB_ENCHANT_OPTIONS, deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 },
+};
+const ENCHANT_LINE_COUNT = 3;
+// 삼중 재설정(계정당 1회 구매): 한 번에 결과 3개를 뽑아 그중 하나를 고른다. 월드3 후반 골드 기준.
+const ENCHANT_TRIPLE_COST = 1e28;
+const ENCHANT_AUTO_INTERVAL_MS = 1500;
+function enchantOpt(kind, key) { return ENCHANT_KINDS[kind].options[key]; }
+function enchantTarget(kind) { return ENCHANT_KINDS[kind].target === 'weapon' ? getEquipped() : getEquippedSubweapon(); }
+function enchantTargetTag(kind, it) { return ENCHANT_KINDS[kind].target === 'weapon' ? gradeTag(it) : subweaponGradeTag(it); }
+function enchantCeiling(kind, grade) { const c = ENCHANT_CEILING[grade]; return c ? c * ENCHANT_KINDS[kind].ceilMult : null; }
+function enchantEarlyChance(kind, grade) { return enchantEarlyPromoteChance(grade) * ENCHANT_KINDS[kind].earlyMult; }
+function enchantCost(kind, grade) {
+  const m = ENCHANT_KINDS[kind].costMult;
+  return { tokens: Math.ceil(ENCHANT_TOKEN_COST[grade] * m), gold: Math.round(enchantGoldCost(grade) * m) };
+}
+function rollEnchantLineOf(kind, grade) {
+  const K = ENCHANT_KINDS[kind];
+  const keys = Object.keys(K.options);
+  const key = keys[Math.floor(Math.random() * keys.length)];
+  const opt = K.options[key];
   const [min, max] = opt.ranges[grade - 1];
-  const t = Math.pow(Math.random(), 2);
-  const f = Math.pow(10, opt.dec);
+  const t = Math.pow(Math.random(), K.skew);
+  const f = Math.pow(10, opt.dec != null ? opt.dec : 1);
   return { key, grade, value: Math.round((min + (max - min) * t) * f) / f };
 }
-function rollSubEnchantLines(grade) {
-  if (grade <= 1) return [rollSubEnchantLine(grade), rollSubEnchantLine(grade)];
-  const top = rollSubEnchantLine(grade);
-  const bottom = rollSubEnchantLine(Math.random() < ENCHANT_DEVIATION_CHANCE ? grade : grade - 1);
-  return [top, bottom];
+function rollEnchantLinesOf(kind, grade) {
+  const K = ENCHANT_KINDS[kind];
+  const lines = [rollEnchantLineOf(kind, grade)];
+  for (let i = 1; i < ENCHANT_LINE_COUNT; i++) {
+    const g = grade <= 1 || Math.random() < K.deviation ? grade : grade - 1;
+    lines.push(rollEnchantLineOf(kind, g));
+  }
+  return lines;
 }
-function subEnchantLineText(line) {
-  const opt = SUB_ENCHANT_OPTIONS[line.key];
+// 하위 호환: 기존 호출부(무기 각인 2줄 함수명)
+function rollEnchantLines(grade) { return rollEnchantLinesOf('wMain', grade); }
+function enchantLineTextOf(kind, line) {
+  const opt = enchantOpt(kind, line.key);
+  if (!opt) return '';
   return `<span class="grade-${GRADES[line.grade].name}">[${GRADES[line.grade].name}]</span> ${opt.name} +${line.value}${opt.unit}`;
 }
-function payEnchantCost(grade) {
-  const tokenCost = ENCHANT_TOKEN_COST[grade];
-  const goldCost = enchantGoldCost(grade);
-  if (BN.lt(S.raidTokens, tokenCost)) { log(`🎫 토벌의 증표가 부족합니다 (${tokenCost}개 필요)`, 'lg-bad'); return false; }
-  if (BN.lt(S.gold, goldCost)) { log(`골드가 부족합니다 (${fmt(goldCost)} 필요)`, 'lg-bad'); return false; }
-  S.raidTokens = BN.sub(S.raidTokens, tokenCost);
-  S.gold = BN.sub(S.gold, goldCost);
+function enchantLineText(line) { return enchantLineTextOf('wMain', line); }
+function subEnchantLineText(line) { return enchantLineTextOf('sMain', line); }
+// accEff 합산용: 이 각인 줄의 실제 스탯 값(fraction 또는 초)
+function enchantLineStat(kind, line) {
+  const opt = enchantOpt(kind, line.key);
+  if (!opt) return null;
+  return { stat: opt.stat, value: line.value / (opt.div || 100) };
+}
+function payEnchant(kind, grade, times) {
+  const c = enchantCost(kind, grade);
+  const tokens = c.tokens * times, gold = c.gold * times;
+  if (BN.lt(S.raidTokens, tokens)) { log(`🎫 토벌의 증표가 부족합니다 (${tokens}개 필요)`, 'lg-bad'); return false; }
+  if (BN.lt(S.gold, gold)) { log(`골드가 부족합니다 (${fmt(gold)} 필요)`, 'lg-bad'); return false; }
+  S.raidTokens = BN.sub(S.raidTokens, tokens);
+  S.gold = BN.sub(S.gold, gold);
   return true;
 }
-function grantSubEnchant(sw) {
-  if (!sw) return;
-  if (sw.enhance < ENCHANT_MIN_ENHANCE) { log(`각인은 +${ENCHANT_MIN_ENHANCE} 이상 보조무기부터 부여할 수 있습니다.`, 'lg-bad'); return; }
-  if (sw.enchant) { log('이미 각인이 부여된 보조무기입니다.', 'lg-bad'); return; }
-  if (!payEnchantCost(1)) return;
-  sw.enchant = { grade: 1, lines: rollSubEnchantLines(1), pity: 0 };
-  log(`⚒️ <b>보조무기 각인 부여!</b> ${subweaponGradeTag(sw)}에 <span class="grade-레어">레어</span> 각인이 새겨졌습니다.`, 'lg-prim');
+function grantEnchantOf(kind) {
+  const K = ENCHANT_KINDS[kind];
+  const it = enchantTarget(kind);
+  if (!it || (K.target === 'weapon' && isFist(it))) { log('각인을 새길 장비가 없습니다.', 'lg-bad'); return; }
+  if (it.enhance < ENCHANT_MIN_ENHANCE) { log(`각인은 +${ENCHANT_MIN_ENHANCE} 이상부터 부여할 수 있습니다.`, 'lg-bad'); return; }
+  if (it[K.field]) { log(`이미 ${K.label}이 있습니다.`, 'lg-bad'); return; }
+  if (K.field === 'addEnchant' && !it.enchant) { log('에디셔널 각인은 일반 각인을 먼저 새겨야 합니다.', 'lg-bad'); return; }
+  if (!payEnchant(kind, 1, 1)) return;
+  it[K.field] = { grade: 1, lines: rollEnchantLinesOf(kind, 1), pity: 0 };
+  log(`⚒️ <b>${K.label} 부여!</b> ${enchantTargetTag(kind, it)}에 <span class="grade-레어">레어</span> 각인이 새겨졌습니다.`, 'lg-prim');
   renderBlacksmith(); renderTop(); save();
 }
-function resetSubEnchant(sw) {
-  if (!sw || !sw.enchant) return;
-  const grade = sw.enchant.grade;
-  if (!payEnchantCost(grade)) return;
-  const ceiling = ENCHANT_CEILING[grade];
-  const canPromote = grade < ENCHANT_MAX_GRADE;
-  const earlyPromote = canPromote && Math.random() < enchantEarlyPromoteChance(grade);
-  if (canPromote && ceiling != null && (earlyPromote || sw.enchant.pity + 1 >= ceiling)) {
-    sw.enchant.grade = grade + 1;
-    sw.enchant.pity = 0;
-    sw.enchant.lines = rollSubEnchantLines(sw.enchant.grade);
-    log(`✨ <b>보조무기 각인 등급 승급!</b>${earlyPromote ? ' (조기 승급!)' : ''} ${subweaponGradeTag(sw)}의 각인이 <span class="grade-${GRADES[sw.enchant.grade].name}">${GRADES[sw.enchant.grade].name}</span> 등급이 되었습니다!`, 'lg-prim');
-  } else {
-    sw.enchant.pity++;
-    sw.enchant.lines = rollSubEnchantLines(grade);
-    log(`⚒️ 보조무기 각인 재설정: 효과가 변경되었습니다.${canPromote ? ` (${sw.enchant.pity}/${ceiling})` : ''}`, 'lg-good');
-  }
-  renderBlacksmith(); renderTop(); save();
-}
-function renderSubEnchantBox() {
-  const box = $('subEnchantBox');
-  if (!box) return;
-  const sw = getEquippedSubweapon();
-  if (!sw) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">장착된 보조무기가 없습니다.</div>'; return; }
-  if (sw.enhance < ENCHANT_MIN_ENHANCE) {
-    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">각인은 <b style="color:var(--unique)">+${ENCHANT_MIN_ENHANCE}</b> 이상 강화한 보조무기부터 부여할 수 있습니다. (현재 ${subweaponGradeTag(sw)})</div>`;
-    return;
-  }
-  if (!sw.enchant) {
-    box.innerHTML = `
-      <div style="font-size:13px;margin-bottom:8px;">${subweaponGradeTag(sw)}에는 아직 각인이 없습니다.</div>
-      <button class="primary" id="grantSubEnchantBtn">각인부여 (🎫${ENCHANT_TOKEN_COST[1]} + 💰${fmt(enchantGoldCost(1))})</button>`;
-    $('grantSubEnchantBtn').onclick = () => grantSubEnchant(sw);
-    return;
-  }
-  const en = sw.enchant;
+// 재설정 1회분의 승급 판정(천장/조기). 승급하면 등급을 올리고 true.
+function enchantAdvance(kind, en) {
   const grade = en.grade;
-  const maxed = grade >= ENCHANT_MAX_GRADE;
-  const tokenCost = ENCHANT_TOKEN_COST[grade];
-  const goldCost = enchantGoldCost(grade);
-  const canAfford = BN.gte(S.raidTokens, tokenCost) && BN.gte(S.gold, goldCost);
-  box.innerHTML = `
-    <div style="font-size:13px;margin-bottom:6px;">${subweaponGradeTag(sw)} — 각인 등급 <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span></div>
-    <div class="lg-prim" style="margin-bottom:2px;">${subEnchantLineText(en.lines[0])}</div>
-    <div class="lg-prim" style="margin-bottom:8px;">${subEnchantLineText(en.lines[1])}</div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">${maxed ? `최대 등급(${GRADES[ENCHANT_MAX_GRADE].name})입니다.` : `다음 등급까지 효과 변경 ${en.pity}/${ENCHANT_CEILING[grade]}회 (매 재설정마다 ${fmtPct(enchantEarlyPromoteChance(grade) * 100)} 확률로 조기 승급)`} · 보유 🎫 ${fmt(S.raidTokens || 0)}</div>
-    <button class="primary" id="resetSubEnchantBtn" ${canAfford ? '' : 'disabled'}>각인 재설정 (🎫${tokenCost} + 💰${fmt(goldCost)})</button>`;
-  $('resetSubEnchantBtn').onclick = () => resetSubEnchant(sw);
+  const canPromote = grade < ENCHANT_MAX_GRADE;
+  const ceiling = enchantCeiling(kind, grade);
+  const early = canPromote && Math.random() < enchantEarlyChance(kind, grade);
+  if (canPromote && ceiling != null && (early || en.pity + 1 >= ceiling)) {
+    en.grade = grade + 1;
+    en.pity = 0;
+    return { promoted: true, early };
+  }
+  en.pity++;
+  return { promoted: false };
+}
+function logEnchantPromote(kind, it, en, early) {
+  log(`✨ <b>${ENCHANT_KINDS[kind].label} 등급 승급!</b>${early ? ' (조기 승급!)' : ''} ${enchantTargetTag(kind, it)}의 각인이 <span class="grade-${GRADES[en.grade].name}">${GRADES[en.grade].name}</span> 등급이 되었습니다!`, 'lg-prim');
+}
+// times회 재설정. 승급이 나오면 그 결과를 바로 적용하고 멈춘다(승급 결과는 확정).
+// 승급이 없으면 결과(후보) 배열을 돌려준다 — 적용 여부는 호출부가 결정.
+function enchantRollBatch(kind, it, times) {
+  const K = ENCHANT_KINDS[kind];
+  const en = it[K.field];
+  if (!payEnchant(kind, en.grade, times)) return null;
+  const cands = [];
+  for (let i = 0; i < times; i++) {
+    const adv = enchantAdvance(kind, en);
+    if (adv.promoted) {
+      en.lines = rollEnchantLinesOf(kind, en.grade);
+      en.pending = null;
+      logEnchantPromote(kind, it, en, adv.early);
+      return { promoted: true };
+    }
+    cands.push(rollEnchantLinesOf(kind, en.grade));
+  }
+  return { promoted: false, cands };
+}
+// 수동 재설정: 1회는 바로 적용(기존 방식), 삼중(보유 시)은 결과 3개를 ❓로 보여주고 고르게 한다.
+function resetEnchantOf(kind, times) {
+  const K = ENCHANT_KINDS[kind];
+  const it = enchantTarget(kind);
+  if (!it || !it[K.field]) return;
+  const en = it[K.field];
+  if (en.pending) { log('먼저 대기 중인 각인 결과를 고르거나 버려주세요.', 'lg-bad'); return; }
+  times = times === 3 && S.enchantTriple ? 3 : 1;
+  const r = enchantRollBatch(kind, it, times);
+  if (!r) return;
+  if (!r.promoted) {
+    if (times === 1) {
+      en.lines = r.cands[0];
+      const ceiling = enchantCeiling(kind, en.grade);
+      log(`⚒️ ${K.label} 재설정: 효과가 변경되었습니다.${en.grade < ENCHANT_MAX_GRADE && ceiling ? ` (${en.pity}/${ceiling})` : ''}`, 'lg-good');
+    } else {
+      en.pending = { cands: r.cands, revealed: r.cands.map(() => false) };
+      log(`🎲 ${K.label} 삼중 재설정: 결과 3개 중 하나를 고르세요.`, 'lg-good');
+    }
+  }
+  renderBlacksmith(); renderTop(); save();
+}
+// 하위 호환
+function grantEnchant() { grantEnchantOf('wMain'); }
+function resetEnchant() { resetEnchantOf('wMain', 1); }
+function grantSubEnchant() { grantEnchantOf('sMain'); }
+function resetSubEnchant() { resetEnchantOf('sMain', 1); }
+function chooseEnchantPending(kind, idx) {
+  const K = ENCHANT_KINDS[kind];
+  const it = enchantTarget(kind);
+  const en = it && it[K.field];
+  if (!en || !en.pending) return;
+  if (idx != null && en.pending.cands[idx]) {
+    en.lines = en.pending.cands[idx];
+    log(`✅ ${K.label}: 새 결과를 적용했습니다.`, 'lg-prim');
+  } else {
+    log(`🗑️ ${K.label}: 결과를 버리고 기존 각인을 유지합니다.`);
+  }
+  en.pending = null;
+  renderBlacksmith(); renderTop(); save();
+}
+function revealEnchantPending(kind, idx) {
+  const K = ENCHANT_KINDS[kind];
+  const it = enchantTarget(kind);
+  const en = it && it[K.field];
+  if (!en || !en.pending) return;
+  en.pending.revealed[idx] = true;
+  renderBlacksmith(); save();
+}
+function buyEnchantTriple() {
+  if (S.enchantTriple) return;
+  if (BN.lt(S.gold, ENCHANT_TRIPLE_COST)) { log(`골드가 부족합니다 (${fmt(ENCHANT_TRIPLE_COST)} 필요)`, 'lg-bad'); return; }
+  S.gold = BN.sub(S.gold, ENCHANT_TRIPLE_COST);
+  S.enchantTriple = true;
+  log(`🎲 <b>삼중 재설정</b>을 구매했습니다! 이제 각인을 한 번에 3개씩 돌려 그중 하나를 고를 수 있습니다.`, 'lg-prim');
+  renderBlacksmith(); renderTop(); save();
 }
 
-function renderEnchantBox() {
-  const box = $('enchantBox');
+// ---- 자동 재설정 ----
+// 1.5초마다 재설정(삼중 보유 + 켜두면 3개씩). 결과는 바로 적용하지 않고 기존 각인을 유지하다가,
+// 줄마다 지정한 조건(옵션 + 최소 수치, 또는 상관없음)을 모두 만족하는 결과가 나오면 멈추고 ❓로 보여준다.
+// 승급이 나오면 승급 결과는 확정 적용하고 멈춘다. 증표·골드 부족, 장비 변경, 대기 결과가 있으면 멈춘다.
+let enchantAuto = null; // { kind, itemId, timer }
+function enchantAutoCfg(kind) {
+  if (!S.enchantAuto || typeof S.enchantAuto !== 'object') S.enchantAuto = {};
+  if (!S.enchantAuto[kind]) S.enchantAuto[kind] = { lines: [0, 1, 2].map(() => ({ key: '', min: 0 })), triple: true };
+  return S.enchantAuto[kind];
+}
+function enchantMatches(kind, lines) {
+  const cfg = enchantAutoCfg(kind);
+  let any = false;
+  for (let i = 0; i < ENCHANT_LINE_COUNT; i++) {
+    const c = cfg.lines[i];
+    if (!c || !c.key) continue;
+    any = true;
+    const l = lines[i];
+    if (!l || l.key !== c.key || l.value < (+c.min || 0)) return false;
+  }
+  return any;
+}
+function stopEnchantAuto(msg, cls) {
+  if (!enchantAuto) return;
+  clearInterval(enchantAuto.timer);
+  const kind = enchantAuto.kind;
+  enchantAuto = null;
+  if (msg) log(msg, cls || 'lg-bad');
+  if (currentTab === 'blacksmith') renderBlacksmith();
+  return kind;
+}
+function startEnchantAuto(kind) {
+  const K = ENCHANT_KINDS[kind];
+  const it = enchantTarget(kind);
+  if (!it || !it[K.field]) return;
+  if (it[K.field].pending) { log('먼저 대기 중인 각인 결과를 고르거나 버려주세요.', 'lg-bad'); return; }
+  if (!enchantAutoCfg(kind).lines.some(c => c.key)) { log('멈출 조건을 한 줄 이상 정해주세요.', 'lg-bad'); return; }
+  if (enchantAuto) stopEnchantAuto();
+  enchantAuto = { kind, itemId: it.id, timer: setInterval(enchantAutoTick, ENCHANT_AUTO_INTERVAL_MS) };
+  log(`🔁 ${K.label} 자동 재설정 시작`, 'lg-good');
+  renderBlacksmith();
+}
+function notifyEnchant(title, body) {
+  floatText(title);
+  try { showCodexPopup(`<div style="font-size:15px;font-weight:bold;margin-bottom:6px;">${title}</div><div>${body}</div>`); } catch (e) {}
+}
+function enchantAutoTick() {
+  if (!enchantAuto) return;
+  const kind = enchantAuto.kind;
+  const K = ENCHANT_KINDS[kind];
+  const it = enchantTarget(kind);
+  if (!it || it.id !== enchantAuto.itemId || !it[K.field]) { stopEnchantAuto(`⚙️ 장착 장비가 바뀌어 ${K.label} 자동 재설정을 멈췄습니다.`); return; }
+  const en = it[K.field];
+  if (en.pending) { stopEnchantAuto(); return; }
+  const times = S.enchantTriple && enchantAutoCfg(kind).triple ? 3 : 1;
+  const c = enchantCost(kind, en.grade);
+  if (BN.lt(S.raidTokens, c.tokens * times) || BN.lt(S.gold, c.gold * times)) { stopEnchantAuto(`⚙️ 증표나 골드가 부족해 ${K.label} 자동 재설정을 멈췄습니다.`); return; }
+  const r = enchantRollBatch(kind, it, times);
+  if (!r) { stopEnchantAuto(); return; }
+  if (r.promoted) {
+    stopEnchantAuto();
+    notifyEnchant(`✨ ${K.label} 등급 승급!`, `${enchantTargetTag(kind, it)}의 각인이 <span class="grade-${GRADES[en.grade].name}">${GRADES[en.grade].name}</span> 등급이 되어 자동 재설정을 멈췄습니다.`);
+  } else if (r.cands.some(l => enchantMatches(kind, l))) {
+    en.pending = { cands: r.cands, revealed: r.cands.map(() => false) };
+    stopEnchantAuto();
+    log(`🎯 ${K.label}: 원하는 조건의 각인이 나와 자동 재설정을 멈췄습니다!`, 'lg-prim');
+    notifyEnchant(`🎯 원하는 ${K.label}이 나왔습니다!`, '대장장이 탭에서 ❓ 카드를 눌러 확인하고, 사용할지 고르세요.');
+  }
+  if (currentTab === 'blacksmith') renderBlacksmith();
+  renderTop(); save();
+}
+
+// ---- 대장장이 UI ----
+function enchantLinesHtml(kind, lines) {
+  return lines.map(l => `<div class="lg-prim" style="margin-bottom:2px;">${enchantLineTextOf(kind, l)}</div>`).join('');
+}
+function enchantAutoHtml(kind) {
+  const K = ENCHANT_KINDS[kind];
+  const cfg = enchantAutoCfg(kind);
+  const running = enchantAuto && enchantAuto.kind === kind;
+  const opts = Object.entries(K.options).map(([k, o]) => `<option value="${k}">${o.name}</option>`).join('');
+  const rows = cfg.lines.map((c, i) => `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;font-size:12px;">
+      <span style="width:34px;">${i + 1}줄</span>
+      <select data-ea-key="${i}" style="flex:1;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 4px;" ${running ? 'disabled' : ''}>
+        <option value="">상관없음</option>${opts}
+      </select>
+      <input type="number" step="0.1" min="0" data-ea-min="${i}" value="${c.min || 0}" style="width:64px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 4px;" ${running ? 'disabled' : ''}>
+      <span>이상</span>
+    </div>`).join('');
+  return `<details style="margin-top:10px;" ${running ? 'open' : ''}><summary style="cursor:pointer;font-size:13px;">🔁 자동 재설정 ${running ? '<b style="color:#7de08a">(진행 중)</b>' : ''}</summary>
+    <div style="margin-top:6px;">
+      <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">${ENCHANT_AUTO_INTERVAL_MS / 1000}초마다 재설정하다가, 정한 조건을 모두 만족하는 결과가 나오면 멈추고 ❓로 보여줍니다. 그 전 결과는 적용되지 않습니다.</div>
+      ${rows}
+      ${S.enchantTriple ? `<label style="font-size:12px;display:flex;align-items:center;gap:6px;margin:4px 0;"><input type="checkbox" data-ea-triple ${cfg.triple ? 'checked' : ''} ${running ? 'disabled' : ''}> 🎲 3개씩 돌리기 (비용 3배)</label>` : ''}
+      <button class="${running ? '' : 'primary'}" data-ea-toggle>${running ? '⏹️ 자동 재설정 멈추기' : '▶️ 자동 재설정 시작'}</button>
+    </div></details>`;
+}
+function enchantPendingHtml(kind, en) {
+  const p = en.pending;
+  const cards = p.cands.map((lines, i) => p.revealed[i]
+    ? `<div style="border:1px solid var(--border);border-radius:8px;padding:6px;margin-bottom:6px;background:var(--panel2);">${enchantLinesHtml(kind, lines)}<button class="primary" data-ep-use="${i}" style="margin-top:4px;">✅ 이 각인 사용</button></div>`
+    : `<button data-ep-reveal="${i}" style="width:100%;font-size:20px;padding:14px;margin-bottom:6px;">❓</button>`).join('');
+  return `<div style="margin:8px 0;padding:8px;border:1px dashed var(--prim);border-radius:8px;">
+    <div style="font-size:13px;margin-bottom:6px;">🎯 새 결과 ${p.cands.length}개 — ❓를 눌러 확인하고 사용할지 고르세요.</div>
+    ${cards}
+    <button data-ep-discard>🗑️ 모두 버리고 기존 각인 유지</button></div>`;
+}
+function renderEnchantKind(kind) {
+  const K = ENCHANT_KINDS[kind];
+  const box = $(K.boxId);
   if (!box) return;
-  const w = getEquipped();
-  if (!w || isFist(w)) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">장착된 무기가 없습니다.</div>'; return; }
-  if (w.enhance < ENCHANT_MIN_ENHANCE) {
-    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">각인은 <b style="color:var(--unique)">+${ENCHANT_MIN_ENHANCE}</b> 이상 강화한 무기부터 부여할 수 있습니다. (현재 ${gradeTag(w)})</div>`;
+  const it = enchantTarget(kind);
+  const what = K.target === 'weapon' ? '무기' : '보조무기';
+  if (!it || (K.target === 'weapon' && isFist(it))) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">장착된 ${what}가 없습니다.</div>`; return; }
+  if (it.enhance < ENCHANT_MIN_ENHANCE) {
+    box.innerHTML = `<div style="color:var(--sub);font-size:13px;">각인은 <b style="color:var(--unique)">+${ENCHANT_MIN_ENHANCE}</b> 이상 강화한 ${what}부터 부여할 수 있습니다. (현재 ${enchantTargetTag(kind, it)})</div>`;
     return;
   }
-  if (!w.enchant) {
-    const tokenCost = ENCHANT_TOKEN_COST[1];
-    const goldCost = enchantGoldCost(1);
+  const en = it[K.field];
+  if (!en) {
+    if (K.field === 'addEnchant' && !it.enchant) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">일반 각인을 먼저 새겨야 에디셔널 각인을 부여할 수 있습니다.</div>`; return; }
+    const c = enchantCost(kind, 1);
     box.innerHTML = `
-      <div style="font-size:13px;margin-bottom:8px;">${gradeTag(w)}에는 아직 각인이 없습니다.</div>
-      <button class="primary" id="grantEnchantBtn">각인부여 (🎫${tokenCost} + 💰${fmt(goldCost)})</button>`;
-    $('grantEnchantBtn').onclick = () => grantEnchant(w);
+      <div style="font-size:13px;margin-bottom:8px;">${enchantTargetTag(kind, it)}에는 아직 ${K.label}이 없습니다.</div>
+      <button class="primary" data-en-grant>각인부여 (🎫${c.tokens} + 💰${fmt(c.gold)})</button>`;
+    box.querySelector('[data-en-grant]').onclick = () => grantEnchantOf(kind);
     return;
   }
-  const en = w.enchant;
   const grade = en.grade;
   const maxed = grade >= ENCHANT_MAX_GRADE;
-  const ceiling = ENCHANT_CEILING[grade];
-  const tokenCost = ENCHANT_TOKEN_COST[grade];
-  const goldCost = enchantGoldCost(grade);
-  const canAfford = BN.gte(S.raidTokens, tokenCost) && BN.gte(S.gold, goldCost);
+  const c = enchantCost(kind, grade);
+  const canAfford = n => BN.gte(S.raidTokens, c.tokens * n) && BN.gte(S.gold, c.gold * n);
+  const busy = !!en.pending || (enchantAuto && enchantAuto.kind === kind);
   box.innerHTML = `
-    <div style="font-size:13px;margin-bottom:6px;">${gradeTag(w)} — 각인 등급 <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span></div>
-    <div class="lg-prim" style="margin-bottom:2px;">${enchantLineText(en.lines[0])}</div>
-    <div class="lg-prim" style="margin-bottom:8px;">${enchantLineText(en.lines[1])}</div>
-    <div style="font-size:12px;color:var(--sub);margin-bottom:8px;">${maxed ? `최대 등급(${GRADES[ENCHANT_MAX_GRADE].name})입니다.` : `다음 등급까지 효과 변경 ${en.pity}/${ceiling}회 (매 재설정마다 ${fmtPct(enchantEarlyPromoteChance(grade) * 100)} 확률로 조기 승급)`} · 보유 🎫 ${fmt(S.raidTokens || 0)}</div>
-    <button class="primary" id="resetEnchantBtn" ${canAfford ? '' : 'disabled'}>각인 재설정 (🎫${tokenCost} + 💰${fmt(goldCost)})</button>`;
-  $('resetEnchantBtn').onclick = () => resetEnchant(w);
+    <div style="font-size:13px;margin-bottom:6px;">${enchantTargetTag(kind, it)} — 각인 등급 <span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span></div>
+    ${enchantLinesHtml(kind, en.lines)}
+    ${en.lines.length < ENCHANT_LINE_COUNT ? '<div style="font-size:11px;color:var(--sub);">다음 재설정부터 3줄로 뽑힙니다.</div>' : ''}
+    <div style="font-size:12px;color:var(--sub);margin:8px 0;">${maxed ? `최대 등급(${GRADES[ENCHANT_MAX_GRADE].name})입니다.` : `다음 등급까지 효과 변경 ${en.pity}/${enchantCeiling(kind, grade)}회 (매 재설정마다 ${fmtPct(enchantEarlyChance(kind, grade) * 100)} 확률로 조기 승급)`} · 보유 🎫 ${fmt(S.raidTokens || 0)}</div>
+    ${en.pending ? enchantPendingHtml(kind, en) : ''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+      <button class="primary" data-en-reset="1" ${busy || !canAfford(1) ? 'disabled' : ''}>각인 재설정 (🎫${c.tokens} + 💰${fmt(c.gold)})</button>
+      ${S.enchantTriple ? `<button data-en-reset="3" ${busy || !canAfford(3) ? 'disabled' : ''}>🎲 삼중 재설정 (🎫${c.tokens * 3} + 💰${fmt(c.gold * 3)})</button>` : ''}
+    </div>
+    ${enchantAutoHtml(kind)}`;
+  box.querySelectorAll('[data-en-reset]').forEach(b => { b.onclick = () => resetEnchantOf(kind, +b.dataset.enReset); });
+  box.querySelectorAll('[data-ep-reveal]').forEach(b => { b.onclick = () => revealEnchantPending(kind, +b.dataset.epReveal); });
+  box.querySelectorAll('[data-ep-use]').forEach(b => { b.onclick = () => chooseEnchantPending(kind, +b.dataset.epUse); });
+  const disc = box.querySelector('[data-ep-discard]'); if (disc) disc.onclick = () => chooseEnchantPending(kind, null);
+  const cfg = enchantAutoCfg(kind);
+  box.querySelectorAll('[data-ea-key]').forEach(sel => {
+    const i = +sel.dataset.eaKey;
+    sel.value = cfg.lines[i].key || '';
+    sel.onchange = () => { cfg.lines[i].key = sel.value; save(); };
+  });
+  box.querySelectorAll('[data-ea-min]').forEach(inp => {
+    const i = +inp.dataset.eaMin;
+    inp.onchange = () => { cfg.lines[i].min = Math.max(0, +inp.value || 0); save(); };
+  });
+  const tri = box.querySelector('[data-ea-triple]'); if (tri) tri.onchange = () => { cfg.triple = tri.checked; save(); };
+  const tog = box.querySelector('[data-ea-toggle]');
+  if (tog) tog.onclick = () => { if (enchantAuto && enchantAuto.kind === kind) stopEnchantAuto(`⏹️ ${K.label} 자동 재설정을 멈췄습니다.`, 'lg-good'); else startEnchantAuto(kind); };
+}
+function renderEnchantTripleBox() {
+  const box = $('enchantTripleBox');
+  if (!box) return;
+  box.innerHTML = S.enchantTriple
+    ? `<div style="font-size:13px;">🎲 <b>삼중 재설정</b> 보유 중 — 각인 칸마다 "삼중 재설정" 버튼과 자동 재설정의 "3개씩 돌리기"를 쓸 수 있습니다.</div>`
+    : `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">한 번에 각인 결과 3개를 뽑아 그중 하나를 고를 수 있게 됩니다(비용 3배, 계정당 1회 구매).</div>
+       <button class="primary" id="buyEnchantTripleBtn" ${BN.lt(S.gold, ENCHANT_TRIPLE_COST) ? 'disabled' : ''}>🎲 삼중 재설정 구매 (💰 ${fmt(ENCHANT_TRIPLE_COST)})</button>`;
+  const b = $('buyEnchantTripleBtn'); if (b) b.onclick = buyEnchantTriple;
+}
+function renderEnchantBox() {
+  for (const kind of Object.keys(ENCHANT_KINDS)) renderEnchantKind(kind);
+  renderEnchantTripleBox();
 }
 
 // ---------- 토벌전 UI ----------
@@ -11174,8 +11377,7 @@ function renderSubCodexBonuses() {
 
 // 대장장이 탭 렌더링 — 무기 각인 UI
 function renderBlacksmith() {
-  renderEnchantBox();
-  renderSubEnchantBox();
+  renderEnchantBox(); // 무기/보조무기 × 일반/에디셔널 네 칸 + 삼중 재설정
 }
 
 /* ===================== 저장 / 불러오기 ===================== */
@@ -11484,6 +11686,8 @@ function buildSnapshot() {
     if (w.effect && EFFECTS[w.effect]) lines.push(`특수효과: ${EFFECTS[w.effect].name}`);
     if (w.spirit && ANCIENT_SPIRITS[w.spirit]) lines.push(`에이션트 스피릿: ${ANCIENT_SPIRITS[w.spirit].name}`);
     if (Array.isArray(w.runes) && w.runes.length) lines.push(`룬: ${countedNames(w.runes.map(r => runeName(r))).join(', ')}`);
+    if (w.enchant) lines.push(`각인: ${w.enchant.lines.map(l => stripTags(enchantLineText(l))).join(' / ')}`);
+    if (w.addEnchant) lines.push(`에디셔널: ${w.addEnchant.lines.map(l => stripTags(enchantLineTextOf('wAdd', l))).join(' / ')}`);
     if (Array.isArray(w.awakening) && w.awakening.some(Boolean)) lines.push(...w.awakening.map((a, i) => a ? `각성 ★${i + 1}: ${awakenSlotLabel(a)}` : null).filter(Boolean));
     snap.weapon = lines;
   }
@@ -11497,6 +11701,7 @@ function buildSnapshot() {
     const gd = subGenesisDef(sw);
     if (gd) snap.sub.push(`태초 효과: ${gd.passiveName} · ${gd.activeName} (${subGenesisTierLabel(sw)})`);
     if (sw.enchant) snap.sub.push(`각인: ${sw.enchant.lines.map(l => stripTags(subEnchantLineText(l))).join(' / ')}`);
+    if (sw.addEnchant) snap.sub.push(`에디셔널: ${sw.addEnchant.lines.map(l => stripTags(enchantLineTextOf('sAdd', l))).join(' / ')}`);
   }
   const g = getEquippedGlove();
   if (g) snap.glove = [stripTags(gloveGradeTag(g)), gloveStatText(g)];
@@ -12804,6 +13009,7 @@ function renderSubInventory() {
           🗡️ [${t ? t.name : ''} 패시브] ${passiveText || '없음'}<br>
           ⚡ [${subweaponActiveName(sw)}] 보스 피해량 +${(subweaponActiveBossDmg(sw, accEff().subAmp) * 100).toFixed(0)}%, ${subweaponActiveDuration(sw).toFixed(1)}초간 (보스 계열 전투당 1회)
           ${sw.enchant ? `<br>⚒️ 각인: ${sw.enchant.lines.map(subEnchantLineText).join(' / ')}` : ''}
+          ${sw.addEnchant ? `<br>✨ 에디셔널: ${sw.addEnchant.lines.map(l => enchantLineTextOf('sAdd', l)).join(' / ')}` : ''}
           ${isGenesisSubweapon(sw) ? `<br><span style="color:var(--prim)">${subGenesisEffectLines(sw)}</span>${subGenesisLoreHtml(sw)}` : ''}
           ${isAncientSubweapon(sw) ? `<br><span style="color:var(--gold)">${subAncientEffectLine(sw)}</span>` : ''}
         </div>`
@@ -13494,9 +13700,12 @@ const GUIDE_SECTIONS = [
   },
   {
     icon: '⚒️', title: '무기 각인',
-    body: `대장장이 탭에서 <b>+15강 이상</b> 강화한 무기(맨손 제외)에 부여할 수 있습니다. 항상 2줄이며 <b>레어</b> 등급에서 시작해 최대 <b>태초</b> 등급까지 승급합니다. 에픽 등급부터는 첫째 줄이 현재 등급, 둘째 줄은 한 단계 낮은 등급으로 나뉩니다(아주 드물게 "이탈"로 둘 다 같은 등급이 되기도 합니다).
-    <br><br><b>각인 재설정</b>을 하면 두 줄의 효과와 수치가 다시 뽑힙니다. 재설정을 거듭해 등급별로 정해진 누적 횟수(천장)에 도달하면 확정으로 다음 등급으로 승급하고, 그 전에도 재설정마다 낮은 확률로 조기 승급할 수 있습니다.
+    body: `대장장이 탭에서 <b>+15강 이상</b> 강화한 무기(맨손 제외)에 부여할 수 있습니다. <b>3줄</b>이며 <b>레어</b> 등급에서 시작해 최대 <b>태초</b> 등급까지 승급합니다. 에픽 등급부터는 첫째 줄이 현재 등급, 둘째·셋째 줄은 한 단계 낮은 등급이고, 각 줄이 5% 확률로 "이탈"해 현재 등급으로 뜹니다(예전 2줄 각인은 다음 재설정부터 3줄).
+    <br><br><b>각인 재설정</b>을 하면 세 줄의 효과와 수치가 다시 뽑힙니다. 재설정을 거듭해 등급별로 정해진 누적 횟수(천장)에 도달하면 확정으로 다음 등급으로 승급하고, 그 전에도 재설정마다 낮은 확률로 조기 승급할 수 있습니다.
     <br><br>각인 부여·재설정에는 골드와 함께 🎫 <b>토벌의 증표</b>가 필요합니다(등급이 오를수록 비용 증가). 무기가 파괴되면 각인도 함께 사라집니다.
+    <br><br><b>✨ 에디셔널 각인</b>: 일반 각인이 있는 무기·보조무기에 3줄짜리 각인을 하나 더 새길 수 있습니다. 옵션과 수치 범위는 같지만 높은 수치가 훨씬 드물고(이탈 2%), 승급 천장은 2배·조기 승급 확률은 절반이며, 비용은 1.5배입니다.
+    <br><br><b>🔁 자동 재설정</b>: 줄마다 원하는 옵션과 최소 수치(또는 "상관없음")를 정해두면 1.5초마다 재설정합니다. 그동안 결과는 적용되지 않고, 조건을 모두 만족하는 결과가 나오면 멈추고 ❓ 카드로 보여줍니다 — 눌러서 확인한 뒤 사용하거나 버릴 수 있습니다. 등급이 승급하면 승급 결과가 적용되고 멈춥니다.
+    <br><br><b>🎲 삼중 재설정</b>(계정당 1회 구매): 한 번에 결과 3개를 뽑아 그중 하나를 고를 수 있습니다(비용 3배). 자동 재설정에서도 3개씩 돌릴 수 있습니다.
     <br><br><b>등장 가능한 효과</b>(줄마다 무작위 1종, 등급이 높을수록 수치 범위도 커짐)
     <table class="guide-table">
       <tr><th>효과</th><th>단위</th><th><span class="grade-레어">레어</span>(시작) 범위</th><th><span class="grade-태초">태초</span>(최대) 범위</th></tr>
@@ -13799,9 +14008,9 @@ function renderAccTab() {
 // 무기는 id로 참조한다(룬은 무기 자체에 귀속된 배열이라 따로 저장할 필요 없이 자동으로 함께
 // 적용됨). 장신구는 accEquipped 스냅샷을 통째로 복사해둔다.
 // 기본 3개 + 4번째 5000억 골드, 5번째 10조 골드로 순서대로 해금(인덱스 3, 4).
-// 6~10번째는 월드2 후반 골드를 크게 빨아들이는 용도로 매우 비싸게 — 6번째가 태초 보조무기 +29→30
-// 강화 약 30회분(1c)이고, 그 뒤로 한 칸마다 100배씩.
-const PRESET_UNLOCK_COST = { 3: 5e11, 4: 1e13, 5: 1e21, 6: 1e23, 7: 1e25, 8: 1e27, 9: 1e29 };
+// 6~10번째는 후반 골드를 크게 빨아들이는 용도로 매우 비싸게 — 6번째(10b)가 월드2 40층 사냥 약 5시간분,
+// 그 뒤로 한 칸마다 10배씩(10번째 100c는 월드3 이후 목표).
+const PRESET_UNLOCK_COST = { 3: 5e11, 4: 1e13, 5: 1e19, 6: 1e20, 7: 1e21, 8: 1e22, 9: 1e23 };
 function unlockPresetSlot(idx) {
   if (idx !== S.presetSlots) return; // 순서대로만 해금 가능
   const cost = PRESET_UNLOCK_COST[idx];

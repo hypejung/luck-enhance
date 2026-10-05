@@ -10082,7 +10082,7 @@ function resetEnchant(w) {
 // 메인 무기 각인과 같은 구조(+15 이상, 2줄, 레어~태초, 조기 승급/천장, 🎫 토벌의 증표 + 골드)를
 // 그대로 쓰되, 옵션은 파밍·보조무기 계열 6종만. 전투 스탯(공격력·치명타 등)이 각인 하나만큼 통째로
 // 더 쌓이지 않게 하려는 것. 액티브 위력/지속시간은 강화 수치를 넘지 않게 낮게 잡았다 —
-// 태초 각인 한 줄 최대가 액티브 위력 +34%p(강화 중반 한 단계 정도), 지속시간 +2초(보조무기
+// 태초 각인 한 줄 최대가 액티브 위력 +55%p(강화 후반 한 단계 정도), 지속시간 +2초(보조무기
 // 도감 마일스톤 2개분) 수준. 드롭률은 21~40층 소스라 월드1에서는 절반만 적용(accEff 참고).
 const ENCHANT_BASE_RANGES = [[2, 5], [3.5, 9], [6, 15], [10.5, 26], [18, 45], [31.5, 79], [55, 137.5]];
 const scaleEnchantRanges = (mult, dec) => ENCHANT_BASE_RANGES.map(([a, b]) => [+(a * mult).toFixed(dec), +(b * mult).toFixed(dec)]);
@@ -10092,7 +10092,7 @@ const SUB_ENCHANT_OPTIONS = {
   gold:              { name: '골드 획득',           stat: 'gold',              unit: '%',  div: 100, dec: 1, ranges: ENCHANT_BASE_RANGES },
   bossDmg:           { name: '보스 피해량',         stat: 'bossDmg',           unit: '%',  div: 100, dec: 1, ranges: ENCHANT_BASE_RANGES },
   subAmp:            { name: '보조무기 효과 증폭',  stat: 'subAmp',            unit: '%',  div: 100, dec: 1, ranges: scaleEnchantRanges(0.2, 1) },
-  subActiveDmg:      { name: '액티브 피해량',       stat: 'subActiveDmg',      unit: '%p', div: 100, dec: 1, ranges: scaleEnchantRanges(0.25, 1) },
+  subActiveDmg:      { name: '액티브 피해량',       stat: 'subActiveDmg',      unit: '%p', div: 100, dec: 1, ranges: scaleEnchantRanges(0.4, 1) },
   subActiveDuration: { name: '액티브 지속시간',     stat: 'subActiveDuration', unit: '초', div: 1,   dec: 2, ranges: scaleEnchantRanges(2 / 137.5, 2) },
 };
 const SUB_ENCHANT_OPTION_KEYS = Object.keys(SUB_ENCHANT_OPTIONS);

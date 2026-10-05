@@ -5916,6 +5916,8 @@ let uid = 1;
 let expandedWeapons = new Set(); // 가방에서 "효과 보기"로 펼친 무기 id (세이브 대상 아님)
 let expandedSubweapons = new Set(); // 가방에서 "효과 보기"로 펼친 보조무기 id (세이브 대상 아님)
 
+// 전투 프리셋 슬롯 최대 개수(기본 3 + 골드로 순서대로 해금, PRESET_UNLOCK_COST 참고)
+const PRESET_MAX_SLOTS = 10;
 function newState() {
   return {
     gold: BN.from(0),
@@ -5970,8 +5972,8 @@ function newState() {
     // 전투 프리셋: 무기·보조무기는 id로 참조, 장신구와 룬 구성(runeIds)은 스냅샷으로 저장한다.
     // 룬은 무기에서 자유롭게 뺐다 꼈다 할 수 있어서 id 참조만으론 "그때 그 구성"이 보장 안 됨.
     // 보조무기는 룬이 없어서 id 참조만으로 충분하다.
-    // 슬롯 자체는 항상 5개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
-    presets: [1, 2, 3, 4, 5].map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null })),
+    // 슬롯 자체는 항상 PRESET_MAX_SLOTS(10)개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
+    presets: Array.from({ length: PRESET_MAX_SLOTS }, (_, i) => i + 1).map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null })),
     presetSlots: 3,
     contentPresets: {},  // 컨텐츠별 지정 프리셋: { hunt|raid|library|worldraid|punch: 프리셋 index }
     raidMaxCleared: 0,     // 토벌전 영구 최고 클리어 단계 수 (고대의 도서관 해금 조건)
@@ -11244,8 +11246,8 @@ function migrate(d) {
     if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
   }
   if (!Array.isArray(d.presets) || !d.presets.length) d.presets = [];
-  // 프리셋 슬롯을 5개로 확장하면서, 기존에 3개만 있던 세이브는 나머지를 빈 슬롯으로 채운다.
-  while (d.presets.length < 5) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null });
+  // 프리셋 슬롯을 늘리면서(3 → 5 → 10), 기존 세이브는 모자란 만큼 빈 슬롯으로 채운다.
+  while (d.presets.length < PRESET_MAX_SLOTS) d.presets.push({ name: `프리셋 ${d.presets.length + 1}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null });
   if (typeof d.presetSlots !== 'number' || d.presetSlots < 3) d.presetSlots = 3;
   if (!d.contentPresets || typeof d.contentPresets !== 'object' || Array.isArray(d.contentPresets)) d.contentPresets = {};
   // 이전 버전 호환: 보조무기 프리셋 필드가 없던 세이브는 채워넣는다.
@@ -13797,7 +13799,9 @@ function renderAccTab() {
 // 무기는 id로 참조한다(룬은 무기 자체에 귀속된 배열이라 따로 저장할 필요 없이 자동으로 함께
 // 적용됨). 장신구는 accEquipped 스냅샷을 통째로 복사해둔다.
 // 기본 3개 + 4번째 5000억 골드, 5번째 10조 골드로 순서대로 해금(인덱스 3, 4).
-const PRESET_UNLOCK_COST = { 3: 5e11, 4: 1e13 };
+// 6~10번째는 월드2 후반 골드를 크게 빨아들이는 용도로 매우 비싸게 — 6번째가 태초 보조무기 +29→30
+// 강화 약 30회분(1c)이고, 그 뒤로 한 칸마다 100배씩.
+const PRESET_UNLOCK_COST = { 3: 5e11, 4: 1e13, 5: 1e21, 6: 1e23, 7: 1e25, 8: 1e27, 9: 1e29 };
 function unlockPresetSlot(idx) {
   if (idx !== S.presetSlots) return; // 순서대로만 해금 가능
   const cost = PRESET_UNLOCK_COST[idx];

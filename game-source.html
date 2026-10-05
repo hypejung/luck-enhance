@@ -1087,7 +1087,7 @@
     <div class="panel">
       <h3>🗡️ 보조무기 각인</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        <b style="color:var(--unique)">+15 이상</b> 강화한 장착 보조무기에 각인을 새길 수 있습니다. 비용·등급·승급 규칙은 무기 각인과 같고,
+        <b style="color:var(--unique)">+15 이상</b> 강화한 장착 보조무기에 각인을 새길 수 있습니다. 등급·승급 규칙은 무기 각인과 같고 비용(증표·골드)은 2배이며,
         옵션은 드롭률·골드 획득·보스 피해량·보조무기 효과 증폭·액티브 피해량·액티브 지속시간 중에서 나옵니다.
         드롭률은 다른 월드(1~20층)에서 사냥할 때 절반만 적용됩니다.
       </div>
@@ -1096,7 +1096,7 @@
     <div class="panel">
       <h3>✨ 보조무기 에디셔널 각인</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        일반 각인이 있는 보조무기에 3줄짜리 각인을 하나 더 새깁니다. 높은 수치와 승급이 훨씬 드물고, 비용은 1.5배입니다.
+        일반 각인이 있는 보조무기에 3줄짜리 각인을 하나 더 새깁니다. 높은 수치와 승급이 훨씬 드물고, 비용은 보조무기 각인의 1.5배(무기 각인의 3배)입니다.
       </div>
       <div id="subAddEnchantBox"></div>
     </div>
@@ -10076,11 +10076,13 @@ const SUB_ENCHANT_OPTION_KEYS = Object.keys(SUB_ENCHANT_OPTIONS);
 // - 승급: 천장(ENCHANT_CEILING × ceilMult) 또는 재설정마다 조기 승급(기본 확률 × earlyMult).
 // - 비용: 등급별 증표·골드 × costMult(에디셔널 1.5배, 증표는 올림).
 // - 에디셔널 각인은 일반 각인이 있어야 부여할 수 있다.
+// 보조무기 각인은 무기 각인보다 비싸다(증표·골드 모두 2배, 에디셔널은 여기에 1.5배를 더 곱해 3배).
+const SUB_ENCHANT_COST_MULT = 2;
 const ENCHANT_KINDS = {
   wMain: { target: 'weapon', field: 'enchant',    label: '무기 각인',              boxId: 'enchantBox',       options: ENCHANT_OPTIONS,     deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: 1 },
   wAdd:  { target: 'weapon', field: 'addEnchant', label: '무기 에디셔널 각인',     boxId: 'addEnchantBox',    options: ENCHANT_OPTIONS,     deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 },
-  sMain: { target: 'sub',    field: 'enchant',    label: '보조무기 각인',          boxId: 'subEnchantBox',    options: SUB_ENCHANT_OPTIONS, deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: 1 },
-  sAdd:  { target: 'sub',    field: 'addEnchant', label: '보조무기 에디셔널 각인', boxId: 'subAddEnchantBox', options: SUB_ENCHANT_OPTIONS, deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 },
+  sMain: { target: 'sub',    field: 'enchant',    label: '보조무기 각인',          boxId: 'subEnchantBox',    options: SUB_ENCHANT_OPTIONS, deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: SUB_ENCHANT_COST_MULT },
+  sAdd:  { target: 'sub',    field: 'addEnchant', label: '보조무기 에디셔널 각인', boxId: 'subAddEnchantBox', options: SUB_ENCHANT_OPTIONS, deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 * SUB_ENCHANT_COST_MULT },
 };
 const ENCHANT_LINE_COUNT = 3;
 // 삼중 재설정(계정당 1회 구매): 한 번에 결과 3개를 뽑아 그중 하나를 고른다. 월드3 후반 골드 기준.

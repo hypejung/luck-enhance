@@ -611,6 +611,7 @@
         <div class="tab" data-tab="craft">🧪 조합</div>
         <div class="tab" data-tab="acc">📿 장신구</div>
         <div class="tab" data-tab="box">🎁 랜덤박스</div>
+        <div class="tab" data-tab="disassemble">🔨 분해기</div>
       </div>
     </div>
     <div class="tabgroup" data-group="etc">
@@ -888,6 +889,16 @@
   </div>
 
   <!-- 랜덤박스 -->
+  <div id="tab-disassemble" style="display:none">
+    <div class="panel">
+      <h3>🔨 분해기</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        신화·고대·태초 무기와 보조무기를 분해해 🍃 세계수의 잎을 얻습니다. 고대·태초는 📜 무기의 정수도 함께 얻고,
+        강화 단계가 높을수록 더 많이 얻습니다. 태초의 유물을 분해하면 그 사냥터에서 다시 드랍될 수 있습니다.
+      </div>
+      <div id="disassembleBox"></div>
+    </div>
+  </div>
   <div id="tab-box" style="display:none">
     <div id="boxSubTabBar" style="display:flex;gap:6px;margin-bottom:10px;"></div>
     <div id="boxWeaponPanels">
@@ -3313,12 +3324,12 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 21.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 22.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '⚒️ 각인 확장 · 🏺 고대 보조무기 등장',
+    version: 6, versionLabel: '1.0.5', title: '⚒️ 각인 확장 · 🔨 분해기 · 🏺 고대 보조무기 등장',
     changes: [
       { id: 12, date: '2026-10-03', text: '🏺 고대 보조무기 20종 등장: 월드2 21~40층마다 그 층에만 있는 고대 보조무기가 아주 낮은 확률로 드롭됩니다.' },
       { id: 13, date: '2026-10-03', text: '✨ 고대 보조무기에는 종류 패시브·결전의 기백 위에 저마다 고유한 고대 효과가 붙습니다. (📘 가이드 → 고대 보조무기)' },
@@ -3330,6 +3341,7 @@ const PATCH_NOTES = [
       { id: 19, date: '2026-10-05', text: '✨ 에디셔널 각인 추가: 일반 각인이 있는 무기·보조무기에 3줄짜리 각인을 하나 더 새길 수 있습니다. (비용 1.5배, 높은 수치·승급은 더 드묾)' },
       { id: 20, date: '2026-10-05', text: '🔁 각인 자동 재설정: 줄마다 원하는 옵션과 최소 수치를 정해두면 자동으로 돌리다가, 조건에 맞는 결과가 나오면 멈추고 ❓로 보여줍니다. 확인 후 사용하거나 버릴 수 있습니다.' },
       { id: 21, date: '2026-10-05', text: '🎲 삼중 재설정(계정당 1회 구매): 한 번에 각인 결과 3개를 뽑아 그중 하나를 고를 수 있습니다.' },
+      { id: 22, date: '2026-10-05', text: '🔨 분해기 추가(🎒 아이템 → 분해기): 신화·고대·태초 무기와 보조무기를 분해해 세계수의 잎(고대·태초는 무기의 정수도)을 얻습니다. 강화 단계가 높을수록 더 많이 얻고, 신화는 자동분해도 설정할 수 있습니다.' },
     ],
   },
 ];
@@ -5998,6 +6010,7 @@ function newState() {
     // 슬롯 자체는 항상 PRESET_MAX_SLOTS(10)개를 만들어두고, presetSlots(기본 3)로 몇 번째까지 해금됐는지 관리한다.
     presets: Array.from({ length: PRESET_MAX_SLOTS }, (_, i) => i + 1).map(n => ({ name: `프리셋 ${n}번`, weaponId: null, accEquipped: null, runeIds: null, subWeaponId: null })),
     presetSlots: 3,
+    disassemble: {},      // 분해기: { boss, autoWeapon, autoSub, types, effects, subTypes } (disCfg()가 기본값을 채움)
     enchantTriple: false, // 삼중 재설정 구매 여부(계정당 1회)
     enchantAuto: {},      // 각인 자동 재설정 조건: { wMain|wAdd|sMain|sAdd: { lines: [{key, min} ×3], triple } }
     contentPresets: {},  // 컨텐츠별 지정 프리셋: { hunt|raid|library|worldraid|punch: 프리셋 index }
@@ -7441,6 +7454,13 @@ function autoSellFilterMatch(w) {
 function addWeapon(w) {
   unlockCodexEntry(w); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록
   // 자동판매 필터: 등급/종류/효과 중 하나라도 걸리고 강화수치 0인 새 무기는 획득 즉시 자동 판매
+  // 신화 자동분해(분해기 탭): 자동판매보다 먼저 — 잎이 골드보다 쓸모 있으므로
+  if (autoDisassembleMatch('w', w)) {
+    const r = disassembleReward(w);
+    grantDisassembleReward(r);
+    log(`🔨 자동분해: ${gradeTag(w)} → ${disRewardText(r)}`);
+    return;
+  }
   if (w.enhance === 0 && !isGenesisWeapon(w) && !isAncientWeapon(w) && autoSellFilterMatch(w)) {
     const price = sellPrice(w);
     S.gold = BN.add(S.gold, price);
@@ -7666,6 +7686,12 @@ function addSubweapon(sw) {
   if (!Array.isArray(S.subweapons)) S.subweapons = [];
   // 자동판매 필터: 무기 가방과 동일한 패턴 — 등급/종류 필터에 걸리고 강화0인 새 보조무기는 획득 즉시 자동 판매
   // (고대 이상은 자동판매 대상에서 항상 제외, 보스 보조무기는 "보스 보조무기도 판매"를 켰을 때만)
+  if (autoDisassembleMatch('s', sw)) {
+    const r = disassembleReward(sw);
+    grantDisassembleReward(r);
+    log(`🔨 자동분해: ${subweaponGradeTag(sw)} → ${disRewardText(r)}`);
+    return;
+  }
   if (sw.enhance === 0 && subAutoSellFilterMatch(sw)) {
     const price = subSellPrice(sw);
     S.gold = BN.add(S.gold, price);
@@ -13588,7 +13614,7 @@ function switchTab(name) {
   currentTab = name;
   setActiveTabGroup(name);
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === name));
-  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'acc', 'inventory', 'box', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'worldraid', 'guide', 'patchnotes', 'preset']) {
+  for (const t of ['hunt', 'enhance', 'stats', 'craft', 'acc', 'inventory', 'box', 'disassemble', 'rune', 'gamble', 'codex', 'blacksmith', 'raid', 'library', 'worldraid', 'guide', 'patchnotes', 'preset']) {
     $('tab-' + t).style.display = t === name ? '' : 'none';
   }
   if (name === 'preset') renderPresetTab();
@@ -13601,6 +13627,7 @@ function switchTab(name) {
   if (name === 'acc') renderAccTab();
   if (name === 'inventory') renderInventory();
   if (name === 'box') renderBoxes();
+  if (name === 'disassemble') renderDisassembleTab();
   if (name === 'rune') renderRuneTab();
   if (name === 'gamble') renderGambleTables();
   if (name === 'codex') renderCodex();
@@ -14030,6 +14057,172 @@ function renderAccTab() {
     }
   }
   renderBossAccs();
+}
+
+/* ===================== 분해기 ===================== */
+// 신화·고대·태초 무기/보조무기를 분해해 🍃 세계수의 잎(고대·태초는 📜 무기의 정수도)을 얻는다.
+// 보상 = 등급 기본값 × 1.08^강화 단계(+20 약 ×4.7, +30 약 ×10). 장착 중·프리셋에 저장된 장비와
+// 맨손은 분해할 수 없고, 보스 장비는 "보스 장비도 분해"를 켰을 때만 대상. 태초의 유물을 분해하면
+// 보유 기록(S.genesisOwned)을 지워 그 층에서 다시 드랍될 수 있게 한다(태초 보조무기는 원래 가방에
+// 없으면 다시 드랍된다). 신화는 자동판매처럼 획득 즉시 자동분해(강화 0단계)를 켤 수 있다.
+const DISASSEMBLE_REWARD = { 5: { leaves: 1000, essence: 0 }, 6: { leaves: 200000, essence: 50000 }, 7: { leaves: 2000000, essence: 500000 } };
+const DISASSEMBLE_ENH_GROWTH = 1.08;
+function disassembleReward(it) {
+  const base = DISASSEMBLE_REWARD[it.grade];
+  if (!base) return null;
+  const m = Math.pow(DISASSEMBLE_ENH_GROWTH, it.enhance || 0);
+  return { leaves: Math.floor(base.leaves * m), essence: Math.floor(base.essence * m) };
+}
+function disPresetLocked(kind, id) {
+  return (S.presets || []).some(p => p && (kind === 'w' ? p.weaponId === id : p.subWeaponId === id));
+}
+function disassemblable(kind, it) {
+  if (!it || !DISASSEMBLE_REWARD[it.grade]) return false;
+  if (kind === 'w' && (isFist(it) || it.id === S.equipped)) return false;
+  if (kind === 's' && it.id === S.subEquipped) return false;
+  if (disPresetLocked(kind, it.id)) return false;
+  if (it.bossFloor !== undefined && !(S.disassemble && S.disassemble.boss)) return false;
+  return true;
+}
+function disCfg() {
+  if (!S.disassemble || typeof S.disassemble !== 'object') S.disassemble = {};
+  const d = S.disassemble;
+  if (typeof d.boss !== 'boolean') d.boss = false;
+  if (typeof d.autoWeapon !== 'boolean') d.autoWeapon = false;
+  if (typeof d.autoSub !== 'boolean') d.autoSub = false;
+  if (!Array.isArray(d.types)) d.types = [];
+  if (!Array.isArray(d.effects)) d.effects = [];
+  if (!Array.isArray(d.subTypes)) d.subTypes = [];
+  return d;
+}
+// 신화 자동분해 필터: 켜져 있고, 종류/효과를 하나도 안 골랐으면 모든 신화, 골랐으면 그중 하나라도 맞을 때.
+function autoDisassembleMatch(kind, it) {
+  const d = disCfg();
+  if (it.grade !== 5 || (it.enhance || 0) !== 0) return false;
+  if (it.bossFloor !== undefined && !d.boss) return false;
+  if (kind === 'w') {
+    if (!d.autoWeapon) return false;
+    if (!d.types.length && !d.effects.length) return true;
+    return d.types.includes(it.type) || (!!it.effect && d.effects.includes(it.effect));
+  }
+  if (!d.autoSub) return false;
+  if (!d.subTypes.length) return true;
+  const t = SUBWEAPON_TYPES[it.typeIdx];
+  return !!t && d.subTypes.includes(t.name);
+}
+function grantDisassembleReward(r) {
+  S.worldTreeLeaf = BN.add(S.worldTreeLeaf || BN.from(0), r.leaves);
+  if (r.essence > 0) S.weaponEssence = BN.add(S.weaponEssence, r.essence);
+}
+function disRewardText(r) { return `🍃 ${fmt(r.leaves)}${r.essence > 0 ? ` · 📜 ${fmt(r.essence)}` : ''}`; }
+// 실제 분해(검사·확인은 호출부). 가방에서 빼고 보상 지급.
+function doDisassemble(kind, it) {
+  const r = disassembleReward(it);
+  if (!r) return null;
+  if (kind === 'w') {
+    if (Array.isArray(it.runes) && it.runes.length) { S.runes.push(...it.runes); it.runes = []; }
+    S.weapons = S.weapons.filter(x => x.id !== it.id);
+    if (it.genesisId && Array.isArray(S.genesisOwned)) S.genesisOwned = S.genesisOwned.filter(id => id !== it.genesisId);
+    if (enhanceTargetId === it.id) enhanceTargetId = null;
+  } else {
+    S.subweapons = S.subweapons.filter(x => x.id !== it.id);
+    if (subEnhanceTargetId === it.id) subEnhanceTargetId = null;
+  }
+  grantDisassembleReward(r);
+  return r;
+}
+let disSelected = new Set(); // 'w:id' | 's:id'
+function disItems() {
+  const list = [];
+  for (const w of S.weapons || []) if (disassemblable('w', w)) list.push({ kind: 'w', it: w });
+  for (const sw of S.subweapons || []) if (disassemblable('s', sw)) list.push({ kind: 's', it: sw });
+  list.sort((a, b) => b.it.grade - a.it.grade || (b.it.enhance || 0) - (a.it.enhance || 0));
+  return list;
+}
+function disTag(kind, it) { return kind === 'w' ? gradeTag(it) : subweaponGradeTag(it); }
+// 분해 요청: 고대·태초가 섞여 있으면 경고 팝업으로 한 번 더 확인받는다.
+function requestDisassemble(entries) {
+  entries = entries.filter(e => disassemblable(e.kind, e.it));
+  if (!entries.length) { log('분해할 장비가 없습니다.', 'lg-bad'); return; }
+  const total = { leaves: 0, essence: 0 };
+  for (const e of entries) { const r = disassembleReward(e.it); total.leaves += r.leaves; total.essence += r.essence; }
+  const run = () => {
+    let n = 0;
+    for (const e of entries) if (disassemblable(e.kind, e.it) && doDisassemble(e.kind, e.it)) n++;
+    disSelected.clear();
+    log(`🔨 <b>분해</b> ${n}개 → ${disRewardText(total)} 획득!`, 'lg-prim');
+    renderDisassembleTab(); renderTop(); save();
+  };
+  const rare = entries.filter(e => e.it.grade >= 6);
+  if (!rare.length) { run(); return; }
+  const names = rare.slice(0, 8).map(e => `· ${disTag(e.kind, e.it)}`).join('<br>') + (rare.length > 8 ? `<br>· 외 ${rare.length - 8}개` : '');
+  const genesisNote = rare.some(e => e.kind === 'w' && e.it.genesisId) ? '<br><br>태초의 유물은 분해하면 보유 기록이 지워지고, 그 사냥터에서 아주 낮은 확률로 다시 드랍될 수 있습니다.' : '';
+  showConfirmModal(`⚠️ <b>고대·태초 장비를 분해합니다.</b> 되돌릴 수 없습니다!<br><br>${names}${genesisNote}<br><br>받는 보상(전체): ${disRewardText(total)}`, run, { confirmLabel: '분해하기' });
+}
+function disFilterHtml() {
+  const d = disCfg();
+  const chk = (attr, on, label) => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" ${attr} ${on ? 'checked' : ''}> ${label}</label>`;
+  return `
+    <div style="font-size:13px;margin-bottom:6px;">${chk('data-dis-boss', d.boss, '👹 보스 장비도 분해 <span style="font-size:11px;color:var(--sub)">(끄면 보스 무기·보스 보조무기는 목록·자동분해에서 제외)</span>')}</div>
+    <div class="guide-card" style="margin-bottom:8px;">
+      <div class="guide-head" data-dis-auto-toggle>⚙️ 신화 자동분해 (획득 즉시, 강화 0단계)<span class="guide-arrow">▾</span></div>
+      <div class="guide-body" data-dis-auto-body hidden>
+        <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">종류·효과를 하나도 고르지 않으면 모든 신화를 분해하고, 고르면 그중 하나라도 맞는 것만 분해합니다. 자동판매보다 먼저 적용됩니다.</div>
+        ${chk('data-dis-auto="w"', d.autoWeapon, '<b>⚔️ 신화 무기 자동분해</b>')}
+        <div style="margin:6px 0 4px;color:var(--sub);font-size:12px;">무기 종류</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">${WEAPON_TYPES.map(t => chk(`data-dis-type="${t.name}"`, d.types.includes(t.name), `${t.icon} ${t.name}`)).join('')}</div>
+        <div style="margin:6px 0 4px;color:var(--sub);font-size:12px;">무기 효과 (신화)</div>
+        <div style="display:flex;flex-direction:column;gap:4px;max-height:150px;overflow-y:auto;padding:6px;background:var(--panel);border-radius:6px;">${Object.entries(EFFECTS).filter(([, e]) => e.grade === 5).map(([k, e]) => chk(`data-dis-effect="${k}"`, d.effects.includes(k), `<span class="grade-신화">${e.name}</span>`)).join('')}</div>
+        <div style="margin-top:10px;">${chk('data-dis-auto="s"', d.autoSub, '<b>🗡️ 신화 보조무기 자동분해</b>')}</div>
+        <div style="margin:6px 0 4px;color:var(--sub);font-size:12px;">보조무기 종류</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;">${SUBWEAPON_TYPES.map(t => chk(`data-dis-subtype="${t.name}"`, d.subTypes.includes(t.name), `${t.icon} ${t.name}`)).join('')}</div>
+      </div>
+    </div>`;
+}
+let disAutoOpen = false;
+function renderDisassembleTab() {
+  const box = $('disassembleBox');
+  if (!box) return;
+  const d = disCfg();
+  const items = disItems();
+  const keyOf = e => `${e.kind}:${e.it.id}`;
+  for (const k of [...disSelected]) if (!items.some(e => keyOf(e) === k)) disSelected.delete(k);
+  const sel = items.filter(e => disSelected.has(keyOf(e)));
+  const selTotal = sel.reduce((a, e) => { const r = disassembleReward(e.it); a.leaves += r.leaves; a.essence += r.essence; return a; }, { leaves: 0, essence: 0 });
+  box.innerHTML = `
+    ${disFilterHtml()}
+    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">보유 🍃 ${fmt(S.worldTreeLeaf || 0)} · 📜 ${fmt(S.weaponEssence || 0)} — 장착 중이거나 프리셋에 저장된 장비는 목록에 나오지 않습니다.</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+      <button class="primary" data-dis-run ${sel.length ? '' : 'disabled'}>🔨 선택 분해 (${sel.length}개${sel.length ? ` → ${disRewardText(selTotal)}` : ''})</button>
+      <button data-dis-allmyth ${items.some(e => e.it.grade === 5) ? '' : 'disabled'}>신화 전체 선택</button>
+      <button data-dis-clear ${sel.length ? '' : 'disabled'}>선택 해제</button>
+    </div>
+    ${items.length ? items.map(e => {
+      const r = disassembleReward(e.it);
+      return `<div class="invitem" style="align-items:center;">
+        <label style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;">
+          <input type="checkbox" data-dis-sel="${keyOf(e)}" ${disSelected.has(keyOf(e)) ? 'checked' : ''}>
+          <div style="min-width:0;"><div class="wn">${e.kind === 'w' ? '⚔️' : '🗡️'} ${disTag(e.kind, e.it)}</div><div class="wi">${disRewardText(r)}</div></div>
+        </label>
+        <div class="btns"><button data-dis-one="${keyOf(e)}">분해</button></div>
+      </div>`;
+    }).join('') : '<div style="color:var(--sub);font-size:13px;">분해할 수 있는 신화·고대·태초 장비가 없습니다.</div>'}`;
+  const find = k => items.find(e => keyOf(e) === k);
+  box.querySelectorAll('[data-dis-sel]').forEach(cb => { cb.onchange = () => { if (cb.checked) disSelected.add(cb.dataset.disSel); else disSelected.delete(cb.dataset.disSel); renderDisassembleTab(); }; });
+  box.querySelectorAll('[data-dis-one]').forEach(b => { b.onclick = () => { const e = find(b.dataset.disOne); if (e) requestDisassemble([e]); }; });
+  box.querySelector('[data-dis-run]').onclick = () => requestDisassemble(sel);
+  box.querySelector('[data-dis-allmyth]').onclick = () => { for (const e of items) if (e.it.grade === 5) disSelected.add(keyOf(e)); renderDisassembleTab(); };
+  box.querySelector('[data-dis-clear]').onclick = () => { disSelected.clear(); renderDisassembleTab(); };
+  const save1 = () => save();
+  box.querySelector('[data-dis-boss]').onchange = e => { d.boss = e.target.checked; save1(); renderDisassembleTab(); };
+  const head = box.querySelector('[data-dis-auto-toggle]'), body = box.querySelector('[data-dis-auto-body]');
+  body.hidden = !disAutoOpen; head.parentElement.classList.toggle('open', disAutoOpen);
+  head.onclick = () => { disAutoOpen = !disAutoOpen; body.hidden = !disAutoOpen; head.parentElement.classList.toggle('open', disAutoOpen); };
+  box.querySelectorAll('[data-dis-auto]').forEach(cb => { cb.onchange = () => { if (cb.dataset.disAuto === 'w') d.autoWeapon = cb.checked; else d.autoSub = cb.checked; save1(); }; });
+  const toggleIn = (arr, v, on) => { const s = new Set(arr); if (on) s.add(v); else s.delete(v); return [...s]; };
+  box.querySelectorAll('[data-dis-type]').forEach(cb => { cb.onchange = () => { d.types = toggleIn(d.types, cb.dataset.disType, cb.checked); save1(); }; });
+  box.querySelectorAll('[data-dis-effect]').forEach(cb => { cb.onchange = () => { d.effects = toggleIn(d.effects, cb.dataset.disEffect, cb.checked); save1(); }; });
+  box.querySelectorAll('[data-dis-subtype]').forEach(cb => { cb.onchange = () => { d.subTypes = toggleIn(d.subTypes, cb.dataset.disSubtype, cb.checked); save1(); }; });
 }
 
 /* ===================== 전투 프리셋 ===================== */

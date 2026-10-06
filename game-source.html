@@ -15026,7 +15026,7 @@ function updateAutoBtn() {
 window.toggleEnhanceFx = toggleEnhanceFx;
 // 개발·테스트용 진입로: 콘솔에서 await __dev('비밀번호') → 성공하면 __devEval('코드')로 게임 내부에서 실행.
 // 코드에는 비밀번호의 SHA-256만 있어서 코드를 읽어도 비밀번호를 알 수 없다.
-const DEV_PASS_HASH = 'be115f5216cf3a1fdcabdc1d111cd4daffc62237dc94ce8f7a37089b5f70c401';
+const DEV_PASS_HASH = '1b51774a72c6a40650ca8dd8871c6471751a954601e82fcc6a32ab7fda51ccd6';
 window.__dev = async pass => {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(pass)));
   const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');

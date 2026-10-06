@@ -7888,6 +7888,12 @@ function subDestroyChance(sw) {
   return chance;
 }
 let subEnhanceRevealPending = false; // 메인 무기와 동일한 "뜸들이기~리빌" 연출 가드
+// 비용 부족으로 강화가 안 될 때: 로그만 남기면 "버튼이 안 눌린다"로 보이므로 패널을 갱신하고 버튼을 흔든다
+function subEnhDenied() {
+  if (currentTab === 'enhance' && enhSubTab === 'subweapon') renderEnhance();
+  const b = $('subEnhBtn');
+  if (b) { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); setTimeout(() => b.classList.remove('shake'), 350); }
+}
 function trySubEnhance(advanced, targetSubweapon) {
   if (subEnhanceRevealPending) return;
   // targetSubweapon: 자동 강화(autoSubEnhanceTick)가 명시적으로 넘겨주는 대상 — 메인 무기
@@ -7899,16 +7905,17 @@ function trySubEnhance(advanced, targetSubweapon) {
   if (advanced && !subAdvancedEnhEligible(sw)) { log('고급 강화는 고급 재료가 필요한 +15 이상부터 사용할 수 있습니다.', 'lg-bad'); return; }
   // 고급 강화는 골드 소모량도 일반 강화의 3배(메인 무기와 동일한 배율)
   const cost = advanced ? subAdvancedEnhGoldCost(sw) : subEnhanceCost(sw);
-  if (BN.lt(S.gold, cost)) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); return; }
+  if (BN.lt(S.gold, cost)) { log(`골드가 부족합니다 (${fmt(cost)} 필요)`, 'lg-bad'); subEnhDenied(); return; }
   // 고대 보조무기: 골드 외에 무기의 정수도 소모
   const essenceNeed = subAncientEssenceCost(sw) + subGenesisEssenceCost(sw);
-  if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) { log(`무기의 정수가 부족합니다! (필요 ${fmt(essenceNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad'); return; }
+  if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) { log(`무기의 정수가 부족합니다! (필요 ${fmt(essenceNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad'); subEnhDenied(); return; }
   // 일반 강화는 고급 재료 소모가 없고, 고급 강화를 선택했을 때만 소모한다(이미 메인 무기
   // 강화/토벌전 등으로 수급 중인 재료를 그대로 재사용 — 별도 수급처를 새로 만들지 않는다).
   const matNeed = advanced ? subAdvancedEnhMatCost(sw) : 0;
   const matSt = highMatStatus(true, matNeed);
   if (!matSt.ok) {
     log(`고급 재료가 부족합니다! (필요 ${matSt.need}개, 보유 ${matSt.have}개 — 부족분 🍃 세계수의 잎 ${matSt.shortfall}개(보유 ${fmt(matSt.leavesHave)}개) 또는 🎫 토벌의 증표 ${matSt.tokensNeed}개로 대체 가능, 보유 ${fmt(matSt.tokensHave)}개) — ${highMatFloorLabel(true)} 사냥터에서 재료를 모으거나 토벌전에 참여하세요`, 'lg-bad');
+    subEnhDenied();
     return;
   }
   S.gold = BN.sub(S.gold, cost);
@@ -13108,11 +13115,16 @@ function renderSubEquippedBox() {
     </div>
     ${!maxed ? `<div style="color:var(--gold);font-size:12px;margin-top:2px;">🔜 다음 강화(+${sw.enhance + 1}) 시 상승: ${subNextRiseLabel(sw)}</div>` : ''}
     ${isEquipped ? `<div style="margin-top:6px;"><button id="subUnequipBtn" style="font-size:11px;">🗑️ 장착 해제</button></div>` : ''}`;
+  // 비용 부족이면 버튼을 눌러도 로그만 남고 아무 일도 안 일어나서 "버튼이 안 눌린다"로 보였다 —
+  // 메인 무기처럼 정수 보유/필요를 보여주고, 부족하면 빨간 안내를 띄운다.
+  const subEssNeed = maxed ? 0 : subAncientEssenceCost(sw) + subGenesisEssenceCost(sw);
+  const subEssOk = BN.gte(S.weaponEssence, subEssNeed);
+  const subGoldOk = maxed || BN.gte(S.gold, cost);
   $('subenhstat').innerHTML = `
     <div>공격력<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
-    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
-    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>`;
+    <div>강화 비용<b style="color:${maxed || subGoldOk ? 'var(--gold)' : '#ff7a7a'}">${maxed ? 'MAX' : fmt(cost)}</b></div>
+    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${subEssNeed > 0 ? `<div>무기의 정수<b style="color:${subEssOk ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence)}/${fmt(subEssNeed)}</b></div>` : ''}`;
   // 하락 확률: 메인 무기와 같은 기준(실패 전체 대비 %) — resolveSubEnhance()의 유지/하락 비율 0.5/0.5
   const subDowngradeChance = maxed ? 0 : Math.round((100 - dChance) * 0.5 * enhanceEventDowngradeMult(sw.enhance) * 10) / 10;
   $('subenhrates').innerHTML = (maxed
@@ -13122,10 +13134,13 @@ function renderSubEquippedBox() {
       : isGenesisSubweapon(sw)
         ? `🌌 태초 보조무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%, 고급 강화 시 유지 확률 상승)</span> · 현재 <b>+${sw.enhance}</b>`
         : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 현재 <b>+${sw.enhance}</b>`)
+    + (!maxed && (!subGoldOk || !subEssOk) ? `<div style="margin-top:4px;color:#ff7a7a;">⚠️ ${!subGoldOk ? '골드' : '무기의 정수'}가 부족해서 강화할 수 없습니다.</div>` : '')
     + (!maxed && (S.penaltyGuard || 0) > 0 ? `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>` : '');
   bindPenaltyGuardToggles();
   const subRiskWord = isGenesisSubweapon(sw) ? null : isAncientSubweapon(sw) ? '초기화' : '파괴';
-  $('subEnhBtn').innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${chance.toFixed(1)}%${subRiskWord ? ` / ${subRiskWord} ${dChance.toFixed(1)}%` : ''})</span>`;
+  // 내용이 같으면 버튼 안쪽을 다시 쓰지 않는다 — 누르는 도중 안쪽 노드가 바뀌면 클릭이 씹힐 수 있다
+  const subBtnHtml = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${chance.toFixed(1)}%${subRiskWord ? ` / ${subRiskWord} ${dChance.toFixed(1)}%` : ''})</span>`;
+  if ($('subEnhBtn').dataset.html !== subBtnHtml) { $('subEnhBtn').innerHTML = subBtnHtml; $('subEnhBtn').dataset.html = subBtnHtml; }
   $('subEnhBtn').disabled = maxed || subEnhanceRevealPending;
   $('subEnhBtn').onclick = () => { if (!maxed) trySubEnhance(false); };
   $('subActiveTimingInput').onchange = (e) => setSubweaponActiveTiming(e.target.value);

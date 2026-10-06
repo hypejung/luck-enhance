@@ -3256,6 +3256,8 @@ const WEEKLY_RAID_BOSS = {
   flavor: '니드호그가 끝없이 갉아온 세계수의 뿌리는 이미 돌이킬 수 없이 썩었다. 그 뿌리를 지키던 루멘 아르카조차 신성을 버리고 등을 돌렸다 — 세계수는 스스로를 지킬 힘조차 잃은 것이다. 썩은 수액이 응어리져 터져 나오면, 초원의 슬라임 못부터 신들의 영역 균열까지 푸른세계 스무 곳 어딘가에서 동시에 같은 절규가 솟는다. 사냥꾼들은 저마다의 자리에서, 하나의 세계수가 지르는 단말마와 맞선다.',
 };
 const WEEKLY_RAID = { duration: 120, maxAttempts: 3 };
+// 일시 폐쇄: 세이브 조작으로 순위·보상이 오염될 수 있어(서버 검증 없음) 도전·기록 업로드·순위 조회·보상 정산을 모두 막는다.
+const WEEKLY_RAID_CLOSED = true;
 // 주차 키 = 그 날이 속한 주(로컬 기준 월요일)의 yyyymmdd. todayKey()와 동일한 인코딩 방식.
 function dateKeyOf(d) { return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate(); }
 function weekMonday(d) {
@@ -9505,6 +9507,7 @@ function weeklyRaidEnsureWeek() {
   }
 }
 function startWeeklyRaidFight() {
+  if (WEEKLY_RAID_CLOSED) { log('🚧 세계수의 단말마는 잠시 닫혀 있습니다.', 'lg-bad'); return; }
   if (bossFight.active) { log('이미 다른 전투가 진행 중입니다.', 'lg-bad'); return; }
   if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
   weeklyRaidEnsureWeek();
@@ -9746,6 +9749,7 @@ function arcaneTomesHtml() {
 // 다시 그리면서 매번 포커스를 잃어(모바일에서는 키보드가 내려가는 형태로 나타남) 버린다.
 let worldRaidLeaderboardCache = { week: null, entries: null, loading: false, error: false };
 function refreshWorldRaidLeaderboard(force) {
+  if (WEEKLY_RAID_CLOSED) return;
   const wk = weekKey();
   if (worldRaidLeaderboardCache.loading) return;
   if (!force && worldRaidLeaderboardCache.week === wk && (worldRaidLeaderboardCache.entries || worldRaidLeaderboardCache.error)) return;
@@ -9801,6 +9805,11 @@ function renderWorldRaidTab() {
   }
   battlePanel.style.display = 'none';
   box.style.display = '';
+  if (WEEKLY_RAID_CLOSED) {
+    box.innerHTML = `<div style="font-size:14px;margin-bottom:6px;">🚧 <b>세계수의 단말마는 잠시 닫혀 있습니다.</b></div>
+      <div style="font-size:12px;color:var(--sub);">순위를 공정하게 운영할 수 있도록 정비 중입니다. 다시 열리면 패치노트로 알려드릴게요.</div>`;
+    return;
+  }
   weeklyRaidEnsureWeek();
   if (!syncConfigured()) {
     box.innerHTML = `<div style="font-size:13px;color:var(--sub);">동기화 서버가 아직 준비되지 않아 전역 랭킹을 사용할 수 없습니다.</div>`;
@@ -11813,7 +11822,7 @@ async function showRaidBuild(entry) {
 }
 let worldRaidUploadBusy = false;
 function uploadWeeklyRaidRecord() {
-  if (!syncConfigured()) return;
+  if (WEEKLY_RAID_CLOSED || !syncConfigured()) return;
   if (worldRaidUploadBusy) return;
   worldRaidUploadBusy = true;
   uploadWeeklyRaidBuild(); // 이 기록을 낸 세팅 요약(별도 경로, 실패해도 순위 기록과 무관)
@@ -11839,7 +11848,7 @@ function uploadWeeklyRaidRecord() {
 // 사이트 구조상 "정해진 시각 자동 지급"은 불가능해서, 다음에 게임을 켰을 때 클라이언트가
 // 알아서 확인·지급하는 방식으로 대신한다(다른 서버 없는 아이들 게임들의 흔한 패턴).
 async function settleWeeklyRaidRewards() {
-  if (!syncConfigured()) return;
+  if (WEEKLY_RAID_CLOSED || !syncConfigured()) return;
   const pwk = prevWeekKey();
   if (S.weeklyRaid.claimedWeek === pwk) return;
   try {
@@ -14371,6 +14380,7 @@ function applyContentPreset(key) {
 function renderContentPresetBars() {
   document.querySelectorAll('.content-preset-bar').forEach(el => {
     const key = el.dataset.cp;
+    if (key === 'worldraid' && WEEKLY_RAID_CLOSED) { el.innerHTML = ''; return; } // 레이드 일시 폐쇄 중
     const cur = contentPresetIdx(key);
     const opts = S.presets.slice(0, S.presetSlots).map((p, i) => p.weaponId == null ? '' :
       `<option value="${i}" ${cur === i ? 'selected' : ''}>${escHtml(p.name)}</option>`).join('');

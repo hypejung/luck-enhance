@@ -923,7 +923,7 @@
       <h3>🔮 룬 상점</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         룬은 <b style="color:var(--unique)">+15 이상 강화</b>한 무기에 장착할 수 있습니다.
-        <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다. 슬롯 수 등 자세한 내용은 📘 가이드 탭 참고.
+        <b style="color:var(--rare)">일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을, <b style="color:var(--legend)">레전더리 이상</b> 룬은 특수 효과를 부여합니다(레전더리·신화는 더 높은 수치의 스탯 룬도 나옵니다). 슬롯 수 등 자세한 내용은 📘 가이드 탭 참고.
       </div>
       <div id="runeboxlist"></div>
       <div id="runegachaslot"></div>
@@ -3359,12 +3359,12 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 26.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 27.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '🌳 세계수의 단말마 재오픈 · ⚒️ 각인 확장 · 🔨 분해기',
+    version: 6, versionLabel: '1.0.5', title: '🌳 세계수의 단말마 재오픈 · ⚒️ 각인 확장 · 🔨 분해기 · 🔮 룬',
     changes: [
       { id: 17, date: '2026-10-05', text: '⚒️ 보조무기 각인 추가: 대장장이에서 +15 이상 보조무기에 각인을 새길 수 있습니다. (드롭률·골드·보스 피해량·보조무기 효과 증폭·액티브 피해량·액티브 지속시간)' },
       { id: 18, date: '2026-10-05', text: '📜 각인이 3줄로 늘어났습니다: 첫 줄은 각인 등급, 아래 두 줄은 한 단계 아래 등급(각각 드물게 같은 등급)으로 뜹니다. 기존 각인은 다음 재설정부터 3줄이 됩니다.' },
@@ -3376,6 +3376,7 @@ const PATCH_NOTES = [
       { id: 24, date: '2026-10-06', text: '🏷️ 레이드 칭호 개편: 주간 기여 기준을 넘으면 누구나 칭호를 얻고, 다음 한 주 동안 모든 사냥터 드롭률·골드가 최대 +30% 오릅니다. (제목 옆에 표시)' },
       { id: 25, date: '2026-10-06', text: '🎖️ 명예의 정수 상점 개편: 강화 패널티 방지권, 토벌전·도서관 추가 도전권, 각인 승급 진행도, 강철실이 추가되고 정수류는 진행도에 맞춰 늘어납니다.' },
       { id: 26, date: '2026-10-06', text: '⏱️ 세계수의 단말마 전투는 시간 연장 룬과 관계없이 120초로 고정됩니다.' },
+      { id: 27, date: '2026-10-06', text: '🔮 레전더리·신화 스탯 룬 추가: 질풍·정밀·파괴·연격·연격 증폭·살육의 룬이 레전더리·신화 등급으로도 나옵니다. (예: 파괴의 룬 유니크 +90%p → 레전더리 +150%p → 신화 +230%p)' },
     ],
   },
 ];
@@ -5867,6 +5868,21 @@ const RUNE_SPECIALS = {
               proc: 0.10, skillMult: 100.0,
               desc: '공격속도 +300%p, 치명타 확률 +25%p, 치명타 피해 +200%p. 공격 시 10% 확률로 "염왕"이 발동해 무기 공격력의 10000%에 달하는 피해를 입힌다(염왕 발동 시에도 별도로 치명타가 적용될 수 있다).' },
 };
+// 레전더리·신화 스탯 룬 — 유니크 스탯 룬(RUNE_STATS)의 데미지 계열 6종을 수치만 올린 것. 룬박스 뽑기 풀에
+// 특수 룬과 같은 비중으로 섞이고, weaponRuneStat()이 유니크 스탯 룬과 똑같이 합산한다.
+const RUNE_STAT_UPGRADES = {
+  atkSpeed:    { 4: 40, 5: 60 },
+  critChance:  { 4: 26, 5: 36 },
+  critDamage:  { 4: 150, 5: 230 },
+  extraAtk:    { 4: 26, 5: 36 },
+  extraAtkDmg: { 4: 150, 5: 230 },
+  bossDmg:     { 4: 55, 5: 80 },
+};
+for (const [stat, byGrade] of Object.entries(RUNE_STAT_UPGRADES)) {
+  for (const [g, v] of Object.entries(byGrade)) {
+    RUNE_SPECIALS[`${stat}_g${g}`] = { name: RUNE_STATS[stat].name, grade: +g, stat, value: v, desc: RUNE_STATS[stat].desc(v) };
+  }
+}
 const RUNE_SPECIALS_BY_GRADE = { 4: [], 5: [], 6: [] };
 for (const [k, v] of Object.entries(RUNE_SPECIALS)) { if (!v.libraryOnly && !v.uniqueGrant) RUNE_SPECIALS_BY_GRADE[v.grade].push(k); }
 // 도서관 보상 전용 뽑기 풀 — libraryOnly 룬만 등급별로 모아둔다.
@@ -6371,6 +6387,7 @@ function weaponRuneStat(w, statKey) {
   let total = 0;
   for (const r of w.runes) {
     if (r.grade <= 3 && r.key === statKey) total += RUNE_STATS[statKey].values[r.grade];
+    else if (r.grade >= 4) { const d = RUNE_SPECIALS[r.key]; if (d && d.stat === statKey) total += d.value; }
   }
   return total;
 }
@@ -13885,6 +13902,11 @@ const GUIDE_SECTIONS = [
     icon: '🔮', title: '룬',
     body: `<b>+15강 이상</b> 강화한 무기에만 장착할 수 있으며, 슬롯 수는 무기 등급에 따라 일반 1개부터 신화 6개, 고대 8개, 태초 10개까지 늘어납니다.
     <br><br><b>일반~유니크</b> 룬은 공격속도/치명타/연타/보스피해 같은 일반 스탯을 올려주고, <b>레전더리 이상</b> 룬은 각각 고유한 특수 효과를 부여합니다.
+    <br><br><b>레전더리·신화 스탯 룬</b>: 유니크 스탯 룬과 같은 종류를 더 높은 수치로 — 룬박스에서 특수 룬과 같은 비중으로 나옵니다.
+    <table class="guide-table">
+      <tr><th>룬</th><th>유니크</th><th><span class="grade-레전더리">레전더리</span></th><th><span class="grade-신화">신화</span></th></tr>
+      ${Object.entries(RUNE_STAT_UPGRADES).map(([k, v]) => `<tr><td>${RUNE_STATS[k].name}</td><td>${RUNE_STATS[k].desc(RUNE_STATS[k].values[3])}</td><td>${RUNE_STATS[k].desc(v[4])}</td><td>${RUNE_STATS[k].desc(v[5])}</td></tr>`).join('')}
+    </table>
     <br><br>룬박스(등급별 가챠)를 구매해서 얻거나, <b>룬 합성</b>으로 같은 등급 3개를 소모해 한 단계 위 등급 룬을 얻을 수 있습니다 — 등급이 높을수록 합성 성공 확률이 낮아지고(신화 8%까지), 고대 등급은 합성 대상에서 제외되며, 실패하면 재료 3개는 전부 사라집니다.
     <br><br>고대의 도서관 전용 특수 룬 8종은 룬박스에서 절대 드롭되지 않고, 오직 도서관 클리어 보상으로만 얻을 수 있습니다.
     <br><br><b>등장 가능한 특수 효과(레전더리 이상)</b>

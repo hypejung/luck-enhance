@@ -11869,8 +11869,19 @@ function load() {
     }
     const data = migrate(JSON.parse(json));
     if (tampered) data.tampered = true;
-    // 무이드 정리
-    uid = data.weapons.reduce((m, w) => Math.max(m, w.id), 0) + 1;
+    // 무이드 정리 — uid는 무기·보조무기·장갑이 같이 쓰는 번호표라 셋 다 보고 다음 번호를 정한다.
+    // (예전엔 무기만 봐서, 다시 접속한 뒤 새로 얻은 보조무기·장갑이 기존 것과 같은 id를 받아
+    // 강화기에서 고른 보조무기와 다른 보조무기가 선택·장착되는 버그가 있었다.)
+    const idLists = [data.weapons, Array.isArray(data.subweapons) ? data.subweapons : [], Array.isArray(data.gloves) ? data.gloves : []];
+    uid = idLists.reduce((m, list) => list.reduce((mm, x) => Math.max(mm, Number(x.id) || 0), m), 0) + 1;
+    // 이미 겹친 id 복구: 같은 목록 안에서 먼저 나온 것(지금 장착·선택되던 쪽)은 그대로 두고 뒤의 것에 새 번호를 준다
+    for (const list of idLists) {
+      const seen = new Set();
+      for (const x of list) {
+        if (seen.has(x.id)) x.id = uid++;
+        seen.add(x.id);
+      }
+    }
     // 룬 uid 정리 (보유 룬 + 무기에 장착된 룬 전부 확인)
     const equippedRuneIds = data.weapons.flatMap(w => Array.isArray(w.runes) ? w.runes.map(r => r.id) : []);
     runeUid = [...data.runes.map(r => r.id), ...equippedRuneIds].reduce((m, id) => Math.max(m, id), 0) + 1;

@@ -1244,6 +1244,9 @@
 
 <script>
 'use strict';
+// 게임 코드 전체를 함수 안에 감싸서 콘솔(전역)에서 게임 상태(S)와 함수를 직접 건드릴 수 없게 한다.
+// 개발·테스트용 진입로는 맨 아래 __dev(비밀번호) 참고.
+(() => {
 /* ======================================================================
  *  운빨강화하기 - 밸런스/컨텐츠 수정은 이 아래 CONFIG 부분만 건드리면 됩니다
  * ====================================================================== */
@@ -11445,6 +11448,41 @@ function renderBlacksmith() {
 
 /* ===================== 저장 / 불러오기 ===================== */
 const SAVE_KEY = 'luckEnhance_v1';
+// ---------- 세이브 서명 ----------
+// 저장 형식: "S2|서명|세이브JSON" 한 덩어리(서명과 내용이 따로 저장되지 않아 탭 여러 개가 동시에 저장해도 안 어긋남).
+// 내용을 고치면 서명이 맞지 않아 감지된다. 감지되면 마지막 정상 백업으로 되돌리고, 백업도 없으면
+// 진행은 그대로 두되 S.tampered로 표시만 한다(저장소 오류 같은 오탐으로 진행이 날아가지 않게).
+// 서명 없는 예전 세이브는 SAVE_UNSIGNED_UNTIL까지만 정상으로 받아 서명을 붙인다.
+const SAVE_BAK_KEY = 'luckEnhance_v1_bak';
+const SAVE_UNSIGNED_UNTIL = Date.parse('2026-10-21T00:00:00+09:00');
+const SAVE_PEPPER = ['de84d863', 'b22131db', '14044969'].join('');
+function saveHash53(str, seed) {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+function saveSig(json) { return saveHash53(SAVE_PEPPER + json, 7) + saveHash53(json + SAVE_PEPPER, 131); }
+function packSave(json) { return `S2|${saveSig(json)}|${json}`; }
+// { json, signed, valid } — 서명 없는 예전 형식은 signed:false
+function unpackSave(raw) {
+  if (typeof raw !== 'string') return null;
+  if (raw.startsWith('S2|')) {
+    const i = raw.indexOf('|', 3);
+    if (i < 0) return { json: raw, signed: true, valid: false };
+    const sig = raw.slice(3, i), json = raw.slice(i + 1);
+    return { json, signed: true, valid: sig === saveSig(json) };
+  }
+  return { json: raw, signed: false, valid: false };
+}
+function saveJsonOf(raw) { const u = unpackSave(raw); return u ? u.json : null; }
+let lastPackedSave = null, lastBackupAt = 0;
+let saveTamperNotice = null; // 불러올 때 변조가 감지됐으면 init 뒤에 안내
 let resetting = false;  // 초기화 중에는 저장 금지
 // save()는 액션마다(강화 한 번, 구매 한 번 등) 아주 자주 호출되는데, 예전엔 그때마다
 // 클라우드(Firebase) 업로드까지 매번 같이 나가서 활발히 플레이할수록 초 단위로 업로드가
@@ -11456,7 +11494,13 @@ function save() {
   const hr = new Date().getHours();
   if (hr === 0 && S.eggs && !S.eggs.midnight) unlockEgg('midnight');
   S.savedAt = Date.now(); // 로컬 저장 시각 — 클라우드 이동 때 더 최신 쪽을 고르는 데 쓴다
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) {}
+  const packed = packSave(JSON.stringify(S));
+  // 직전에 우리가 쓴(=정상) 세이브를 1분에 한 번 백업 칸에 보관 — 변조 감지 시 여기로 되돌린다
+  if (lastPackedSave && Date.now() - lastBackupAt > 60000) {
+    try { localStorage.setItem(SAVE_BAK_KEY, lastPackedSave); lastBackupAt = Date.now(); } catch (e) {}
+  }
+  lastPackedSave = packed;
+  try { localStorage.setItem(SAVE_KEY, packed); } catch (e) {}
 }
 // 이전 버전 저장 데이터에 빠진 필드를 채워주는 마이그레이션
 function migrate(d) {
@@ -11595,7 +11639,17 @@ function load() {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const data = migrate(JSON.parse(raw));
+    const u = unpackSave(raw);
+    let json = u.json;
+    let tampered = false;
+    if (!u.valid && !(!u.signed && Date.now() < SAVE_UNSIGNED_UNTIL)) {
+      // 변조(또는 기한 지난 서명 없는 세이브): 정상 백업이 있으면 되돌리고, 없으면 표시만
+      const b = unpackSave(localStorage.getItem(SAVE_BAK_KEY));
+      if (b && b.valid) { json = b.json; saveTamperNotice = 'restored'; }
+      else { tampered = true; saveTamperNotice = 'flagged'; }
+    }
+    const data = migrate(JSON.parse(json));
+    if (tampered) data.tampered = true;
     // 무이드 정리
     uid = data.weapons.reduce((m, w) => Math.max(m, w.id), 0) + 1;
     // 룬 uid 정리 (보유 룬 + 무기에 장착된 룬 전부 확인)
@@ -11705,7 +11759,7 @@ function syncUpload() {
   if (syncUploadBusy) { syncUploadPending = true; return; }
   syncUploadBusy = true;
   syncKeyFor(id, getSyncPw())
-    .then(key => syncPutSave(key, JSON.stringify(S)))
+    .then(key => syncPutSave(key, packSave(JSON.stringify(S))))
     .catch(() => { /* 오프라인 - 다음 저장 주기에 재시도 */ })
     .finally(() => {
       syncUploadBusy = false;
@@ -11727,7 +11781,7 @@ async function syncApplyOnLoad() {
       if (rec.legacy) {
         // 이동 기간에 예전 위치 업로드가 막혀 클라우드가 로컬보다 오래됐을 수 있으므로 더 최신 쪽을 옮긴다
         let localStr = null, localTime = 0;
-        try { localStr = localStorage.getItem(SAVE_KEY); const l = localStr && JSON.parse(localStr); localTime = (l && (l.savedAt || l.lastSeen)) || 0; } catch (e3) {}
+        try { localStr = localStorage.getItem(SAVE_KEY); const l = localStr && JSON.parse(saveJsonOf(localStr)); localTime = (l && (l.savedAt || l.lastSeen)) || 0; } catch (e3) {}
         if (localStr && localTime > rec.updatedAt) data = localStr;
         await syncMigrateLegacy(id, rec.key, data);
       }
@@ -12105,7 +12159,7 @@ function syncModalIssueNew() {
     confirmBtn.disabled = true;
     confirmBtn.textContent = '업로드 중...';
     try {
-      await syncPutSave(await syncKeyFor(id, pw), JSON.stringify(S));
+      await syncPutSave(await syncKeyFor(id, pw), packSave(JSON.stringify(S)));
       setSyncCreds(id, pw);
       log(`🔗 새 동기화 ID(${id})가 발급되어 현재 진행 상황이 클라우드에 저장되었습니다.`, 'lg-good');
       hideSyncModal();
@@ -14735,6 +14789,13 @@ function renderBossAccs() {
 /* ===================== 초기화 ===================== */
 function init() {
   S = load();
+  if (saveTamperNotice) {
+    // 세이브 변조 감지 — DOM이 준비된 뒤 알린다
+    const msg = saveTamperNotice === 'restored'
+      ? '⚠️ 저장 데이터가 변조되어, 마지막 정상 저장 상태로 되돌렸습니다.'
+      : '⚠️ 저장 데이터가 변조된 것으로 감지되었습니다. 이 계정은 순위 컨텐츠에서 제외될 수 있습니다.';
+    setTimeout(() => { log(msg, 'lg-bad'); try { showAlertModal(`<p>${msg}</p><button class="danger" id="alertOkBtn">확인</button>`); $('alertOkBtn').onclick = hideAlertModal; } catch (e) {} }, 0);
+  }
   if (!S) {
     S = newState();
     const w = defaultWeapon();
@@ -14815,6 +14876,7 @@ function init() {
     showConfirmModal('정말 진행 상황을 모두 삭제하고 처음부터 다시 시작할까요?', () => {
       resetting = true;  // 언로드 핸들러가 재저장하는 것을 차단
       localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(SAVE_BAK_KEY);
       location.reload();
     });
   };
@@ -14960,16 +15022,21 @@ function updateAutoBtn() {
   b.classList.toggle('primary', !S.auto);
 }
 
-// 개발자 전용 치트: 콘솔에서 cheatEssence(100) 형태로 호출 — "고대의 도서관" 컨텐츠가
-// 구현되기 전까지 무기의 정수를 얻을 정식 경로가 없어 QA 편의를 위해 임시로 마련해둔 것.
-window.cheatEssence = function (n) {
-  n = n || 100;
-  S.weaponEssence = BN.add(S.weaponEssence, n);
-  log(`🔧 개발자 치트: 무기의 정수 +${n} (보유 ${fmt(S.weaponEssence)})`, 'lg-prim');
-  renderEnhance(); save();
+// HTML 속성(onchange)에서 부르는 함수만 바깥에 연결한다.
+window.toggleEnhanceFx = toggleEnhanceFx;
+// 개발·테스트용 진입로: 콘솔에서 await __dev('비밀번호') → 성공하면 __devEval('코드')로 게임 내부에서 실행.
+// 코드에는 비밀번호의 SHA-256만 있어서 코드를 읽어도 비밀번호를 알 수 없다.
+const DEV_PASS_HASH = 'be115f5216cf3a1fdcabdc1d111cd4daffc62237dc94ce8f7a37089b5f70c401';
+window.__dev = async pass => {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(pass)));
+  const hex = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+  if (hex !== DEV_PASS_HASH) return false;
+  window.__devEval = code => eval(code); // 직접 eval — 이 함수 안의 게임 상태에 접근 가능
+  return true;
 };
 
 syncApplyOnLoad().finally(init);
+})();
 </script>
 </body>
 </html>

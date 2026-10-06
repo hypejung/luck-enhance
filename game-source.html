@@ -6330,6 +6330,22 @@ function runeDesc(rune) {
   if (!rune) return '';
   return rune.grade <= 3 ? RUNE_STATS[rune.key].desc(RUNE_STATS[rune.key].values[rune.grade]) : RUNE_SPECIALS[rune.key].desc;
 }
+// 같은 룬(등급+종류)을 한 줄로 묶는다: [{ grade, key, items: [...] }] — 등급 높은 순, 같은 등급은 처음 얻은 순
+function groupRunes(list) {
+  const map = new Map();
+  for (const r of list) {
+    const k = r.grade + '|' + r.key;
+    if (!map.has(k)) map.set(k, { grade: r.grade, key: r.key, items: [] });
+    map.get(k).items.push(r);
+  }
+  const groups = [...map.values()];
+  for (const g of groups) g.items.sort((a, b) => a.id - b.id);
+  return groups.sort((a, b) => (b.grade - a.grade) || (a.items[0].id - b.items[0].id));
+}
+// 무기에 낀 룬 설명 줄(같은 룬은 "이름 ×n"으로 한 줄)
+function runeSummaryLines(runes) {
+  return groupRunes(runes || []).map(g => `🔮 [${runeName(g.items[0])}${g.items.length > 1 ? ` ×${g.items.length}` : ''}] ${runeDesc(g.items[0])}`);
+}
 // 보유 룬(미장착) 최대 개수. 장착 해제·무기 파괴 등으로 "이미 갖고 있던 룬이 가방으로
 // 돌아오는" 경우는 이 상한과 무관하게 항상 성공해야 하므로 grantRune()을 거치지 않고
 // 직접 S.runes.push한다 — 룬박스 개봉/룬합성처럼 "새로 얻는" 경로에만 적용.
@@ -7661,7 +7677,8 @@ function subweaponFlavorText(sw) {
 }
 function subweaponGradeTag(sw) {
   const g = GRADES[sw.grade];
-  return `<span class="grade-${g.name}">${g.name} ${SUBWEAPON_TYPES[sw.typeIdx].icon} [${subweaponItemName(sw)}] +${sw.enhance}</span>`;
+  const unbreakable = (isAncientSubweapon(sw) || isGenesisSubweapon(sw)) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
+  return `<span class="grade-${g.name}">${g.name} ${SUBWEAPON_TYPES[sw.typeIdx].icon} [${subweaponItemName(sw)}] +${sw.enhance}</span>${unbreakable}`;
 }
 function subweaponPower(sw) { return sw.grade * 1000 + sw.enhance; } // 대충 비교용(가방 정리 시 최약체 판정)
 function subSellPrice(sw) { return Math.round(20 * subGradeMult(sw.grade) * (1 + sw.enhance * 0.3)); } // TODO 미확정 판매가
@@ -7935,12 +7952,12 @@ function resolveSubEnhance(sw, advanced) {
       // 태초 보조무기의 고급 강화: 파괴가 없는 대신 하락 확률(50%)을 절반(25%)으로
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'dust');
-      log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨${isGenesisSubweapon(sw) ? '' : ` (파괴 확률이었음: ${dChance.toFixed(1)}%)`}${advTag}`, 'lg-bad');
+      log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨${isGenesisSubweapon(sw) ? '' : ` (${isAncientSubweapon(sw) ? '초기화' : '파괴'} 확률이었음: ${dChance.toFixed(1)}%)`}${advTag}`, 'lg-bad');
     } else {
       sw.enhance = Math.max(0, sw.enhance - 1);
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'dust');
-      log(`❌ 보조무기 강화 실패... 단계 하락${isGenesisSubweapon(sw) ? '' : ` (파괴 확률이었음: ${dChance.toFixed(1)}%)`}${advTag}`, 'lg-bad');
+      log(`❌ 보조무기 강화 실패... 단계 하락${isGenesisSubweapon(sw) ? '' : ` (${isAncientSubweapon(sw) ? '초기화' : '파괴'} 확률이었음: ${dChance.toFixed(1)}%)`}${advTag}`, 'lg-bad');
     }
   }
   renderEnhance(); renderSubInventory(); renderTop();
@@ -12440,7 +12457,7 @@ function renderEnhance() {
     ${w.effect ? `<div id="enhwepeffect" class="lg-prim">✨ [${EFFECTS[w.effect].name}] ${EFFECTS[w.effect].desc}</div>` : ''}
     ${spirit ? `<div class="grade-고대">🏺 [${spirit.name}] ${spirit.desc}${spiritStackText(w)}</div>` : ''}
     ${genesisArtifact ? genesisArtifact.effectsText.map(t => `<div class="grade-태초">🌌 ${t}</div>`).join('') : ''}
-    ${(w.runes || []).map(r => `<div class="lg-prim">🔮 [${runeName(r)}] ${runeDesc(r)}</div>`).join('')}`;
+    ${runeSummaryLines(w.runes).map(t => `<div class="lg-prim">${t}</div>`).join('')}`;
   $('enhstat').innerHTML = `
     <div>${atkLabel(w)}<b>${fmt(atk)}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
@@ -12779,7 +12796,7 @@ function renderInventory() {
           ${genesisArtifact ? genesisArtifact.effectsText.map(t => `<span class="grade-태초">🌌 ${t}</span>`).join('<br>') : ''}
           ${genesisArtifact && genesisArtifact.id === 'draugr' ? draugrFloorListHtml(w) : ''}
           ${genesisArtifact && runes.length ? '<br>' : ''}
-          ${runes.map(r => `🔮 [${runeName(r)}] ${runeDesc(r)}`).join('<br>')}
+          ${runeSummaryLines(runes).join('<br>')}
         </div>`
       : '';
     const priceTag = (isGenesisWeapon(w) || isAncientWeapon(w)) ? '판매 불가' : `판매가 ${fmt(sellPrice(w))}`;
@@ -13027,7 +13044,7 @@ function renderSubAdvancedEnhance(sw, maxed) {
   const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🍃${matSt.shortfall}개 대체 가능` : '';
   const advRiskValue = Math.round(subDestroyChance(sw) * ADVANCED_ENH_DESTROY_MULT * 10) / 10;
   // 태초 보조무기는 파괴가 없으므로 고급 강화가 "하락 확률 절반"으로 작동한다(태초 무기와 같은 대응)
-  const advRiskText = isGenesisSubweapon(sw) ? '하락 확률 절반' : `파괴 확률 ${advRiskValue}%로 절반`;
+  const advRiskText = isGenesisSubweapon(sw) ? '하락 확률 절반' : `${isAncientSubweapon(sw) ? '초기화' : '파괴'} 확률 ${advRiskValue}%로 절반`;
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="subAdvancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
       🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${advRiskText}, 💰 ${fmt(goldNeed)} + ${highMatFloorLabel(true)} 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
@@ -13079,12 +13096,19 @@ function renderSubEquippedBox() {
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>`;
+  // 하락 확률: 메인 무기와 같은 기준(실패 전체 대비 %) — resolveSubEnhance()의 유지/하락 비율 0.5/0.5
+  const subDowngradeChance = maxed ? 0 : Math.round((100 - dChance) * 0.5 * enhanceEventDowngradeMult(sw.enhance) * 10) / 10;
   $('subenhrates').innerHTML = (maxed
     ? `🏆 최대 강화 달성! <b>+${sw.enhance}</b>`
-    : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 현재 <b>+${sw.enhance}</b>`)
+    : isAncientSubweapon(sw)
+      ? `🏺 고대 보조무기는 파괴되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%)</span> / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance.toFixed(1)}%)` : ''} · 현재 <b>+${sw.enhance}</b>`
+      : isGenesisSubweapon(sw)
+        ? `🌌 태초 보조무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%, 고급 강화 시 유지 확률 상승)</span> · 현재 <b>+${sw.enhance}</b>`
+        : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 현재 <b>+${sw.enhance}</b>`)
     + (!maxed && (S.penaltyGuard || 0) > 0 ? `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>` : '');
   bindPenaltyGuardToggles();
-  $('subEnhBtn').innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${chance.toFixed(1)}% / 파괴 ${dChance.toFixed(1)}%)</span>`;
+  const subRiskWord = isGenesisSubweapon(sw) ? null : isAncientSubweapon(sw) ? '초기화' : '파괴';
+  $('subEnhBtn').innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost)} (성공 ${chance.toFixed(1)}%${subRiskWord ? ` / ${subRiskWord} ${dChance.toFixed(1)}%` : ''})</span>`;
   $('subEnhBtn').disabled = maxed || subEnhanceRevealPending;
   $('subEnhBtn').onclick = () => { if (!maxed) trySubEnhance(false); };
   $('subActiveTimingInput').onchange = (e) => setSubweaponActiveTiming(e.target.value);
@@ -13450,13 +13474,14 @@ function renderRuneEquippedList() {
   if (!w || isFist(w)) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">맨손에는 룬을 장착할 수 없습니다.</div>'; return; }
   if (!runes.length) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">${gradeTag(w)}에 장착된 룬이 없습니다.</div>`; return; }
   box.innerHTML = '';
-  for (const r of runes) {
-    const gname = GRADES[r.grade].name;
+  for (const g of groupRunes(runes)) {
+    const r = g.items[0];
+    const gname = GRADES[g.grade].name;
     const div = document.createElement('div');
     div.className = 'invitem equipped';
-    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
-      <div class="wi">${runeDesc(r)}</div></div><div class="btns"><button class="danger">장착해제</button></div>`;
-    div.querySelector('button').onclick = () => unequipRuneFromCurrentWeapon(r.id);
+    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}${g.items.length > 1 ? ` ×${g.items.length}` : ''}</span></div>
+      <div class="wi">${runeDesc(r)}</div></div><div class="btns"><button class="danger">장착해제${g.items.length > 1 ? ' 1개' : ''}</button></div>`;
+    div.querySelector('button').onclick = () => unequipRuneFromCurrentWeapon(g.items[g.items.length - 1].id);
     box.appendChild(div);
   }
 }
@@ -13490,33 +13515,47 @@ function renderRuneInventory() {
     list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 룬이 없습니다. 룬박스를 개봉해 획득하세요.</div>';
     return;
   }
-  // grade가 같을 때, 장착/해제로 배열(S.runes ↔ w.runes)이 바뀌어도 순서가 안 흔들리도록
-  // id를 2차 정렬 기준으로 고정한다(그렇지 않으면 장착 중인 룬이 목록 맨 앞으로 튀어보임).
-  const sorted = all.sort((a, b) => (b.grade - a.grade) || (a.id - b.id));
+  // 같은 룬(등급+종류)은 "이름 ×n (장착중 k/n)" 한 줄로 묶는다. 묶음 순서는 처음 얻은 룬 id 기준이라
+  // 장착/해제로 배열(S.runes ↔ w.runes)이 바뀌어도 자리가 흔들리지 않는다.
   list.innerHTML = '';
-  for (const r of sorted) {
-    const gname = GRADES[r.grade].name;
+  for (const g of groupRunes(all)) {
+    const r = g.items[0];
+    const n = g.items.length;
+    const eqItems = g.items.filter(x => x.equipped);
+    const bagItems = g.items.filter(x => !x.equipped);
+    const gname = GRADES[g.grade].name;
+    const eqTag = eqItems.length ? ` <span style="color:var(--unique);font-size:12px">(장착중${eqItems.length < n ? ` ${eqItems.length}/${n}` : ''})</span>` : '';
     const div = document.createElement('div');
-    div.className = 'invitem' + (r.equipped ? ' equipped' : '');
-    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span>${r.equipped ? ' <span style="color:var(--unique);font-size:12px">(장착중)</span>' : ''}</div>
+    div.className = 'invitem' + (eqItems.length ? ' equipped' : '');
+    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}${n > 1 ? ` ×${n}` : ''}</span>${eqTag}</div>
       <div class="wi">${runeDesc(r)}</div></div><div class="btns"></div>`;
     const btns = div.querySelector('.btns');
-    // 판매(위험)는 항상 왼쪽 고정, 장착/장착해제(토글)는 항상 오른쪽 고정 위치에 둔다.
-    // 이렇게 해야 장착 상태가 바뀌어 버튼 구성이 달라져도 같은 자리를 연달아 눌렀을 때
-    // 절대 판매로 이어지지 않는다(이전엔 왼쪽이 장착/장착해제라 판매와 자리가 뒤섞였음).
-    if (!r.equipped) {
+    // 판매(위험)는 항상 왼쪽, 장착/장착해제는 항상 오른쪽 — 버튼 구성이 바뀌어도 같은 자리를
+    // 연달아 눌렀을 때 판매로 이어지지 않게. 판매·장착은 가방에 있는 것부터, 해제는 장착된 것부터 1개씩.
+    if (bagItems.length) {
       const sellBt = document.createElement('button');
-      sellBt.textContent = `판매 (+${fmt(runeSellPrice(r.grade))})`;
+      sellBt.textContent = `판매${n > 1 ? ' 1개' : ''} (+${fmt(runeSellPrice(g.grade))})`;
       sellBt.className = 'danger';
-      sellBt.onclick = () => sellRune(r.id);
+      sellBt.onclick = () => sellRune(bagItems[bagItems.length - 1].id);
       btns.appendChild(sellBt);
     }
-    const bt = document.createElement('button');
-    bt.textContent = r.equipped ? '장착해제' : '장착 무기에 장착';
-    bt.className = r.equipped ? 'danger' : 'primary';
-    bt.style.marginLeft = 'auto';
-    bt.onclick = () => r.equipped ? unequipRuneFromCurrentWeapon(r.id) : equipRuneToCurrentWeapon(r.id);
-    btns.appendChild(bt);
+    const right = document.createElement('div');
+    right.style.cssText = 'margin-left:auto;display:flex;gap:4px;';
+    if (eqItems.length) {
+      const ub = document.createElement('button');
+      ub.textContent = `장착해제${n > 1 ? ' 1개' : ''}`;
+      ub.className = 'danger';
+      ub.onclick = () => unequipRuneFromCurrentWeapon(eqItems[eqItems.length - 1].id);
+      right.appendChild(ub);
+    }
+    if (bagItems.length) {
+      const eb = document.createElement('button');
+      eb.textContent = `장착${n > 1 ? ' 1개' : ' 무기에 장착'}`;
+      eb.className = 'primary';
+      eb.onclick = () => equipRuneToCurrentWeapon(bagItems[0].id);
+      right.appendChild(eb);
+    }
+    btns.appendChild(right);
     list.appendChild(div);
   }
 }
@@ -13576,20 +13615,21 @@ function renderRuneFusion() {
   }
   picker.innerHTML = '';
   const nextEmpty = fusionSlots.findIndex(id => id == null);
-  for (const r of candidates) {
-    const gname = GRADES[r.grade].name;
-    const gradeOk = filledGrade == null || r.grade === filledGrade;
+  for (const g of groupRunes(candidates)) {
+    const r = g.items[0];
+    const gname = GRADES[g.grade].name;
+    const gradeOk = filledGrade == null || g.grade === filledGrade;
     const selectable = nextEmpty !== -1 && gradeOk;
     const div = document.createElement('div');
     div.className = 'invitem';
     if (!selectable) div.style.opacity = '0.4';
-    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}</span></div>
+    div.innerHTML = `<div><div class="wn"><span class="grade-${gname}">${gname} 🔮 ${runeName(r)}${g.items.length > 1 ? ` ×${g.items.length}` : ''}</span></div>
       <div class="wi">${runeDesc(r)}</div></div>
       <div class="btns"><button class="primary" ${selectable ? '' : 'disabled'}>선택</button></div>`;
     div.querySelector('button').onclick = () => {
       const slot = fusionSlots.findIndex(id => id == null);
       if (slot === -1) return;
-      fusionSlots[slot] = r.id;
+      fusionSlots[slot] = g.items[g.items.length - 1].id;
       renderRuneFusion();
     };
     picker.appendChild(div);

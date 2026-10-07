@@ -3270,11 +3270,12 @@ const WEEKLY_RAID_CLOSED = false;
 // 개인 구간(칭호·기록 보상 크기): 10억부터 1구간, 10배마다 한 구간.
 const WEEKLY_RAID_TIER = { floor: 1e9, step: 10 };
 // 전체 구간: 전체 합 1경부터 1구간, 10배마다 한 구간(상한 없음). 로그 스케일이라 합이 10배가 돼야 한 구간 —
-// 보상은 구간에 정비례. maxExp는 한 사람 기록의 "형식 검사"(1e30 초과는 현실적으로 불가능한 값이라
+// 보상은 구간^exp에 비례(높은 구간일수록 한 구간 오를 때 더 크게 늘어남), guardFrom 구간부터 강화 패널티
+// 방지권 (구간 - guardFrom + 1)장. maxExp는 한 사람 기록의 "형식 검사"(1e30 초과는 현실적으로 불가능한 값이라
 // 무시) — Firebase 규칙과 같은 값으로 맞춘다. 게임이 그만큼 성장하면 둘 다 올린다.
-const WEEKLY_RAID_GLOBAL = { floor: 1e16, step: 10, honorPerTier: 20, goldPerTier: 0.5, leavesPerTier: 5000, maxExp: 30 };
+const WEEKLY_RAID_GLOBAL = { floor: 1e16, step: 10, exp: 1.5, honorPerTier: 30, goldPerTier: 1.0, leavesPerTier: 8000, guardFrom: 5, maxExp: 30 };
 // 개인 기록 보상: 역대 최고 × ratio 이상이면 하루 1회, 그 기록의 개인 구간(최소 1)에 비례.
-const WEEKLY_RAID_RECORD = { ratio: 1.2, honorPerTier: 3, leavesPerTier: 2000 };
+const WEEKLY_RAID_RECORD = { ratio: 1.2, honorPerTier: 5, leavesPerTier: 3000 };
 function bnLog10(x) { const b = BN.from(x); return b && b.m > 0 ? Math.log10(b.m) + b.e : -Infinity; }
 function raidTierOf(dmg, floor, step) {
   const l = bnLog10(dmg) - Math.log10(floor);
@@ -3287,7 +3288,8 @@ function weeklyRaidGlobalTierFloor(tier) { return WEEKLY_RAID_GLOBAL.floor * Mat
 function weeklyRaidGlobalReward(tier) {
   const G = WEEKLY_RAID_GLOBAL;
   if (tier <= 0) return null;
-  return { honor: G.honorPerTier * tier, goldMult: G.goldPerTier * tier, leaves: G.leavesPerTier * tier };
+  const k = Math.pow(tier, G.exp);
+  return { honor: Math.round(G.honorPerTier * k), goldMult: Math.round(G.goldPerTier * k * 10) / 10, leaves: Math.round(G.leavesPerTier * k), guards: Math.max(0, tier - G.guardFrom + 1) };
 }
 function weeklyRaidRecordReward(dmg) {
   const t = Math.max(1, weeklyRaidTierOf(dmg));
@@ -3359,7 +3361,7 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 27.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 28.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
@@ -3377,6 +3379,7 @@ const PATCH_NOTES = [
       { id: 25, date: '2026-10-06', text: '🎖️ 명예의 정수 상점 개편: 강화 패널티 방지권, 토벌전·도서관 추가 도전권, 각인 승급 진행도, 강철실이 추가되고 정수류는 진행도에 맞춰 늘어납니다.' },
       { id: 26, date: '2026-10-06', text: '⏱️ 세계수의 단말마 전투는 시간 연장 룬과 관계없이 120초로 고정됩니다.' },
       { id: 27, date: '2026-10-06', text: '🔮 레전더리·신화 스탯 룬 추가: 질풍·정밀·파괴·연격·연격 증폭·살육의 룬이 레전더리·신화 등급으로도 나옵니다. (예: 파괴의 룬 유니크 +90%p → 레전더리 +150%p → 신화 +230%p)' },
+      { id: 28, date: '2026-10-07', text: '🌳 세계수의 단말마 주간 보상 상향: 높은 구간일수록 보상이 더 크게 늘어나고(7구간 기준 명예 140 → 556), 5구간부터 강화 패널티 방지권도 줍니다. 기록 보상도 소폭 상향됐습니다.' },
     ],
   },
 ];
@@ -9716,7 +9719,8 @@ async function weeklyRaidSettleGlobal() {
       S.gold = BN.add(S.gold, gold);
       S.honorEssence = BN.add(S.honorEssence, r.honor);
       S.worldTreeLeaf = BN.add(S.worldTreeLeaf || BN.from(0), r.leaves);
-      msg = `🌳 <b>[세계수의 단말마 주간 결산]</b> 전체 ${g.count}명의 기여 합 ${fmt(g.sum)} → <b>전체 ${tier}구간</b>! (내 기여 ${fmt(total)}) +${fmt(gold)} 골드, 🎖️ 명예의 정수 +${r.honor}, 🍃 세계수의 잎 +${fmt(r.leaves)}`;
+      if (r.guards) S.penaltyGuard = (S.penaltyGuard || 0) + r.guards;
+      msg = `🌳 <b>[세계수의 단말마 주간 결산]</b> 전체 ${g.count}명의 기여 합 ${fmt(g.sum)} → <b>전체 ${tier}구간</b>! (내 기여 ${fmt(total)}) +${fmt(gold)} 골드, 🎖️ 명예의 정수 +${r.honor}, 🍃 세계수의 잎 +${fmt(r.leaves)}${r.guards ? `, 🛡️ 강화 패널티 방지권 +${r.guards}장` : ''}`;
     } else {
       msg = `🌳 <b>[세계수의 단말마 주간 결산]</b> 전체 ${g.count}명의 기여 합 ${fmt(g.sum)} — 아직 전체 1구간(${fmt(WEEKLY_RAID_GLOBAL.floor)})에 닿지 못해 보상이 없습니다.`;
     }
@@ -10037,7 +10041,7 @@ function renderWorldRaidTab() {
   const rows = [];
   for (let k = Math.max(1, gTier - 2); k <= Math.max(gTier, 1) + 3; k++) {
     const r = weeklyRaidGlobalReward(k);
-    rows.push(`<tr${k === gTier ? ' style="color:var(--gold);font-weight:bold"' : ''}><td>${k}</td><td>${fmt(weeklyRaidGlobalTierFloor(k))}</td><td>🎖️${r.honor}</td><td>×${r.goldMult}</td><td>🍃${fmt(r.leaves)}</td></tr>`);
+    rows.push(`<tr${k === gTier ? ' style="color:var(--gold);font-weight:bold"' : ''}><td>${k}</td><td>${fmt(weeklyRaidGlobalTierFloor(k))}</td><td>🎖️${r.honor}</td><td>×${r.goldMult}</td><td>🍃${fmt(r.leaves)}</td><td>${r.guards ? `🛡️${r.guards}` : '-'}</td></tr>`);
   }
   const ls = wr.lastSettled;
   box.innerHTML = `
@@ -10053,8 +10057,8 @@ function renderWorldRaidTab() {
       <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : left <= 0 ? '오늘 도전 횟수를 모두 사용했습니다. 내일 다시 도전할 수 있습니다.' : '하루 3회, 그날의 최고 피해가 일일 기록이 되고 월~일 기록을 합친 값이 내 주간 기여가 됩니다. 시간 연장 룬은 적용되지 않습니다.'}</div>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
-      <div style="font-size:13px;margin-bottom:6px;">🎁 전체 기여 보상 — 모든 유저의 주간 기여 합이 10배가 될 때마다 한 구간(상한 없음). 그 주에 기록을 남긴 모두가 다음 주 첫 접속 때 받습니다.</div>
-      <table class="guide-table"><tr><th>구간</th><th>전체 합</th><th>명예</th><th>골드</th><th>잎</th></tr>${rows.join('')}</table>
+      <div style="font-size:13px;margin-bottom:6px;">🎁 전체 기여 보상 — 모든 유저의 주간 기여 합이 10배가 될 때마다 한 구간(상한 없음). 높은 구간일수록 한 구간 오를 때 보상이 더 크게 늘어나고, ${WEEKLY_RAID_GLOBAL.guardFrom}구간부터 강화 패널티 방지권도 줍니다. 그 주에 기록을 남긴 모두가 다음 주 첫 접속 때 받습니다.</div>
+      <table class="guide-table"><tr><th>구간</th><th>전체 합</th><th>명예</th><th>골드</th><th>잎</th><th>방지권</th></tr>${rows.join('')}</table>
       <div style="font-size:11px;color:var(--sub);margin-top:4px;">골드는 보스 처치 보상 기준 배수.<br>🏅 기록 보상: 1회 피해가 역대 최고의 ${WEEKLY_RAID_RECORD.ratio}배 이상이면(하루 1회) 그 기록의 개인 구간마다 🎖️+${WEEKLY_RAID_RECORD.honorPerTier} 🍃+${fmt(WEEKLY_RAID_RECORD.leavesPerTier)}.<br>칭호(개인 기여 기준): ${['t3', 't2', 't1'].map(k => `${WEEKLY_RAID_TITLES[k].emoji} ${WEEKLY_RAID_TITLES[k].name}(${fmt(weeklyRaidTierFloor(WEEKLY_RAID_TITLES[k].minTier))}, +${Math.round(WEEKLY_RAID_TITLES[k].luck * 100)}%)`).join(' · ')} — 다음 한 주 동안 모든 사냥터 드롭률·골드 증가</div>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:10px;">
@@ -14064,9 +14068,10 @@ const GUIDE_SECTIONS = [
     body: `니드호그가 끝없이 갉아온 세계수의 뿌리는 이미 돌이킬 수 없이 썩었고, 그걸 지키던 루멘 아르카(20층 보스)조차 신성을 버리고 등을 돌렸습니다. 매주 그 썩은 수액이 응어리져 터져 나오는 <b>그르마</b>와, 전용 탭에서 사냥터 진행도와 무관하게 맞섭니다.
     <br><br>매커니즘은 펀치기계와 같습니다 — 체력이 사실상 무한인 상대에게 <b>120초</b> 동안 실제로 들어간 누적 피해를 측정합니다(시간 연장 룬은 적용되지 않음). <b>하루 3회</b> 도전할 수 있고, 그날의 최고 기록이 일일 기록이 됩니다. 월~일 일일 기록을 모두 더한 값이 그 주의 <b>주간 기여</b>입니다.
     <br><br>🌍 <b>전체 기여 보상</b> — 모든 유저의 주간 기여를 합친 값이 10a(1경)를 넘으면 전체 1구간, 그 뒤로 10배마다 한 구간씩 올라가며 상한이 없습니다. 그 주에 한 번이라도 기록을 남긴 사람 모두가 다음 주 첫 접속 때 같은 구간의 보상을 받습니다(누가 얼마나 쳤는지는 공개되지 않습니다).
-    <br>· 구간마다 🎖️ 명예의 정수 +20 · 💰 골드 "사냥터 보스 처치 보상"×0.5 · 🍃 세계수의 잎 +5,000
+    <br>· 보상은 구간^1.5에 비례해서 높은 구간일수록 크게 늘어납니다: 🎖️ 명예의 정수 30×구간^1.5 · 💰 골드 "사냥터 보스 처치 보상"×(구간^1.5) · 🍃 세계수의 잎 8,000×구간^1.5 (예: 7구간 = 명예 556, 골드 ×18.5, 잎 14.8만)
+    <br>· 5구간부터 🛡️ 강화 패널티 방지권 (구간−4)장 (7구간 = 3장)
     <br><br>🏅 <b>기록 보상</b> — 1회 도전 피해가 내 역대 최고 기록의 <b>1.2배 이상</b>이면 하루 1회 즉시 보상을 받습니다. 기준이 "역대 최고"라서 일부러 약하게 쳐도 기준은 내려가지 않습니다.
-    <br>· 그 기록의 개인 구간(10억부터 1구간, 10배마다 한 구간, 최소 1)마다 🎖️ +3 · 🍃 +2,000
+    <br>· 그 기록의 개인 구간(10억부터 1구간, 10배마다 한 구간, 최소 1)마다 🎖️ +5 · 🍃 +3,000
     <br><br>🏷️ <b>칭호</b> — 내 주간 기여가 기준을 넘으면 얻고, 다음 한 주 동안 모든 사냥터에서 효과가 적용됩니다(가장 높은 것 하나, 제목 옆에 표시).
     <br>· 🍂 절규를 들은 자 (기여 1조): 드롭률·골드 +10% · 🪓 뿌리를 가른 자 (100a): +20% · 🌳 단말마를 삼킨 자 (1c): +30%
     <br><br>🎖️ <b>명예의 정수 상점</b>: 특수효과 변경권, 강화 패널티 방지권(실패 시 파괴·초기화·하락을 1회 막음), 토벌전·도서관 추가 도전권, 각인 승급 진행도 +10, 강철실, 무기의 정수·각성의 정수(도서관 최고 서고 1회의 10%), 토벌의 증표, 세계수의 잎을 교환할 수 있습니다.`,

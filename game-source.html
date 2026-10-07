@@ -13725,6 +13725,9 @@ function computeStats() {
     bossBonus: bossDmgBonus() * 100,
     goldBonus: (goldMul - 1) * 100,
     dropBonus: (dropMul - 1) * 100,
+    // 고대·태초 드롭률(genesisAncientDropMult와 같은 식) — 지금 사냥터에서 보스 세트효과가 켜져 있으면 ×3
+    setDropActive: bossSetFloor() === S.floor || subBossSetFloor() === S.floor,
+    rareDropBonus: (genesisAncientDropMult(S.floor) - 1) * 100,
     // 장착 무기의 현재 강화 단계에서 실제로 더해지는 강화확률 보너스(소스마다 기준 단계가 달라 단순 합산은 무의미)
     enhBonus: w && w.enhance < ENH.maxLevel ? enhTierBonus(w.enhance) : 0,
     speedAccBonus: ae.speed * 100,
@@ -13749,6 +13752,7 @@ function renderStats() {
       <div class="statcell"><div class="sl">보스 피해량 보너스</div><div class="sv">+${s.bossBonus.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">골드 획득 보너스</div><div class="sv">+${s.goldBonus.toFixed(0)}%</div></div>
       <div class="statcell"><div class="sl">아이템 드롭률 보너스</div><div class="sv">+${s.dropBonus.toFixed(0)}%</div></div>
+      ${s.setDropActive ? `<div class="statcell"><div class="sl">고대·태초 드롭률 보너스</div><div class="sv">+${s.rareDropBonus.toFixed(0)}%</div><div style="font-size:11px;color:#3ddfff;margin-top:2px">👹 보스 세트효과로 ×3 (${FLOORS[S.floor].name})</div></div>` : ''}
       <div class="statcell"><div class="sl">강화확률 보너스(+${w.enhance}→+${Math.min(ENH.maxLevel, w.enhance + 1)})</div><div class="sv">+${s.enhBonus.toFixed(2)}%p</div></div>
       <div class="statcell"><div class="sl">공격속도 보너스(장신구)</div><div class="sv">+${s.speedAccBonus.toFixed(0)}%</div></div>
     </div>

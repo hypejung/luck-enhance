@@ -96,6 +96,24 @@
     cursor: pointer;
   }
   #patchNoteBanner[hidden] { display: none; }
+  /* 태초 획득 알림 배너(모든 유저 공용, 하루 동안) — 태초 등급 색(청록)과 금빛 */
+  #genesisFeedBanner {
+    background: linear-gradient(90deg, #0f2e2a, #2a2410, #0f2e2a, #2a2410, #0f2e2a);
+    background-size: 400% 100%;
+    animation: worldRaidPromoShine 5s linear infinite;
+    color: #e8fff8;
+    text-align: center;
+    padding: 8px 14px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    border: 1px solid #6cf0c2;
+    box-shadow: 0 0 10px -2px rgba(108,240,194,.5);
+    line-height: 1.6;
+  }
+  #genesisFeedBanner[hidden] { display: none; }
+  #genesisFeedBanner b.gf-item { color: #6cf0c2; }
+  #genesisNameInput { width: 100%; box-sizing: border-box; margin: 6px 0 10px; padding: 8px 10px; font-size: 15px; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: 8px; text-align: center; }
   @keyframes worldRaidPromoShine {
     0% { background-position: 0% 50%; }
     100% { background-position: 400% 50%; }
@@ -583,6 +601,7 @@
   <div id="enhanceEventBanner" hidden>✨🌟 강화데이 진행中! (매주 수·일 자정~자정) 성공확률 UP · 파괴/하락 확률 DOWN · 비용 할인! 🌟✨</div>
   <div id="worldRaidPromoBanner" hidden>🌳🩸 신규 주간 레이드 오픈! 「세계수의 단말마」— 그르마에게 도전하고 순위 보상을 받아보세요! (9/28 월요일까지 안내)</div>
   <div id="patchNoteBanner" hidden></div>
+  <div id="genesisFeedBanner" hidden></div>
 
   <div id="tabs">
     <div class="tabgroup" data-group="combat">
@@ -4548,6 +4567,7 @@ function equippedGenesisSkill() {
 function hasGenesisEquipped(skillKey) { return equippedGenesisSkill() === skillKey; }
 function grantGenesisArtifact(artifact) {
   S.genesisOwned.push(artifact.id);
+  genesisFeedAnnounce(artifact.name, 'weapon');
   const w = {
     id: uid++,
     grade: GENESIS_GRADE,
@@ -6085,6 +6105,7 @@ function newState() {
     subEquipped: null,     // 장착 중인 보조무기 id
     gloves: [],            // 보유 장갑 목록: [{id, typeIdx, grade, enhance}, ...]
     gloveEquipped: null,   // 장착 중인 장갑 id
+    genesisFeedPending: [], genesisFeedName: '', // 태초 획득 알림: 이름 입력·서버 업로드 대기 목록, 마지막으로 쓴 이름
     weeklyRaid: { week: null, days: {}, dayKey: null, dayCount: 0, title: null, titleWeek: null, bestRun: null, recordDay: null, rid: null, pushDirty: false, unsettled: [], lastSettled: null }, // 세계수의 단말마: week=주차키, days={날짜키: 일일 최고 피해}, dayKey/dayCount=오늘 도전 횟수, title/titleWeek=칭호와 그 칭호가 유효한 주, bestRun=역대 최고 1회 피해, recordDay=기록 보상 받은 날, rid=전체 합산용 익명 id(해시해서 키로 씀), pushDirty=이번 주 기록 업로드 대기, unsettled=전체 정산 대기 [{week,total}], lastSettled=마지막 전체 정산 결과
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
   };
@@ -7739,6 +7760,7 @@ function rollGenesisSubweapon(floorIdx, kindMult) {
   const sw = makeGenesisSubweapon(floorIdx);
   addSubweapon(sw);
   const gd = subGenesisDef(sw);
+  genesisFeedAnnounce(gd.name, 'sub');
   log(`🌟🌟🌟 <b class="grade-태초">[태초 보조무기] ${gd.icon} ${gd.name}</b> — <i>${gd.subtitle}</i> 을(를) 획득했습니다!!!`, 'lg-prim');
   renderTop(); save();
 }
@@ -12145,6 +12167,108 @@ function syncUpload() {
     });
 }
 
+// ---------- 태초 획득 알림(모든 유저 공용 배너) ----------
+// 사냥터에서 태초 무기·보조무기를 얻으면 이름을 받아 Firebase genesisFeed/{자동 id} = { name, item, kind, at }에
+// 올리고, 최근 하루 동안 올라온 알림을 모두 배너에 띄운다. 이름은 12자까지, 아이템은 실제 태초 이름일 때만
+// 보여줘서 아무 문구나 배너에 띄울 수 없게 한다. 이름을 적기 전에 창을 닫아도 다음 접속 때 다시 묻는다.
+const GENESIS_FEED_TTL_MS = 24 * 3600 * 1000;
+const GENESIS_FEED_NAME_MAX = 12;
+const GENESIS_FEED_SHOW_MAX = 6;
+let genesisFeedList = []; // 최근 하루 [{ name, item, at }]
+function genesisFeedItemNames() {
+  return new Set([...GENESIS_ARTIFACTS.filter(Boolean).map(a => a.name), ...SUBWEAPON_GENESES.filter(Boolean).map(g => g.name)]);
+}
+function genesisFeedAnnounce(item, kind) {
+  if (!Array.isArray(S.genesisFeedPending)) S.genesisFeedPending = [];
+  S.genesisFeedPending.push({ item, kind, name: null, at: Date.now() });
+  setTimeout(genesisFeedProcess, 0);
+}
+// 목적어 조사: 받침 있으면 "을", 없으면 "를"(한글이 아니면 "을(를)")
+function objJosa(word) {
+  const c = String(word).trim().slice(-1).charCodeAt(0);
+  if (c >= 0xAC00 && c <= 0xD7A3) return (c - 0xAC00) % 28 ? '을' : '를';
+  return '을(를)';
+}
+let genesisFeedBusy = false;
+function genesisFeedProcess() {
+  const list = S && Array.isArray(S.genesisFeedPending) ? S.genesisFeedPending : [];
+  // 이름을 받은 것은 서버에 올린다(실패하면 다음 기회에 다시)
+  if (!genesisFeedBusy && syncConfigured()) {
+    const ready = list.find(x => x.name);
+    if (ready) {
+      genesisFeedBusy = true;
+      fetch(`${SYNC_DB_URL}/genesisFeed.json`, { method: 'POST', body: JSON.stringify({ name: ready.name, item: ready.item, kind: ready.kind, at: { '.sv': 'timestamp' } }) })
+        .then(res => {
+          if (res.ok || res.status === 401 || res.status === 400) { // 규칙 거절은 다시 보내도 같다
+            S.genesisFeedPending = S.genesisFeedPending.filter(x => x !== ready); save();
+          }
+        })
+        .catch(() => {})
+        .finally(() => { genesisFeedBusy = false; if (S.genesisFeedPending.some(x => x.name)) setTimeout(genesisFeedProcess, 1000); else genesisFeedRefresh(); });
+    }
+  }
+  // 이름이 아직 없는 것은 입력창을 띄운다(한 번에 하나)
+  const ask = list.find(x => !x.name);
+  if (ask && !$('genesisNameModal')) genesisFeedAskName(ask);
+}
+function genesisFeedAskName(entry) {
+  const wrap = document.createElement('div');
+  wrap.id = 'genesisNameModal';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.78);display:flex;align-items:center;justify-content:center;padding:20px;z-index:160;';
+  wrap.innerHTML = `<div style="background:var(--panel2);border:1px solid #6cf0c2;border-radius:12px;padding:20px;max-width:360px;width:100%;text-align:center;box-shadow:0 0 24px -4px rgba(108,240,194,.6);">
+      <div style="font-size:28px;margin-bottom:6px;">🌌</div>
+      <div style="font-size:16px;font-weight:bold;margin-bottom:6px;">태초 등급 <span class="grade-태초">${escHtml(entry.item)}</span>${objJosa(entry.item)} 획득했습니다!</div>
+      <div style="font-size:12px;color:var(--sub);">이름을 적으면 모든 유저의 배너에 하루 동안 알림이 뜹니다.</div>
+      <input id="genesisNameInput" maxlength="${GENESIS_FEED_NAME_MAX}" placeholder="이름 (${GENESIS_FEED_NAME_MAX}자까지)" autocomplete="off">
+      <div id="genesisNameErr" style="font-size:12px;color:#ff7a7a;min-height:16px;margin-bottom:6px;"></div>
+      <button class="primary" id="genesisNameOk" style="width:100%;">확인</button>
+    </div>`;
+  document.body.appendChild(wrap);
+  const inp = $('genesisNameInput');
+  inp.value = S.genesisFeedName || '';
+  setTimeout(() => { try { inp.focus(); inp.select(); } catch (e) {} }, 50);
+  const ok = () => {
+    const name = inp.value.replace(/\s+/g, ' ').trim().slice(0, GENESIS_FEED_NAME_MAX);
+    if (!name) { $('genesisNameErr').textContent = '이름을 적어주세요.'; return; }
+    entry.name = name;
+    S.genesisFeedName = name;
+    genesisFeedList.unshift({ name, item: entry.item, at: Date.now() }); // 내 화면에는 바로 표시
+    renderGenesisFeedBanner();
+    wrap.remove();
+    save();
+    genesisFeedProcess();
+  };
+  $('genesisNameOk').onclick = ok;
+  inp.onkeydown = e => { if (e.key === 'Enter') ok(); };
+}
+function genesisFeedRefresh() {
+  if (!syncConfigured()) return;
+  const since = Date.now() - GENESIS_FEED_TTL_MS;
+  const apply = data => {
+    const known = genesisFeedItemNames();
+    const list = Object.values(data || {}).filter(v => v && typeof v.name === 'string' && typeof v.item === 'string' && typeof v.at === 'number'
+      && v.at >= since && known.has(v.item) && v.name.trim() && v.name.length <= GENESIS_FEED_NAME_MAX);
+    list.sort((a, b) => b.at - a.at);
+    genesisFeedList = list.map(v => ({ name: v.name, item: v.item, at: v.at }));
+    renderGenesisFeedBanner();
+  };
+  fetch(`${SYNC_DB_URL}/genesisFeed.json?orderBy=%22at%22&startAt=${since}`)
+    .then(res => res.ok ? res.json() : Promise.reject(res.status))
+    .then(apply)
+    .catch(() => syncFetchJson('genesisFeed', 8000).then(apply).catch(() => {})); // 인덱스가 없으면 전부 읽어서 거른다
+}
+function renderGenesisFeedBanner() {
+  const el = $('genesisFeedBanner');
+  if (!el) return;
+  const since = Date.now() - GENESIS_FEED_TTL_MS;
+  const list = genesisFeedList.filter(v => v.at >= since);
+  if (!list.length) { el.hidden = true; el.innerHTML = ''; return; }
+  const shown = list.slice(0, GENESIS_FEED_SHOW_MAX);
+  el.innerHTML = shown.map(v => `🌌 <b>${escHtml(v.name)}</b>님이 태초 등급 <b class="gf-item">${escHtml(v.item)}</b>${objJosa(v.item)} 획득하였습니다!`).join('<br>')
+    + (list.length > shown.length ? `<br><span style="font-size:12px;opacity:.8">외 ${list.length - shown.length}건</span>` : '');
+  el.hidden = false;
+}
+
 // 페이지 로드 시, 동기화 ID가 이미 있으면 게임을 시작하기 전에 서버 최신 데이터로 로컬을 덮어씀.
 // 아직 예전 위치에 있으면 이때 새 위치로 옮긴다.
 async function syncApplyOnLoad() {
@@ -15242,6 +15366,10 @@ function init() {
   // 세계수의 단말마: 주가 바뀌었으면 지난주 기여 정산(로컬). 탭을 켜둔 채 주가 바뀌어도 1분마다 확인.
   weeklyRaidEnsureWeek(); save();
   setInterval(() => { const wk = S.weeklyRaid.week; weeklyRaidEnsureWeek(); weeklyRaidPushCurrent(); if (S.weeklyRaid.week !== wk) { renderTop(); renderRaidTitleBadge(); save(); } }, 60000);
+  // 태초 획득 알림: 시작 시 + 5분마다 새로 읽고, 1분마다 하루 지난 것은 배너에서 내린다. 이름을 못 받은 것은 다시 묻는다.
+  genesisFeedRefresh(); genesisFeedProcess();
+  setInterval(genesisFeedRefresh, 5 * 60000);
+  setInterval(() => { renderGenesisFeedBanner(); genesisFeedProcess(); }, 60000);
 
   // 동기화 ID가 아직 없으면 안내 모달 표시 (동기화 서버 미설정 시에는 표시하지 않음)
   let syncModalSkipped = false;

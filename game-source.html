@@ -3361,25 +3361,20 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 28.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 29.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '🌳 세계수의 단말마 재오픈 · ⚒️ 각인 확장 · 🔨 분해기 · 🔮 룬',
+    version: 6, versionLabel: '1.0.5', title: '🌳 세계수의 단말마 재오픈 · 🔮 룬 · 🔁 각인 자동 재설정',
     changes: [
-      { id: 17, date: '2026-10-05', text: '⚒️ 보조무기 각인 추가: 대장장이에서 +15 이상 보조무기에 각인을 새길 수 있습니다. (드롭률·골드·보스 피해량·보조무기 효과 증폭·액티브 피해량·액티브 지속시간)' },
-      { id: 18, date: '2026-10-05', text: '📜 각인이 3줄로 늘어났습니다: 첫 줄은 각인 등급, 아래 두 줄은 한 단계 아래 등급(각각 드물게 같은 등급)으로 뜹니다. 기존 각인은 다음 재설정부터 3줄이 됩니다.' },
-      { id: 19, date: '2026-10-05', text: '✨ 에디셔널 각인 추가: 일반 각인이 있는 무기·보조무기에 3줄짜리 각인을 하나 더 새길 수 있습니다. (비용 1.5배, 높은 수치·승급은 더 드묾)' },
-      { id: 20, date: '2026-10-05', text: '🔁 각인 자동 재설정: 줄마다 원하는 옵션과 최소 수치를 정해두면 자동으로 돌리다가, 조건에 맞는 결과가 나오면 멈추고 ❓로 보여줍니다. 확인 후 사용하거나 버릴 수 있습니다.' },
-      { id: 21, date: '2026-10-05', text: '🎲 삼중 재설정(계정당 1회 구매): 한 번에 각인 결과 3개를 뽑아 그중 하나를 고를 수 있습니다.' },
-      { id: 22, date: '2026-10-05', text: '🔨 분해기 추가(🎒 아이템 → 분해기): 신화·고대·태초 무기와 보조무기를 분해해 세계수의 잎(고대·태초는 무기의 정수도)을 얻습니다. 강화 단계가 높을수록 더 많이 얻고, 신화는 자동분해도 설정할 수 있습니다.' },
       { id: 23, date: '2026-10-06', text: '🌳 세계수의 단말마 재오픈: 하루 3회 도전해 그날 최고 기록을 쌓고, 모든 유저의 월~일 합계가 구간을 넘을 때마다 참여한 모두의 보상이 커집니다(다음 주 정산). 1회 기록이 역대 최고의 1.2배를 넘으면 기록 보상도 받습니다.' },
       { id: 24, date: '2026-10-06', text: '🏷️ 레이드 칭호 개편: 주간 기여 기준을 넘으면 누구나 칭호를 얻고, 다음 한 주 동안 모든 사냥터 드롭률·골드가 최대 +30% 오릅니다. (제목 옆에 표시)' },
       { id: 25, date: '2026-10-06', text: '🎖️ 명예의 정수 상점 개편: 강화 패널티 방지권, 토벌전·도서관 추가 도전권, 각인 승급 진행도, 강철실이 추가되고 정수류는 진행도에 맞춰 늘어납니다.' },
       { id: 26, date: '2026-10-06', text: '⏱️ 세계수의 단말마 전투는 시간 연장 룬과 관계없이 120초로 고정됩니다.' },
       { id: 27, date: '2026-10-06', text: '🔮 레전더리·신화 스탯 룬 추가: 질풍·정밀·파괴·연격·연격 증폭·살육의 룬이 레전더리·신화 등급으로도 나옵니다. (예: 파괴의 룬 유니크 +90%p → 레전더리 +150%p → 신화 +230%p)' },
       { id: 28, date: '2026-10-07', text: '🌳 세계수의 단말마 주간 보상 상향: 높은 구간일수록 보상이 더 크게 늘어나고(7구간 기준 명예 140 → 556), 5구간부터 강화 패널티 방지권도 줍니다. 기록 보상도 소폭 상향됐습니다.' },
+      { id: 29, date: '2026-10-08', text: '🔁 각인 자동 재설정 개선: ⚡ 빠르게 돌리기(5배)를 켤 수 있고, 멈출 조건을 "옵션 합"(예: 드롭률 두 줄 합 300% 이상)으로도 정할 수 있습니다. 줄마다 조건은 최소·최대·이탈 최대·직접 입력 중에서 고르면 됩니다.' },
     ],
   },
 ];
@@ -10327,6 +10322,7 @@ const ENCHANT_LINE_COUNT = 3;
 // 삼중 재설정(계정당 1회 구매): 한 번에 결과 3개를 뽑아 그중 하나를 고른다. 월드3 후반 골드 기준.
 const ENCHANT_TRIPLE_COST = 1e28;
 const ENCHANT_AUTO_INTERVAL_MS = 1500;
+const ENCHANT_AUTO_FAST_INTERVAL_MS = 300; // 빠르게 돌리기(5배)
 function enchantOpt(kind, key) { return ENCHANT_KINDS[kind].options[key]; }
 function enchantTarget(kind) { return ENCHANT_KINDS[kind].target === 'weapon' ? getEquipped() : getEquippedSubweapon(); }
 function enchantTargetTag(kind, it) { return ENCHANT_KINDS[kind].target === 'weapon' ? gradeTag(it) : subweaponGradeTag(it); }
@@ -10490,20 +10486,73 @@ function buyEnchantTriple() {
 // 줄마다 지정한 조건(옵션 + 최소 수치, 또는 상관없음)을 모두 만족하는 결과가 나오면 멈추고 ❓로 보여준다.
 // 승급이 나오면 승급 결과는 확정 적용하고 멈춘다. 증표·골드 부족, 장비 변경, 대기 결과가 있으면 멈춘다.
 let enchantAuto = null; // { kind, itemId, timer, last: 직전 재설정 결과(후보 배열), count: 이번에 돌린 횟수 }
+// 조건 방식 두 가지:
+// - line: 줄마다 옵션 + 기준 수치(최소/최대/이탈 최대/직접 입력). 기준은 지금 각인 등급으로 계산 —
+//   1줄은 각인 등급, 2·3줄은 한 단계 아래 등급의 범위("이탈 최대"는 각인 등급의 최대값).
+// - sum: 옵션 최대 2종을 골라 결과 3줄 중 그 옵션 값의 합이 기준 이상이면 멈춘다. 기준은
+//   최소(3줄 모두 최소)/최대(이탈 없이 3줄 최대)/최대(1이탈)/최대(올이탈)/직접 입력.
 function enchantAutoCfg(kind) {
   if (!S.enchantAuto || typeof S.enchantAuto !== 'object') S.enchantAuto = {};
   if (!S.enchantAuto[kind]) S.enchantAuto[kind] = { lines: [0, 1, 2].map(() => ({ key: '', min: 0 })), triple: true };
-  return S.enchantAuto[kind];
+  const cfg = S.enchantAuto[kind];
+  if (cfg.mode !== 'sum') cfg.mode = 'line';
+  for (const c of cfg.lines) if (!c.preset) c.preset = 'custom'; // 예전 설정(수치 직접 입력)
+  if (!cfg.sum || typeof cfg.sum !== 'object') cfg.sum = { keys: ['', ''], preset: 'max', value: 0 };
+  if (!Array.isArray(cfg.sum.keys)) cfg.sum.keys = ['', ''];
+  cfg.fast = !!cfg.fast;
+  return cfg;
 }
-function enchantMatches(kind, lines) {
+function enchantRangeOf(kind, key, grade) {
+  const opt = enchantOpt(kind, key);
+  return opt ? opt.ranges[Math.max(1, Math.min(opt.ranges.length, grade)) - 1] : [0, 0];
+}
+function enchantRoundOf(kind, key, v) {
+  const opt = enchantOpt(kind, key);
+  const f = Math.pow(10, opt && opt.dec != null ? opt.dec : 1);
+  return Math.round(v * f) / f;
+}
+// 줄 방식: i번째 줄 조건의 기준 수치
+function enchantLineNeed(kind, c, i, grade) {
+  if (!c || !c.key) return 0;
+  if (c.preset === 'custom') return +c.min || 0;
+  const lineGrade = i === 0 ? grade : Math.max(1, grade - 1);
+  if (c.preset === 'min') return enchantRangeOf(kind, c.key, lineGrade)[0];
+  if (c.preset === 'devmax') return enchantRangeOf(kind, c.key, grade)[1];
+  return enchantRangeOf(kind, c.key, lineGrade)[1]; // max
+}
+// 합 방식: 기준 합
+function enchantSumNeed(kind, sum, grade) {
+  const keys = (sum.keys || []).filter(Boolean);
+  if (!keys.length) return 0;
+  if (sum.preset === 'custom') return +sum.value || 0;
+  const low = Math.max(1, grade - 1);
+  const mx = g => Math.max(...keys.map(k => enchantRangeOf(kind, k, g)[1]));
+  const mn = g => Math.min(...keys.map(k => enchantRangeOf(kind, k, g)[0]));
+  const v = sum.preset === 'min' ? mn(grade) + 2 * mn(low)
+    : sum.preset === 'max1' ? 2 * mx(grade) + mx(low)
+    : sum.preset === 'maxAll' ? 3 * mx(grade)
+    : mx(grade) + 2 * mx(low); // max
+  return enchantRoundOf(kind, keys[0], v);
+}
+function enchantAutoHasCondition(kind) {
   const cfg = enchantAutoCfg(kind);
+  return cfg.mode === 'sum' ? cfg.sum.keys.some(Boolean) : cfg.lines.some(c => c.key);
+}
+function enchantMatches(kind, lines, grade) {
+  const cfg = enchantAutoCfg(kind);
+  if (cfg.mode === 'sum') {
+    const keys = cfg.sum.keys.filter(Boolean);
+    if (!keys.length) return false;
+    const total = lines.reduce((t, l) => t + (l && keys.includes(l.key) ? l.value : 0), 0);
+    return Math.round(total * 100) / 100 >= enchantSumNeed(kind, cfg.sum, grade) - 1e-9;
+  }
   let any = false;
   for (let i = 0; i < ENCHANT_LINE_COUNT; i++) {
     const c = cfg.lines[i];
     if (!c || !c.key) continue;
     any = true;
     const l = lines[i];
-    if (!l || l.key !== c.key || l.value < (+c.min || 0)) return false;
+    if (!l || l.key !== c.key || l.value < enchantLineNeed(kind, c, i, grade) - 1e-9) return false;
   }
   return any;
 }
@@ -10521,10 +10570,11 @@ function startEnchantAuto(kind) {
   const it = enchantTarget(kind);
   if (!it || !it[K.field]) return;
   if (it[K.field].pending) { log('먼저 대기 중인 각인 결과를 고르거나 버려주세요.', 'lg-bad'); return; }
-  if (!enchantAutoCfg(kind).lines.some(c => c.key)) { log('멈출 조건을 한 줄 이상 정해주세요.', 'lg-bad'); return; }
+  if (!enchantAutoHasCondition(kind)) { log('멈출 조건을 정해주세요.', 'lg-bad'); return; }
   if (enchantAuto) stopEnchantAuto();
-  enchantAuto = { kind, itemId: it.id, timer: setInterval(enchantAutoTick, ENCHANT_AUTO_INTERVAL_MS), last: null, count: 0 };
-  log(`🔁 ${K.label} 자동 재설정 시작`, 'lg-good');
+  const fast = enchantAutoCfg(kind).fast;
+  enchantAuto = { kind, itemId: it.id, timer: setInterval(enchantAutoTick, fast ? ENCHANT_AUTO_FAST_INTERVAL_MS : ENCHANT_AUTO_INTERVAL_MS), last: null, count: 0 };
+  log(`🔁 ${K.label} 자동 재설정 시작${fast ? ' (⚡ 빠르게)' : ''}`, 'lg-good');
   renderBlacksmith();
 }
 // 자동 재설정 중 지금 보이는 결과에서 멈추고 고르기(이미 보이는 결과라 ❓ 없이 바로 공개)
@@ -10561,7 +10611,7 @@ function enchantAutoTick() {
   if (r.promoted) {
     stopEnchantAuto();
     notifyEnchant(`✨ ${K.label} 등급 승급!`, `${enchantTargetTag(kind, it)}의 각인이 <span class="grade-${GRADES[en.grade].name}">${GRADES[en.grade].name}</span> 등급이 되어 자동 재설정을 멈췄습니다.`);
-  } else if (r.cands.some(l => enchantMatches(kind, l))) {
+  } else if (r.cands.some(l => enchantMatches(kind, l, en.grade))) {
     en.pending = { cands: r.cands, revealed: r.cands.map(() => false) };
     stopEnchantAuto();
     log(`🎯 ${K.label}: 원하는 조건의 각인이 나와 자동 재설정을 멈췄습니다!`, 'lg-prim');
@@ -10575,25 +10625,55 @@ function enchantAutoTick() {
 function enchantLinesHtml(kind, lines) {
   return lines.map(l => `<div class="lg-prim" style="margin-bottom:2px;">${enchantLineTextOf(kind, l)}</div>`).join('');
 }
+const EA_SELECT_STYLE = 'background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 4px;';
 function enchantAutoHtml(kind) {
   const K = ENCHANT_KINDS[kind];
   const cfg = enchantAutoCfg(kind);
   const running = enchantAuto && enchantAuto.kind === kind;
+  const it = enchantTarget(kind);
+  const grade = (it && it[K.field] && it[K.field].grade) || 1;
+  const dis = running ? 'disabled' : '';
   const opts = Object.entries(K.options).map(([k, o]) => `<option value="${k}">${o.name}</option>`).join('');
-  const rows = cfg.lines.map((c, i) => `
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;font-size:12px;">
-      <span style="width:34px;">${i + 1}줄</span>
-      <select data-ea-key="${i}" style="flex:1;min-width:0;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 4px;" ${running ? 'disabled' : ''}>
-        <option value="">상관없음</option>${opts}
-      </select>
-      <input type="number" step="0.1" min="0" data-ea-min="${i}" value="${c.min || 0}" style="width:64px;background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 4px;" ${running ? 'disabled' : ''}>
-      <span>이상</span>
-    </div>`).join('');
-  return `<details style="margin-top:10px;" ${running ? 'open' : ''}><summary style="cursor:pointer;font-size:13px;">🔁 자동 재설정 ${running ? '<b style="color:#7de08a">(진행 중)</b>' : ''}</summary>
+  const unitOf = key => { const o = enchantOpt(kind, key); return o ? o.unit : ''; };
+  const presetOpts = (list, cur) => list.map(([v, label]) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${label}</option>`).join('');
+  let body;
+  if (cfg.mode === 'sum') {
+    const sm = cfg.sum;
+    const need = enchantSumNeed(kind, sm, grade);
+    const keySel = j => `<select data-eas-key="${j}" style="flex:1;min-width:0;${EA_SELECT_STYLE}" ${dis}><option value="">${j === 0 ? '옵션 선택' : '(없음)'}</option>${opts}</select>`;
+    body = `
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;font-size:12px;">${keySel(0)}<span>+</span>${keySel(1)}</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;font-size:12px;">
+        <span>합</span>
+        <select data-eas-preset style="${EA_SELECT_STYLE}" ${dis}>${presetOpts([['min', '최소(3줄 모두 최소)'], ['max', '최대'], ['max1', '최대(1이탈)'], ['maxAll', '최대(올이탈)'], ['custom', '직접 입력']], sm.preset)}</select>
+        ${sm.preset === 'custom'
+          ? `<input type="number" step="0.1" min="0" data-eas-value value="${sm.value || 0}" style="width:72px;${EA_SELECT_STYLE}" ${dis}>`
+          : `<b>${sm.keys.some(Boolean) ? need : '-'}</b>`}<span>${unitOf(sm.keys.find(Boolean))} 이상</span>
+      </div>
+      <div style="font-size:11px;color:var(--sub);margin-bottom:4px;">결과 3줄 중 고른 옵션(최대 2종) 값을 모두 더해 기준 이상이면 멈춥니다. 최대·이탈 기준은 지금 각인 등급(${GRADES[grade].name})으로 계산합니다.</div>`;
+  } else {
+    body = cfg.lines.map((c, i) => {
+      const list = [['min', '최소'], ['max', '최대']].concat(i > 0 ? [['devmax', '이탈 최대']] : []).concat([['custom', '직접 입력']]);
+      const need = enchantLineNeed(kind, c, i, grade);
+      return `
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;font-size:12px;">
+        <span style="width:30px;">${i + 1}줄</span>
+        <select data-ea-key="${i}" style="flex:1;min-width:90px;${EA_SELECT_STYLE}" ${dis}><option value="">상관없음</option>${opts}</select>
+        <select data-ea-preset="${i}" style="${EA_SELECT_STYLE}" ${dis}>${presetOpts(list, c.preset === 'devmax' && i === 0 ? 'max' : c.preset)}</select>
+        ${c.preset === 'custom'
+          ? `<input type="number" step="0.1" min="0" data-ea-min="${i}" value="${c.min || 0}" style="width:64px;${EA_SELECT_STYLE}" ${dis}>`
+          : `<b style="min-width:40px;">${c.key ? need : '-'}</b>`}<span>${unitOf(c.key)} 이상</span>
+      </div>`;
+    }).join('') + `<div style="font-size:11px;color:var(--sub);margin-bottom:4px;">최소·최대는 지금 각인 등급(${GRADES[grade].name}) 기준 — 1줄은 각인 등급, 2·3줄은 한 단계 아래 등급의 범위이고, "이탈 최대"는 각인 등급까지 올라간(이탈) 줄의 최대값입니다.</div>`;
+  }
+  const modeBtn = (m, label) => `<button data-ea-mode="${m}" class="${cfg.mode === m ? 'primary' : ''}" style="font-size:12px;padding:3px 10px;" ${dis}>${label}</button>`;
+  return `<details style="margin-top:10px;" ${running ? 'open' : ''}><summary style="cursor:pointer;font-size:13px;">🔁 자동 재설정 ${running ? `<b style="color:#7de08a">(진행 중${cfg.fast ? ' · ⚡빠르게' : ''})</b>` : ''}</summary>
     <div style="margin-top:6px;">
-      <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">${ENCHANT_AUTO_INTERVAL_MS / 1000}초마다 재설정하다가, 정한 조건을 모두 만족하는 결과가 나오면 멈추고 ❓로 보여줍니다. 돌아가는 동안 나온 결과는 아래에 보이고, 마음에 드는 결과가 보이면 "멈추고 이 결과 고르기"로 바로 고를 수 있습니다.</div>
-      ${rows}
-      ${S.enchantTriple ? `<label style="font-size:12px;display:flex;align-items:center;gap:6px;margin:4px 0;"><input type="checkbox" data-ea-triple ${cfg.triple ? 'checked' : ''} ${running ? 'disabled' : ''}> 🎲 3개씩 돌리기 (비용 3배)</label>` : ''}
+      <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">${(cfg.fast ? ENCHANT_AUTO_FAST_INTERVAL_MS : ENCHANT_AUTO_INTERVAL_MS) / 1000}초마다 재설정하다가, 정한 조건을 만족하는 결과가 나오면 멈추고 ❓로 보여줍니다. 돌아가는 동안 나온 결과는 아래에 보이고, 마음에 드는 결과가 보이면 "멈추고 이 결과 고르기"로 바로 고를 수 있습니다.</div>
+      <div style="display:flex;gap:6px;margin-bottom:6px;">${modeBtn('line', '줄마다 조건')}${modeBtn('sum', '옵션 합')}</div>
+      ${body}
+      ${S.enchantTriple ? `<label style="font-size:12px;display:flex;align-items:center;gap:6px;margin:4px 0;"><input type="checkbox" data-ea-triple ${cfg.triple ? 'checked' : ''} ${dis}> 🎲 3개씩 돌리기 (비용 3배)</label>` : ''}
+      <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin:4px 0;"><input type="checkbox" data-ea-fast ${cfg.fast ? 'checked' : ''} ${dis}> ⚡ 빠르게 돌리기 (5배 빠르게, ${ENCHANT_AUTO_FAST_INTERVAL_MS / 1000}초마다)</label>
       ${running ? enchantAutoLiveHtml(kind) : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         ${running && enchantAuto.last ? '<button class="primary" data-ea-pick>⏸️ 멈추고 이 결과 고르기</button>' : ''}
@@ -10660,19 +10740,57 @@ function renderEnchantKind(kind) {
   box.querySelectorAll('[data-ep-use]').forEach(b => { b.onclick = () => chooseEnchantPending(kind, +b.dataset.epUse); });
   const disc = box.querySelector('[data-ep-discard]'); if (disc) disc.onclick = () => chooseEnchantPending(kind, null);
   const cfg = enchantAutoCfg(kind);
+  const rerender = () => { save(); renderEnchantKind(kind); };
+  box.querySelectorAll('[data-ea-mode]').forEach(b => { b.onclick = () => { cfg.mode = b.dataset.eaMode; rerender(); }; });
   box.querySelectorAll('[data-ea-key]').forEach(sel => {
     const i = +sel.dataset.eaKey;
     sel.value = cfg.lines[i].key || '';
-    sel.onchange = () => { cfg.lines[i].key = sel.value; save(); };
+    sel.onchange = () => { cfg.lines[i].key = sel.value; rerender(); };
+  });
+  box.querySelectorAll('[data-ea-preset]').forEach(sel => {
+    const i = +sel.dataset.eaPreset;
+    sel.onchange = () => {
+      const c = cfg.lines[i];
+      // 직접 입력으로 바꾸면 방금까지 보이던 기준값을 시작값으로 채운다
+      if (sel.value === 'custom' && c.preset !== 'custom') c.min = enchantLineNeed(kind, c, i, it[K.field].grade);
+      c.preset = sel.value; rerender();
+    };
   });
   box.querySelectorAll('[data-ea-min]').forEach(inp => {
     const i = +inp.dataset.eaMin;
     inp.onchange = () => { cfg.lines[i].min = Math.max(0, +inp.value || 0); save(); };
   });
+  box.querySelectorAll('[data-eas-key]').forEach(sel => {
+    const j = +sel.dataset.easKey;
+    sel.value = cfg.sum.keys[j] || '';
+    sel.onchange = () => { cfg.sum.keys[j] = sel.value; rerender(); };
+  });
+  const sp = box.querySelector('[data-eas-preset]');
+  if (sp) sp.onchange = () => {
+    if (sp.value === 'custom' && cfg.sum.preset !== 'custom') cfg.sum.value = enchantSumNeed(kind, cfg.sum, it[K.field].grade);
+    cfg.sum.preset = sp.value; rerender();
+  };
+  const sv = box.querySelector('[data-eas-value]'); if (sv) sv.onchange = () => { cfg.sum.value = Math.max(0, +sv.value || 0); save(); };
   const tri = box.querySelector('[data-ea-triple]'); if (tri) tri.onchange = () => { cfg.triple = tri.checked; save(); };
-  const pk = box.querySelector('[data-ea-pick]'); if (pk) pk.onclick = pauseEnchantAutoAndPick;
+  const fastCb = box.querySelector('[data-ea-fast]');
+  if (fastCb) fastCb.onchange = () => {
+    if (!fastCb.checked) { cfg.fast = false; rerender(); return; }
+    fastCb.checked = false; // 확인을 누를 때만 켠다
+    showAlertModal(`<p style="text-align:left">⚡ <b>빠르게 돌리기</b>를 켜면 ${ENCHANT_AUTO_FAST_INTERVAL_MS / 1000}초마다 결과가 바뀝니다.<br>정한 조건에 안 맞는 <b>좋은 옵션이 나와도 눈으로 보고 고르기 전에 지나칠 수 있습니다.</b><br>(조건에 맞는 결과가 나오면 지금처럼 멈춥니다.)</p>
+      <div style="display:flex;gap:8px;justify-content:center;"><button class="primary" id="eaFastOk">켜기</button><button id="eaFastCancel">취소</button></div>`);
+    $('eaFastOk').onclick = () => { hideAlertModal(); cfg.fast = true; rerender(); };
+    $('eaFastCancel').onclick = hideAlertModal;
+  };
+  // 빠르게 돌리기 중엔 화면이 0.3초마다 다시 그려져서 클릭(누르고 떼기) 사이에 버튼이 바뀔 수 있다 — 누르는 순간 처리
+  // (키보드로 누른 클릭은 detail 0 — 그때만 click으로 처리해 마우스 클릭과 두 번 실행되지 않게)
+  const pk = box.querySelector('[data-ea-pick]');
+  if (pk) { pk.onpointerdown = e => { e.preventDefault(); pauseEnchantAutoAndPick(); }; pk.onclick = e => { if (e.detail === 0) pauseEnchantAutoAndPick(); }; }
   const tog = box.querySelector('[data-ea-toggle]');
-  if (tog) tog.onclick = () => { if (enchantAuto && enchantAuto.kind === kind) stopEnchantAuto(`⏹️ ${K.label} 자동 재설정을 멈췄습니다.`, 'lg-good'); else startEnchantAuto(kind); };
+  if (tog) {
+    const toggle = () => { if (enchantAuto && enchantAuto.kind === kind) stopEnchantAuto(`⏹️ ${K.label} 자동 재설정을 멈췄습니다.`, 'lg-good'); else startEnchantAuto(kind); };
+    if (enchantAuto && enchantAuto.kind === kind) { tog.onpointerdown = e => { e.preventDefault(); toggle(); }; tog.onclick = e => { if (e.detail === 0) toggle(); }; }
+    else tog.onclick = toggle;
+  }
 }
 function renderEnchantTripleBox() {
   const box = $('enchantTripleBox');
@@ -13980,7 +14098,10 @@ const GUIDE_SECTIONS = [
     <br><br><b>각인 재설정</b>을 하면 세 줄의 효과와 수치가 다시 뽑힙니다. 재설정을 거듭해 등급별로 정해진 누적 횟수(천장)에 도달하면 확정으로 다음 등급으로 승급하고, 그 전에도 재설정마다 낮은 확률로 조기 승급할 수 있습니다.
     <br><br>각인 부여·재설정에는 골드와 함께 🎫 <b>토벌의 증표</b>가 필요합니다(등급이 오를수록 비용 증가). 무기가 파괴되면 각인도 함께 사라집니다.
     <br><br><b>✨ 에디셔널 각인</b>: 일반 각인이 있는 무기·보조무기에 3줄짜리 각인을 하나 더 새길 수 있습니다. 옵션과 수치 범위는 같지만 높은 수치가 훨씬 드물고(이탈 2%), 승급 천장은 2배·조기 승급 확률은 절반이며, 비용은 1.5배입니다.
-    <br><br><b>🔁 자동 재설정</b>: 줄마다 원하는 옵션과 최소 수치(또는 "상관없음")를 정해두면 1.5초마다 재설정합니다. 돌아가는 동안 나온 결과는 화면에 보이며(바로 적용되지는 않음), 마음에 드는 결과가 보이면 그 자리에서 멈추고 고를 수 있습니다. 조건을 모두 만족하는 결과가 나오면 자동으로 멈추고 ❓ 카드로 보여줍니다 — 눌러서 확인한 뒤 사용하거나 버릴 수 있습니다. 등급이 승급하면 승급 결과가 적용되고 멈춥니다.
+    <br><br><b>🔁 자동 재설정</b>: 멈출 조건을 정해두면 1.5초마다 재설정합니다(⚡ 빠르게 돌리기를 켜면 0.3초마다 — 대신 조건에 안 맞는 좋은 결과를 보고 고르기 전에 지나칠 수 있습니다). 조건은 두 가지 방식으로 정합니다.
+    <br>· <b>줄마다 조건</b>: 줄마다 옵션(또는 "상관없음")과 기준 수치 — 최소 / 최대 / 이탈 최대(2·3줄) / 직접 입력. 최소·최대는 지금 각인 등급으로 계산합니다(1줄은 각인 등급, 2·3줄은 한 단계 아래 등급, "이탈 최대"는 각인 등급까지 올라간 줄의 최대값).
+    <br>· <b>옵션 합</b>: 옵션을 최대 2종 골라 결과 3줄 중 그 옵션 값의 합이 기준 이상이면 멈춥니다. 기준은 최소(3줄 모두 최소) / 최대 / 최대(1이탈) / 최대(올이탈) / 직접 입력(예: 드롭률 합 300%).
+    <br>돌아가는 동안 나온 결과는 화면에 보이며(바로 적용되지는 않음), 마음에 드는 결과가 보이면 그 자리에서 멈추고 고를 수 있습니다. 조건을 모두 만족하는 결과가 나오면 자동으로 멈추고 ❓ 카드로 보여줍니다 — 눌러서 확인한 뒤 사용하거나 버릴 수 있습니다. 등급이 승급하면 승급 결과가 적용되고 멈춥니다.
     <br><br><b>🎲 삼중 재설정</b>(계정당 1회 구매): 한 번에 결과 3개를 뽑아 그중 하나를 고를 수 있습니다(비용 3배). 자동 재설정에서도 3개씩 돌릴 수 있습니다.
     <br><br><b>등장 가능한 효과</b>(줄마다 무작위 1종, 등급이 높을수록 수치 범위도 커짐)
     <table class="guide-table">

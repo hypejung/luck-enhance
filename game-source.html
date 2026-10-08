@@ -10625,6 +10625,8 @@ function enchantAutoTick() {
 function enchantLinesHtml(kind, lines) {
   return lines.map(l => `<div class="lg-prim" style="margin-bottom:2px;">${enchantLineTextOf(kind, l)}</div>`).join('');
 }
+// 자동 재설정 창(details)을 열어둔 상태 — 설정을 바꿀 때마다 다시 그려도 닫히지 않게 기억한다(세션 한정)
+const enchantAutoOpen = {};
 const EA_SELECT_STYLE = 'background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:2px 4px;';
 function enchantAutoHtml(kind) {
   const K = ENCHANT_KINDS[kind];
@@ -10667,7 +10669,7 @@ function enchantAutoHtml(kind) {
     }).join('') + `<div style="font-size:11px;color:var(--sub);margin-bottom:4px;">최소·최대는 지금 각인 등급(${GRADES[grade].name}) 기준 — 1줄은 각인 등급, 2·3줄은 한 단계 아래 등급의 범위이고, "이탈 최대"는 각인 등급까지 올라간(이탈) 줄의 최대값입니다.</div>`;
   }
   const modeBtn = (m, label) => `<button data-ea-mode="${m}" class="${cfg.mode === m ? 'primary' : ''}" style="font-size:12px;padding:3px 10px;" ${dis}>${label}</button>`;
-  return `<details style="margin-top:10px;" ${running ? 'open' : ''}><summary style="cursor:pointer;font-size:13px;">🔁 자동 재설정 ${running ? `<b style="color:#7de08a">(진행 중${cfg.fast ? ' · ⚡빠르게' : ''})</b>` : ''}</summary>
+  return `<details data-ea-details style="margin-top:10px;" ${running || enchantAutoOpen[kind] ? 'open' : ''}><summary style="cursor:pointer;font-size:13px;">🔁 자동 재설정 ${running ? `<b style="color:#7de08a">(진행 중${cfg.fast ? ' · ⚡빠르게' : ''})</b>` : ''}</summary>
     <div style="margin-top:6px;">
       <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">${(cfg.fast ? ENCHANT_AUTO_FAST_INTERVAL_MS : ENCHANT_AUTO_INTERVAL_MS) / 1000}초마다 재설정하다가, 정한 조건을 만족하는 결과가 나오면 멈추고 ❓로 보여줍니다. 돌아가는 동안 나온 결과는 아래에 보이고, 마음에 드는 결과가 보이면 "멈추고 이 결과 고르기"로 바로 고를 수 있습니다.</div>
       <div style="display:flex;gap:6px;margin-bottom:6px;">${modeBtn('line', '줄마다 조건')}${modeBtn('sum', '옵션 합')}</div>
@@ -10740,6 +10742,8 @@ function renderEnchantKind(kind) {
   box.querySelectorAll('[data-ep-use]').forEach(b => { b.onclick = () => chooseEnchantPending(kind, +b.dataset.epUse); });
   const disc = box.querySelector('[data-ep-discard]'); if (disc) disc.onclick = () => chooseEnchantPending(kind, null);
   const cfg = enchantAutoCfg(kind);
+  const det = box.querySelector('[data-ea-details]');
+  if (det) det.ontoggle = () => { enchantAutoOpen[kind] = det.open; };
   const rerender = () => { save(); renderEnchantKind(kind); };
   box.querySelectorAll('[data-ea-mode]').forEach(b => { b.onclick = () => { cfg.mode = b.dataset.eaMode; rerender(); }; });
   box.querySelectorAll('[data-ea-key]').forEach(sel => {

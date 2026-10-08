@@ -10329,7 +10329,7 @@ const SUB_ENCHANT_OPTION_KEYS = Object.keys(SUB_ENCHANT_OPTIONS);
 // 네 종류가 같은 규칙을 공유하고 설정값만 다르다.
 // - 3줄: 첫 줄은 각인 등급, 둘째·셋째 줄은 한 단계 아래 등급이며 각각 deviation 확률로 각인 등급("이탈").
 //   레어(1등급)는 3줄 모두 레어. 예전 2줄 각인은 다음 재설정/승급 때부터 3줄로 뽑힌다.
-// - 값은 범위 안에서 저치 편향(random^skew)으로 뽑는다. 에디셔널은 skew가 커서 높은 값이 훨씬 드물다.
+// - 값은 범위를 30단계로 나눈 값 중 하나를 저치 편향(random^skew)으로 뽑는다. 에디셔널은 skew가 커서 높은 값이 훨씬 드물다.
 // - 승급: 천장(ENCHANT_CEILING × ceilMult) 또는 재설정마다 조기 승급(기본 확률 × earlyMult).
 // - 비용: 등급별 증표·골드 × costMult(에디셔널 1.5배, 증표는 올림).
 // - 에디셔널 각인은 일반 각인이 있어야 부여할 수 있다.
@@ -10342,6 +10342,7 @@ const ENCHANT_KINDS = {
   sAdd:  { target: 'sub',    field: 'addEnchant', label: '보조무기 에디셔널 각인', boxId: 'subAddEnchantBox', options: SUB_ENCHANT_OPTIONS, deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 * SUB_ENCHANT_COST_MULT },
 };
 const ENCHANT_LINE_COUNT = 3;
+const ENCHANT_VALUE_STEPS = 30; // 각인 수치 단계 수(최소~최대를 고르게 나눈 값만 나옴)
 // 삼중 재설정(계정당 1회 구매): 한 번에 결과 3개를 뽑아 그중 하나를 고른다. 월드3 후반 골드 기준.
 const ENCHANT_TRIPLE_COST = 1e28;
 const ENCHANT_AUTO_INTERVAL_MS = 1500;
@@ -10361,9 +10362,11 @@ function rollEnchantLineOf(kind, grade) {
   const key = keys[Math.floor(Math.random() * keys.length)];
   const opt = K.options[key];
   const [min, max] = opt.ranges[grade - 1];
-  const t = Math.pow(Math.random(), K.skew);
+  // 수치는 범위를 ENCHANT_VALUE_STEPS개 단계로 나눈 값 중 하나(연속값 대신 이산값). 단계는 예전과 같은
+  // 저치 편향 분포(random^skew)를 단계로 잘라 뽑는다 — 최댓값 단계는 일반 약 1.7%, 에디셔널 약 0.8%.
+  const step = Math.min(ENCHANT_VALUE_STEPS - 1, Math.floor(Math.pow(Math.random(), K.skew) * ENCHANT_VALUE_STEPS));
   const f = Math.pow(10, opt.dec != null ? opt.dec : 1);
-  return { key, grade, value: Math.round((min + (max - min) * t) * f) / f };
+  return { key, grade, value: Math.round((min + (max - min) * step / (ENCHANT_VALUE_STEPS - 1)) * f) / f };
 }
 function rollEnchantLinesOf(kind, grade) {
   const K = ENCHANT_KINDS[kind];
@@ -14245,7 +14248,7 @@ const GUIDE_SECTIONS = [
   {
     icon: '⚒️', title: '무기 각인',
     body: `대장장이 탭에서 <b>+15강 이상</b> 강화한 무기(맨손 제외)에 부여할 수 있습니다. <b>3줄</b>이며 <b>레어</b> 등급에서 시작해 최대 <b>태초</b> 등급까지 승급합니다. 에픽 등급부터는 첫째 줄이 현재 등급, 둘째·셋째 줄은 한 단계 낮은 등급이고, 각 줄이 5% 확률로 "이탈"해 현재 등급으로 뜹니다(예전 2줄 각인은 다음 재설정부터 3줄).
-    <br><br><b>각인 재설정</b>을 하면 세 줄의 효과와 수치가 다시 뽑힙니다. 재설정을 거듭해 등급별로 정해진 누적 횟수(천장)에 도달하면 확정으로 다음 등급으로 승급하고, 그 전에도 재설정마다 낮은 확률로 조기 승급할 수 있습니다.
+    <br><br><b>각인 재설정</b>을 하면 세 줄의 효과와 수치가 다시 뽑힙니다. 수치는 등급 범위(최소~최대)를 고르게 나눈 <b>30단계 값</b> 중 하나로 나오며, 낮은 단계일수록 잘 나옵니다(최대 단계는 일반 각인 약 1.7%, 에디셔널 약 0.8%). 재설정을 거듭해 등급별로 정해진 누적 횟수(천장)에 도달하면 확정으로 다음 등급으로 승급하고, 그 전에도 재설정마다 낮은 확률로 조기 승급할 수 있습니다.
     <br><br>각인 부여·재설정에는 골드와 함께 🎫 <b>토벌의 증표</b>가 필요합니다(등급이 오를수록 비용 증가). 무기가 파괴되면 각인도 함께 사라집니다.
     <br><br><b>✨ 에디셔널 각인</b>: 일반 각인이 있는 무기·보조무기에 3줄짜리 각인을 하나 더 새길 수 있습니다. 옵션과 수치 범위는 같지만 높은 수치가 훨씬 드물고(이탈 2%), 승급 천장은 2배·조기 승급 확률은 절반이며, 비용은 1.5배입니다.
     <br><br><b>🔁 자동 재설정</b>: 멈출 조건을 정해두면 1.5초마다 재설정합니다(⚡ 빠르게 돌리기를 켜면 0.3초마다 — 대신 조건에 안 맞는 좋은 결과를 보고 고르기 전에 지나칠 수 있습니다). 조건은 두 가지 방식으로 정합니다.

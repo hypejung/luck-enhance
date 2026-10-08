@@ -12192,7 +12192,7 @@ function objJosa(word) {
   if (c >= 0xAC00 && c <= 0xD7A3) return (c - 0xAC00) % 28 ? '을' : '를';
   return '을(를)';
 }
-let genesisFeedBusy = false;
+let genesisFeedBusy = false, genesisFeedRetryLater = false;
 function genesisFeedProcess() {
   const list = S && Array.isArray(S.genesisFeedPending) ? S.genesisFeedPending : [];
   // 이름을 받은 것은 서버에 올린다(실패하면 다음 기회에 다시)
@@ -12202,12 +12202,14 @@ function genesisFeedProcess() {
       genesisFeedBusy = true;
       fetch(`${SYNC_DB_URL}/genesisFeed.json`, { method: 'POST', body: JSON.stringify({ name: ready.name, item: ready.item, kind: ready.kind, at: { '.sv': 'timestamp' } }) })
         .then(res => {
-          if (res.ok || res.status === 401 || res.status === 400) { // 규칙 거절은 다시 보내도 같다
+          if (!res.ok) genesisFeedRetryLater = true; // 실패한 건 1분 주기에 다시
+          // 거절(401)은 Firebase 규칙이 아직 없을 때도 나므로 바로 버리지 않고, 3일 지나도 안 되면 버린다
+          if (res.ok || res.status === 400 || (res.status === 401 && Date.now() - (ready.at || 0) > 3 * 86400000)) {
             S.genesisFeedPending = S.genesisFeedPending.filter(x => x !== ready); save();
           }
         })
-        .catch(() => {})
-        .finally(() => { genesisFeedBusy = false; if (S.genesisFeedPending.some(x => x.name)) setTimeout(genesisFeedProcess, 1000); else genesisFeedRefresh(); });
+        .catch(() => { genesisFeedRetryLater = true; })
+        .finally(() => { genesisFeedBusy = false; if (S.genesisFeedPending.some(x => x.name) && !genesisFeedRetryLater) setTimeout(genesisFeedProcess, 1000); else genesisFeedRefresh(); genesisFeedRetryLater = false; });
     }
   }
   // 이름이 아직 없는 것은 입력창을 띄운다(한 번에 하나)

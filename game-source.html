@@ -1101,9 +1101,10 @@
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">대장장이가 망치를 내려놓으며 말했다. "무기에 이름을 새기는 것과, 운명을 새기는 것은 다른 일이야.
         토벌전에서 가져온 증표라면 — 그 운명을 다시 쓸 수 있을지도 모르지."</div>
-        <div><b style="color:var(--unique)">+15 이상</b> 강화한 무기부터 각인을 새길 수 있습니다. 재설정은 🎫 토벌의 증표와 골드를 소모하며,
+        <div><b style="color:var(--unique)">+15 이상</b> 강화한 무기부터 각인을 새길 수 있습니다(장착하지 않은 무기도 가방에서 골라 새길 수 있음). 재설정은 🎫 토벌의 증표와 골드를 소모하며,
         무기가 파괴되면 각인도 함께 사라집니다.</div>
       </div>
+      <div id="enchantTargetBar" style="margin-bottom:8px;"></div>
       <div id="enchantBox"></div>
     </div>
     <div class="panel">
@@ -1117,10 +1118,11 @@
     <div class="panel">
       <h3>🗡️ 보조무기 각인</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        <b style="color:var(--unique)">+15 이상</b> 강화한 장착 보조무기에 각인을 새길 수 있습니다. 등급·승급 규칙은 무기 각인과 같고 비용(증표·골드)은 2배이며,
+        <b style="color:var(--unique)">+15 이상</b> 강화한 보조무기에 각인을 새길 수 있습니다(장착하지 않은 보조무기도 가방에서 골라 새길 수 있음). 등급·승급 규칙은 무기 각인과 같고 비용(증표·골드)은 2배이며,
         옵션은 드롭률·골드 획득·보스 피해량·보조무기 효과 증폭·액티브 피해량·액티브 지속시간 중에서 나옵니다.
         드롭률은 다른 월드(1~20층)에서 사냥할 때 절반만 적용됩니다.
       </div>
+      <div id="subEnchantTargetBar" style="margin-bottom:8px;"></div>
       <div id="subEnchantBox"></div>
     </div>
     <div class="panel">
@@ -10357,7 +10359,57 @@ const ENCHANT_TRIPLE_COST = 1e28;
 const ENCHANT_AUTO_INTERVAL_MS = 1500;
 const ENCHANT_AUTO_FAST_INTERVAL_MS = 300; // 빠르게 돌리기(5배)
 function enchantOpt(kind, key) { return ENCHANT_KINDS[kind].options[key]; }
-function enchantTarget(kind) { return ENCHANT_KINDS[kind].target === 'weapon' ? getEquipped() : getEquippedSubweapon(); }
+// 각인 대상: 기본은 장착 장비, 강화기처럼 가방의 다른 무기·보조무기를 골라둘 수 있다(세션 한정, 무기·에디셔널 공용).
+const enchantPickId = { weapon: null, sub: null };
+const enchantPickerOpen = { weapon: false, sub: false };
+function enchantTargetOf(target) {
+  const id = enchantPickId[target];
+  if (id != null) {
+    const it = (target === 'weapon' ? S.weapons : (S.subweapons || [])).find(x => x.id === id);
+    if (it) return it;
+    enchantPickId[target] = null; // 판매·분해·파괴로 사라짐 → 장착 장비로
+  }
+  return target === 'weapon' ? getEquipped() : getEquippedSubweapon();
+}
+function enchantTarget(kind) { return enchantTargetOf(ENCHANT_KINDS[kind].target); }
+function setEnchantPick(target, id) {
+  // 대상이 바뀌면 그 대상 쪽 자동 재설정은 멈춘다
+  if (enchantAuto && ENCHANT_KINDS[enchantAuto.kind].target === target) stopEnchantAuto('⚙️ 각인 대상을 바꿔 자동 재설정을 멈췄습니다.', 'lg-good');
+  enchantPickId[target] = id;
+  enchantPickerOpen[target] = false;
+  renderBlacksmith();
+}
+function renderEnchantTargetBar(target) {
+  const bar = $(target === 'weapon' ? 'enchantTargetBar' : 'subEnchantTargetBar');
+  if (!bar) return;
+  const what = target === 'weapon' ? '무기' : '보조무기';
+  const cur = enchantTargetOf(target); // 사라진 대상이면 여기서 장착 장비로 돌아간다
+  const usingBag = enchantPickId[target] != null;
+  const tagOf = x => target === 'weapon' ? gradeTag(x) : subweaponGradeTag(x);
+  let html = '';
+  if (usingBag) {
+    html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <div style="flex:1;font-size:12px;color:var(--sub)">🎒 가방의 ${what}에 각인 중입니다 (미장착 — 효과는 장착해야 적용)</div>
+      <button data-ec-back style="font-size:12px;">${target === 'weapon' ? '⚔️' : '🗡️'} 장착 ${what}로</button>
+    </div>`;
+  }
+  html += `<button data-ec-toggle style="width:100%;font-size:12px;">${enchantPickerOpen[target] ? '▴ 닫기' : `🎒 가방에서 다른 ${what}에 각인하기`}</button>`;
+  if (enchantPickerOpen[target]) {
+    const pool = target === 'weapon' ? S.weapons.filter(x => !isFist(x)) : (S.subweapons || []);
+    const list = pool.filter(x => x !== cur && x.enhance >= ENCHANT_MIN_ENHANCE);
+    html += `<div style="margin-top:6px;max-height:220px;overflow-y:auto;">` + (list.length
+      ? list.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);">
+          <div style="flex:1;font-size:12px;">${tagOf(x)}<div style="color:var(--sub)">${x.enchant ? `각인 <span class="grade-${GRADES[x.enchant.grade].name}">${GRADES[x.enchant.grade].name}</span>` : '각인 없음'}${x.addEnchant ? ` · 에디셔널 <span class="grade-${GRADES[x.addEnchant.grade].name}">${GRADES[x.addEnchant.grade].name}</span>` : ''}</div></div>
+          <button class="primary" data-ec-pick="${x.id}" style="font-size:12px;">선택</button>
+        </div>`).join('')
+      : `<div style="font-size:12px;color:var(--sub);text-align:center;padding:8px;">각인할 수 있는(+${ENCHANT_MIN_ENHANCE} 이상) 다른 ${what}가 없습니다.</div>`) + `</div>`;
+  }
+  bar.innerHTML = html;
+  bar.querySelector('[data-ec-toggle]').onclick = () => { enchantPickerOpen[target] = !enchantPickerOpen[target]; renderEnchantTargetBar(target); };
+  const back = bar.querySelector('[data-ec-back]'); if (back) back.onclick = () => setEnchantPick(target, null);
+  bar.querySelectorAll('[data-ec-pick]').forEach(b => { b.onclick = () => setEnchantPick(target, +b.dataset.ecPick); });
+}
 function enchantTargetTag(kind, it) { return ENCHANT_KINDS[kind].target === 'weapon' ? gradeTag(it) : subweaponGradeTag(it); }
 function enchantCeiling(kind, grade) { const c = ENCHANT_CEILING[grade]; return c ? c * ENCHANT_KINDS[kind].ceilMult : null; }
 function enchantEarlyChance(kind, grade) { return enchantEarlyPromoteChance(grade) * ENCHANT_KINDS[kind].earlyMult; }
@@ -10647,7 +10699,7 @@ function enchantAutoTick() {
   const kind = enchantAuto.kind;
   const K = ENCHANT_KINDS[kind];
   const it = enchantTarget(kind);
-  if (!it || it.id !== enchantAuto.itemId || !it[K.field]) { stopEnchantAuto(`⚙️ 장착 장비가 바뀌어 ${K.label} 자동 재설정을 멈췄습니다.`); return; }
+  if (!it || it.id !== enchantAuto.itemId || !it[K.field]) { stopEnchantAuto(`⚙️ 각인 대상 장비가 바뀌어 ${K.label} 자동 재설정을 멈췄습니다.`); return; }
   const en = it[K.field];
   if (en.pending) { stopEnchantAuto(); return; }
   const times = S.enchantTriple && enchantAutoCfg(kind).triple ? 3 : 1;
@@ -10868,6 +10920,7 @@ function renderEnchantTripleBox() {
   const b = $('buyEnchantTripleBtn'); if (b) b.onclick = buyEnchantTriple;
 }
 function renderEnchantBox() {
+  renderEnchantTargetBar('weapon'); renderEnchantTargetBar('sub');
   for (const kind of Object.keys(ENCHANT_KINDS)) renderEnchantKind(kind);
   renderEnchantTripleBox();
 }

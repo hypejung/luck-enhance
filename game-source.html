@@ -950,8 +950,9 @@
     <div class="panel">
       <h3>⚔️ 장착 중인 룬</h3>
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-        지금 장착한 무기에 낀 룬입니다. 여기서 바로 해제하면 아래 "보유 룬"으로 돌아와서 다른 룬으로 바꿔 낄 수 있습니다.
+        지금 장착한 무기(또는 가방에서 고른 무기)에 낀 룬입니다. 여기서 바로 해제하면 아래 "보유 룬"으로 돌아와서 다른 룬으로 바꿔 낄 수 있습니다.
       </div>
+      <div id="runeTargetBar" style="margin-bottom:8px;"></div>
       <div id="runeEquippedList"></div>
     </div>
     <div class="panel">
@@ -13744,8 +13745,46 @@ function openRuneBox(tier) {
   renderTop(); renderRuneTab(); save();
 }
 
+// 룬 대상 무기: 기본은 장착 무기, 강화기·각인처럼 가방의 다른 무기를 골라둘 수 있다(세션 한정)
+let runePickId = null, runePickerOpen = false;
+function runeTargetWeapon() {
+  if (runePickId != null) {
+    const w = S.weapons.find(x => x.id === runePickId);
+    if (w) return w;
+    runePickId = null; // 판매·분해·파괴로 사라짐 → 장착 무기로
+  }
+  return getEquipped();
+}
+function renderRuneTargetBar() {
+  const bar = $('runeTargetBar');
+  if (!bar) return;
+  const cur = runeTargetWeapon();
+  const usingBag = runePickId != null;
+  let html = '';
+  if (usingBag) {
+    html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <div style="flex:1;font-size:12px;color:var(--sub)">🎒 가방의 무기에 룬을 끼우는 중입니다 (미장착 — 효과는 장착해야 적용)</div>
+      <button data-rt-back style="font-size:12px;">⚔️ 장착 무기로</button>
+    </div>`;
+  }
+  html += `<button data-rt-toggle style="width:100%;font-size:12px;">${runePickerOpen ? '▴ 닫기' : '🎒 가방에서 다른 무기에 룬 끼우기'}</button>`;
+  if (runePickerOpen) {
+    const list = S.weapons.filter(x => !isFist(x) && x !== cur && x.enhance >= 15);
+    html += `<div style="margin-top:6px;max-height:220px;overflow-y:auto;">` + (list.length
+      ? list.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);">
+          <div style="flex:1;font-size:12px;">${gradeTag(x)}<div style="color:var(--sub)">룬 ${(x.runes || []).length}/${runeSlotsForGrade(x.grade)}</div></div>
+          <button class="primary" data-rt-pick="${x.id}" style="font-size:12px;">선택</button>
+        </div>`).join('')
+      : `<div style="font-size:12px;color:var(--sub);text-align:center;padding:8px;">룬을 낄 수 있는(+15 이상) 다른 무기가 없습니다.</div>`) + `</div>`;
+  }
+  bar.innerHTML = html;
+  bar.querySelector('[data-rt-toggle]').onclick = () => { runePickerOpen = !runePickerOpen; renderRuneTargetBar(); };
+  const back = bar.querySelector('[data-rt-back]'); if (back) back.onclick = () => { runePickId = null; runePickerOpen = false; renderRuneTab(); };
+  bar.querySelectorAll('[data-rt-pick]').forEach(b => { b.onclick = () => { runePickId = +b.dataset.rtPick; runePickerOpen = false; renderRuneTab(); }; });
+}
 function equipRuneToCurrentWeapon(runeId) {
-  const w = getEquipped();
+  const w = runeTargetWeapon();
   if (!w) { log('장착된 무기가 없습니다.', 'lg-bad'); return; }
   if (isFist(w)) { log('맨손에는 룬을 장착할 수 없습니다.', 'lg-bad'); return; }
   if (w.enhance < 15) { log('룬은 +15 이상 강화한 무기에만 장착할 수 있습니다.', 'lg-bad'); return; }
@@ -13769,7 +13808,7 @@ function equipRuneToCurrentWeapon(runeId) {
 }
 
 function unequipRuneFromCurrentWeapon(runeId) {
-  const w = getEquipped();
+  const w = runeTargetWeapon();
   if (!w || !Array.isArray(w.runes)) return;
   const idx = w.runes.findIndex(r => r.id === runeId);
   if (idx < 0) return;
@@ -13868,7 +13907,8 @@ function buyRuneBoxesBulk(i, count) {
 function renderRuneEquippedList() {
   const box = $('runeEquippedList');
   if (!box) return;
-  const w = getEquipped();
+  renderRuneTargetBar();
+  const w = runeTargetWeapon();
   const runes = (w && Array.isArray(w.runes)) ? w.runes : [];
   if (!w || isFist(w)) { box.innerHTML = '<div style="color:var(--sub);font-size:13px;">맨손에는 룬을 장착할 수 없습니다.</div>'; return; }
   if (!runes.length) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">${gradeTag(w)}에 장착된 룬이 없습니다.</div>`; return; }
@@ -13906,7 +13946,7 @@ function renderRuneInventory() {
   setupRuneAutoSellControls();
   const countEl = $('runeinvcount');
   if (countEl) countEl.textContent = `(${S.runes.length}/${RUNE_BAG_MAX})`;
-  const w = getEquipped();
+  const w = runeTargetWeapon();
   const equippedRunes = (w && Array.isArray(w.runes)) ? w.runes.map(r => ({ ...r, equipped: true })) : [];
   const bagRunes = S.runes.map(r => ({ ...r, equipped: false }));
   const all = [...equippedRunes, ...bagRunes];

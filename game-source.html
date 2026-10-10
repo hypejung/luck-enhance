@@ -32,6 +32,7 @@
     display: flex; flex-direction: column; align-items: center;
     padding: 12px;
     user-select: none;
+    overflow-wrap: break-word; /* 아주 큰 숫자처럼 끊을 곳 없는 긴 글자도 화면 밖으로 나가지 않고 줄바꿈 */
   }
   #wrap { width: 100%; max-width: 760px; }
 
@@ -200,7 +201,7 @@
   .guide-head:hover { color: var(--gold); }
   .guide-head .guide-arrow { font-size: 11px; color: var(--sub); transition: transform .15s; }
   .guide-card.open .guide-head .guide-arrow { transform: rotate(180deg); }
-  .guide-body { padding: 0 14px 14px; font-size: 13px; line-height: 1.7; color: var(--text); }
+  .guide-body { padding: 0 14px 14px; font-size: 13px; line-height: 1.7; color: var(--text); overflow-x: auto; }
   .guide-body[hidden] { display: none; }
   .guide-body b { color: var(--gold); }
   .guide-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
@@ -391,9 +392,9 @@
 
   /* ===== 능력치 ===== */
   .statgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px,1fr)); gap: 8px; }
-  .statcell { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .statcell { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; min-width: 0; }
   .statcell .sl { font-size: 11px; color: var(--sub); }
-  .statcell .sv { font-size: 16px; font-weight: bold; margin-top: 2px; }
+  .statcell .sv { font-size: 16px; font-weight: bold; margin-top: 2px; overflow-wrap: anywhere; }
 
   /* ===== 인벤토리 ===== */
   .invitem {
@@ -3385,21 +3386,16 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 30.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 31.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '🌳 세계수의 단말마 재오픈 · 🔮 룬 · 🔁 각인 자동 재설정',
+    version: 6, versionLabel: '1.0.5', title: '💠 각성 개편 · 🔁 각인 자동 재설정',
     changes: [
-      { id: 23, date: '2026-10-06', text: '🌳 세계수의 단말마 재오픈: 하루 3회 도전해 그날 최고 기록을 쌓고, 모든 유저의 월~일 합계가 구간을 넘을 때마다 참여한 모두의 보상이 커집니다(다음 주 정산). 1회 기록이 역대 최고의 1.2배를 넘으면 기록 보상도 받습니다.' },
-      { id: 24, date: '2026-10-06', text: '🏷️ 레이드 칭호 개편: 주간 기여 기준을 넘으면 누구나 칭호를 얻고, 다음 한 주 동안 모든 사냥터 드롭률·골드가 최대 +30% 오릅니다. (제목 옆에 표시)' },
-      { id: 25, date: '2026-10-06', text: '🎖️ 명예의 정수 상점 개편: 강화 패널티 방지권, 토벌전·도서관 추가 도전권, 각인 승급 진행도, 강철실이 추가되고 정수류는 진행도에 맞춰 늘어납니다.' },
-      { id: 26, date: '2026-10-06', text: '⏱️ 세계수의 단말마 전투는 시간 연장 룬과 관계없이 120초로 고정됩니다.' },
-      { id: 27, date: '2026-10-06', text: '🔮 레전더리·신화 스탯 룬 추가: 질풍·정밀·파괴·연격·연격 증폭·살육의 룬이 레전더리·신화 등급으로도 나옵니다. (예: 파괴의 룬 유니크 +90%p → 레전더리 +150%p → 신화 +230%p)' },
-      { id: 28, date: '2026-10-07', text: '🌳 세계수의 단말마 주간 보상 상향: 높은 구간일수록 보상이 더 크게 늘어나고(7구간 기준 명예 140 → 556), 5구간부터 강화 패널티 방지권도 줍니다. 기록 보상도 소폭 상향됐습니다.' },
       { id: 29, date: '2026-10-08', text: '🔁 각인 자동 재설정 개선: ⚡ 빠르게 돌리기(5배)를 켤 수 있고, 멈출 조건을 "옵션 합"으로도 정할 수 있습니다. 줄마다 조건은 최소·최대·이탈 최대·직접 입력 중에서 고르면 됩니다.' },
       { id: 30, date: '2026-10-08', text: '🔁 옵션 합 조건 변경: 옵션 하나의 3줄 합(예: 드롭률 합 100% 이상)에 추가 옵션(예: 공격력)을 함께 걸 수 있습니다. 합 기준이 두 줄로는 안 되는 값이면 추가 옵션은 자동으로 꺼집니다.' },
+      { id: 31, date: '2026-10-10', text: '💠 각성 개편: 각성 등급이 일반~태초 8단계로 늘고, 무기 등급까지의 각성만 나옵니다(고대 무기는 고대까지). 일반~신화는 스탯 이름 그대로의 수치(전설 공격력 +100%, 신화 +150%), 고대·태초는 최종 공격력·치명타 피해·연타 피해·보스 피해에 곱해지는 옵션입니다. 기존 특수효과 슬롯은 같은 등급의 공격력으로 바뀝니다.' },
     ],
   },
 ];
@@ -3691,106 +3687,110 @@ function libraryCycleTotal() { return LIBRARY.weeklyTotal + ((S.library && S.lib
 function libraryUnlocked() { return (S.raidMaxCleared || 0) > LIBRARY.unlockRaidStage; }
 
 // ---------- 각성 시스템 (+20강 이상 무기 전용, 강화 RNG와 완전히 분리된 확정 파워 트랙) ----------
-// 5개 슬롯(★1~★5)을 각각 독립적으로 각성의 정수로 "언락"하며, 언락 시 등급(일반/레어/에픽/전설)
+// 5개 슬롯(★1~★5)을 각각 독립적으로 각성의 정수로 "언락"하며, 언락 시 등급(일반~태초 8단계)
 // 테이블에서 확률적으로 하나를 뽑는다(이미 뽑은 슬롯도 더 저렴한 비용으로 재도전 가능).
 // 모든 슬롯의 효과는 동시에 중첩 적용된다 — 상위 랭크가 하위 랭크를 대체하지 않는다.
+// 등장 가능한 최고 등급 = 무기 등급(고대 무기는 고대까지). 상한을 넘는 등급은 확률표에서 빼고
+// 남은 등급끼리 비율대로 다시 나눈다.
 const AWAKENING_ENH_REQ = 20;
+const AWAKENING_RARITIES = ['common', 'rare', 'epic', 'unique', 'legendary', 'mythic', 'ancient', 'genesis'];
 const AWAKENING_RANKS = [
-  { unlockCost: 5,   rerollCost: 3,   odds: [70, 25, 5, 0] },
-  { unlockCost: 15,  rerollCost: 9,   odds: [60, 28, 10, 2] },
-  { unlockCost: 40,  rerollCost: 25,  odds: [50, 30, 15, 5] },
-  { unlockCost: 100, rerollCost: 60,  odds: [40, 32, 20, 8] },
-  { unlockCost: 250, rerollCost: 150, odds: [30, 32, 25, 13] },
+  //                                      일반 레어 에픽 유니크 전설 신화 고대 태초
+  { unlockCost: 5,   rerollCost: 3,   odds: [50, 30, 14, 5,  1,  0,   0,   0] },
+  { unlockCost: 15,  rerollCost: 9,   odds: [40, 30, 18, 8,  3,  1,   0,   0] },
+  { unlockCost: 40,  rerollCost: 25,  odds: [30, 28, 22, 12, 5,  2.5, 0.5, 0] },
+  { unlockCost: 100, rerollCost: 60,  odds: [22, 25, 24, 15, 8,  4.5, 1.3, 0.2] },
+  { unlockCost: 250, rerollCost: 150, odds: [15, 22, 24, 18, 11, 6.5, 2.8, 0.7] },
 ];
-const AWAKENING_RARITY_LABEL = { common: '일반', rare: '레어', epic: '에픽', legendary: '전설' };
-// 기존 무기/룬 등급 색상 체계(.grade-일반=회색 ~ .grade-레전더리=빨강)를 각성 등급 표시에도 그대로 재사용
-const AWAKENING_RARITY_GRADE_CLASS = { common: 'grade-일반', rare: 'grade-레어', epic: 'grade-에픽', legendary: 'grade-레전더리' };
-const AWAKENING_COMMON_POOL = [
-  { key: 'atk',   label: '공격력',   min: 0.08, max: 0.15 },
-  { key: 'speed', label: '공격속도', min: 0.05, max: 0.10 },
-  { key: 'gold',  label: '골드 획득', min: 0.10, max: 0.20 },
-  { key: 'luck',  label: '드롭률',   min: 0.08, max: 0.15 },
-];
-const AWAKENING_RARE_POOL = ['keenEye', 'critBoost', 'treasureHunt', 'swiftStep', 'comboBoost'];
-const AWAKENING_EPIC_POOL = ['libraryEcho', 'resonance', 'unbreakable', 'critFollowup'];
-const AWAKENING_LEGENDARY_POOL = ['fullBloom', 'awakenWave', 'harmony'];
-const AWAKENING_EFFECTS = {
-  keenEye:      { name: '심안의 각성',   desc: '치명타 확률 +8%p',   critChance: 0.08 },
-  critBoost:    { name: '파괴의 각성',   desc: '치명타 피해 +25%p',  critDamage: 0.25 },
-  comboBoost:   { name: '연격의 각성',   desc: '연타 피해 +25%p',   extraAtkDmg: 0.25 },
-  treasureHunt: { name: '탐욕의 각성',   desc: '드롭률 +15%p',      luck: 0.15 },
-  swiftStep:    { name: '가속의 각성',   desc: '공격속도 +12%p',    speed: 0.12 },
-  libraryEcho:  { name: '서고의 메아리', desc: '무기의 정수·각성의 정수 획득량 +50%', essenceMult: 0.5 },
-  resonance:    { name: '각성 공명',     desc: '다른 각성 슬롯 하나당 공격력 +5%p', atkPerOtherSlot: 0.05 },
-  // 기존 20%p는 +20강 파괴확률 절벽(13%→32%)을 이 슬롯 하나로 거의 무력화할 만큼 강력해서
-  // (도감 파괴감소 전부 합쳐도 최대 17%p인데 이걸 단독으로 넘어섬) 8%p로 하향.
-  unbreakable:  { name: '필멸자의 저항', desc: '강화 파괴·초기화 확률 -8%p', destroyReduce: 0.08 },
-  critFollowup: { name: '회심의 연격',   desc: '치명타 발생 시 20% 확률로 무료 추가타 1회 발동', proc: 0.20 },
-  fullBloom:    { name: '완전한 개화',   desc: '공격력 +100%p의 강력한 고정 보너스', atk: 1.00 },
-  awakenWave:   { name: '각성의 파도',   desc: '재료 소모 없이 아직 열리지 않은 다른 슬롯 하나가 즉시 무료로 각성된다', special: 'freeSlot' },
-  harmony:      { name: '만물의 조화',   desc: '공격력·공속·치명타확률·치명타피해·골드·드롭이 모두 +5%p', allStats: 0.05 },
+const AWAKENING_RARITY_LABEL = { common: '일반', rare: '레어', epic: '에픽', unique: '유니크', legendary: '전설', mythic: '신화', ancient: '고대', genesis: '태초' };
+// 기존 무기/룬 등급 색상 체계(.grade-일반=회색 ~ .grade-태초)를 각성 등급 표시에도 그대로 재사용
+const AWAKENING_RARITY_GRADE_CLASS = { common: 'grade-일반', rare: 'grade-레어', epic: 'grade-에픽', unique: 'grade-유니크', legendary: 'grade-레전더리', mythic: 'grade-신화', ancient: 'grade-고대', genesis: 'grade-태초' };
+// 일반~신화: 단순 스탯 상승. 값은 [일반, 레어, 에픽, 유니크, 전설, 신화] 순서 고정값
+// (등급 간 비율 10/20/35/60/100%, 신화 = 전설 ×1.5).
+const AWAKENING_STATS = {
+  atk:         { label: '공격력',     pct: false, values: [0.10, 0.20, 0.35, 0.60, 1.00, 1.50] },
+  speed:       { label: '공격속도',   pct: false, values: [0.04, 0.08, 0.14, 0.24, 0.40, 0.60] },
+  critChance:  { label: '치명타 확률', pct: true,  values: [0.02, 0.04, 0.07, 0.12, 0.20, 0.30] },
+  critDamage:  { label: '치명타 피해', pct: true,  values: [0.10, 0.20, 0.35, 0.60, 1.00, 1.50] },
+  extraAtk:    { label: '연타 확률',   pct: true,  values: [0.02, 0.04, 0.07, 0.12, 0.20, 0.30] },
+  extraAtkDmg: { label: '연타 피해',   pct: true,  values: [0.10, 0.20, 0.35, 0.60, 1.00, 1.50] },
+  gold:        { label: '골드 획득',   pct: false, values: [0.15, 0.30, 0.50, 0.90, 1.50, 2.25] },
+  luck:        { label: '드롭률',     pct: true,  values: [0.05, 0.10, 0.18, 0.30, 0.50, 0.75] },
 };
-function rollAwakeningResult(rankIdx) {
+const AWAKENING_STAT_KEYS = Object.keys(AWAKENING_STATS);
+// 고대·태초: 해당 능력치의 "최종" 수치에 곱연산. 각성 슬롯끼리는 합산한 뒤 한 번만 곱한다
+// (예: 최종 공격력 +30% ×5칸 = ×2.5). 값은 [고대, 태초].
+const AWAKENING_FINALS = {
+  finalAtk:      { label: '최종 공격력',     values: [0.30, 0.50] },
+  finalCritDmg:  { label: '최종 치명타 피해', values: [0.36, 0.60] },
+  finalExtraDmg: { label: '최종 연타 피해',   values: [0.60, 1.00] },
+  finalBossDmg:  { label: '최종 보스 피해',   values: [0.45, 0.75] },
+};
+const AWAKENING_FINAL_KEYS = Object.keys(AWAKENING_FINALS);
+function awakenRarityIdx(r) { return Math.max(0, AWAKENING_RARITIES.indexOf(r)); }
+function awakenMaxRarityIdx(w) { return Math.max(0, Math.min(AWAKENING_RARITIES.length - 1, (w && w.grade) || 0)); }
+// 무기 등급 상한을 넘는 등급을 빼고 남은 확률을 비율대로 다시 나눈 확률표(%)
+function awakenOddsFor(w, rankIdx) {
   const odds = AWAKENING_RANKS[rankIdx].odds;
-  const r = Math.random() * 100;
-  let rarity;
-  if (r < odds[0]) rarity = 'common';
-  else if (r < odds[0] + odds[1]) rarity = 'rare';
-  else if (r < odds[0] + odds[1] + odds[2]) rarity = 'epic';
-  else rarity = 'legendary';
-  if (rarity === 'common') {
-    const pick = AWAKENING_COMMON_POOL[Math.floor(Math.random() * AWAKENING_COMMON_POOL.length)];
-    const value = +(pick.min + Math.random() * (pick.max - pick.min)).toFixed(3);
-    return { rarity, statKey: pick.key, value };
-  }
-  const pool = rarity === 'rare' ? AWAKENING_RARE_POOL : rarity === 'epic' ? AWAKENING_EPIC_POOL : AWAKENING_LEGENDARY_POOL;
-  const key = pool[Math.floor(Math.random() * pool.length)];
-  return { rarity, key };
+  const cap = awakenMaxRarityIdx(w);
+  const kept = odds.map((p, i) => i <= cap ? p : 0);
+  const sum = kept.reduce((a, b) => a + b, 0) || 1;
+  return kept.map(p => p * 100 / sum);
+}
+function rollAwakeningResult(w, rankIdx) {
+  const odds = awakenOddsFor(w, rankIdx);
+  let r = Math.random() * 100, idx = 0;
+  for (; idx < odds.length - 1; idx++) { if (r < odds[idx]) break; r -= odds[idx]; }
+  while (idx > 0 && !odds[idx]) idx--;
+  const rarity = AWAKENING_RARITIES[idx];
+  const keys = idx >= 6 ? AWAKENING_FINAL_KEYS : AWAKENING_STAT_KEYS;
+  return { rarity, key: keys[Math.floor(Math.random() * keys.length)] };
+}
+// 슬롯 하나의 수치(스탯 슬롯이면 덧셈 수치, 최종 슬롯이면 곱연산 수치)
+function awakenSlotValue(slot) {
+  if (!slot) return 0;
+  const idx = awakenRarityIdx(slot.rarity);
+  if (AWAKENING_FINALS[slot.key]) return AWAKENING_FINALS[slot.key].values[Math.max(0, idx - 6)] || 0;
+  const s = AWAKENING_STATS[slot.key];
+  return s ? (s.values[Math.min(5, idx)] || 0) : 0;
 }
 function awakenSlotLabel(slot) {
   if (!slot) return '';
-  if (slot.rarity === 'common') {
-    const p = AWAKENING_COMMON_POOL.find(x => x.key === slot.statKey);
-    return `${p ? p.label : slot.statKey} +${(slot.value * 100).toFixed(1)}%`;
-  }
-  const def = AWAKENING_EFFECTS[slot.key];
-  return def ? `${def.name} — ${def.desc}` : slot.key;
+  const v = awakenSlotValue(slot);
+  if (AWAKENING_FINALS[slot.key]) return `${AWAKENING_FINALS[slot.key].label} +${Math.round(v * 100)}%`;
+  const s = AWAKENING_STATS[slot.key];
+  if (!s) return slot.key;
+  return `${s.label} +${+(v * 100).toFixed(1)}${s.pct ? '%p' : '%'}`;
 }
-// 각 슬롯의 효과를 특정 스탯 키(atk/speed/critChance/critDamage/gold/luck/destroyReduce) 기준으로 합산.
+// 일반~신화 스탯 슬롯 합산(atk/speed/critChance/critDamage/extraAtk/extraAtkDmg/gold/luck)
 function awakenStat(w, statKey) {
   if (!w || !Array.isArray(w.awakening)) return 0;
   let total = 0;
-  const filled = w.awakening.filter(Boolean).length;
-  for (const slot of w.awakening) {
-    if (!slot) continue;
-    if (slot.rarity === 'common') {
-      if (slot.statKey === statKey) total += slot.value;
-      continue;
-    }
-    const def = AWAKENING_EFFECTS[slot.key];
-    if (!def) continue;
-    if (def.allStats && ['atk', 'speed', 'critChance', 'critDamage', 'gold', 'luck'].includes(statKey)) total += def.allStats;
-    if (statKey === 'critChance' && def.critChance) total += def.critChance;
-    if (statKey === 'critDamage' && def.critDamage) total += def.critDamage;
-    if (statKey === 'extraAtkDmg' && def.extraAtkDmg) total += def.extraAtkDmg;
-    if (statKey === 'luck' && def.luck) total += def.luck;
-    if (statKey === 'speed' && def.speed) total += def.speed;
-    if (statKey === 'atk' && def.atk) total += def.atk;
-    if (statKey === 'atk' && def.atkPerOtherSlot) total += Math.max(0, filled - 1) * def.atkPerOtherSlot;
-    if (statKey === 'destroyReduce' && def.destroyReduce) total += def.destroyReduce;
-  }
+  for (const slot of w.awakening) if (slot && slot.key === statKey && AWAKENING_STATS[statKey]) total += awakenSlotValue(slot);
   return total;
 }
-function hasAwakenEffect(w, key) {
-  return !!(w && Array.isArray(w.awakening) && w.awakening.some(s => s && s.key === key));
+// 고대·태초 최종 배율: 같은 옵션끼리 합산 후 1회 곱 (finalAtk/finalCritDmg/finalExtraDmg/finalBossDmg)
+function awakenFinalMult(w, finalKey) {
+  if (!w || !Array.isArray(w.awakening)) return 1;
+  let total = 0;
+  for (const slot of w.awakening) if (slot && slot.key === finalKey) total += awakenSlotValue(slot);
+  return 1 + total;
 }
-function awakenEssenceMult(w) {
-  return hasAwakenEffect(w, 'libraryEcho') ? 1 + (AWAKENING_EFFECTS.libraryEcho.essenceMult || 0) : 1;
+// 구버전 각성 슬롯 변환: 등급은 그대로, 스탯이 정해진 효과는 같은 스탯으로, 특수효과는 같은 등급 공격력으로
+const AWAKENING_LEGACY_KEY = { keenEye: 'critChance', critBoost: 'critDamage', comboBoost: 'extraAtkDmg', treasureHunt: 'luck', swiftStep: 'speed' };
+function migrateAwakeningSlot(slot) {
+  if (!slot || typeof slot !== 'object') return null;
+  const rarity = AWAKENING_RARITIES.includes(slot.rarity) ? slot.rarity : 'common';
+  let key = slot.rarity === 'common' && slot.statKey ? slot.statKey : slot.key;
+  if (AWAKENING_LEGACY_KEY[key]) key = AWAKENING_LEGACY_KEY[key];
+  const isFinalTier = awakenRarityIdx(rarity) >= 6;
+  if (isFinalTier ? !AWAKENING_FINALS[key] : !AWAKENING_STATS[key]) key = isFinalTier ? 'finalAtk' : 'atk';
+  return { rarity, key };
 }
-// 무기의 정수/각성의 정수 보상에 적용되는 전체 배율 — 각성(서고의 메아리) + 도서관 전용 룬
+// 무기의 정수/각성의 정수 보상에 적용되는 전체 배율 — 도서관 전용 룬
 // (탐구의 룬/천공서고의 룬, 둘 다 중첩 가능) + 유물 마일스톤을 전부 곱연산으로 합산.
 function essenceRewardMult(w) {
-  let mult = awakenEssenceMult(w);
+  let mult = 1;
   mult *= Math.pow(1 + (RUNE_SPECIALS.scholarRune.mult || 0), weaponSpecialCount(w, 'scholarRune'));
   mult *= Math.pow(1 + (RUNE_SPECIALS.skyArchiveRune.mult || 0), weaponSpecialCount(w, 'skyArchiveRune'));
   return mult;
@@ -3806,18 +3806,9 @@ function awakenAttempt(w, rankIdx) {
   const cost = isReroll ? rank.rerollCost : rank.unlockCost;
   if (BN.lt(S.awakeningEssence, cost)) { log(`각성의 정수가 부족합니다! (필요 ${cost}, 보유 ${fmt(S.awakeningEssence)})`, 'lg-bad'); return; }
   S.awakeningEssence = BN.sub(S.awakeningEssence, cost);
-  const result = rollAwakeningResult(rankIdx);
+  const result = rollAwakeningResult(w, rankIdx);
   w.awakening[rankIdx] = result;
   log(`✨ 각성 ★${rankIdx + 1} ${isReroll ? '재도전' : '발동'}! [${AWAKENING_RARITY_LABEL[result.rarity]}] ${awakenSlotLabel(result)}`, 'lg-prim');
-  if (result.rarity === 'legendary' && result.key === 'awakenWave') {
-    const emptyIdx = [];
-    for (let i = 0; i < 5; i++) if (i !== rankIdx && !w.awakening[i]) emptyIdx.push(i);
-    if (emptyIdx.length) {
-      const pick = emptyIdx[Math.floor(Math.random() * emptyIdx.length)];
-      w.awakening[pick] = rollAwakeningResult(pick);
-      log(`🌊 각성의 파도! ★${pick + 1} 슬롯도 무료로 각성되었습니다.`, 'lg-prim');
-    }
-  }
   renderEnhance(); save();
 }
 
@@ -6191,7 +6182,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus() + behemothExcessBonus + luciferAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk');
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus() + behemothExcessBonus + luciferAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk') * awakenFinalMult(w, 'finalAtk');
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -7066,6 +7057,8 @@ function bigLetterLabel(tier) {
 // BN({m,e}) 객체가 들어오면 BN.fmt()로, 일반 숫자면 기존 로직 그대로 처리한다(하위 호환).
 function fmt(n) {
   if (BN.isBN(n)) return BN.fmt(n);
+  if (Number.isNaN(n)) return '0';
+  if (!isFinite(n)) return BN.fmt(BN.from(n === -Infinity ? -Number.MAX_VALUE : Number.MAX_VALUE)); // Infinity면 아래 단위 루프가 끝나지 않아 게임이 멈춤
   n = Math.floor(n);
   if (n >= BIG_LETTER_BASE) {
     let unitValue = BIG_LETTER_BASE, tier = 0;
@@ -8955,7 +8948,7 @@ function attack(w) {
   const e = w.effect ? EFFECTS[w.effect] : null;
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
-    dmg *= (1 + bossDmgBonus()) * pandoraStatMult('bossDmg');
+    dmg *= (1 + bossDmgBonus()) * pandoraStatMult('bossDmg') * awakenFinalMult(w, 'finalBossDmg');
   }
   dmg *= ancientSubDmgMult() * (1 + (asubForce.bonus || 0)); // 고대 보조무기(허수아비·뱃삯·족쇄·미완성 설계·황혼·정각의 종·예정된 명중)
   dmg *= genesisSubDmgMult(); // 태초 보조무기(황금 양털·두 얼굴)
@@ -9020,7 +9013,7 @@ function attack(w) {
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
-    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage');
+    (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage') * awakenFinalMult(w, 'finalCritDmg');
   // 파쇄의 리듬/주문 작렬 전용 치명타 배율: 기본 배율은 그대로, 스탯으로 얻은 추가 상승분만
   // EFFECT_CRIT_DMG_SCALE만큼만 반영한다.
   critMult += ancientSubCritDmgBonus() + genesisSubCritAdd(); // 고대 보조무기(등불·미완성 설계)·태초 보조무기(경계의 눈): 상한 밖 추가 치명타 피해
@@ -9070,11 +9063,6 @@ function attack(w) {
   // 다음 공격 시작 시 고정 피해로 그대로 한 번 더 적용한다.
   if (weaponSpecialCount(w, 'causalityRune') > 0 && Math.random() < RUNE_SPECIALS.causalityRune.proc) {
     fx.causalityEcho = dmg;
-  }
-  // 회심의 연격(각성 에픽 효과): 치명타 발생 시 확률적으로 무료 추가타 1회 발동
-  if (didCrit && hasAwakenEffect(w, 'critFollowup') && Math.random() < (AWAKENING_EFFECTS.critFollowup.proc || 0)) {
-    dealMonDamage(preCritDmg * EXTRA_ATK_DMG_MULT);
-    floatText('⚡ 회심의 연격!');
   }
   // 불주먹(맨손 전용 태초 룬): 공격 시 확률적으로 "염왕" 발동 — 무기 공격력의 10000% 고정 피해.
   // 염왕도 별도로 치명타 판정을 받는다(같은 치명타 확률/배율 재사용).
@@ -9270,7 +9258,7 @@ function attack(w) {
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
   // 베헤모스의 짓누르는 발걸음(태초의 유물): 연타(추가공격)가 완전히 불가능해진다
   const extraChance = hasBehemoth() ? 0 : Math.min(DMG_CAPS.extraChance,
-    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + sporeExtraBonus + ancientSubExtraChance()) * pandoraStatMult('extraAtk');
+    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + awakenStat(w, 'extraAtk') + sporeExtraBonus + ancientSubExtraChance()) * pandoraStatMult('extraAtk');
   // 연타 피해 = 기준 배율(평소 75%, 포자 폭발 활성 중엔 150%) × (1 + 연타 피해 스탯 합계)
   // — 치명타 피해와 마찬가지로 장신구/룬/훈련/인챈트/무기 특성/각성에서 상한 없이 누적된다.
   const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0) + (azathothWhim === 'extra' ? AZATHOTH.extraDmgBonus : 0);
@@ -9278,7 +9266,7 @@ function attack(w) {
   // 아자토스의 눈먼 변덕(태초의 유물): '확정 연타' 변덕이 뽑히면 이번 공격에 확정 연타 발생
   if (fujinPhaseActive() || azathothWhim === 'extra' || asubForce.extra || (extraChance > 0 && Math.random() < extraChance)) {
     const extraDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
-    let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * ancientSubExtraDmgMult();
+    let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * awakenFinalMult(w, 'finalExtraDmg') * ancientSubExtraDmgMult();
     ancientSubOnExtra(); // 고대 보조무기(길 잃은 양떼)
     // 포자 폭발(고대 에이션트 스피릿): 다른 무기와 달리 연타(추가공격)도 별도로 치명타 판정을 받는다
     if (w.spirit === 'sporeburst' && critChance > 0 && Math.random() < critChance) {
@@ -10060,7 +10048,7 @@ function renderWorldRaidTab() {
     const d = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + i);
     const v = (wr.days || {})[dateKeyOf(d)];
     const isToday = dateKeyOf(d) === todayKey();
-    return `<div style="flex:1;min-width:44px;text-align:center;padding:4px 2px;border:1px solid ${isToday ? 'var(--gold)' : 'var(--border)'};border-radius:6px;font-size:11px;"><div style="color:var(--sub)">${nm}</div><div>${v ? fmt(v) : '-'}</div></div>`;
+    return `<div style="min-width:0;text-align:center;padding:4px 1px;border:1px solid ${isToday ? 'var(--gold)' : 'var(--border)'};border-radius:6px;font-size:11px;overflow-wrap:anywhere;"><div style="color:var(--sub)">${nm}</div><div style="font-size:10px;line-height:1.2">${v ? fmt(v) : '-'}</div></div>`;
   }).join('');
   const t = activeRaidTitle();
   const nextTitleKey = ['t3', 't2', 't1'].find(k => myTier < WEEKLY_RAID_TITLES[k].minTier);
@@ -10081,14 +10069,14 @@ function renderWorldRaidTab() {
       <div style="font-size:13px;margin-top:6px;">오늘 도전: <b>${weeklyRaidTodayCount()}/${WEEKLY_RAID.dailyAttempts}</b> · 오늘 최고: <b style="color:var(--gold)">${fmt(weeklyRaidTodayBest())}</b></div>
       <div style="font-size:13px;margin-top:4px;">이번 주 내 기여: <b style="color:var(--gold)">${fmt(total)}</b> · 개인 ${myTier}구간${nextTitle ? ` · ${nextTitle.emoji} 칭호까지 ${fmt(BN.sub(BN.from(weeklyRaidTierFloor(nextTitle.minTier)), total))}` : ''}</div>
       <div style="font-size:13px;margin-top:4px;">🏅 역대 최고 1회: <b>${fmt(best)}</b> · ${recordToday ? '오늘 기록 보상 받음' : recordNeed ? `${fmt(recordNeed)} 이상이면 기록 보상` : '첫 도전 시 기록 보상'}</div>
-      <div style="display:flex;gap:4px;margin:8px 0;">${dayCells}</div>
+      <div style="display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin:8px 0;">${dayCells}</div>
       ${t ? `<div style="font-size:12px;margin-bottom:6px;">현재 칭호: ${t.emoji} <b>${t.name}</b> (드롭률·골드 +${Math.round(t.luck * 100)}%, 이번 주 동안)</div>` : ''}
       <button class="primary" id="worldRaidChallengeBtn" ${available ? '' : 'disabled'}>🩸 그르마에게 도전 (${WEEKLY_RAID.duration}초)</button>
       <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : left <= 0 ? '오늘 도전 횟수를 모두 사용했습니다. 내일 다시 도전할 수 있습니다.' : '하루 3회, 그날의 최고 피해가 일일 기록이 되고 월~일 기록을 합친 값이 내 주간 기여가 됩니다. 시간 연장 룬은 적용되지 않습니다.'}</div>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
       <div style="font-size:13px;margin-bottom:6px;">🎁 전체 기여 보상 — 모든 유저의 주간 기여 합이 10배가 될 때마다 한 구간(상한 없음). 높은 구간일수록 한 구간 오를 때 보상이 더 크게 늘어나고, ${WEEKLY_RAID_GLOBAL.guardFrom}구간부터 강화 패널티 방지권도 줍니다. 그 주에 기록을 남긴 모두가 다음 주 첫 접속 때 받습니다.</div>
-      <table class="guide-table"><tr><th>구간</th><th>전체 합</th><th>명예</th><th>골드</th><th>잎</th><th>방지권</th></tr>${rows.join('')}</table>
+      <div style="overflow-x:auto"><table class="guide-table" style="white-space:nowrap"><tr><th>구간</th><th>전체 합</th><th>명예</th><th>골드</th><th>잎</th><th>방지권</th></tr>${rows.join('')}</table></div>
       <div style="font-size:11px;color:var(--sub);margin-top:4px;">골드는 보스 처치 보상 기준 배수.<br>🏅 기록 보상: 1회 피해가 역대 최고의 ${WEEKLY_RAID_RECORD.ratio}배 이상이면(하루 1회) 그 기록의 개인 구간마다 🎖️+${WEEKLY_RAID_RECORD.honorPerTier} 🍃+${fmt(WEEKLY_RAID_RECORD.leavesPerTier)}.<br>칭호(개인 기여 기준): ${['t3', 't2', 't1'].map(k => `${WEEKLY_RAID_TITLES[k].emoji} ${WEEKLY_RAID_TITLES[k].name}(${fmt(weeklyRaidTierFloor(WEEKLY_RAID_TITLES[k].minTier))}, +${Math.round(WEEKLY_RAID_TITLES[k].luck * 100)}%)`).join(' · ')} — 다음 한 주 동안 모든 사냥터 드롭률·골드 증가</div>
     </div>
     <div style="border-top:1px solid var(--border);padding-top:10px;">
@@ -12024,6 +12012,7 @@ function migrate(d) {
   }
   for (const w of d.weapons || []) {
     if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
+    w.awakening = w.awakening.map(migrateAwakeningSlot); // 구버전(특수효과·연속 수치) 슬롯 → 스탯 이름 방식
   }
   if (!Array.isArray(d.presets) || !d.presets.length) d.presets = [];
   // 프리셋 슬롯을 늘리면서(3 → 5 → 10), 기존 세이브는 모자란 만큼 빈 슬롯으로 채운다.
@@ -12983,12 +12972,13 @@ function renderAwakening(w, maxed) {
     return;
   }
   if (!Array.isArray(w.awakening) || w.awakening.length !== 5) w.awakening = [null, null, null, null, null];
+  const maxRarity = AWAKENING_RARITIES[awakenMaxRarityIdx(w)];
   const rows = AWAKENING_RANKS.map((rank, i) => {
     const slot = w.awakening[i];
     const locked = !slot && i > 0 && !w.awakening[i - 1];
     const cost = slot ? rank.rerollCost : rank.unlockCost;
     const affordable = !locked && BN.gte(S.awakeningEssence, cost);
-    // 각성 등급도 기존 무기/룬 등급과 같은 색상 체계(일반=회색 ~ 전설=레전더리 빨강)를 그대로 재사용
+    // 각성 등급도 기존 무기/룬 등급과 같은 색상 체계(일반=회색 ~ 태초)를 그대로 재사용
     const rarityClass = slot ? (AWAKENING_RARITY_GRADE_CLASS[slot.rarity] || '') : '';
     const label = slot
       ? `<span class="${rarityClass}">[${AWAKENING_RARITY_LABEL[slot.rarity]}]</span> ${awakenSlotLabel(slot)}`
@@ -13004,7 +12994,8 @@ function renderAwakening(w, maxed) {
       </div>`;
   }).join('');
   box.innerHTML = `
-    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">📖 각성 — 보유 각성의 정수 <b style="color:var(--gold)">💠${fmt(S.awakeningEssence || 0)}</b></div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">📖 각성 — 보유 각성의 정수 <b style="color:var(--gold)">💠${fmt(S.awakeningEssence || 0)}</b>
+      · 최고 <span class="${AWAKENING_RARITY_GRADE_CLASS[maxRarity]}">${AWAKENING_RARITY_LABEL[maxRarity]}</span> 등급까지</div>
     ${rows}`;
   box.querySelectorAll('[data-awaken]').forEach(btn => {
     btn.onclick = () => awakenAttempt(w, +btn.dataset.awaken);
@@ -14126,14 +14117,14 @@ function computeStats() {
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critChance || 0) + pandoraStackCritChanceBonus();
   const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance') * 100;
   const paradoxCritBonus = (w && w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
-  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0) + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage');
+  let critMult = Math.min(DMG_CAPS.critMult, (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCount2 * (RUNE_SPECIALS.fireFist.critDamage || 0) + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage') * awakenFinalMult(w, 'finalCritDmg');
   const critMultPct = critMult * 100;
   const sporeActive = !!(w && w.spirit === 'sporeburst' && now < fx.sporeburstUntil);
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
-  const extraChance = hasBehemoth() ? 0 : Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + sporeExtraBonus) * pandoraStatMult('extraAtk') * 100;
+  const extraChance = hasBehemoth() ? 0 : Math.min(DMG_CAPS.extraChance, (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae.extraAtk + awakenStat(w, 'extraAtk') + sporeExtraBonus) * pandoraStatMult('extraAtk') * 100;
   const extraAtkDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
   const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0);
-  const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * 100;
+  const extraAtkDmgPct = extraAtkDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * awakenFinalMult(w, 'finalExtraDmg') * 100;
   // 골드/드랍률은 dropRoll()의 실제 계산식(곱연산)과 맞춘다 — 약탈자의 격노(고대 에이션트
   // 스피릿)의 고정 +50%/스택 보너스와 각성(탐욕의 각성 등)의 골드/드롭률 스탯이 예전엔 이
   // 화면에 전혀 반영되지 않았음.
@@ -14149,7 +14140,7 @@ function computeStats() {
   return {
     atk, spd, dps: atk * spd,
     critChance, critMultPct, extraChance, extraAtkDmgPct,
-    bossBonus: bossDmgBonus() * 100,
+    bossBonus: ((1 + bossDmgBonus()) * awakenFinalMult(w, 'finalBossDmg') - 1) * 100,
     goldBonus: (goldMul - 1) * 100,
     dropBonus: (dropMul - 1) * 100,
     // 고대·태초 드롭률(genesisAncientDropMult와 같은 식) — 지금 사냥터에서 보스 세트효과가 켜져 있으면 ×3
@@ -14281,6 +14272,18 @@ function switchTab(name) {
 // 남기고, 괄호로 조건/수치를 줄줄이 붙이는 대신 이 탭으로 넘긴다. 신규 시스템 추가 시에도
 // 이 원칙을 그대로 따를 것(새 안내문에 괄호 설명을 쌓지 말고 여기 항목을 추가).
 // 가이드용 각인 수치표: 옵션 × 등급(레어~태초) 최소~최대, 30단계 한 칸 크기
+function awakeningGuideHtml() {
+  const th = r => `<th><span class="${AWAKENING_RARITY_GRADE_CLASS[r]}">${AWAKENING_RARITY_LABEL[r]}</span></th>`;
+  const oddsRows = AWAKENING_RANKS.map((rk, i) => `<tr><td>★${i + 1}</td>${rk.odds.map(p => `<td>${p ? p + '%' : '–'}</td>`).join('')}<td style="white-space:nowrap">${rk.unlockCost} / ${rk.rerollCost}</td></tr>`).join('');
+  const statRows = Object.values(AWAKENING_STATS).map(st => `<tr><td style="white-space:nowrap">${st.label}</td>${st.values.map(v => `<td>+${+(v * 100).toFixed(1)}${st.pct ? '%p' : '%'}</td>`).join('')}</tr>`).join('');
+  const finalRows = Object.values(AWAKENING_FINALS).map(f => `<tr><td style="white-space:nowrap">${f.label}</td>${f.values.map(v => `<td>×${+(1 + v).toFixed(2)}</td>`).join('')}</tr>`).join('');
+  return `<b>슬롯별 등급 확률</b> (무기 등급보다 높은 칸은 빼고 남은 확률을 비율대로 다시 나눔)
+    <div style="overflow-x:auto"><table class="guide-table"><tr><th>슬롯</th>${AWAKENING_RARITIES.map(th).join('')}<th>언락/재도전 💠</th></tr>${oddsRows}</table></div>
+    <br><b>일반~신화</b>: 아래 스탯 중 무작위 1종 (덧셈)
+    <div style="overflow-x:auto"><table class="guide-table"><tr><th>스탯</th>${AWAKENING_RARITIES.slice(0, 6).map(th).join('')}</tr>${statRows}</table></div>
+    <br><b>고대·태초</b>: 아래 최종 옵션 중 무작위 1종 — 해당 능력치의 최종 수치에 곱해집니다(각성 슬롯끼리는 합산 후 1회 곱, 예: 고대 최종 공격력 5칸 = ×2.5)
+    <div style="overflow-x:auto"><table class="guide-table"><tr><th>옵션</th>${AWAKENING_RARITIES.slice(6).map(th).join('')}</tr>${finalRows}</table></div>`;
+}
 function enchantRangeTableHtml(options) {
   const grades = [1, 2, 3, 4, 5, 6, 7];
   const num = (v, dec) => String(+v.toFixed(dec != null ? dec : 1));
@@ -14361,13 +14364,9 @@ const GUIDE_SECTIONS = [
   {
     icon: '💠', title: '각성 시스템',
     body: `<b>+20강 이상</b> 무기부터 가능한, 강화 RNG와 완전히 분리된 확정 파워 트랙입니다. 재화는 고대의 도서관에서 얻는 <b>각성의 정수</b>를 사용합니다.
-    <br><br>★1~★5 다섯 슬롯을 순서대로 각성의 정수로 언락하며, 언락할 때마다 일반/레어/에픽/전설 등급 중 확률적으로 하나를 얻습니다. 이미 얻은 슬롯도 더 저렴한 비용으로 재도전(리롤)할 수 있습니다.
+    <br><br>★1~★5 다섯 슬롯을 순서대로 각성의 정수로 언락하며, 언락할 때마다 일반·레어·에픽·유니크·전설·신화·고대·태초 중 확률적으로 하나의 등급을 얻습니다. <b>나올 수 있는 최고 등급은 무기 등급과 같습니다</b>(고대 무기는 고대까지, 태초 무기는 태초까지). 이미 얻은 슬롯도 더 저렴한 비용으로 재도전(리롤)할 수 있습니다.
     <br><br>모든 슬롯의 효과는 동시에 전부 적용됩니다 — 상위 등급이 하위 등급을 대체하지 않으니, 다섯 슬롯 모두 각각의 값어치가 있습니다.
-    <br><br><b>등장 가능한 효과</b>
-    <br>· <b>일반</b>(스탯 무작위 1종): 공격력 · 공격속도 · 골드 획득 · 드롭률
-    <br>· <b>레어</b>: 심안의 각성(치명타 확률 +8%p) · 파괴의 각성(치명타 피해 +25%p) · 연격의 각성(연타 피해 +25%p) · 탐욕의 각성(드롭률 +15%p) · 가속의 각성(공격속도 +12%p)
-    <br>· <b>에픽</b>: 서고의 메아리(무기의 정수·각성의 정수 획득량 +50%) · 각성 공명(다른 각성 슬롯 1개당 공격력 +5%p) · 필멸자의 저항(강화 파괴·초기화 확률 -8%p) · 회심의 연격(치명타 시 20% 확률로 무료 추가타)
-    <br>· <b>전설</b>: 완전한 개화(공격력 +100%p 고정 보너스) · 각성의 파도(다른 슬롯 하나 즉시 무료 각성) · 만물의 조화(공격력·공속·치명타확률·치명타피해·골드·드롭 모두 +5%p)`,
+    <br><br>${awakeningGuideHtml()}`,
   },
   {
     icon: '🔮', title: '룬',

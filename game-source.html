@@ -3727,6 +3727,19 @@ const AWAKENING_FINALS = {
   finalBossDmg:  { label: '최종 보스 피해',   values: [0.45, 0.75] },
 };
 const AWAKENING_FINAL_KEYS = Object.keys(AWAKENING_FINALS);
+// 고대·태초 전용 특수효과(예전 에픽·전설 특수효과를 수치 상향해 재활용). 값은 [고대, 태초].
+// 같은 효과 여러 칸은 합산(회심의 연격·필멸자의 저항은 확률이라 최대 100%).
+const AWAKENING_SPECIALS = {
+  libraryEcho:  { label: '서고의 메아리', values: [0.80, 1.50], desc: v => `무기·각성의 정수 획득 +${Math.round(v * 100)}%` },
+  unbreakable:  { label: '필멸자의 저항', values: [0.25, 0.40], desc: v => `강화 실패 시 ${Math.round(v * 100)}% 확률로 패널티(초기화·하락) 무효` },
+  critFollowup: { label: '회심의 연격',   values: [0.30, 0.50], desc: v => `치명타 시 ${Math.round(v * 100)}% 확률로 같은 피해 1회 추가` },
+  // 각성 공명: 최종 공격력 기본값 + 다른 고대·태초 칸 수에 비례. 고대 = 20% + 다른 고대·태초 칸당 5%(전부면 40%),
+  // 태초 = 25% + 다른 태초 칸당 10%·고대 칸당 5%(전부 태초면 65%).
+  resonance:    { label: '각성 공명',     values: [0.20, 0.25], perOther: [[0.05, 0.05], [0.05, 0.10]],
+                  desc: (v, idx) => idx >= 7 ? `최종 공격력 +${Math.round(v * 100)}% (다른 태초 칸당 +10%, 고대 칸당 +5%)` : `최종 공격력 +${Math.round(v * 100)}% (다른 고대·태초 칸당 +5%)` },
+  harmony:      { label: '만물의 조화',   values: [0.10, 0.16], desc: v => `최종 공격력·치명타 피해·연타 피해·보스 피해 +${Math.round(v * 100)}%` },
+};
+const AWAKENING_SPECIAL_KEYS = Object.keys(AWAKENING_SPECIALS);
 function awakenRarityIdx(r) { return Math.max(0, AWAKENING_RARITIES.indexOf(r)); }
 function awakenMaxRarityIdx(w) { return Math.max(0, Math.min(AWAKENING_RARITIES.length - 1, (w && w.grade) || 0)); }
 // 무기 등급 상한을 넘는 등급을 빼고 남은 확률을 비율대로 다시 나눈 확률표(%)
@@ -3743,7 +3756,7 @@ function rollAwakeningResult(w, rankIdx) {
   for (; idx < odds.length - 1; idx++) { if (r < odds[idx]) break; r -= odds[idx]; }
   while (idx > 0 && !odds[idx]) idx--;
   const rarity = AWAKENING_RARITIES[idx];
-  const keys = idx >= 6 ? AWAKENING_FINAL_KEYS : AWAKENING_STAT_KEYS;
+  const keys = idx >= 6 ? AWAKENING_FINAL_KEYS.concat(AWAKENING_SPECIAL_KEYS) : AWAKENING_STAT_KEYS;
   return { rarity, key: keys[Math.floor(Math.random() * keys.length)] };
 }
 // 슬롯 하나의 수치(스탯 슬롯이면 덧셈 수치, 최종 슬롯이면 곱연산 수치)
@@ -3751,6 +3764,7 @@ function awakenSlotValue(slot) {
   if (!slot) return 0;
   const idx = awakenRarityIdx(slot.rarity);
   if (AWAKENING_FINALS[slot.key]) return AWAKENING_FINALS[slot.key].values[Math.max(0, idx - 6)] || 0;
+  if (AWAKENING_SPECIALS[slot.key]) return AWAKENING_SPECIALS[slot.key].values[Math.max(0, idx - 6)] || 0;
   const s = AWAKENING_STATS[slot.key];
   return s ? (s.values[Math.min(5, idx)] || 0) : 0;
 }
@@ -3758,6 +3772,7 @@ function awakenSlotLabel(slot) {
   if (!slot) return '';
   const v = awakenSlotValue(slot);
   if (AWAKENING_FINALS[slot.key]) return `${AWAKENING_FINALS[slot.key].label} +${Math.round(v * 100)}%`;
+  if (AWAKENING_SPECIALS[slot.key]) { const sp = AWAKENING_SPECIALS[slot.key]; return `${sp.label} — ${sp.desc(v, awakenRarityIdx(slot.rarity))}`; }
   const s = AWAKENING_STATS[slot.key];
   if (!s) return slot.key;
   return `${s.label} +${+(v * 100).toFixed(1)}${s.pct ? '%p' : '%'}`;
@@ -3773,8 +3788,44 @@ function awakenStat(w, statKey) {
 function awakenFinalMult(w, finalKey) {
   if (!w || !Array.isArray(w.awakening)) return 1;
   let total = 0;
-  for (const slot of w.awakening) if (slot && slot.key === finalKey) total += awakenSlotValue(slot);
+  w.awakening.forEach((slot, i) => {
+    if (!slot) return;
+    if (slot.key === finalKey || slot.key === 'harmony') total += awakenSlotValue(slot);
+    else if (slot.key === 'resonance' && finalKey === 'finalAtk') total += awakenResonanceValue(w, i);
+  });
   return 1 + total;
+}
+// 각성 공명 한 칸의 최종 공격력 수치(기본값 + 다른 고대·태초 칸 보너스)
+function awakenResonanceValue(w, slotIdx) {
+  const slot = w.awakening[slotIdx];
+  const tier = awakenRarityIdx(slot.rarity) >= 7 ? 1 : 0;
+  const per = AWAKENING_SPECIALS.resonance.perOther[tier]; // [다른 고대 칸당, 다른 태초 칸당]
+  let v = awakenSlotValue(slot);
+  w.awakening.forEach((o, j) => {
+    if (!o || j === slotIdx) return;
+    const oi = awakenRarityIdx(o.rarity);
+    if (oi >= 7) v += per[1]; else if (oi === 6) v += per[0];
+  });
+  return v;
+}
+// 고대·태초 특수효과 수치 합(같은 효과 여러 칸 합산)
+function awakenSpecialSum(w, key) {
+  if (!w || !Array.isArray(w.awakening)) return 0;
+  let total = 0;
+  for (const slot of w.awakening) if (slot && slot.key === key) total += awakenSlotValue(slot);
+  return total;
+}
+// 회심의 연격: 치명타가 터진 타격의 피해를 확률적으로 한 번 더 넣는다(여러 칸이면 확률 합산, 최대 100%)
+function awakenCritFollowup(w, dmg) {
+  const p = Math.min(1, awakenSpecialSum(w, 'critFollowup'));
+  if (p > 0 && Math.random() < p) { dealMonDamage(dmg); floatText('⚡ 회심의 연격!'); }
+}
+// 필멸자의 저항: 강화 실패 패널티(초기화·하락)를 확률적으로 무효(여러 칸이면 확률 합산, 최대 100%)
+function awakenResistPenalty(w) {
+  const p = Math.min(1, awakenSpecialSum(w, 'unbreakable'));
+  if (!(p > 0 && Math.random() < p)) return false;
+  log(`🛡️ <b>필멸자의 저항</b>(각성) 발동! 강화 실패 패널티를 막고 단계를 유지했습니다.`, 'lg-prim');
+  return true;
 }
 // 구버전 각성 슬롯 변환: 등급은 그대로, 스탯이 정해진 효과는 같은 스탯으로, 특수효과는 같은 등급 공격력으로
 const AWAKENING_LEGACY_KEY = { keenEye: 'critChance', critBoost: 'critDamage', comboBoost: 'extraAtkDmg', treasureHunt: 'luck', swiftStep: 'speed' };
@@ -3784,13 +3835,13 @@ function migrateAwakeningSlot(slot) {
   let key = slot.rarity === 'common' && slot.statKey ? slot.statKey : slot.key;
   if (AWAKENING_LEGACY_KEY[key]) key = AWAKENING_LEGACY_KEY[key];
   const isFinalTier = awakenRarityIdx(rarity) >= 6;
-  if (isFinalTier ? !AWAKENING_FINALS[key] : !AWAKENING_STATS[key]) key = isFinalTier ? 'finalAtk' : 'atk';
+  if (isFinalTier ? !(AWAKENING_FINALS[key] || AWAKENING_SPECIALS[key]) : !AWAKENING_STATS[key]) key = isFinalTier ? 'finalAtk' : 'atk';
   return { rarity, key };
 }
-// 무기의 정수/각성의 정수 보상에 적용되는 전체 배율 — 도서관 전용 룬
+// 무기의 정수/각성의 정수 보상에 적용되는 전체 배율 — 각성(서고의 메아리) + 도서관 전용 룬
 // (탐구의 룬/천공서고의 룬, 둘 다 중첩 가능) + 유물 마일스톤을 전부 곱연산으로 합산.
 function essenceRewardMult(w) {
-  let mult = 1;
+  let mult = 1 + awakenSpecialSum(w, 'libraryEcho');
   mult *= Math.pow(1 + (RUNE_SPECIALS.scholarRune.mult || 0), weaponSpecialCount(w, 'scholarRune'));
   mult *= Math.pow(1 + (RUNE_SPECIALS.skyArchiveRune.mult || 0), weaponSpecialCount(w, 'skyArchiveRune'));
   return mult;
@@ -9217,6 +9268,7 @@ function attack(w) {
   } else {
     dealMonDamage(dmg);
   }
+  if (didCrit) awakenCritFollowup(w, dmg); // 회심의 연격(각성 고대·태초)
   // 카마소츠의 조종(태초의 유물): 매 공격 확정 메아리 연쇄 + 15타마다 공진 파쇄
   camazotzEcho(dmg);
   camazotzResonance(w);
@@ -11066,7 +11118,7 @@ function resolveEnhance(w, advanced) {
     const destroyRoll = Math.random() * 100;
     const stayRoll = Math.random();
     // 패널티(파괴·초기화·하락)가 나올 상황이면 방지권으로 "유지" 처리 — 파계전사 인장(하락 대신 골드)보다 먼저
-    if ((destroyRoll < dChance || stayRoll >= stayChance) && tryUsePenaltyGuard('강화 실패')) {
+    if ((destroyRoll < dChance || stayRoll >= stayChance) && (awakenResistPenalty(w) || tryUsePenaltyGuard('강화 실패'))) {
       playEnhanceFx('protect', attemptLevel);
       playEnhancePanelReveal('enhMainPanel', 'dust');
       renderEnhance(); renderTop(); save();
@@ -14277,12 +14329,15 @@ function awakeningGuideHtml() {
   const oddsRows = AWAKENING_RANKS.map((rk, i) => `<tr><td>★${i + 1}</td>${rk.odds.map(p => `<td>${p ? p + '%' : '–'}</td>`).join('')}<td style="white-space:nowrap">${rk.unlockCost} / ${rk.rerollCost}</td></tr>`).join('');
   const statRows = Object.values(AWAKENING_STATS).map(st => `<tr><td style="white-space:nowrap">${st.label}</td>${st.values.map(v => `<td>+${+(v * 100).toFixed(1)}${st.pct ? '%p' : '%'}</td>`).join('')}</tr>`).join('');
   const finalRows = Object.values(AWAKENING_FINALS).map(f => `<tr><td style="white-space:nowrap">${f.label}</td>${f.values.map(v => `<td>×${+(1 + v).toFixed(2)}</td>`).join('')}</tr>`).join('');
+  const specialRows = Object.values(AWAKENING_SPECIALS).map(sp => `<tr><td style="white-space:nowrap">${sp.label}</td>${sp.values.map((v, i) => `<td>${sp.desc(v, 6 + i)}</td>`).join('')}</tr>`).join('');
   return `<b>슬롯별 등급 확률</b> (무기 등급보다 높은 칸은 빼고 남은 확률을 비율대로 다시 나눔)
     <div style="overflow-x:auto"><table class="guide-table"><tr><th>슬롯</th>${AWAKENING_RARITIES.map(th).join('')}<th>언락/재도전 💠</th></tr>${oddsRows}</table></div>
     <br><b>일반~신화</b>: 아래 스탯 중 무작위 1종 (덧셈)
     <div style="overflow-x:auto"><table class="guide-table"><tr><th>스탯</th>${AWAKENING_RARITIES.slice(0, 6).map(th).join('')}</tr>${statRows}</table></div>
     <br><b>고대·태초</b>: 아래 최종 옵션 중 무작위 1종 — 해당 능력치의 최종 수치에 곱해집니다(각성 슬롯끼리는 합산 후 1회 곱, 예: 고대 최종 공격력 5칸 = ×2.5)
-    <div style="overflow-x:auto"><table class="guide-table"><tr><th>옵션</th>${AWAKENING_RARITIES.slice(6).map(th).join('')}</tr>${finalRows}</table></div>`;
+    <div style="overflow-x:auto"><table class="guide-table"><tr><th>옵션</th>${AWAKENING_RARITIES.slice(6).map(th).join('')}</tr>${finalRows}</table></div>
+    <br><b>고대·태초 특수효과</b> (위 최종 옵션 4종과 함께 9종 중 무작위 1종. 같은 효과 여러 칸은 합산, 확률형은 최대 100%)
+    <div style="overflow-x:auto"><table class="guide-table"><tr><th>효과</th>${AWAKENING_RARITIES.slice(6).map(th).join('')}</tr>${specialRows}</table></div>`;
 }
 function enchantRangeTableHtml(options) {
   const grades = [1, 2, 3, 4, 5, 6, 7];

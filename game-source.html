@@ -270,9 +270,11 @@
   .enhWepTitle { font-size: 22px; font-weight: bold; margin-bottom: 4px; }
   .enhnum { color: var(--gold); }
   #enhwepeffect { font-size: 13px; margin: 6px 0; }
-  .enhStatGrid { display: flex; justify-content: space-around; margin: 10px 0; font-size: 14px; }
-  .enhStatGrid div { text-align: center; }
-  .enhStatGrid b { display: block; font-size: 18px; margin-top: 2px; }
+  /* 공격력·다음 단계·강화 비용·성공 확률·재료·정수 칸: 예전엔 한 줄 flex라 모바일에서 6칸이 짓눌려
+     라벨과 숫자가 글자 단위로 쪼개졌다 → 폭에 맞춰 2~3열로 접히는 칸(그리드)으로 */
+  .enhStatGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; margin: 10px 0; font-size: 12px; }
+  .enhStatGrid > div { text-align: center; min-width: 0; padding: 6px 4px; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; color: var(--sub); word-break: keep-all; overflow-wrap: anywhere; }
+  .enhStatGrid b { display: block; font-size: 16px; margin-top: 2px; word-break: normal; }
   .enhrates { font-size: 13px; color: var(--sub); text-align: center; margin: 8px 0; }
   .enhrates b { color: var(--text); }
   .warn { color: #ff8a8a; }

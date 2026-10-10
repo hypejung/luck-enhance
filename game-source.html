@@ -12163,6 +12163,9 @@ const SYNC_PW_KEY = 'luckEnhance_syncPw';
 const SYNC_ID_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 헷갈리는 0/O, 1/I 제외
 const SYNC_PW_CHARS = 'abcdefghijkmnpqrstuvwxyz23456789';
 
+// ?nosync=1 로 열면 클라우드에서 받아오지도, 올리지도 않는다(이 기기 데이터 그대로) — 다른 기기의 잘못된
+// 업로드로 클라우드가 덮어써졌을 때, 원래 기기에 남은 데이터를 확인하고 클라우드로 되돌리는 복구용.
+const SYNC_PAUSED = (() => { try { return new URLSearchParams(location.search).has('nosync'); } catch (e) { return false; } })();
 function syncConfigured() { return !!SYNC_DB_URL; }
 function getSyncId() { try { return localStorage.getItem(SYNC_ID_KEY) || ''; } catch (e) { return ''; } }
 function getSyncPw() { try { return localStorage.getItem(SYNC_PW_KEY) || ''; } catch (e) { return ''; } }
@@ -12232,7 +12235,7 @@ let syncUploadBusy = false;
 let syncUploadPending = false;
 // 저장이 일어날 때마다 같은 데이터를 서버에도 올림 (실패 시 조용히 무시 - 다음 저장 때 다시 시도됨)
 function syncUpload() {
-  if (!syncConfigured()) return;
+  if (!syncConfigured() || SYNC_PAUSED) return;
   const id = getSyncId();
   if (!id) return;
   if (syncUploadBusy) { syncUploadPending = true; return; }
@@ -12350,10 +12353,37 @@ function renderGenesisFeedBanner() {
   el.hidden = false;
 }
 
+// 동기화 멈춤(?nosync=1) 안내 + 이 기기 데이터로 클라우드 복구
+function showSyncPausedModal() {
+  const id = getSyncId();
+  const w = getEquipped();
+  const summary = `골드 ${fmt(S.gold)} · 무기 ${S.weapons.length}개 · 장착 ${w ? stripTags(gradeTag(w)) : '없음'}`;
+  showAlertModal(`<h3>⏸️ 동기화를 멈추고 열었습니다</h3>
+    <p style="text-align:left">이 기기에 저장된 데이터 그대로입니다. 클라우드에서 받아오지도, 올리지도 않습니다.<br><span class="alertSub">${escHtml(summary)}</span></p>
+    ${id ? `<p style="text-align:left">이 데이터가 맞다면 동기화 ID <b>${escHtml(id)}</b>의 클라우드 데이터를 이 기기 데이터로 되돌릴 수 있습니다.</p>
+    <button class="primary" id="syncRestoreBtn">☁️ 이 기기 데이터로 클라우드 복구</button><div style="height:8px"></div>` : '<p class="alertSub">이 기기에는 동기화 ID가 없습니다.</p>'}
+    <button id="syncPausedCloseBtn">닫기 (이 상태로 보기)</button>
+    <div id="syncRestoreMsg" style="font-size:12px;margin-top:8px;"></div>`);
+  $('syncPausedCloseBtn').onclick = hideAlertModal;
+  const rb = $('syncRestoreBtn');
+  if (rb) rb.onclick = async () => {
+    rb.disabled = true; rb.textContent = '올리는 중...';
+    try {
+      save();
+      await syncPutSave(await syncKeyFor(id, getSyncPw()), packSave(JSON.stringify(S)));
+      $('syncRestoreMsg').innerHTML = '<span style="color:#7de08a">✅ 클라우드를 이 기기 데이터로 되돌렸습니다.</span> <a href="' + location.pathname + '">동기화 켜고 다시 열기</a>';
+      rb.textContent = '복구 완료';
+    } catch (e) {
+      $('syncRestoreMsg').innerHTML = '<span style="color:#ff7a7a">업로드에 실패했습니다. 인터넷 연결을 확인하고 다시 눌러주세요.</span>';
+      rb.disabled = false; rb.textContent = '☁️ 이 기기 데이터로 클라우드 복구';
+    }
+  };
+}
+
 // 페이지 로드 시, 동기화 ID가 이미 있으면 게임을 시작하기 전에 서버 최신 데이터로 로컬을 덮어씀.
 // 아직 예전 위치에 있으면 이때 새 위치로 옮긴다.
 async function syncApplyOnLoad() {
-  if (!syncConfigured()) return;
+  if (!syncConfigured() || SYNC_PAUSED) return;
   const id = getSyncId();
   if (!id) return;
   const pw = getSyncPw();
@@ -12608,6 +12638,9 @@ function syncModalEnterExisting() {
         $('syncModalErr').textContent = 'ID 또는 비밀번호가 올바르지 않습니다.';
       } else {
         showConfirmModal('현재 기기의 진행 상황을 덮어쓰고 불러온 데이터로 시작할까요?', async () => {
+          // 새로고침 직전 언로드 저장(markLeave)·주기 저장이 "이 기기의 기존 진행 상황"을 로컬에 다시 쓰고
+          // 새 ID로 클라우드에 올려, 불러온 계정을 덮어쓰던 버그 — 여기서부터 저장·업로드를 막는다.
+          resetting = true;
           try { localStorage.setItem(SAVE_KEY, rec.data); } catch (e2) {}
           setSyncCreds(id, pw);
           if (rec.legacy) { try { await syncMigrateLegacy(id, rec.key, rec.data); } catch (e3) {} }
@@ -15290,6 +15323,7 @@ function renderBossAccs() {
 /* ===================== 초기화 ===================== */
 function init() {
   S = load();
+  if (SYNC_PAUSED) setTimeout(showSyncPausedModal, 300);
   if (saveTamperNotice) {
     // 세이브 변조 감지 — DOM이 준비된 뒤 알린다
     const msg = saveTamperNotice === 'restored'

@@ -2055,6 +2055,127 @@ const SUBWEAPON_GENESES = [
 떼어내려 하면, 손끝이 차가워진다.
 
 멜뤼진(Melusine).` },
+  { id: 'pygmalion', name: '피그말리온의 조각칼 쌍검띠', subtitle: 'Pygmalion, the Sculptor', icon: '🗿',
+    passiveName: '깎아내는 손길', activeName: '갈라테이아의 숨결',
+    passiveText: '깎아낼수록 돌은 가벼워지고, 형상은 숨을 쉬기 시작한다.',
+    activeText: '그가 입을 맞춘 순간, 차가운 돌에 온기가 돌았다.',
+    // 치명타가 안 터진 공격마다 조각 +1(최대 max, 전투 단위), 다음 치명타 피해 ×(1+perChip×조각), 치명타에 전부 소모
+    // 액티브: 발동 즉시 조각 가득 + 지속 중엔 소모 안 됨
+    p: { perChip: 0.018, max: 30 },
+    lore: `그는 어떤 여인도 사랑하지 않았다.
+대신 상아를 깎았다.
+
+날마다 조금씩.
+어깨의 곡선을, 손가락의 마디를,
+아직 뜨지 않은 눈꺼풀을.
+
+깎아낸 조각들이 발밑에 쌓여갈수록
+형상은 점점 사람을 닮아갔고,
+그는 점점 그것을 사랑하게 되었다.
+
+어느 날 밤 그는 빌었다.
+그리고 돌에 입을 맞췄다.
+
+차가워야 할 입술이, 따뜻했다.
+
+멈춘 공방의 인형들은
+지금도 누군가의 입맞춤을 기다리며 서 있다.
+
+피그말리온(Pygmalion).` },
+  { id: 'aeolus', name: '아이올로스의 바람자루 도끼걸이', subtitle: 'Aeolus, Keeper of the Winds', icon: '🌪️',
+    passiveName: '풀려난 바람', activeName: '다시 묶은 자루',
+    passiveText: '자루를 연 순간, 가두어 두었던 바람이 한꺼번에 쏟아진다.',
+    activeText: '바람은 다시 자루 속으로, 그리고 또 한 번 밖으로.',
+    // 보스전 시작 직후 피해 +maxBonus, decay초에 걸쳐 0까지 선형 감소 / 액티브: 지속 중 최대치 유지, 끝나면 다시 decay초
+    p: { maxBonus: 1.22, decay: 20 },
+    lore: `바람의 왕은 한 나그네에게 선물을 주었다.
+가죽 자루 하나.
+그 안에는 고향으로 가는 길을 막는
+모든 거센 바람이 묶여 있었다.
+
+배는 순풍을 타고 아흐레를 달렸다.
+고향의 불빛이 보일 무렵,
+지친 나그네는 잠이 들었다.
+
+선원들은 자루 속에 금이 들었으리라 생각했다.
+매듭이 풀리는 순간,
+묶여 있던 모든 바람이 한꺼번에 터져 나왔다.
+
+증기 배관로의 낡은 밸브들은
+지금도 그날의 바람 소리를 낸다.
+
+아이올로스(Aeolus).` },
+  { id: 'maat', name: '마아트의 깃털 창꽂이', subtitle: "Ma'at, the Feather of Truth", icon: '🪶',
+    passiveName: '심장의 무게', activeName: '저울의 판결',
+    passiveText: '깃털보다 무거운 심장은, 저울을 넘어 쏟아진다.',
+    activeText: '저울이 기운 순간, 판결은 번복되지 않는다.',
+    // 치명타 확률 1당 치명타 피해 +perChance(배율 가산, 상한 밖), 100%를 넘는 확률은 1당 +perOver / 액티브: 치명타 피해 ×activeMult
+    p: { perChance: 2.2, perOver: 5.0, activeMult: 1.5 },
+    lore: `죽은 자는 저울 앞에 선다.
+한쪽에는 그의 심장이,
+다른 한쪽에는 깃털 하나가 놓인다.
+
+진실의 여신이 머리에 꽂고 있던 깃털.
+세상에서 가장 가볍고,
+세상에서 가장 무거운 것.
+
+심장이 깃털보다 가벼우면 낙원으로.
+무거우면, 저울 아래 기다리는 것에게로.
+
+태엽 감옥의 재판관은
+멈추지 않고 같은 재판을 되풀이한다.
+저울은 언제나, 조금씩 기울어 있다.
+
+마아트(Ma'at).` },
+  { id: 'odysseus', name: '오디세우스의 열두 도끼 화살통', subtitle: 'Odysseus, Through Twelve Axes', icon: '🎯',
+    passiveName: '열두 개의 구멍', activeName: '구혼자들의 최후',
+    passiveText: '열두 개의 도끼 구멍을, 화살 하나가 꿰뚫고 지나간다.',
+    activeText: '활시위를 당길 수 있는 자는, 오직 한 사람뿐이었다.',
+    // 연타 피해 ×(1+base+perChance×연타 확률(최대 1)), 100%를 넘는 연타 확률은 두 번째 연타 확률 / 액티브: 매 공격 연타 1회 확정 추가
+    p: { base: 4, perChance: 4 },
+    lore: `이십 년 만에 돌아온 왕을
+아무도 알아보지 못했다.
+
+궁전에는 구혼자들이 가득했고,
+왕비는 마지막 시험을 냈다.
+늙은 왕의 활에 시위를 걸고,
+일렬로 세운 열두 개의 도끼 구멍을
+화살 하나로 꿰뚫는 자와 혼인하겠다고.
+
+누구도 시위조차 걸지 못했다.
+
+넝마를 걸친 나그네가 활을 들었다.
+시위가 울리는 소리는
+제비의 노래 같았다고 한다.
+
+화살은 열두 구멍을 모두 지나갔다.
+그리고 다음 화살은, 구혼자들을 향했다.
+
+오디세우스(Odysseus).` },
+  { id: 'sleipnir', name: '슬레이프니르의 여덟 발굽 마도서', subtitle: 'Sleipnir, the Eight-Legged', icon: '🐎',
+    passiveName: '여덟 개의 다리', activeName: '이그드라실을 건너',
+    passiveText: '여덟 개의 다리는, 땅을 딛는 법을 잊었다.',
+    activeText: '세계수의 가지를 건너, 아홉 세계를 하루에 달린다.',
+    // 기본 공속 대비 빨라진 비율 1(=100%)당 모든 피해 +perSpeed / 액티브: 지속 중 공격속도 ×(1+activeSpeed)
+    p: { perSpeed: 0.1, activeSpeed: 0.35 },
+    lore: `신들의 성벽을 쌓던 거인에게는
+지치지 않는 말이 한 필 있었다.
+
+그 말을 꾀어낸 것은
+암말로 모습을 바꾼 한 장난꾸러기 신이었다.
+
+그렇게 태어난 망아지에게는
+다리가 여덟 개 있었다.
+
+망아지는 자라서 신들의 왕을 태웠다.
+땅과 하늘을, 산 자와 죽은 자의 나라를,
+세계수의 가지를 따라 아홉 세계를 달렸다.
+
+폭주하는 코어 지하에서는
+지금도 쇠로 된 말발굽 소리가 울린다.
+여덟 번씩, 쉬지 않고.
+
+슬레이프니르(Sleipnir).` },
 ];
 // 그 층 몬스터 1마리당 기본 확률 — 고대 보조무기(1/1400만)보다 약 4.4배 희박(풀세팅 약 39일)
 const SUBWEAPON_GENESIS_BASE_CHANCE = 1 / 61000000;
@@ -8665,7 +8786,7 @@ function genesisSubFx() {
 }
 function gsubState() {
   if (!fx.gsub) fx.gsub = { fleece: 0, atkAcc: 0, avgAtk: 0, sickleT: 0, crits: 0, marks: 0, echoes: [], deadT: 0, hornT: 0,
-    parisT: 0, maxHit: 0, jonahT: 0, ember: 1 };
+    parisT: 0, maxHit: 0, jonahT: 0, ember: 1, chips: 0, windT: 0 };
   return fx.gsub;
 }
 // 결전의 기백(+태초 고유 액티브)이 켜져 있는 동안
@@ -8712,6 +8833,14 @@ function genesisSubDmgMult() {
     return 1 + (r - 1) * s;
   }
   if (id === 'prometheus' && bossFight.active) return 1 + (gsubState().ember - 1) * s;
+  if (id === 'aeolus' && bossFight.active) { // 풀려난 바람: 보스전 시작(또는 액티브 종료) 후 decay초에 걸쳐 잦아듦
+    return 1 + p.maxBonus * s * Math.max(0, 1 - gsubState().windT / p.decay);
+  }
+  if (id === 'sleipnir') { // 여덟 개의 다리: 기본 공속 대비 빨라진 비율만큼
+    const w = getEquipped();
+    const base = w ? weaponBaseSpeed(w) : 0;
+    return base > 0 ? 1 + p.perSpeed * s * Math.max(0, weaponSpeed(w) / base - 1) : 1;
+  }
   if (id === 'melusine') { // 토요일의 비밀: 체력이 below 아래일수록(0%에서 최대)
     const frac = gsubActiveOn() ? 0 : gsubTargetHpFrac();
     return frac < p.below ? 1 + p.maxBonus * s * (p.below - frac) / p.below : 1;
@@ -8726,12 +8855,31 @@ function gsubParisOpen(g) {
 }
 function genesisSubSpeedMult() {
   const g = genesisSubFx();
+  if (g && g.gd.id === 'sleipnir' && gsubActiveOn()) return 1 + g.p.activeSpeed * g.s;
   return g && g.gd.id === 'hel' && bossFight.active && !gsubHelLatePhase() ? 1 + g.p.speed * g.s : 1;
 }
-// 치명타 배율 가산(헤임달) — 상한 밖
-function genesisSubCritAdd() {
+// 오디세우스(열두 개의 구멍): 연타 확률(상한 전 원값)로 연타 피해 배율·두 번째 연타 확률, 액티브 중 확정 연타
+function genesisSubOdysseus(rawExtraChance) {
   const g = genesisSubFx();
-  return g && g.gd.id === 'heimdall' ? g.p.critDmg * g.s : 0;
+  if (!g || g.gd.id !== 'odysseus') return null;
+  const c = Math.max(0, rawExtraChance || 0);
+  return { dmgMult: 1 + g.s * (g.p.base + g.p.perChance * Math.min(1, c)), second: Math.min(1, Math.max(0, c - 1)), force: gsubActiveOn() };
+}
+// 무기 종류 기본 공격속도(슬레이프니르의 "빨라진 비율" 기준)
+function weaponBaseSpeed(w) {
+  const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
+  return w.speedOverride != null ? w.speedOverride : (t ? t.speed : 1);
+}
+// 치명타 배율 가산(헤임달) — 상한 밖
+function genesisSubCritAdd(rawCritChance) {
+  const g = genesisSubFx();
+  if (!g) return 0;
+  if (g.gd.id === 'heimdall') return g.p.critDmg * g.s;
+  if (g.gd.id === 'maat') { // 심장의 무게: 치명타 확률만큼, 100% 초과분은 더 크게
+    const c = Math.max(0, rawCritChance || 0);
+    return g.s * (Math.min(1, c) * g.p.perChance + Math.max(0, c - 1) * g.p.perOver);
+  }
+  return 0;
 }
 // 치명타 배율 곱(카인의 표식) — 예언 패턴 감쇠 뒤에 곱한다
 function genesisSubCritMult() {
@@ -8739,6 +8887,8 @@ function genesisSubCritMult() {
   if (!g) return 1;
   if (g.gd.id === 'cain') return 1 + g.p.perMark * g.s * gsubState().marks;
   if (g.gd.id === 'paris' && gsubParisOpen(g)) return 1 + (g.p.critMult - 1) * g.s;
+  if (g.gd.id === 'pygmalion') return 1 + g.p.perChip * g.s * gsubState().chips;
+  if (g.gd.id === 'maat' && gsubActiveOn()) return 1 + (g.p.activeMult - 1) * g.s;
   return 1;
 }
 function genesisSubIgnoresForesight() {
@@ -8747,6 +8897,12 @@ function genesisSubIgnoresForesight() {
 }
 function genesisSubOnHit(didCrit, critDmg) {
   const g = genesisSubFx();
+  if (g && g.gd.id === 'pygmalion') { // 깎아내는 손길: 비치명타마다 조각 +1, 치명타에 소모(액티브 중엔 유지)
+    const st = gsubState();
+    if (!didCrit) st.chips = Math.min(g.p.max, st.chips + 1);
+    else if (!gsubActiveOn()) st.chips = 0;
+    return;
+  }
   if (!g || g.gd.id !== 'cain' || !didCrit) return;
   const st = gsubState();
   st.crits++;
@@ -8768,6 +8924,7 @@ function genesisSubOnExtra(extraTotal) {
 function genesisSubOnActivate() {
   const g = genesisSubFx();
   if (g && g.gd.id === 'cain') { gsubState().marks = g.p.maxMarks; floatText('🩸 표식 각인!'); }
+  if (g && g.gd.id === 'pygmalion') { gsubState().chips = g.p.max; floatText('🗿 갈라테이아의 숨결!'); }
 }
 // 보스 패턴 발동 직전(bdTrigger) — true를 돌려주면 그 패턴은 무효
 function genesisSubOnPattern() {
@@ -8812,6 +8969,8 @@ function genesisSubTick(dt) {
     }
   } else if (g.gd.id === 'paris') {
     st.parisT += dt;
+  } else if (g.gd.id === 'aeolus') {
+    st.windT = on ? 0 : st.windT + dt;
   } else if (g.gd.id === 'prometheus') {
     const rate = 1 + p.rate * (on ? 2 : 1);
     st.ember = Math.min(p.max, st.ember * Math.pow(rate, dt));
@@ -9258,7 +9417,7 @@ function attack(w) {
     (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage') * awakenFinalMult(w, 'finalCritDmg');
   // 파쇄의 리듬/주문 작렬 전용 치명타 배율: 기본 배율은 그대로, 스탯으로 얻은 추가 상승분만
   // EFFECT_CRIT_DMG_SCALE만큼만 반영한다.
-  critMult += ancientSubCritDmgBonus() + genesisSubCritAdd(); // 고대 보조무기(등불·미완성 설계)·태초 보조무기(경계의 눈): 상한 밖 추가 치명타 피해
+  critMult += ancientSubCritDmgBonus() + genesisSubCritAdd(((e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance')); // 고대 보조무기(등불·미완성 설계)·태초 보조무기(경계의 눈): 상한 밖 추가 치명타 피해
   const critMultBase = (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5);
   const effectCritMult = bdForesightMult(critMultBase + (critMult - critMultBase) * EFFECT_CRIT_DMG_SCALE);
   critMult = bdForesightMult(critMult); // 보스 방해(예언): 치명타 추가분만 깎는다
@@ -9500,16 +9659,19 @@ function attack(w) {
   const sporeActive = w.spirit === 'sporeburst' && now < fx.sporeburstUntil;
   const sporeExtraBonus = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkBonus || 0) : 0;
   // 베헤모스의 짓누르는 발걸음(태초의 유물): 연타(추가공격)가 완전히 불가능해진다
-  const extraChance = hasBehemoth() ? 0 : Math.min(DMG_CAPS.extraChance,
-    (e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + awakenStat(w, 'extraAtk') + sporeExtraBonus + ancientSubExtraChance()) * pandoraStatMult('extraAtk');
+  const extraRaw = hasBehemoth() ? 0 : ((e && e.extra ? e.extra : 0) + weaponRuneStat(w, 'extraAtk') / 100 + trainingValue('extraAtk') + typeTrait(w, 'extra') + ae2.extraAtk + awakenStat(w, 'extraAtk') + sporeExtraBonus + ancientSubExtraChance());
+  const extraChance = Math.min(DMG_CAPS.extraChance, extraRaw) * pandoraStatMult('extraAtk');
+  // 오디세우스(태초 보조무기): 연타 확률(상한 전)로 연타 피해 증폭·초과분은 두 번째 연타, 액티브 중 연타 1회 확정 추가
+  const ody = hasBehemoth() ? null : genesisSubOdysseus(extraRaw * pandoraStatMult('extraAtk'));
   // 연타 피해 = 기준 배율(평소 75%, 포자 폭발 활성 중엔 150%) × (1 + 연타 피해 스탯 합계)
   // — 치명타 피해와 마찬가지로 장신구/룬/훈련/인챈트/무기 특성/각성에서 상한 없이 누적된다.
   const extraAtkDmgBonus = weaponRuneStat(w, 'extraAtkDmg') / 100 + trainingValue('extraAtkDmg') + typeTrait(w, 'extraAtkDmg') + ae2.extraAtkDmg + awakenStat(w, 'extraAtkDmg') + (fujinPhaseActive() ? FUJIN_RAIJIN.extraAtkDmgBonus : 0) + (azathothWhim === 'extra' ? AZATHOTH.extraDmgBonus : 0);
   // 풍신뇌신도(태초의 유물): 풍신 위상 중엔 모든 공격에 확정 연타(추가공격) 발생
   // 아자토스의 눈먼 변덕(태초의 유물): '확정 연타' 변덕이 뽑히면 이번 공격에 확정 연타 발생
-  if (fujinPhaseActive() || azathothWhim === 'extra' || asubForce.extra || (extraChance > 0 && Math.random() < extraChance)) {
+  const extraRolled = fujinPhaseActive() || azathothWhim === 'extra' || asubForce.extra || (extraChance > 0 && Math.random() < extraChance);
+  if (extraRolled || (ody && ody.force)) {
     const extraDmgBase = sporeActive ? (ANCIENT_SPIRITS.sporeburst.extraAtkDmgMult || EXTRA_ATK_DMG_MULT) : EXTRA_ATK_DMG_MULT;
-    let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * awakenFinalMult(w, 'finalExtraDmg') * ancientSubExtraDmgMult();
+    let extraDmg = preCritDmg * extraDmgBase * (1 + extraAtkDmgBonus) * pandoraStatMult('extraAtkDmg') * awakenFinalMult(w, 'finalExtraDmg') * ancientSubExtraDmgMult() * (ody ? ody.dmgMult : 1);
     ancientSubOnExtra(); // 고대 보조무기(길 잃은 양떼)
     // 포자 폭발(고대 에이션트 스피릿): 다른 무기와 달리 연타(추가공격)도 별도로 치명타 판정을 받는다
     if (w.spirit === 'sporeburst' && critChance > 0 && Math.random() < critChance) {
@@ -9519,7 +9681,11 @@ function attack(w) {
     // 피의 갈증(고대 에이션트 스피릿): 출혈 지속 중에는 연타가 2연타(기본+1타)가 아니라
     // 5연타(기본+4타)로 적용된다 — 추가타 횟수만 늘어날 뿐 타당 피해량은 동일하다.
     const bloodThirstActive = w.spirit === 'bloodtribute' && now < fx.bloodThirstUntil;
-    const extraHits = bloodThirstActive ? (ANCIENT_SPIRITS.bloodtribute.extraAtkHits - 1) : 1;
+    let extraHits = bloodThirstActive ? (ANCIENT_SPIRITS.bloodtribute.extraAtkHits - 1) : 1;
+    if (ody) { // 원래 연타 + 확정 추가(액티브) + 두 번째 연타(초과 확률)
+      if (ody.force && extraRolled) extraHits += 1;
+      if (ody.second > 0 && Math.random() < ody.second) { extraHits += 1; floatText('🎯 열두 개의 구멍!'); }
+    }
     dealMonDamage(extraDmg * extraHits);
     floatText(bloodThirstActive ? '🦇 광란!' : '⚡ 연타!');
     genesisSubOnExtra(extraDmg * extraHits); // 태초 보조무기(황금 양털·구름의 장막)

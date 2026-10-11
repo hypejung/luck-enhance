@@ -1927,6 +1927,134 @@ const SUBWEAPON_GENESES = [
 누군가는 아직 그 소리를 기다리고 있다.
 
 헤임달(Heimdallr), 걀라르호른의 주인.` },
+  { id: 'paris', name: '파리스의 운명 화살통', subtitle: 'Paris, the Fated Archer', icon: '🏹',
+    passiveName: '뒤꿈치의 틈', activeName: '운명의 화살',
+    passiveText: '불사의 몸에도, 강물이 닿지 않은 한 뼘이 있다.',
+    activeText: '화살은 이미 쏘아졌다. 운명이 그 끝을 정해두었을 뿐.',
+    // 보스전에서 every초마다 open초 동안 약점 노출 — 노출 중 치명타 피해 ×critMult(단계 배율은 증가분에만)
+    // 액티브: 지속 중 약점 상시 노출
+    p: { every: 6, open: 2, critMult: 2.1 },
+    lore: `전쟁은 십 년을 끌었다.
+성벽은 무너지지 않았고, 영웅은 쓰러지지 않았다.
+
+어머니는 아들을 저승의 강에 담갔다고 한다.
+온몸이 강물에 잠겼다.
+단 한 곳, 어머니의 손가락이 쥐고 있던 발뒤꿈치만 빼고.
+
+누구도 그 틈을 몰랐다.
+가장 겁 많고, 가장 멀리 서 있던 왕자만이
+신의 손에 이끌려 시위를 당겼다.
+
+화살은 바람을 타고 내려가
+정확히, 한 뼘의 틈에 박혔다.
+
+이 화살통은 그날 이후로 비어 본 적이 없다.
+
+파리스(Paris).` },
+  { id: 'fortuna', name: '포르투나의 수레바퀴 마도서', subtitle: 'Fortuna, the Wheel', icon: '🎡',
+    passiveName: '운명의 수레바퀴', activeName: '여신의 미소',
+    passiveText: '수레바퀴는 멈추지 않는다. 오늘의 왕이 내일의 거지가 된다.',
+    activeText: '여신이 눈을 뜬 순간, 바퀴는 한 번 더 돈다.',
+    // 매 공격 wheel 중 하나를 굴려 피해 배율(단계 배율은 1에서 벗어난 만큼에만) / 액티브: 두 번 굴려 높은 값
+    p: { wheel: [0.5, 0.75, 1, 1, 1.25, 1.5, 2, 2.5] },
+    lore: `물에 잠긴 시장 한가운데,
+아직도 천천히 도는 바퀴 하나가 있다.
+
+상인들은 그 앞에 금화를 던지고 빌었다.
+어떤 이는 왕이 되었고,
+어떤 이는 다음 날 모든 것을 잃었다.
+
+바퀴를 돌리는 여신은 눈을 가리고 있었다.
+누구의 얼굴도 보지 않았다.
+그래서 누구도 원망할 수 없었다.
+
+물이 시장을 삼킨 밤에도
+바퀴는 멈추지 않았다.
+
+이 책의 마지막 장에는
+그 바퀴의 눈금이 빼곡히 적혀 있다.
+
+포르투나(Fortuna).` },
+  { id: 'jonah', name: '요나의 고래뱃속 건틀릿', subtitle: 'Jonah, in the Belly', icon: '🐋',
+    passiveName: '사흘의 어둠', activeName: '토해내다',
+    passiveText: '삼켜진 것은 사라지지 않는다. 어둠 속에서, 다시 올라올 날을 기다릴 뿐.',
+    activeText: '사흘째 되던 날, 바다가 모든 것을 토해냈다.',
+    // 보스전에서 가장 컸던 단일 피해(태초 효과 자신 제외, 평균 공격 피해의 capAvg배 상한)를 기억해
+    // every초마다 그 피해 × mult 재현 / 액티브: 재현 주기 activeEvery초
+    p: { every: 2, mult: 4.5, activeEvery: 0.5, capAvg: 8 },
+    lore: `명령을 피해 도망친 자가 있었다.
+배는 폭풍을 만났고,
+선원들은 그를 바다에 던졌다.
+
+거대한 것이 그를 삼켰다.
+
+사흘 동안 그는 어둠 속에 있었다.
+위도 아래도 없는 곳에서
+삼켜진 것들이 천천히 쌓여가는 소리를 들었다.
+
+사흘째 되던 날,
+바다는 그를 해안에 토해냈다.
+그리고 그와 함께 삼켰던 모든 것을.
+
+잠긴 대성당의 종지기들은
+지금도 바닥에서 그 건틀릿을 건져 올린다고 한다.
+안쪽이, 아직도 축축하다.
+
+요나(Jonah).` },
+  { id: 'prometheus', name: '프로메테우스의 사슬 표창집', subtitle: 'Prometheus, the Bound', icon: '🔥',
+    passiveName: '훔친 불씨', activeName: '독수리가 오지 않는 날',
+    passiveText: '하늘에서 훔친 불은, 꺼지지 않고 조용히 번져간다.',
+    activeText: '오늘만은 독수리가 오지 않는다.',
+    // 보스전에서 피해 배율이 매초 ×(1+rate) 복리로 성장(최대 max, 단계 배율은 증가분에만).
+    // 보스 패턴 발동 시 증가분 절반으로. 액티브: 성장 2배 + 패턴에도 줄지 않음
+    p: { rate: 0.025, max: 2.6 },
+    lore: `그는 신들의 불을 훔쳐
+추위에 떠는 이들에게 나눠주었다.
+
+벌은 영원했다.
+바위에 묶이고,
+매일 독수리가 내려와 그를 쪼았다.
+밤이 되면 상처는 아물었고,
+아침이 되면 독수리는 다시 왔다.
+
+그러나 그가 건넨 불씨는
+한 번도 꺼진 적이 없었다.
+작은 불은 큰불이 되었고,
+큰불은 세상이 되었다.
+
+물의 감옥 가장 깊은 곳에
+녹슨 사슬이 늘어져 있다.
+그 끝에 매달린 표창집은, 만지면 따뜻하다.
+
+프로메테우스(Prometheus).` },
+  { id: 'melusine', name: '멜뤼진의 비늘 검집', subtitle: 'Melusine, the Serpent Queen', icon: '🐍',
+    passiveName: '토요일의 비밀', activeName: '드러난 본모습',
+    passiveText: '그녀가 감춘 것은 꼬리였다. 끝이 다가올수록 비늘이 드러난다.',
+    activeText: '약속은 깨졌고, 여왕은 더 이상 숨지 않는다.',
+    // 대상 체력이 below 아래로 내려가면 낮을수록 피해 증가(0%에서 +maxBonus). 펀치기계·주간 레이드는
+    // 남은 시간 비율로 대신 판정. 액티브: 지속 중 체력과 상관없이 최대치
+    p: { below: 0.5, maxBonus: 0.8 },
+    lore: `물가에서 만난 여인은 왕이 되어줄 남자에게
+단 하나의 약속을 받아냈다.
+
+토요일에는, 내 방을 들여다보지 마세요.
+
+궁전은 번영했고 아이들이 태어났다.
+여왕은 아름다웠고, 아무것도 숨기지 않는 듯했다.
+
+어느 토요일,
+남자는 문틈으로 그녀를 보았다.
+욕조 안에서 물결치는 것은 다리가 아니라
+비늘로 덮인 긴 꼬리였다.
+
+약속은 깨졌다.
+여왕은 창밖으로 날아갔고,
+궁전은 천천히 바다 아래로 가라앉았다.
+
+검집에는 지금도 비늘 한 장이 붙어 있다.
+떼어내려 하면, 손끝이 차가워진다.
+
+멜뤼진(Melusine).` },
 ];
 // 그 층 몬스터 1마리당 기본 확률 — 고대 보조무기(1/1400만)보다 약 4.4배 희박(풀세팅 약 39일)
 const SUBWEAPON_GENESIS_BASE_CHANCE = 1 / 61000000;
@@ -8525,7 +8653,8 @@ function genesisSubFx() {
   return { gd, p: gd.p, s: subGenesisScale(sw) };
 }
 function gsubState() {
-  if (!fx.gsub) fx.gsub = { fleece: 0, atkAcc: 0, avgAtk: 0, sickleT: 0, crits: 0, marks: 0, echoes: [], deadT: 0, hornT: 0 };
+  if (!fx.gsub) fx.gsub = { fleece: 0, atkAcc: 0, avgAtk: 0, sickleT: 0, crits: 0, marks: 0, echoes: [], deadT: 0, hornT: 0,
+    parisT: 0, maxHit: 0, jonahT: 0, ember: 1 };
   return fx.gsub;
 }
 // 결전의 기백(+태초 고유 액티브)이 켜져 있는 동안
@@ -8536,6 +8665,7 @@ function gsubDeal(amount) { gsubNoTrack = true; try { dealMonDamage(amount); } f
 function genesisSubOnDamage(amount) {
   if (!fx.gsub || !bossFight.active || gsubNoTrack) return;
   fx.gsub.atkAcc += amount;
+  if (amount > fx.gsub.maxHit) fx.gsub.maxHit = amount; // 요나(사흘의 어둠): 가장 컸던 한 방
 }
 // 공격 시작 시: 직전 공격 1회가 실제로 입힌 총 피해(치명타·연타·주문 작렬 등 포함)의 이동 평균
 function genesisSubPreAttack() {
@@ -8549,13 +8679,39 @@ function gsubHelLatePhase() {
   if (bossFight.isPunch || bossFight.isWeeklyRaid) return bossFight.elapsed >= (bossFight.elapsed + bossFight.timeLeft) / 2;
   return BN.toNumber(BN.div(mon.hp, mon.maxHp)) < 0.5;
 }
+// 대상의 남은 체력 비율 — 체력이 사실상 안 줄어드는 펀치기계·주간 레이드는 남은 시간 비율로 대신(멜뤼진)
+function gsubTargetHpFrac() {
+  if (bossFight.active && (bossFight.isPunch || bossFight.isWeeklyRaid)) {
+    const total = bossFight.elapsed + bossFight.timeLeft;
+    return total > 0 ? Math.max(0, bossFight.timeLeft / total) : 1;
+  }
+  if (!mon || BN.lte(mon.maxHp, 0)) return 1;
+  return Math.max(0, Math.min(1, BN.toNumber(BN.div(mon.hp, mon.maxHp))));
+}
 // 치명타 전 피해 배율
 function genesisSubDmgMult() {
   const g = genesisSubFx();
   if (!g) return 1;
-  if (g.gd.id === 'nephele') return 1 + g.p.perStack * g.s * gsubState().fleece;
-  if (g.gd.id === 'hel' && bossFight.active && gsubHelLatePhase()) return 1 + g.p.bossDmg * g.s;
+  const id = g.gd.id, p = g.p, s = g.s;
+  if (id === 'nephele') return 1 + p.perStack * s * gsubState().fleece;
+  if (id === 'hel' && bossFight.active && gsubHelLatePhase()) return 1 + p.bossDmg * s;
+  if (id === 'fortuna') { // 운명의 수레바퀴: 매 공격 한 칸(액티브 중엔 두 번 굴려 높은 값)
+    const spin = () => p.wheel[Math.floor(Math.random() * p.wheel.length)];
+    const r = gsubActiveOn() ? Math.max(spin(), spin()) : spin();
+    return 1 + (r - 1) * s;
+  }
+  if (id === 'prometheus' && bossFight.active) return 1 + (gsubState().ember - 1) * s;
+  if (id === 'melusine') { // 토요일의 비밀: 체력이 below 아래일수록(0%에서 최대)
+    const frac = gsubActiveOn() ? 0 : gsubTargetHpFrac();
+    return frac < p.below ? 1 + p.maxBonus * s * (p.below - frac) / p.below : 1;
+  }
   return 1;
+}
+// 파리스(뒤꿈치의 틈): 지금 약점이 드러나 있는지(보스전 한정, 액티브 중엔 상시)
+function gsubParisOpen(g) {
+  if (!bossFight.active) return false;
+  if (gsubActiveOn()) return true;
+  return (gsubState().parisT % g.p.every) < g.p.open;
 }
 function genesisSubSpeedMult() {
   const g = genesisSubFx();
@@ -8569,7 +8725,10 @@ function genesisSubCritAdd() {
 // 치명타 배율 곱(카인의 표식) — 예언 패턴 감쇠 뒤에 곱한다
 function genesisSubCritMult() {
   const g = genesisSubFx();
-  return g && g.gd.id === 'cain' ? 1 + g.p.perMark * g.s * gsubState().marks : 1;
+  if (!g) return 1;
+  if (g.gd.id === 'cain') return 1 + g.p.perMark * g.s * gsubState().marks;
+  if (g.gd.id === 'paris' && gsubParisOpen(g)) return 1 + (g.p.critMult - 1) * g.s;
+  return 1;
 }
 function genesisSubIgnoresForesight() {
   const g = genesisSubFx();
@@ -8602,6 +8761,11 @@ function genesisSubOnActivate() {
 // 보스 패턴 발동 직전(bdTrigger) — true를 돌려주면 그 패턴은 무효
 function genesisSubOnPattern() {
   const g = genesisSubFx();
+  if (g && g.gd.id === 'prometheus' && !gsubActiveOn()) { // 훔친 불씨: 패턴에 맞으면 증가분 절반
+    const st = gsubState();
+    if (st.ember > 1) { st.ember = 1 + (st.ember - 1) / 2; floatText('🦅 불씨가 쪼였다'); }
+    return false;
+  }
   if (!g || g.gd.id !== 'heimdall' || !gsubActiveOn()) return false;
   const st = gsubState();
   if (st.avgAtk > 0) gsubDeal(st.avgAtk * g.p.mult * g.s);
@@ -8634,6 +8798,19 @@ function genesisSubTick(dt) {
     while (st.hornT >= p.every) {
       st.hornT -= p.every;
       if (st.avgAtk > 0) { gsubDeal(st.avgAtk * p.mult * s); floatText('📯 걀라르호른!'); hit = true; }
+    }
+  } else if (g.gd.id === 'paris') {
+    st.parisT += dt;
+  } else if (g.gd.id === 'prometheus') {
+    const rate = 1 + p.rate * (on ? 2 : 1);
+    st.ember = Math.min(p.max, st.ember * Math.pow(rate, dt));
+  } else if (g.gd.id === 'jonah') {
+    st.jonahT += dt;
+    const every = on ? p.activeEvery : p.every;
+    while (st.jonahT >= every) {
+      st.jonahT -= every;
+      const hitAmt = Math.min(st.maxHit, st.avgAtk * p.capAvg);
+      if (hitAmt > 0) { gsubDeal(hitAmt * p.mult * s); floatText('🐋 토해낸 일격!'); hit = true; }
     }
   } else if (g.gd.id === 'cain' && st.echoes.length) {
     const now = Date.now();

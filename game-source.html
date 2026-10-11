@@ -8254,6 +8254,13 @@ function autoSubEnhanceTick() {
     log(`⚙️ 골드가 부족해 보조무기 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
     return;
   }
+  const essenceNeed = subAncientEssenceCost(cur) + subGenesisEssenceCost(cur);
+  if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) {
+    const target = autoSubEnhanceTarget;
+    stopAutoSubEnhance();
+    log(`⚙️ 무기의 정수가 부족해 보조무기 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(essenceNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad');
+    return;
+  }
   trySubEnhance(false, cur);
 }
 // ---- 사냥터 드롭(월드2 전용, 상자 상점과는 별개의 무료 획득 경로) ----
@@ -11451,6 +11458,14 @@ function autoEnhanceTick() {
     const target = autoEnhanceTarget;
     stopAutoEnhance();
     log(`⚙️ 골드가 부족해 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
+    return;
+  }
+  // 태초/고대 무기: 무기의 정수가 모자라면 중지(예전엔 확인이 없어 멈추지 않고 매 틱 "정수 부족" 로그만 쌓였다)
+  const essenceNeed = essenceCostFor(cur);
+  if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) {
+    const target = autoEnhanceTarget;
+    stopAutoEnhance();
+    log(`⚙️ 무기의 정수가 부족해 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(essenceNeed)}, 보유 ${fmt(S.weaponEssence)}) — 고대의 도서관에서 획득하세요`, 'lg-bad');
     return;
   }
   const matNeed = highMatsNeeded(cur.enhance);

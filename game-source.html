@@ -903,8 +903,14 @@
         <h3>🧤 보유 장갑 <span style="font-size:12px;color:var(--sub)" id="gloveinvcount"></span></h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
           🧵 강철실 보유: <b id="gloveSteelCount" style="color:var(--gold)"></b> · 📄 금서의 페이지: <b id="gloveForbiddenPages" style="color:var(--gold)"></b><br>
-          장갑은 1개만 장착할 수 있고, 토벌전 21단계 이상(30%)·도서관 21서고 이상(50%) 승리 시 획득합니다.
+          장갑은 1개만 장착할 수 있고, 토벌전 21단계 이상(30%)·도서관 21서고 이상(50%) 승리, 🌌 성야국 사냥(0.15%)·성야국 보스(보스 장갑)에서 획득합니다.
           🪡 자수: 금서의 페이지 1장 + 📜 무기의 정수로 대응 스탯 하나를 무작위로 수놓습니다(장갑마다 1칸, 다시 하면 덮어씀). 자세한 내용은 📘 가이드 탭 참고.
+        </div>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:8px; display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          🗑️ 자동판매:
+          <select id="gloveAutoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
+          이하 장갑은 강화 0단계·자수 없음일 때 획득 즉시 판매 (보스 장갑 제외)
+          <button id="gloveAutoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
         </div>
         <div id="gloveinvlist"></div>
       </div>
@@ -1089,6 +1095,22 @@
           도감 등록 현황에 따라 자동으로 활성화되는 효과입니다. 별도 장착 없이 조건을 만족하는 즉시 항상 적용됩니다.
         </div>
         <div id="subCodexBonusList"></div>
+      </div>
+    </div>
+    <div id="codexGloveSection" style="display:none">
+      <div class="panel">
+        <h3>🧤 장갑 도감</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+          월드3(성야국) 보스 장갑 컬렉션입니다. 41~60층 보스가 그 층 전용 장갑을 드롭하고, 한 번 얻으면 도감에 남습니다(판매·파괴해도 유지). 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
+        </div>
+        <div id="gloveCodexGrid"></div>
+      </div>
+      <div class="panel">
+        <h3>🏆 보스 장갑 수집 효과</h3>
+        <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+          모은 보스 장갑 종류 수에 따라 자동으로 활성화되는 효과입니다. 월드 구분 없이 항상 적용됩니다(드롭률만 월드 규칙을 따름).
+        </div>
+        <div id="gloveCodexBonusList"></div>
       </div>
     </div>
     <div id="codexPopup" hidden>
@@ -2741,6 +2763,12 @@ function codexStatText(stat, value, cap) {
     subDropRate: v => `🍀 보조무기 드롭률 +${Math.round(v * 100)}%`,
     subGachaDiscount: v => `🎁 보조무기 상자 가격 -${Math.round(v * 100)}%`,
     subEnhGoldReduce: v => `💰 보조무기 강화 골드 소모 -${Math.round(v * 100)}%`,
+    gloveEnh: v => `🧤 장갑 강화 확률 +${+(v * 100).toFixed(1)}%p`,
+    gloveDropRate: v => `🧤 장갑 드롭률 +${Math.round(v * 100)}%`,
+    gloveEnhGoldReduce: v => `🧤 장갑 강화 골드 -${Math.round(v * 100)}%`,
+    gloveDestroyReduce: v => `🛡️ 장갑 강화 파괴 확률 -${Math.round(v * 100)}%p`,
+    gloveAmp: v => `🧤 장갑 보조 스탯·자수 증폭 +${Math.round(v * 100)}%`,
+    embroideryDiscount: v => `🪡 자수 정수 비용 -${Math.round(v * 100)}%`,
   };
   return (map[stat] || (v => `+${v}`))(value);
 }
@@ -3229,6 +3257,7 @@ const BOSS = {
   weaponDrop: 0.007,      // 신화 보스무기 드롭 (0.7%) — 1~20층 전용
   accDrop: 0.009,         // 신화 보스장신구 드롭 (0.9%) — 1~20/21~40 공용
   subweaponDrop: 0.004,   // 보스 보조무기 드롭 (0.4%) — 21~40층 전용. weaponDrop보다 낮게
+  gloveDrop: 0.004,       // 보스 장갑 드롭 (0.4%, 광폭화 보스 2배) — 41~60층 전용
                           // 잡아서 "보조무기는 좀 더 상위 컨텐츠"라는 인식을 준다.
   // 승리 보상 골드 = 해당 층 몬스터를 "원킷" 기준으로 1시간 사냥했을 때 벌 수 있는 골드
   // (장착 무기의 실질 공속 × 3600초 × 층 처치골드), 골드 보너스 배율도 동일하게 적용.
@@ -3588,6 +3617,58 @@ const GLOVE_DROP_GRADES = [ // [시작 단계(index), 등급 가중치]
   [30, [[3, 35], [4, 45], [5, 20]]],
   [35, [[4, 60], [5, 40]]],
 ];
+// ---- 🌌 성야국 보스 장갑 (월드3 41~60층) ----
+// 층 보스 승리 시 BOSS.gloveDrop(광폭화 보스 2배). 신화 고정, 그 보스 패턴을 가장 많이 막는 종류로 고정.
+// 같은 층 보스 장신구와 세트(gloveBossSetFloor). 지금 갖고 있으면 골드로 대체, 판매·파괴했으면 다시 나온다.
+// index = 층 번호 - WORLD3_START_FLOOR (0 = 41층). typeIdx는 GLOVE_TYPES 순서.
+const GLOVE_BOSS_NAMES = [
+  { name: '누미에르의 양털 장갑',       typeIdx: 6, flavor: '백 마리째 양에서 멈춘 손가락이, 아직 이 털실 안에서 숫자를 센다.' },
+  { name: '오스필라의 꽃잎 수면장갑',   typeIdx: 6, flavor: '끼는 순간 하품이 나지만, 이상하게 눈은 더 또렷해진다.' },
+  { name: '마르무르의 이불 걷는 장갑',  typeIdx: 3, flavor: '포근하게 덮인 것을 단번에 걷어내는, 단호한 손.' },
+  { name: '룰라비아의 자장가 손싸개',   typeIdx: 6, flavor: '아기 손에 씌우던 작은 손싸개. 어떤 노래도 이 손을 재우지 못한다.' },
+  { name: '힙노리아의 촛농 장갑',       typeIdx: 6, flavor: '꺼진 초에서 흘러내린 촛농이 굳어, 빛을 놓치지 않는 손이 되었다.' },
+  { name: '플로베르의 거꾸로 꿰맨 장갑', typeIdx: 4, flavor: '안팎이 뒤집힌 채 꿰매져, 되돌아가려는 것을 끊어낸다.' },
+  { name: '에셀리온의 난간 잡는 장갑',  typeIdx: 0, flavor: '끝없는 계단에서도, 이 손이 잡은 난간만은 제자리에 있다.' },
+  { name: '미로이네의 은도금 연회장갑', typeIdx: 2, flavor: '거울 속 손님과 진짜 손님을 단번에 가려내는 은빛 손끝.' },
+  { name: '테디안의 실밥 뜯는 장갑',    typeIdx: 4, flavor: '꿰매 일으킨 것들의 실밥을 하나씩 뜯어내는 손.' },
+  { name: '마스카렐의 커튼콜 장갑',     typeIdx: 5, flavor: '막이 내리지 않는 무대에서, 끝까지 박수를 치던 손.' },
+  { name: '셀레니아의 물그림자 장갑',   typeIdx: 0, flavor: '물에 비친 달이 아니라, 진짜 달을 가리키는 손.' },
+  { name: '토비안의 절굿공이 붕대',     typeIdx: 1, flavor: '달이 뜰 때마다 방아를 찧느라 단단해진 손에 감긴 붕대.' },
+  { name: '마레아의 썰물 장갑',         typeIdx: 4, flavor: '밀려온 것을 붙잡아, 다시 바다로 돌려보내지 않는다.' },
+  { name: '크레센토의 초승달 점술장갑', typeIdx: 2, flavor: '깎여 나간 달의 조각으로 내일의 칼끝을 읽는다.' },
+  { name: '에클리샤의 월식 장갑',       typeIdx: 6, flavor: '달의 얼굴이 가려진 동안에도, 이 손은 길을 잃지 않는다.' },
+  { name: '갈락시엘의 별 캐는 장갑',    typeIdx: 3, flavor: '은하수 바닥에서 별을 캐내던, 노래가 배어 있는 손.' },
+  { name: '네뷸리아의 물감 묻은 장갑',  typeIdx: 6, flavor: '밤하늘을 칠하다 남은 물감이 손끝마다 다른 색으로 번져 있다.' },
+  { name: '코메타르의 꼬리별 장갑',     typeIdx: 5, flavor: '돌아오겠다는 약속처럼, 떠나도 반드시 다시 손에 잡힌다.' },
+  { name: '보레알의 커튼 걷는 장갑',    typeIdx: 2, flavor: '밤하늘에 드리운 빛의 커튼을 걷어, 그 뒤를 본다.' },
+  { name: '녹투르나의 새벽 쥔 장갑',    typeIdx: 6, flavor: '금지된 새벽을 꼭 쥐고 있다. 이 손을 펴는 날, 밤이 끝난다.' },
+];
+// 보스 장갑 수집 마일스톤 — 황혼국 "보스 보조무기 수집"과 같은 구간, 효과는 장갑 쪽.
+// gloveEnh는 표시용(text) — 실제 강화 확률은 GLOVE_ENH_BONUS_SOURCES에서 기준 단계 방식으로 적용.
+const GLOVE_BOSS_MILESTONES = [
+  { count: 1,  effs: [['gloveEnh', 0.02]], text: '🧤 장갑 강화 확률 +2%p (+12강 기준, 높은 단계일수록 줄어듦)' },
+  { count: 2,  effs: [['gloveDropRate', 0.10]] },
+  { count: 4,  effs: [['luck', 0.15], ['gloveEnhGoldReduce', 0.05]] },
+  { count: 6,  effs: [['gloveDestroyReduce', 0.03]] },
+  { count: 8,  effs: [['gloveAmp', 0.05]] },
+  { count: 10, effs: [['embroideryDiscount', 0.10], ['gloveDropRate', 0.10]] },
+  { count: 12, effs: [['gloveEnh', 0.06], ['luck', 0.30]], text: '🧤 장갑 강화 확률 +6%p (+22강 기준, 높은 단계일수록 줄어듦), 🍀 드롭률 +30%' },
+  { count: 14, effs: [['gloveEnhGoldReduce', 0.10]] },
+  { count: 16, effs: [['gloveAmp', 0.05]] },
+  { count: 18, effs: [['gloveDestroyReduce', 0.05]] },
+  { count: 20, effs: [['gloveAmp', 0.10], ['embroideryDiscount', 0.10], ['luck', 0.50]] },
+];
+function gloveBossCodexCount() { return (S && Array.isArray(S.gloveBossCodexSeen) ? S.gloveBossCodexSeen : []).filter(Boolean).length; }
+function gloveBossMilestoneEff() {
+  const eff = {};
+  const n = gloveBossCodexCount();
+  for (const m of GLOVE_BOSS_MILESTONES) {
+    if (n < m.count) continue;
+    for (const [stat, val] of m.effs) eff[stat] = (eff[stat] || 0) + val;
+  }
+  return eff;
+}
+function gloveBossInfo(g) { return g && g.bossFloor !== undefined ? GLOVE_BOSS_NAMES[g.bossFloor - WORLD3_START_FLOOR] || null : null; }
 function getEquippedGlove() { return (S && Array.isArray(S.gloves) ? S.gloves : []).find(g => g.id === S.gloveEquipped) || null; }
 function gloveStats(g) {
   const t = GLOVE_TYPES[g.typeIdx];
@@ -3647,10 +3728,16 @@ function gloveAtk(g) {
   if (!g) return 0;
   return GRADES[g.grade].atk * SUBWEAPON_ATK_MULT * GLOVE_ATK_MULT * enhAtkMult(g.enhance, g.grade);
 }
-function gloveName(g) { return GLOVE_TYPES[g.typeIdx].names[g.grade] || GLOVE_TYPES[g.typeIdx].names[0]; }
+function gloveName(g) {
+  const bi = gloveBossInfo(g);
+  if (bi) return bi.name; // 보스 장갑은 등급 공용 이름 대신 그 층 전용 이름
+  return GLOVE_TYPES[g.typeIdx].names[g.grade] || GLOVE_TYPES[g.typeIdx].names[0];
+}
 function gloveGradeTag(g) {
   const gname = GRADES[g.grade].name;
-  return `<span class="grade-${gname}">${gname} ${GLOVE_TYPES[g.typeIdx].icon} [${gloveName(g)}] +${g.enhance}</span>`;
+  const boss = g.bossFloor !== undefined && FLOORS[g.bossFloor]
+    ? ` <span style="font-size:12px;color:#3ddfff;font-weight:bold">👹[${FLOORS[g.bossFloor].name}]</span>` : '';
+  return `<span class="grade-${gname}">${gname} ${GLOVE_TYPES[g.typeIdx].icon} [${gloveName(g)}] +${g.enhance}</span>${boss}`;
 }
 // 보조 스탯·자수는 증폭이 있으면 증폭 후 값을 같이 보여준다 (예: 집중 40% → 58%)
 function gloveStatText(g) {
@@ -3665,21 +3752,36 @@ function gloveStatText(g) {
 }
 function gloveSellPrice(g) { return Math.round(20 * subGradeMult(g.grade) * (1 + g.enhance * 0.3)); }
 function glovePower(g) { return g.grade * 1000 + g.enhance; }
+// 장갑 자동판매: 설정 등급 이하 + 강화 0단계 + 자수 없음. 보스 장갑은 항상 제외.
+function gloveAutoSellMatch(g) {
+  return S.gloveAutoSellGrade != null && g.bossFloor === undefined && g.grade <= S.gloveAutoSellGrade && !g.enhance && !g.embroidery;
+}
+// 가방에 넣었으면 true, 자동판매됐으면 false. 보스 장갑은 어떤 경우에도 자동판매하지 않는다
+// (가방이 꽉 차 있고 팔 수 있는 장갑이 없으면 정원을 넘겨서라도 넣는다).
 function addGlove(g) {
   if (!Array.isArray(S.gloves)) S.gloves = [];
+  const isBoss = g.bossFloor !== undefined;
+  if (gloveAutoSellMatch(g)) {
+    S.gold = BN.add(S.gold, gloveSellPrice(g));
+    log(`🗑️ 자동판매: ${gloveGradeTag(g)} → +${fmt(gloveSellPrice(g))} 골드`);
+    return false;
+  }
   if (S.gloves.length >= GLOVE_BAG_MAX) {
-    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped);
+    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped && x.bossFloor === undefined);
     const weakest = [...sellable].sort((a, b) => glovePower(a) - glovePower(b))[0];
-    if (!weakest || glovePower(weakest) > glovePower(g)) {
+    if (!isBoss && (!weakest || glovePower(weakest) > glovePower(g))) {
       S.gold = BN.add(S.gold, gloveSellPrice(g));
       log(`🧤 장갑 가방이 가득 차서 새 장갑을 자동 판매: ${gloveGradeTag(g)}`);
-      return;
+      return false;
     }
-    S.gold = BN.add(S.gold, gloveSellPrice(weakest));
-    S.gloves = S.gloves.filter(x => x.id !== weakest.id);
-    log(`🧤 장갑 가방이 가득 차서 가장 약한 장갑 자동 판매: ${gloveGradeTag(weakest)}`);
+    if (weakest) {
+      S.gold = BN.add(S.gold, gloveSellPrice(weakest));
+      S.gloves = S.gloves.filter(x => x.id !== weakest.id);
+      log(`🧤 장갑 가방이 가득 차서 가장 약한 장갑 자동 판매: ${gloveGradeTag(weakest)}`);
+    }
   }
   S.gloves.push(g);
+  return true;
 }
 // 토벌전 21단계 이상 승리 시: 절반은 그 보스의 방해 효과를 주 스탯으로 막는 장갑, 절반은 8종 무작위
 function rollGloveDrop(stage) {
@@ -3698,8 +3800,19 @@ function dropGloveFor(list, grade) {
   const matching = GLOVE_TYPES.map((t, i) => i).filter(i => counters.includes(GLOVE_TYPES[i].main));
   const pool = matching.length && Math.random() < 0.5 ? matching : GLOVE_TYPES.map((t, i) => i);
   const g = { id: uid++, typeIdx: pool[Math.floor(Math.random() * pool.length)], grade, enhance: 0 };
-  addGlove(g);
-  log(`🧤 <b>장갑 획득!</b> ${gloveGradeTag(g)} — ${gloveStatText(g)}`, grade >= 4 ? 'lg-prim' : 'lg-good');
+  if (addGlove(g)) log(`🧤 <b>장갑 획득!</b> ${gloveGradeTag(g)} — ${gloveStatText(g)}`, grade >= 4 ? 'lg-prim' : 'lg-good');
+}
+// 성야국(월드3) 사냥터 장갑 드롭 — 황혼국 보조무기 사냥 드롭과 같은 확률·등급표.
+// 절반은 그 층 보스 패턴을 막는 종류(dropGloveFor).
+const GLOVE_HUNT_DROP_CHANCE = 0.0015;
+const GLOVE_HUNT_DROP_TABLE = [[0, 45], [1, 28], [2, 15], [3, 8], [4, 3], [5, 1]];
+function rollGloveHuntDrop(floorIdx, kindMult) {
+  if (worldOf(floorIdx) !== 3) return;
+  const w = getEquipped();
+  const mul = (1 + accEff().luck + awakenStat(w, 'luck')) * (1 + (accEff().gloveDropRate || 0));
+  if (Math.random() >= GLOVE_HUNT_DROP_CHANCE * kindMult * mul) return;
+  dropGloveFor(floorDisruptionList(floorIdx), wrand(GLOVE_HUNT_DROP_TABLE));
+  renderTop(); save();
 }
 function equipGlove(id) {
   if (!(S.gloves || []).some(g => g.id === id)) return;
@@ -3724,11 +3837,31 @@ function gloveSteelCost(enh) { return enh < 10 ? 1 : enh < 20 ? 3 : 8; }
 function gloveEnhanceCost(g) {
   return Math.round(GLOVE_ENH.goldBase * Math.pow(GLOVE_ENH.goldGrowth, g.enhance) * enhanceEventCostMult(g.enhance) * (1 - Math.min(0.9, accEff().gloveEnhGoldReduce || 0)));
 }
+// 장갑 강화 확률 보정 — 보조무기(SUB_ENH_BONUS_SOURCES)와 같은 방식: 출처마다 기준 단계(cap)에서 딱 value %p,
+// 다른 단계는 SUB_ENH.success 표의 비율만큼(고강일수록 작게). 예전엔 accEff().gloveEnh를 모든 단계에 그대로
+// 더해서 고강 확률이 수십 배로 뛰었다 — accEff().gloveEnh는 이제 UI 표시용으로만 남긴다.
+const GLOVE_ENH_BONUS_SOURCES = [
+  { cap: 20, value: 6, has: () => S.bossAccs.includes(52) },                  // 마레아의 밀물 팔찌 (53층 보스 장신구)
+  { cap: 18, value: 3, has: () => (S.accEquipped || []).some(a => a.floor === 52) },  // 53층 장신구
+  { cap: 20, value: 4, has: () => (S.accEquipped || []).some(a => a.floor === 59) },  // 60층 장신구
+  { cap: 12, value: 2, has: () => gloveBossCodexCount() >= 1 },               // 보스 장갑 1종 수집
+  { cap: 22, value: 6, has: () => gloveBossCodexCount() >= 12 },              // 보스 장갑 12종 수집
+];
+function gloveEnhTierBonus(enhance) {
+  let bonus = subEnhanceEventSuccessBonus(enhance);
+  for (const src of GLOVE_ENH_BONUS_SOURCES) {
+    if (!src.has()) continue;
+    bonus += src.value * (SUB_ENH.success[enhance] / SUB_ENH.success[src.cap]);
+  }
+  return bonus;
+}
 function gloveSuccessChance(g) {
-  return Math.min(100, subGradeAdjustedSuccess(g.grade, g.enhance) + subEnhanceEventSuccessBonus(g.enhance) + (accEff().gloveEnh || 0) * 100);
+  return Math.min(100, subGradeAdjustedSuccess(g.grade, g.enhance) + gloveEnhTierBonus(g.enhance));
 }
 function gloveDestroyChance(g) {
-  let chance = SUB_ENH.destroy[g.enhance] || 0;
+  const base = SUB_ENH.destroy[g.enhance] || 0;
+  const reduce = Math.min(0.95, accEff().gloveDestroyReduce || 0); // 보조무기와 같은 %p 차감
+  let chance = Math.max(0, Math.round((base - reduce * 100) * 10) / 10);
   if (enhanceEventActive()) chance = Math.round(chance * ENHANCE_EVENT.destroyMult * 10) / 10;
   return chance;
 }
@@ -6713,6 +6846,8 @@ function newState() {
     subEquipped: null,     // 장착 중인 보조무기 id
     gloves: [],            // 보유 장갑 목록: [{id, typeIdx, grade, enhance}, ...]
     gloveEquipped: null,   // 장착 중인 장갑 id
+    gloveBossCodexSeen: [], // 보스 장갑 컬렉션(월드3): [true/false, ...] 20개, index = 층 번호(0=41층)
+    gloveAutoSellGrade: null, // 이 등급 이하 + 강화0 + 자수 없는 장갑은 획득 즉시 자동판매 (null=끔, 보스 장갑 제외)
     genesisFeedPending: [], genesisFeedName: '', // 태초 획득 알림: 이름 입력·서버 업로드 대기 목록, 마지막으로 쓴 이름
     weeklyRaid: { week: null, days: {}, dayKey: null, dayCount: 0, title: null, titleWeek: null, bestRun: null, recordDay: null, rid: null, pushDirty: false, unsettled: [], lastSettled: null }, // 세계수의 단말마: week=주차키, days={날짜키: 일일 최고 피해}, dayKey/dayCount=오늘 도전 횟수, title/titleWeek=칭호와 그 칭호가 유효한 주, bestRun=역대 최고 1회 피해, recordDay=기록 보상 받은 날, rid=전체 합산용 익명 id(해시해서 키로 씀), pushDirty=이번 주 기록 업로드 대기, unsettled=전체 정산 대기 [{week,total}], lastSettled=마지막 전체 정산 결과
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
@@ -7215,7 +7350,7 @@ function accEff() {
     subAmp: 0, subEnh: 0, subDestroyReduce: 0, subActiveDmg: 0, subActiveDuration: 0, subDropRate: 0, subGachaDiscount: 0, subEnhGoldReduce: 0,
     // 장갑 전용 스탯(월드3 장신구/꿈조각) — gloveAmp: 장갑 보조 스탯·자수 증폭(주 스탯 제외), gloveEnh: 장갑 강화 확률(%p, 0.06=6%p),
     // gloveDropRate: 장갑 드롭률, gloveEnhGoldReduce: 장갑 강화 골드 감소, embroideryDiscount: 자수 정수 비용 감소
-    gloveAmp: 0, gloveEnh: 0, gloveDropRate: 0, gloveEnhGoldReduce: 0, embroideryDiscount: 0,
+    gloveAmp: 0, gloveEnh: 0, gloveDropRate: 0, gloveEnhGoldReduce: 0, embroideryDiscount: 0, gloveDestroyReduce: 0,
   };
   const world1 = isWorld1BonusActive();
   // 장신구/보스장신구는 "그 장신구가 몇 층 것인가"(eq.floor)로 개별 판정한다 — 21~40층
@@ -7283,6 +7418,8 @@ function accEff() {
   }
   // 🌙 꿈조각(월드3 보스 수집품) 개수 마일스톤 — 계정 범용, 드롭률만 월드3 소스 규칙
   if (S) { const ds = dreamShardMilestoneEff(); for (const k of Object.keys(ds)) eff[k] = (eff[k] || 0) + (k === 'luck' ? luckFor(ds[k], 'w3') : ds[k]); }
+  // 🧤 보스 장갑 수집 마일스톤 — 계정 범용, 드롭률만 월드3 소스 규칙
+  if (S) { const gb = gloveBossMilestoneEff(); for (const k of Object.keys(gb)) eff[k] = (eff[k] || 0) + (k === 'luck' ? luckFor(gb[k], 'w3') : gb[k]); }
   // 능력치 훈련 (장비와 무관하게 항상 적용, 월드 구분 없음)
   // 세계수의 단말마 칭호: 모든 사냥터에 그대로(다른 월드 절반 규칙 없음)
   const raidTitle = S && S.weeklyRaid ? activeRaidTitle() : null;
@@ -7393,8 +7530,6 @@ function bossSetFloor() {
   if (w.bossFloor === 'all') return S.bossAccs.includes(S.floor) ? S.floor : null;
   return S.bossAccs.includes(w.bossFloor) ? w.bossFloor : null;
 }
-// 월드2 버전 세트 효과 판정 — 메인 무기 대신 장착 중인 보조무기의 bossFloor로 판정한다
-// (21~40층은 보스가 메인 무기를 안 주므로 bossSetFloor()가 절대 성립하지 않는다).
 // 월드3 버전 세트 효과 판정 — 장착 중인 보스 장갑의 bossFloor로 판정
 function gloveBossSetFloor() {
   if (!S || !Array.isArray(S.bossAccs) || !S.bossAccs.length) return null;
@@ -7402,6 +7537,8 @@ function gloveBossSetFloor() {
   if (!g || g.bossFloor === undefined) return null;
   return S.bossAccs.includes(g.bossFloor) ? g.bossFloor : null;
 }
+// 월드2 버전 세트 효과 판정 — 메인 무기 대신 장착 중인 보조무기의 bossFloor로 판정한다
+// (21~40층은 보스가 메인 무기를 안 주므로 bossSetFloor()가 절대 성립하지 않는다).
 function subBossSetFloor() {
   if (!S || !Array.isArray(S.bossAccs) || !S.bossAccs.length) return null;
   const sw = getEquippedSubweapon();
@@ -7982,6 +8119,8 @@ function dropRoll() {
   rollAncientWeapon(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 보조무기: 월드2(21~40층) 전용 드롭 시도 (엘리트는 5배, rollSubweaponDrop 내부에서 층 체크)
   rollSubweaponDrop(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
+  // 장갑: 월드3(41~60층) 전용 사냥 드롭 (엘리트는 5배)
+  rollGloveHuntDrop(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 황혼의 유산(수집품): 고대 무기와 같은 방식의 초저확률 고정 드롭 (월드2 전용, 엘리트는 5배)
   rollSubweaponRelic(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 고대 보조무기(장착형): 그 층 고유 고대 보조무기 초저확률 드롭 (월드2 전용, 엘리트는 5배)
@@ -10997,7 +11136,8 @@ function endBossFight(win) {
       }
     } else if (inWorld2(f) && Math.random() < BOSS.subweaponDrop * (1 + accEff().luck + awakenStat(w, 'luck'))) {
       const idx = f - WORLD2_START_FLOOR;
-      if (S.subBossCodexSeen[idx]) {
+      // 지금 갖고 있을 때만 골드로 대체(예전엔 도감 등록 여부로 판정해서 판매·파괴 후 다시 안 나왔다)
+      if ((S.subweapons || []).some(x => x.bossFloor === f)) {
         log(`보스 보조무기는 이미 보유 중이라 골드로 대체 지급됩니다.`);
         S.gold = BN.add(S.gold, Math.floor(floorGold(f) * 10));
       } else {
@@ -11008,6 +11148,19 @@ function endBossFight(win) {
         addSubweapon(sw);
         S.subBossCodexSeen[idx] = true;
         log(`🗡️ <b>보스 보조무기 드롭!</b> ${subweaponGradeTag(sw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
+      }
+    } else if (worldOf(f) === 3 && Math.random() < BOSS.gloveDrop * (enrageBoss ? 2 : 1) * (1 + accEff().luck + awakenStat(w, 'luck')) * (1 + (accEff().gloveDropRate || 0))) {
+      // 41~60층(월드3): 그 층 전용 보스 장갑(GLOVE_BOSS_NAMES)
+      const idx = f - WORLD3_START_FLOOR;
+      if ((S.gloves || []).some(x => x.bossFloor === f)) {
+        log(`보스 장갑은 이미 보유 중이라 골드로 대체 지급됩니다.`);
+        S.gold = BN.add(S.gold, Math.floor(floorGold(f) * 10));
+      } else {
+        const g = { id: uid++, typeIdx: GLOVE_BOSS_NAMES[idx].typeIdx, grade: 5, enhance: 0, bossFloor: f };
+        addGlove(g);
+        if (!Array.isArray(S.gloveBossCodexSeen)) S.gloveBossCodexSeen = [];
+        S.gloveBossCodexSeen[idx] = true;
+        log(`🧤 <b>보스 장갑 드롭!</b> ${gloveGradeTag(g)} — 보스 장신구와 세트 효과!`, 'lg-prim');
       }
     }
     // 신화 보스장신구 드롭 (1~20/21~40 공용 — BOSS_ACCS는 이미 40개로 확장됨)
@@ -12467,12 +12620,15 @@ let codexMainSubTab = 'weapon'; // 순수 UI 상태라 세이브 불필요
 const CODEX_MAIN_SUBTAB_OPTIONS = [
   { v: 'weapon', label: '📖 무기 도감' },
   { v: 'subweapon', label: '🗡️ 보조무기 도감' },
+  { v: 'glove', label: '🧤 장갑 도감' },
 ];
 function renderCodex() {
   renderEquipSubTabBar('codexMainSubTabBar', codexMainSubTab, (v) => { codexMainSubTab = v; renderCodex(); }, CODEX_MAIN_SUBTAB_OPTIONS);
   $('codexWeaponSection').style.display = codexMainSubTab === 'weapon' ? '' : 'none';
   $('codexSubweaponSection').style.display = codexMainSubTab === 'subweapon' ? '' : 'none';
+  $('codexGloveSection').style.display = codexMainSubTab === 'glove' ? '' : 'none';
   if (codexMainSubTab === 'subweapon') { renderSubCodex(); return; }
+  if (codexMainSubTab === 'glove') { renderGloveCodex(); return; }
   renderCodexBonuses();
   const box = $('codexGrid');
   if (!box) return;
@@ -12729,6 +12885,52 @@ function renderSubCodexBonuses() {
     <div style="font-weight:bold;margin:12px 0 6px;">⏳ 미완성 세트</div>${pendingSorted.map(p => row(p, true)).join('')}`;
 }
 
+// 🧤 장갑 도감 — 보스 장갑 20종(미보유도 미리보기) + 수집 마일스톤
+function renderGloveCodex() {
+  const box = $('gloveCodexGrid');
+  if (!box) return;
+  const seen = S.gloveBossCodexSeen || [];
+  const items = GLOVE_BOSS_NAMES.map((bg, idx) => {
+    const t = GLOVE_TYPES[bg.typeIdx];
+    const F = FLOORS[WORLD3_START_FLOOR + idx];
+    const stats = gloveStats({ typeIdx: bg.typeIdx, grade: 5, enhance: 0 });
+    const statLine = Object.entries(stats).map(([k, v]) => `${DISRUPT_COUNTERS[k].icon} ${DISRUPT_COUNTERS[k].name} ${fmtRate(v, 1)}`).join(' · ');
+    const html = subCodexGradeCellHtml(t.icon, bg.name, bg.flavor)
+      + `<div style="font-size:12px;margin-bottom:4px;">신화 ${t.icon} · +0 대응 스탯: ${statLine}</div>`
+      + (F ? `<div style="font-size:12px;color:#3ddfff;">👹 ${F.name} 보스 · ${F.boss.name || F.boss} — 같은 층 보스 장신구와 세트</div>` : '');
+    return { icon: t.icon, unlocked: !!seen[idx], name: bg.name, html };
+  });
+  const unlockedCount = items.filter(i => i.unlocked).length;
+  box.innerHTML = `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
+    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div><div class="codex-grid"></div></div>`;
+  const grid = box.querySelector('.codex-grid');
+  items.forEach(it => {
+    const cell = document.createElement('div');
+    cell.className = 'codex-cell' + (it.unlocked ? '' : ' locked');
+    cell.title = it.unlocked ? '' : it.name;
+    cell.style.borderColor = it.unlocked ? GRADES[5].color : '';
+    if (it.unlocked) cell.style.boxShadow = `0 0 8px ${GRADES[5].color}`;
+    cell.innerHTML = `<span class="codex-icon" style="${it.unlocked ? `color:${GRADES[5].color}` : ''}">${it.icon}</span>`;
+    cell.onclick = () => showCodexPopup(it.html); // 미보유도 목표 미리보기(보스 보조무기와 같은 취급)
+    grid.appendChild(cell);
+  });
+  const listBox = $('gloveCodexBonusList');
+  if (!listBox) return;
+  const row = (m, on) => `
+    <div class="invitem${on ? ' equipped' : ''}"${on ? '' : ' style="opacity:0.55"'}>
+      <div><div class="wn"><span class="grade-신화">[보스 장갑] ${m.count}종 수집</span>${on ? '' : ` <span style="color:var(--sub);font-size:12px">${unlockedCount}/${m.count}</span>`}</div>
+      <div class="wi">${m.text || m.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ')}</div></div>
+    </div>`;
+  const active = GLOVE_BOSS_MILESTONES.filter(m => unlockedCount >= m.count);
+  const pending = GLOVE_BOSS_MILESTONES.filter(m => unlockedCount < m.count);
+  const totals = gloveBossMilestoneEff();
+  const totalLines = Object.entries(totals).filter(([k]) => k !== 'gloveEnh')
+    .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v).replace(' ', ' 총 ')}</div>`).join('');
+  listBox.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">📊 현재 보스 장갑 수집 효과 합계</div>${totalLines || '<div style="color:var(--sub);font-size:13px;">아직 합산될 효과가 없습니다.</div>'}
+    <div style="font-weight:bold;margin:12px 0 6px;">✅ 활성화된 효과 (${active.length}개)</div>${active.length ? active.map(m => row(m, true)).join('') : '<div style="color:var(--sub);font-size:13px;">아직 활성화된 효과가 없습니다.</div>'}
+    <div style="font-weight:bold;margin:12px 0 6px;">⏳ 다음 효과</div>${pending.map(m => row(m, false)).join('')}`;
+}
+
 // 대장장이 탭 렌더링 — 무기 각인 UI
 function renderBlacksmith() {
   renderEnchantBox(); // 무기/보조무기 × 일반/에디셔널 네 칸 + 삼중 재설정
@@ -12823,6 +13025,8 @@ function migrate(d) {
   if (!Array.isArray(d.subAncientSeen)) d.subAncientSeen = [];
   if (!Array.isArray(d.subGenesisSeen)) d.subGenesisSeen = [];
   if (!Array.isArray(d.dreamShards)) d.dreamShards = [];
+  if (!Array.isArray(d.gloveBossCodexSeen)) d.gloveBossCodexSeen = [];
+  if (d.gloveAutoSellGrade === undefined) d.gloveAutoSellGrade = null;
   if (!Array.isArray(d.subBossCodexSeen)) d.subBossCodexSeen = [];
   if (!Array.isArray(d.subRelics)) d.subRelics = [];
   if (!Array.isArray(d.subweapons)) d.subweapons = [];
@@ -13846,7 +14050,7 @@ function renderBossInfoNote() {
   if (w === 1) { el.innerHTML = `${base} · 승리 시 골드 대량 + <span class="grade-신화">신화 등급</span> 보스무기/보스장신구 드롭 (각 0.7% / 0.9%)`; return; }
   if (w === 2) { el.innerHTML = `${base} · 승리 시 골드 대량 + 📜 무기의 정수 + <span class="grade-신화">신화 등급</span> 보스 보조무기/보스장신구 드롭 (각 0.4% / 0.9%)`; return; }
   const enr = floorBossEnrage(f);
-  el.innerHTML = `${base} · 승리 시 골드 대량 + 📜 무기의 정수 + <span class="grade-신화">신화 등급</span> 보스장신구 ${enr ? '1.8' : '0.9'}% · 🌙 꿈조각 ${enr ? 10 : 5}%`
+  el.innerHTML = `${base} · 승리 시 골드 대량 + 📜 무기의 정수 + <span class="grade-신화">신화 등급</span> 보스 장갑 ${enr ? '0.8' : '0.4'}% · 보스장신구 ${enr ? '1.8' : '0.9'}% · 🌙 꿈조각 ${enr ? 10 : 5}%`
     + (enr ? `<div style="color:#ff9b5e;margin-top:2px">🔥 광폭화 보스 — 보상 강화: 골드 ×3 · 재료 ×2 · 드롭 확률 ×2 · 🧵 강철실</div>` : '')
     + disruptionSummaryHtml(floorDisruptionList(f), enr).replace('<div class="wi"', '<div class="wi" style="margin-top:2px;color:#ffb37a"')
     + `<div style="color:var(--sub)">⏳ 60초 보스전이라 시간 잠식·가시 반격은 절반 세기 · 🧤 장갑의 대응 스탯으로 패턴을 약하게 만들 수 있습니다</div>`;
@@ -14767,7 +14971,31 @@ function renderSubInventory() {
 }
 
 /* ===================== 장갑 가방 / 강화기 ===================== */
+// 장갑 자동판매 등급 UI — 보조무기 자동판매와 같은 패턴(종류 필터 없이 등급만)
+function setupGloveAutoSellControls() {
+  const sel = $('gloveAutoSellSelect');
+  if (!sel) return;
+  if (!sel.dataset.built) {
+    sel.innerHTML = '<option value="">끔</option>' + GRADES.slice(0, 6).map((g, i) => `<option value="${i}">${g.name}</option>`).join('');
+    sel.dataset.built = '1';
+    sel.onchange = () => { S.gloveAutoSellGrade = sel.value === '' ? null : +sel.value; save(); };
+    $('gloveAutoSellCleanBtn').onclick = () => {
+      if (S.gloveAutoSellGrade == null) { log('먼저 자동판매 등급을 선택하세요.', 'lg-bad'); return; }
+      const targets = (S.gloves || []).filter(g => g.id !== S.gloveEquipped && gloveAutoSellMatch(g));
+      if (!targets.length) { log('정리할 장갑이 없습니다.'); return; }
+      let total = 0;
+      for (const g of targets) total += gloveSellPrice(g);
+      S.gold = BN.add(S.gold, total);
+      const ids = new Set(targets.map(g => g.id));
+      S.gloves = S.gloves.filter(g => !ids.has(g.id));
+      log(`🗑️ 장갑 가방 일괄 정리: ${targets.length}개 판매 → +${fmt(total)} 골드`, 'lg-good');
+      renderGloveInventory(); renderTop(); save();
+    };
+  }
+  sel.value = S.gloveAutoSellGrade == null ? '' : String(S.gloveAutoSellGrade);
+}
 function renderGloveInventory() {
+  setupGloveAutoSellControls();
   const list = $('gloveinvlist');
   if (!list) return;
   const gloves = S.gloves || [];
@@ -14778,7 +15006,7 @@ function renderGloveInventory() {
   const pagesEl = $('gloveForbiddenPages');
   if (pagesEl) pagesEl.textContent = `${fmt(S.forbiddenPages || 0)}장`;
   if (!gloves.length) {
-    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 장갑이 없습니다. 토벌전 21단계·도서관 21서고 이상에서 승리하면 획득할 수 있습니다.</div>';
+    list.innerHTML = '<div style="color:var(--sub);font-size:13px;">보유한 장갑이 없습니다. 토벌전 21단계·도서관 21서고 이상에서 승리하거나 🌌 성야국에서 사냥하면 획득할 수 있습니다.</div>';
     return;
   }
   list.innerHTML = '';
@@ -15451,8 +15679,10 @@ const GUIDE_SECTIONS = [
       <tr><th>등급</th><th>주 스탯 +0 → +30</th><th>🪡 자수 값</th></tr>
       ${[0, 1, 2, 3, 4, 5].map(gr => `<tr><td><span class="grade-${GRADES[gr].name}">${GRADES[gr].name}</span></td><td>${fmtRate(gloveStats({ typeIdx: 0, grade: gr, enhance: 0 }).accuracy, 1)} → ${fmtRate(gloveStats({ typeIdx: 0, grade: gr, enhance: 30 }).accuracy, 1)}</td><td>${EMBROIDERY.ranges[gr].map(v => fmtRate(v)).join('~')}</td></tr>`).join('')}
     </table>
-    <br><b>획득</b>: 토벌전 21단계 이상 승리 시 30%, 도서관 21서고 이상 승리 시 50% 확률(도서관 쪽이 등급이 더 높음). 절반은 그 보스의 패턴을 막는 종류가 나옵니다.
-    <br><br><b>강화</b>: 골드와 <b>🧵 강철실</b>(토벌전 21단계·도서관 21서고 이상 보상)이 필요합니다. 성공·파괴 확률은 보조무기와 같고, +15부터는 강철실 30배로 파괴 확률을 절반으로 낮추는 고급 강화를 쓸 수 있습니다. 강화는 장착 중인 장갑만 할 수 있습니다.
+    <br><b>획득</b>: 토벌전 21단계 이상 승리 시 30%, 도서관 21서고 이상 승리 시 50% 확률(도서관 쪽이 등급이 더 높음). 🌌 성야국(41~60층) 몬스터 사냥 시 0.15%, 성야국 층 보스 승리 시 그 층 전용 <b>보스 장갑</b> 0.4%(광폭화 보스 0.8%). 절반은 그 보스의 패턴을 막는 종류가 나옵니다.
+    <br><br><b>👹 보스 장갑</b>: 성야국 층마다 1종(20종), 신화 고정. 같은 층 보스 장신구와 세트가 되어 그 층에서 공격력 +30%·골드 +50%·드롭률 +50%. 지금 갖고 있으면 골드로 대신 받고, 판매하거나 파괴됐으면 다시 나옵니다. 모은 종류 수(1/2/4/…/20종)에 따라 장갑 강화 확률·파괴 확률·드롭률·증폭 등 수집 효과가 붙습니다(📘 도감 → 🧤 장갑 도감).
+    <br><br><b>🗑️ 자동판매</b>: 🎒 가방 → 🧤 장갑에서 등급을 고르면 그 등급 이하·강화 0단계·자수 없는 장갑을 얻자마자 판매합니다. 보스 장갑은 항상 남깁니다.
+    <br><br><b>강화</b>: 골드와 <b>🧵 강철실</b>(토벌전 21단계·도서관 21서고 이상 보상)이 필요합니다. 성공·파괴 확률은 보조무기와 같고, +15부터는 강철실 30배로 파괴 확률을 절반으로 낮추는 고급 강화를 쓸 수 있습니다. 장신구·수집 효과의 "장갑 강화 확률 +N%p"는 보조무기처럼 기준 단계에서 그 수치이고, 그보다 높은 단계일수록 확률표 비율만큼 줄어듭니다. 강화는 장착 중인 장갑만 할 수 있습니다.
     <br><br><b>🪡 자수</b>: 도서관 21서고 이상에서 얻는 <b>📄 금서의 페이지</b> 1장과 📜 무기의 정수로, 장갑에 대응 스탯 하나를 무작위로 수놓습니다(장갑마다 1칸). 다시 수놓으면 기존 자수를 덮어쓰고, 같은 장갑에 수놓을수록 정수 비용이 오릅니다. 주 스탯과 같은 스탯이 나오면 그대로 더해져서, 신화 +30 장갑(주 스탯 80%)이면 그 패턴을 완전히 무효로 만들 수도 있습니다. 보통은 장갑이 못 막는 두 번째 패턴의 스탯을 노리는 것이 좋습니다.
     <br><br><b>🌌 보조 스탯·자수 증폭</b>: 성야국 장신구·꿈조각의 증폭 효과는 장착한 장갑의 <b>보조 스탯과 자수</b> 수치에 곱해집니다. <b>주 스탯은 증폭되지 않고</b> 등급과 강화로만 오르므로, 강화는 주 패턴을, 증폭은 두 번째·세 번째 패턴을 막는 역할입니다. 증폭이 있으면 장갑 정보에 "40% → 58%"처럼 증폭 후 값이 함께 표시됩니다.`,
   },
@@ -15544,7 +15774,7 @@ const GUIDE_SECTIONS = [
     body: `📖 도감 탭의 "🗡️ 보조무기 도감" 서브탭에서 관리하는, 월드2(황혼국) 보조무기 컬렉션입니다. 무기 도감과 마찬가지로 <b>실제로 한 번이라도 획득</b>하면 등록되고, 등록 현황에 따라 자동으로 보너스가 붙습니다. 전부 <b>월드 구분 없이 항상 적용</b>됩니다(무기 도감과 달리 월드1 한정이 아님).
     <br><br>네 트랙으로 나뉩니다.
     <br>· <b>일반 보조무기(48종, 8타입×6등급)</b>: 그 등급 8타입을 전부 모으면 <b>등급 세트</b> 보너스, 한 타입의 6등급을 전부 모으면 <b>타입 마스터리</b> 보너스
-    <br>· <b>보스 보조무기(20종)</b>: 21~40층 보스가 그 층 전용 보조무기를 고정 드롭. 1/2/4/6/8/10/12/14/16/18/20종 수집 시 계단식 누적 보너스(액티브 위력·지속시간, 강화확률·파괴확률, 드롭률·뽑기 할인)
+    <br>· <b>보스 보조무기(20종)</b>: 21~40층 보스가 그 층 전용 보조무기를 고정 드롭(지금 갖고 있으면 골드로 대체, 판매·파괴했으면 다시 나옴). 1/2/4/6/8/10/12/14/16/18/20종 수집 시 계단식 누적 보너스(액티브 위력·지속시간, 강화확률·파괴확률, 드롭률·뽑기 할인)
     <br>· <b>고대 보조무기(20종)</b>: 장착형 고대 보조무기의 획득 기록(아래 "고대 보조무기" 항목 참고)
     <br>· <b>🏺 황혼의 유산(20종)</b>: 월드2 사냥 중 아주 낮은 확률로 드롭되는 수집형 트린켓. 5/10/15/20개 수집 시 드롭률·뽑기 할인·강화 골드 절감·뽑기 고급 등급 확률 상향 보너스
     <br><br>보너스는 전부 보조무기 시스템 자체를 강화하는 sub* 스탯(패시브/액티브 증폭, 강화·파괴 확률, 드롭률, 뽑기 할인·비용)으로 지급됩니다.`,
@@ -15631,7 +15861,8 @@ const GUIDE_SECTIONS = [
     body: `황혼 다음에 오는 밤의 세계입니다. <b>40층(황혼의 끝)을 충분히 사냥</b>하고 <b>토벌전 ${WORLD3_RAID_UNLOCK_STAGE}단계를 클리어</b>하면 열립니다. 사냥터 탭의 <b>🌌 성야국</b> 서브탭에서 고를 수 있습니다.
     <br><br>테마는 5단계씩 🌙 졸음의 들녘 → 💭 뒤집힌 꿈길 → 🌕 달의 뒷면 → 🌌 은하의 물길입니다. 사냥터 체력은 41층이 40층의 2배에서 시작해 층마다 약 1.9배씩 오릅니다.
     <br><br><b>👹 사냥터 보스 패턴</b>: 성야국 사냥터 보스는 토벌전·도서관처럼 방해 패턴을 씁니다(41~49층 1개, 51~59층 2개, 60층 3개). 보스전이 60초라서 시간 잠식·가시 반격은 절반 세기입니다. 🧤 장갑의 대응 스탯으로 약하게 만들 수 있습니다.
-    <br><br><b>🔥 광폭화 보스</b>: <b>45·50·55·60층</b> 보스는 체력이 ${fmtRate(BOSS_ENRAGE_HP)} 이하가 되면 광폭화해 모든 패턴이 ${BOSS_ENRAGE_MULT}배 강해집니다. 대신 보상이 강화됩니다 — 골드 ×3, 재료 ×2, 보스 장신구·꿈조각 드롭 확률 ×2, 🧵 강철실 추가.
+    <br><br><b>🔥 광폭화 보스</b>: <b>45·50·55·60층</b> 보스는 체력이 ${fmtRate(BOSS_ENRAGE_HP)} 이하가 되면 광폭화해 모든 패턴이 ${BOSS_ENRAGE_MULT}배 강해집니다. 대신 보상이 강화됩니다 — 골드 ×3, 재료 ×2, 보스 장갑·보스 장신구·꿈조각 드롭 확률 ×2, 🧵 강철실 추가.
+    <br><br><b>🧤 장갑 드롭</b>: 성야국 몬스터를 잡으면 0.15%(엘리트 5배) 확률로 장갑이 나옵니다(일반 45%·레어 28%·에픽 15%·유니크 8%·전설 3%·신화 1%, 절반은 그 층 보스 패턴을 막는 종류). 층 보스를 이기면 0.4%(광폭화 보스 0.8%) 확률로 그 층 전용 <b>보스 장갑</b>(신화, 그 보스 패턴을 막는 종류)이 나오고, 같은 층 보스 장신구와 <b>세트</b>가 되어 그 층에서 공격력 +30%·골드 +50%·드롭률 +50%가 붙습니다. 보스 장갑을 모은 종류 수에 따라 수집 효과가 붙습니다(📘 도감 → 🧤 장갑 도감).
     <br><br><b>📿 보스 장신구 41~60</b>: 골드·드롭률·공격력·공격속도 외에 🧤 <b>장갑 강화 확률</b>(53층), <b>장갑 보조 스탯·자수 증폭</b>(57·60층)이 있습니다. 사냥터 장신구 41~60에도 이 증폭이 섞여 나옵니다. 증폭은 장착한 장갑의 <b>보조 스탯과 🪡 자수</b>에만 곱해지고, 주 스탯은 등급과 강화로만 오릅니다.
     <br><br><b>🌙 꿈조각</b>: 성야국 사냥터 보스를 이기면 5%(광폭화 보스 10%) 확률로 그 사냥터의 꿈조각을 얻습니다(20종, 📿 장신구 탭 → 🌌 성야국에서 확인). 같은 테마 5개를 모으면 <b>고강화 확률</b>이 오릅니다(+27강까지 +1.5%p / +28강까지 +1.5%p / +29강까지 +1.0%p / +29강까지 +1.0%p, 그 위 단계는 확률표 비율로 감소). 모은 개수에 따라 5개 장갑 드롭률 +15% · 10개 장갑 강화 골드 -20%·드롭률 +24% · 15개 자수 정수 비용 -30% · 20개 드롭률 +50%·장갑 보조 스탯·자수 증폭 +10%.
     <br><br>성야국에서는 보조무기·황혼의 유산이 나오지 않습니다(장비 축은 🧤 장갑).`,
@@ -15764,6 +15995,7 @@ function accEffText(eff) {
   if (eff.gloveDropRate) parts.push(`🧤 장갑 드롭률 +${Math.round(eff.gloveDropRate * 100)}%`);
   if (eff.gloveEnhGoldReduce) parts.push(`🧤 장갑 강화 골드 -${Math.round(eff.gloveEnhGoldReduce * 100)}%`);
   if (eff.embroideryDiscount) parts.push(`🪡 자수 정수 비용 -${Math.round(eff.embroideryDiscount * 100)}%`);
+  if (eff.gloveDestroyReduce) parts.push(`🛡️ 장갑 강화 파괴 확률 -${Math.round(eff.gloveDestroyReduce * 100)}%p`);
   return parts.join(' · ');
 }
 
@@ -16459,7 +16691,7 @@ function renderBossAccs() {
     div.className = 'invitem equipped';
     div.innerHTML = `
       <div><div class="wn"><span class="bossacc-stage">${stage}단계 · ${FLOORS[f].name}</span> <span class="grade-신화">신화 👹 [${b.name}]</span> <span style="color:var(--unique);font-size:12px">✅ 상시 장착중</span>${setOn ? ' <span style="color:var(--unique);font-size:12px">✨ 세트 발동중!</span>' : ''}</div>
-      <div class="wi">${accEffText(b.eff)} · 세트 효과: ${FLOORS[f].name}에서 공격력 +30%, 골드 +50%, 드롭률 +50%, 고대·태초 무기 드롭률 3배</div></div>`;
+      <div class="wi">${accEffText(b.eff)} · 세트 효과: ${FLOORS[f].name}에서 공격력 +30%, 골드 +50%, 드롭률 +50%${wNum === 3 ? ` <span style="color:var(--sub)">(짝: 🧤 ${GLOVE_BOSS_NAMES[f - WORLD3_START_FLOOR].name})</span>` : ', 고대·태초 무기 드롭률 3배'}</div></div>`;
     if (best) {
       const partnerLabel = wNum === 1 ? '보스 무기' : wNum === 2 ? '보스 보조무기' : '보스 장갑';
       const isOn = best.id === (wNum === 1 ? S.equipped : wNum === 2 ? S.subEquipped : S.gloveEquipped);

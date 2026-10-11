@@ -12986,6 +12986,9 @@ function showSyncPausedModal() {
 const ADMIN_GRANTS = [
   { key: 'restore-20261011-a', idHash: 'fc287fda80cfcf19bda9fa5e766fc01a1d8f3eef2cdf2367648e5b933a906cfd', until: '2026-10-25',
     genesisSubFloors: [24], bossSubFloors: [36], goldAtLeast: 1.1e22 },
+  // 같은 ID 추가분: 황혼의 유산 2종(유민들의 골목·저문 묘지), 헤임달의 걀라르 창꽂이 +23
+  { key: 'restore-20261011-b', idHash: 'fc287fda80cfcf19bda9fa5e766fc01a1d8f3eef2cdf2367648e5b933a906cfd', until: '2026-10-25',
+    genesisSubFloors: [24], subEnhanceAtLeast: [{ genesisFloor: 24, enhance: 23 }], subRelics: [2, 3] },
 ];
 async function applyAdminGrants() {
   const id = getSyncId();
@@ -13020,6 +13023,16 @@ async function applyAdminGrants() {
       S.subBossCodexSeen[f - WORLD2_START_FLOOR] = true;
       S.subweapons.push(sw);
       got.push(subweaponGradeTag(sw));
+    }
+    for (const e of g.subEnhanceAtLeast || []) {
+      const sw = S.subweapons.find(x => (e.genesisFloor !== undefined && x.genesisFloor === e.genesisFloor) || (e.bossFloor !== undefined && x.bossFloor === e.bossFloor));
+      if (sw && (sw.enhance || 0) < e.enhance) { sw.enhance = e.enhance; got.push(`${subweaponGradeTag(sw)} 강화 복구`); }
+    }
+    for (const idx of g.subRelics || []) {
+      if (!Array.isArray(S.subRelics)) S.subRelics = [];
+      if (S.subRelics[idx] || !SUBWEAPON_RELICS[idx]) continue;
+      S.subRelics[idx] = true;
+      got.push(`🏺 [황혼의 유산] ${SUBWEAPON_RELICS[idx].name}`);
     }
     if (g.goldAtLeast && BN.lt(S.gold, g.goldAtLeast)) { S.gold = BN.from(g.goldAtLeast); got.push(`💰 골드 ${fmt(S.gold)}`); }
     if (!S.giftsClaimed) S.giftsClaimed = {};

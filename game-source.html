@@ -6475,6 +6475,7 @@ function newState() {
     auto: true,
     gambleTable: 0,    // 선택된 도박 테이블 (0~3)
     lastSeen: null,    // 마지막 접속 시각 (오프라인 보상용)
+    playTime: 0,       // 실제로 게임을 켜 둔 시간(초) — 기기 간 동기화 때 "더 진행된 세이브"를 고르는 기준
     boxCount: 0,
     gambleCount: 0,
     destroyedCount: 0,
@@ -12554,7 +12555,7 @@ let resetting = false;  // 초기화 중에는 저장 금지
 // 주기 자동저장 + 탭을 벗어나는 시점(markLeave)에서만 별도로 트리거해서 트래픽을 아낀다
 // (그 사이 비정상 종료 시 최대 10초 분량만 클라우드에 덜 반영될 수 있음 — 로컬 진행은 무관).
 function save() {
-  if (resetting) return;
+  if (resetting || syncHalted) return;
   const hr = new Date().getHours();
   if (hr === 0 && S.eggs && !S.eggs.midnight) unlockEgg('midnight');
   S.savedAt = Date.now(); // 로컬 저장 시각 — 클라우드 이동 때 더 최신 쪽을 고르는 데 쓴다
@@ -12799,8 +12800,10 @@ async function syncFetchJson(path, timeoutMs) {
     clearTimeout(timer);
   }
 }
+// 기록 형식: { data, updatedAt, meta: { pt(플레이타임 초), dev(마지막으로 쓴 기기 id) } }
 async function syncPutSave(key, dataStr) {
-  const res = await fetch(`${SYNC_DB_URL}/saves2/${key}.json`, { method: 'PUT', body: JSON.stringify({ data: dataStr, updatedAt: Date.now() }) });
+  const meta = { pt: ptOfPacked(dataStr), dev: getDeviceId() };
+  const res = await fetch(`${SYNC_DB_URL}/saves2/${key}.json`, { method: 'PUT', body: JSON.stringify({ data: dataStr, updatedAt: Date.now(), meta }) });
   if (!res.ok) throw new Error('http ' + res.status);
 }
 // 예전 위치의 세이브(이동 기간 중에만). 비밀번호가 맞지 않으면 'badpw'.
@@ -12821,29 +12824,180 @@ async function syncMigrateLegacy(id, key, dataStr) {
 async function syncLoadRecord(id, pw, timeoutMs) {
   const key = await syncKeyFor(id, pw);
   const rec = await syncFetchJson(`saves2/${key}`, timeoutMs);
-  if (rec && rec.data) return { data: rec.data, key, legacy: false };
+  if (rec && rec.data) return { data: rec.data, key, legacy: false, meta: rec.meta || null, updatedAt: rec.updatedAt || 0 };
   const old = await syncFetchLegacy(id, pw, timeoutMs);
   if (old === 'badpw') return 'badpw';
   if (old) return { data: old.data, key, legacy: true, updatedAt: old.updatedAt || 0 };
   return null;
 }
 
-let syncUploadBusy = false;
-let syncUploadPending = false;
-// 저장이 일어날 때마다 같은 데이터를 서버에도 올림 (실패 시 조용히 무시 - 다음 저장 때 다시 시도됨)
-function syncUpload() {
-  if (!syncConfigured() || SYNC_PAUSED) return;
+// ---------- 기기 간 세이브 동기화 (2026-10-11 개편) ----------
+// 예전 방식의 사고: ① 며칠 전 상태로 백그라운드에 남아 있던 탭이 돌아오자마자 낡은 데이터를 올려
+// 클라우드를 덮어쓰고 ② 다른 기기를 열면 클라우드가 무조건 이겨 그 기기의 진행까지 덮어썼다.
+// 지금 방식:
+// · S.playTime(실제로 켜 둔 시간)을 세이브와 클라우드 기록(meta.pt)에 함께 둔다.
+// · 접속할 때: 이 기기 세이브와 클라우드 중 플레이타임이 더 긴 쪽을 쓴다(같으면 클라우드, 단 마지막으로 쓴 게 이 기기면 이 기기).
+// · 올리기 전에: 클라우드를 마지막으로 쓴 기기(meta.dev)가 다른 기기면 덮어쓰지 않는다 → 클라우드가 더 진행됐으면
+//   자동으로 그 데이터를 불러오고(이 기기 데이터는 백업), 아니면 게임을 멈추고 어느 쪽을 쓸지 묻는다.
+// · 탭이 다시 보일 때도 같은 확인을 한다(옛날 탭이 깨어나자마자 덮어쓰는 것 방지).
+// · 어느 쪽이든 덮어쓰기 직전 데이터는 이 기기에 최근 5개까지 백업한다(🔗 동기화 → 💾 백업에서 복구).
+const DEVICE_ID_KEY = 'luckEnhance_devId';
+const SAVE_BACKUPS_KEY = 'luckEnhance_backups';
+const SAVE_BACKUP_MAX = 5;
+const SYNC_FORCE_KEY = 'luckEnhance_syncForce'; // 'cloud' | 'local' — 다음 접속 1회 강제
+const SYNC_NOTE_KEY = 'luckEnhance_syncNote';   // 다음 접속 때 띄울 안내
+function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+function getDeviceId() {
+  let d = lsGet(DEVICE_ID_KEY);
+  if (!d) { d = randStr(SYNC_PW_CHARS, 12); lsSet(DEVICE_ID_KEY, d); }
+  return d;
+}
+function parsePacked(raw) { try { const j = saveJsonOf(raw); return j ? JSON.parse(j) : null; } catch (e) { return null; } }
+function ptOfPacked(raw) { const d = parsePacked(raw); return (d && Number(d.playTime)) || 0; }
+function fmtPlayTime(sec) {
+  sec = Math.max(0, Math.floor(sec || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? `${h}시간 ${m}분` : `${m}분`;
+}
+function fmtClock(ms) {
+  if (!ms) return '-';
+  const d = new Date(ms);
+  return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+function packedSummary(raw) {
+  const d = parsePacked(raw);
+  if (!d) return '알 수 없음';
+  let gold = '-';
+  try { gold = fmt(BN.from(d.gold)); } catch (e) {}
+  return `⏱️ ${fmtPlayTime(d.playTime)} · 💰 ${gold} · 무기 ${Array.isArray(d.weapons) ? d.weapons.length : 0}개 · 저장 ${fmtClock(d.savedAt)}`;
+}
+function listSaveBackups() {
+  try { const a = JSON.parse(lsGet(SAVE_BACKUPS_KEY) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+}
+// 덮어쓰기 직전 데이터를 보관(같은 데이터는 중복 저장 안 함). 저장 공간이 모자라면 오래된 것부터 버린다.
+function pushSaveBackup(raw, label) {
+  if (!raw) return;
+  let list = listSaveBackups().filter(b => b.data !== raw);
+  list.unshift({ at: Date.now(), label, pt: ptOfPacked(raw), data: raw });
+  list = list.slice(0, SAVE_BACKUP_MAX);
+  while (list.length && !lsSet(SAVE_BACKUPS_KEY, JSON.stringify(list))) list.pop();
+}
+
+let syncBusy = false;
+let syncPendingMode = null;
+let syncClaimed = false;   // 이번 접속에서 이 기기가 클라우드에 한 번이라도 썼는지
+let syncHalted = false;    // 다른 기기와 충돌해 선택을 기다리는 중 — 진행·저장 멈춤
+let syncConflictRec = null; // 선택을 기다리는 충돌(다른 팝업이 덮어써도 다시 띄운다)
+let syncCloudPtAtLoad = 0; // 접속 때 본 클라우드 플레이타임(백업 복구 시 이보다 크게 맞춘다)
+// mode: 'upload'(확인 후 올림) | 'check'(확인만) | 'claim'(확인 없이 올림 — 접속 직후·사용자 선택 직후)
+async function syncRun(mode) {
+  if (!syncConfigured() || SYNC_PAUSED || syncHalted || resetting) return;
   const id = getSyncId();
   if (!id) return;
-  if (syncUploadBusy) { syncUploadPending = true; return; }
-  syncUploadBusy = true;
-  syncKeyFor(id, getSyncPw())
-    .then(key => syncPutSave(key, packSave(JSON.stringify(S))))
-    .catch(() => { /* 오프라인 - 다음 저장 주기에 재시도 */ })
-    .finally(() => {
-      syncUploadBusy = false;
-      if (syncUploadPending) { syncUploadPending = false; syncUpload(); }
-    });
+  if (syncBusy) {
+    const rank = { check: 0, upload: 1, claim: 2 };
+    if (!syncPendingMode || rank[mode] > rank[syncPendingMode]) syncPendingMode = mode;
+    return;
+  }
+  syncBusy = true;
+  try {
+    const key = await syncKeyFor(id, getSyncPw());
+    if (mode !== 'claim') {
+      const meta = await syncFetchJson(`saves2/${key}/meta`, 6000);
+      // meta가 없으면: 아직 아무도 새 방식으로 안 썼다(이 기기 첫 업로드) — 단, 이미 썼는데 사라졌다면 옛 버전 탭이 덮어쓴 것
+      const foreign = meta ? meta.dev !== getDeviceId() : syncClaimed;
+      if (foreign) { await syncOnForeign(key); return; }
+    }
+    if (mode === 'check') return;
+    await syncPutSave(key, packSave(JSON.stringify(S)));
+    syncClaimed = true;
+  } catch (e) { /* 오프라인 - 다음 주기에 다시 */ }
+  finally {
+    syncBusy = false;
+    if (syncPendingMode) { const m = syncPendingMode; syncPendingMode = null; syncRun(m); }
+  }
+}
+// 저장할 때마다(10초 주기·탭 떠날 때) 클라우드에도 올림 — 올리기 전에 다른 기기가 썼는지 확인한다
+function syncUpload() { syncRun('upload'); }
+// 다른 기기가 클라우드에 썼다: 클라우드가 더 진행됐으면 자동으로 불러오고, 아니면 멈추고 묻는다
+async function syncOnForeign(key) {
+  const rec = await syncFetchJson(`saves2/${key}`, 8000);
+  if (!rec || !rec.data) return;
+  const cloudPt = ptOfPacked(rec.data);
+  if (cloudPt > (S.playTime || 0)) {
+    syncPullCloud(rec.data, 'pulled');
+    return;
+  }
+  syncHalted = true;
+  syncConflictRec = rec;
+  showSyncConflictModal(rec, key);
+}
+// 클라우드 데이터로 교체(이 기기 데이터는 백업) 후 새로고침
+function syncPullCloud(cloudRaw, note) {
+  save();
+  pushSaveBackup(lsGet(SAVE_KEY), '이 기기 (다른 기기 데이터로 바꾸기 전)');
+  resetting = true;
+  lsSet(SAVE_KEY, cloudRaw);
+  lsSet(SYNC_FORCE_KEY, 'cloud');
+  lsSet(SYNC_NOTE_KEY, note || 'pulled');
+  location.reload();
+}
+function showSyncConflictModal(rec, key) {
+  const localRaw = packSave(JSON.stringify(S));
+  showAlertModal(`<h3>⚠️ 다른 기기에서도 플레이했어요</h3>
+    <p style="text-align:left">이 기기가 쉬는 동안 다른 기기가 클라우드에 저장했습니다. 덮어쓰지 않도록 이 기기의 진행을 멈췄어요. 어느 쪽으로 이어갈까요? (고르지 않은 쪽은 이 기기에 백업됩니다)</p>
+    <div style="text-align:left;font-size:13px;margin:6px 0;padding:8px;border:1px solid var(--border);border-radius:8px;">☁️ <b>다른 기기(클라우드)</b><br><span class="alertSub">${escHtml(packedSummary(rec.data))}</span></div>
+    <div style="text-align:left;font-size:13px;margin:6px 0;padding:8px;border:1px solid var(--border);border-radius:8px;">📱 <b>이 기기</b><br><span class="alertSub">${escHtml(packedSummary(localRaw))}</span></div>
+    <button class="primary" id="syncPickCloudBtn">☁️ 다른 기기 데이터로 이어하기</button><div style="height:8px"></div>
+    <button id="syncPickLocalBtn">📱 이 기기 데이터로 클라우드 덮어쓰기</button>`);
+  $('syncPickCloudBtn').onclick = () => { syncConflictRec = null; hideAlertModal(); syncHalted = false; syncPullCloud(rec.data, 'pulled'); };
+  $('syncPickLocalBtn').onclick = async () => {
+    pushSaveBackup(rec.data, '클라우드 (이 기기 데이터로 덮어쓰기 전)');
+    S.playTime = Math.max(S.playTime || 0, ptOfPacked(rec.data)) + 1; // 다른 기기가 열렸을 때도 이쪽이 이기도록
+    syncConflictRec = null;
+    syncHalted = false;
+    hideAlertModal();
+    save();
+    await syncRun('claim');
+    log('📱 이 기기 데이터로 클라우드를 덮어썼습니다. (클라우드에 있던 데이터는 🔗 동기화 → 💾 백업에 보관)', 'lg-prim');
+  };
+}
+// 접속 직후 안내(이전 접속에서 남긴 메모)
+function syncShowLoadNote() {
+  const note = lsGet(SYNC_NOTE_KEY);
+  lsDel(SYNC_NOTE_KEY);
+  if (note === 'pulled') log('☁️ 다른 기기에서 더 진행된 데이터를 불러왔습니다. 이 기기에 있던 데이터는 🔗 동기화 → 💾 백업에 보관돼 있어요.', 'lg-prim');
+  else if (note === 'pushed') log('📱 이 기기 데이터가 더 진행돼 있어서 클라우드에 올렸습니다. 클라우드에 있던 데이터는 🔗 동기화 → 💾 백업에 보관돼 있어요.', 'lg-prim');
+  else if (note === 'restored') log('💾 백업에서 복구했습니다. 이 데이터가 클라우드에도 올라갑니다.', 'lg-prim');
+}
+function syncModalBackups() {
+  const list = listSaveBackups();
+  showSyncModal(`
+    <h3>💾 백업에서 복구</h3>
+    <div class="syncNote">기기 간 동기화로 데이터를 바꾸기 직전 상태가 이 기기에 최근 ${SAVE_BACKUP_MAX}개까지 보관됩니다. 복구하면 지금 데이터도 백업에 남고, 복구한 데이터가 클라우드에 올라갑니다.</div>
+    <div style="font-size:12px;color:var(--sub);margin:6px 0;">지금: ${escHtml(packedSummary(packSave(JSON.stringify(S))))}</div>
+    ${list.length ? list.map((b, i) => `<div style="text-align:left;font-size:12px;margin:6px 0;padding:8px;border:1px solid var(--border);border-radius:8px;">
+      <b>${escHtml(fmtClock(b.at))}</b> · ${escHtml(b.label || '')}<br><span style="color:var(--sub)">${escHtml(packedSummary(b.data))}</span>
+      <div style="margin-top:6px"><button data-restore-backup="${i}">이 백업으로 복구</button></div></div>`).join('') : '<div class="syncNote">아직 보관된 백업이 없습니다.</div>'}
+    <div class="syncRow"><button id="syncBackupBackBtn" class="primary">닫기</button></div>`);
+  $('syncBackupBackBtn').onclick = syncModalHome;
+  document.querySelectorAll('[data-restore-backup]').forEach(btn => {
+    btn.onclick = () => {
+      const b = listSaveBackups()[+btn.dataset.restoreBackup];
+      if (!b) return;
+      showConfirmModal(`${fmtClock(b.at)} 백업으로 복구할까요? 지금 데이터는 백업에 남습니다.`, () => {
+        save();
+        pushSaveBackup(lsGet(SAVE_KEY), '이 기기 (백업 복구 전)');
+        resetting = true;
+        lsSet(SAVE_KEY, b.data);
+        lsSet(SYNC_FORCE_KEY, 'local');
+        lsSet(SYNC_NOTE_KEY, 'restored');
+        location.reload();
+      });
+    };
+  });
 }
 
 // ---------- 태초 획득 알림(모든 유저 공용 배너) ----------
@@ -12966,8 +13120,12 @@ function showSyncPausedModal() {
   if (rb) rb.onclick = async () => {
     rb.disabled = true; rb.textContent = '올리는 중...';
     try {
+      const k = await syncKeyFor(id, getSyncPw());
+      let cloudPt = 0;
+      try { const m = await syncFetchJson(`saves2/${k}/meta`, 6000); cloudPt = (m && m.pt) || 0; } catch (e2) {}
+      S.playTime = Math.max(S.playTime || 0, cloudPt) + 1; // 다른 기기에서 열어도 이 데이터가 이기도록
       save();
-      await syncPutSave(await syncKeyFor(id, getSyncPw()), packSave(JSON.stringify(S)));
+      await syncPutSave(k, packSave(JSON.stringify(S)));
       $('syncRestoreMsg').innerHTML = '<span style="color:#7de08a">✅ 클라우드를 이 기기 데이터로 되돌렸습니다.</span> <a href="' + location.pathname + '">동기화 켜고 다시 열기</a>';
       rb.textContent = '복구 완료';
     } catch (e) {
@@ -12977,8 +13135,6 @@ function showSyncPausedModal() {
   };
 }
 
-// 페이지 로드 시, 동기화 ID가 이미 있으면 게임을 시작하기 전에 서버 최신 데이터로 로컬을 덮어씀.
-// 아직 예전 위치에 있으면 이때 새 위치로 옮긴다.
 // ---------- 운영자 복구 지급(특정 동기화 ID 1회) ----------
 // 동기화 사고 등으로 잃은 아이템을 돌려줄 때 쓴다. ID는 SHA-256 해시로만 적어 코드에 노출하지 않는다.
 // 그 ID로 연결된 기기에서 게임을 열면 1번 지급(S.giftsClaimed[key]). 같은 아이템을 이미 갖고 있으면 그 아이템은
@@ -13042,25 +13198,44 @@ async function applyAdminGrants() {
     if (typeof currentTab !== 'undefined' && (currentTab === 'inventory' || currentTab === 'enhance')) switchTab(currentTab);
   }
 }
+// 페이지 로드 시(게임 시작 전): 이 기기 세이브와 클라우드 중 더 진행된(플레이타임이 긴) 쪽을 고른다.
+// 안 고른 쪽은 이 기기에 백업. 아직 예전 위치에 있으면 이때 새 위치로 옮긴다.
 async function syncApplyOnLoad() {
   if (!syncConfigured() || SYNC_PAUSED) return;
   const id = getSyncId();
   if (!id) return;
   const pw = getSyncPw();
+  const force = lsGet(SYNC_FORCE_KEY);
+  lsDel(SYNC_FORCE_KEY);
   try {
     const rec = await syncLoadRecord(id, pw, 6000);
-    if (rec && rec !== 'badpw') {
-      let data = rec.data;
-      if (rec.legacy) {
-        // 이동 기간에 예전 위치 업로드가 막혀 클라우드가 로컬보다 오래됐을 수 있으므로 더 최신 쪽을 옮긴다
-        let localStr = null, localTime = 0;
-        try { localStr = localStorage.getItem(SAVE_KEY); const l = localStr && JSON.parse(saveJsonOf(localStr)); localTime = (l && (l.savedAt || l.lastSeen)) || 0; } catch (e3) {}
-        if (localStr && localTime > rec.updatedAt) data = localStr;
-        await syncMigrateLegacy(id, rec.key, data);
-      }
-      try { localStorage.setItem(SAVE_KEY, data); } catch (e2) {}
+    if (!rec || rec === 'badpw') return;
+    const localRaw = lsGet(SAVE_KEY);
+    if (rec.legacy) {
+      // 이동 기간에 예전 위치 업로드가 막혀 클라우드가 로컬보다 오래됐을 수 있으므로 더 최신 쪽을 옮긴다
+      let data = rec.data, localTime = 0;
+      try { const l = localRaw && JSON.parse(saveJsonOf(localRaw)); localTime = (l && (l.savedAt || l.lastSeen)) || 0; } catch (e3) {}
+      if (localRaw && localTime > rec.updatedAt) data = localRaw;
+      await syncMigrateLegacy(id, rec.key, data);
+      lsSet(SAVE_KEY, data);
+      return;
     }
-  } catch (e) { /* 오프라인/타임아웃 - 로컬 저장 데이터로 계속 진행 */ }
+    const cloudPt = ptOfPacked(rec.data), localPt = localRaw ? ptOfPacked(localRaw) : -1;
+    syncCloudPtAtLoad = cloudPt;
+    let useCloud;
+    if (force === 'local') useCloud = false;
+    else if (force === 'cloud' || !localRaw) useCloud = true;
+    else if (cloudPt !== localPt) useCloud = cloudPt > localPt;
+    else useCloud = !(rec.meta && rec.meta.dev === getDeviceId()); // 같으면 클라우드, 마지막으로 쓴 게 이 기기면 이 기기
+    if (localRaw === rec.data) return;
+    if (useCloud) {
+      if (localRaw && force !== 'cloud') { pushSaveBackup(localRaw, '이 기기 (클라우드 데이터를 불러오기 전)'); lsSet(SYNC_NOTE_KEY, 'pulled'); }
+      lsSet(SAVE_KEY, rec.data);
+    } else {
+      pushSaveBackup(rec.data, '클라우드 (이 기기 데이터로 덮어쓰기 전)');
+      if (force !== 'local') lsSet(SYNC_NOTE_KEY, 'pushed');
+    }
+  } catch (e) { /* 오프라인/타임아웃 - 로컬 저장 데이터로 계속 진행(올리기 전 확인이 충돌을 잡는다) */ }
 }
 
 // 화면 표시용: 태그 제거 / HTML 이스케이프
@@ -13193,9 +13368,13 @@ function syncModalHome() {
       <h3>🔗 동기화 연결됨</h3>
       <div class="syncNote">현재 이 기기는 아래 ID와 연결되어 저장할 때마다 자동으로 클라우드에 백업됩니다.</div>
       <div class="syncIdBig">${id}</div>
+      <div class="syncNote">⏱️ 플레이타임 ${fmtPlayTime(S.playTime)} — 여러 기기에서 할 때는 플레이타임이 더 긴(더 진행된) 데이터가 이어집니다.</div>
       <div class="syncRow">
         <button id="syncCopyIdBtn">📋 ID 복사</button>
         <button id="syncReconnectBtn">🔄 다른 ID로 연결</button>
+      </div>
+      <div class="syncRow">
+        <button id="syncBackupsBtn">💾 백업에서 복구 (${listSaveBackups().length})</button>
       </div>
       <div class="syncRow">
         <button id="syncDisconnectBtn" class="danger">연결 해제</button>
@@ -13203,6 +13382,7 @@ function syncModalHome() {
       </div>
     `);
     $('syncCopyIdBtn').onclick = () => syncCopyText(id, 'ID가 복사되었습니다.');
+    $('syncBackupsBtn').onclick = syncModalBackups;
     $('syncReconnectBtn').onclick = () => syncModalChoice(false);
     $('syncDisconnectBtn').onclick = () => {
       showConfirmModal('이 기기의 동기화 연결을 해제할까요? (저장된 진행 상황은 그대로 남고, 더 이상 클라우드에 자동 백업되지 않습니다)', () => {
@@ -13264,6 +13444,7 @@ function syncModalIssueNew() {
     try {
       await syncPutSave(await syncKeyFor(id, pw), packSave(JSON.stringify(S)));
       setSyncCreds(id, pw);
+      syncClaimed = true;
       log(`🔗 새 동기화 ID(${id})가 발급되어 현재 진행 상황이 클라우드에 저장되었습니다.`, 'lg-good');
       hideSyncModal();
     } catch (e) {
@@ -13300,8 +13481,11 @@ function syncModalEnterExisting() {
         showConfirmModal('현재 기기의 진행 상황을 덮어쓰고 불러온 데이터로 시작할까요?', async () => {
           // 새로고침 직전 언로드 저장(markLeave)·주기 저장이 "이 기기의 기존 진행 상황"을 로컬에 다시 쓰고
           // 새 ID로 클라우드에 올려, 불러온 계정을 덮어쓰던 버그 — 여기서부터 저장·업로드를 막는다.
+          save();
+          pushSaveBackup(lsGet(SAVE_KEY), '이 기기 (다른 ID로 연결하기 전)');
           resetting = true;
           try { localStorage.setItem(SAVE_KEY, rec.data); } catch (e2) {}
+          lsSet(SYNC_FORCE_KEY, 'cloud'); // 이 기기 세이브가 더 길어도 불러온 계정 데이터를 쓴다
           setSyncCreds(id, pw);
           if (rec.legacy) { try { await syncMigrateLegacy(id, rec.key, rec.data); } catch (e3) {} }
           location.reload();
@@ -16081,6 +16265,10 @@ function init() {
     }
   }
   applyAdminGrants().catch(() => {}); // 운영자 복구 지급(해당 동기화 ID일 때만)
+  // 동기화: 백업 복구로 연 경우 클라우드보다 플레이타임을 크게 맞춰 다른 기기에서도 이 데이터가 이기게 한다
+  if (lsGet(SYNC_NOTE_KEY) === 'restored') S.playTime = Math.max(S.playTime || 0, syncCloudPtAtLoad) + 1;
+  syncShowLoadNote();
+  if (getSyncId()) { save(); syncRun('claim'); } // 접속 때 고른 데이터로 이 기기가 클라우드의 주인이 된다
 
   // 탭
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));
@@ -16144,8 +16332,15 @@ function init() {
   let last = performance.now();
   setInterval(() => {
     const now = performance.now();
-    const dt = Math.min(0.25, (now - last) / 1000);
+    const rawDt = (now - last) / 1000;
+    const dt = Math.min(0.25, rawDt);
     last = now;
+    if (syncHalted) { // 다른 기기와 충돌해 선택을 기다리는 중 — 선택 창이 다른 팝업에 가려졌으면 다시 띄운다
+      if (syncConflictRec && $('alertModal').hidden) showSyncConflictModal(syncConflictRec);
+      return;
+    }
+    // 플레이타임: 실제로 켜 둔 시간(백그라운드에서 멈춰 있다 깨어난 공백은 5초까지만)
+    S.playTime = (S.playTime || 0) + Math.min(5, Math.max(0, rawDt));
     try {
       // tick() 내부에서 자동사냥 여부·보스전/토벌전/펀치기계 여부를 직접 가려서 처리한다
       // (자동사냥이 꺼져 있어도 진행 중인 보스전/토벌전/펀치기계와 스택 감소는 계속돼야 함).
@@ -16190,6 +16385,7 @@ function init() {
       else if (!resetting) { save(); syncUpload(); } // PC 탭 전환: 안전을 위한 저장/동기화만, 자리비움 기록은 안 함
     } else {
       grantOffline(); // S.lastSeen이 없으면(위에서 자리비움 기록을 안 한 경우) 내부에서 조용히 무시됨
+      syncRun('check'); // 쉬는 동안 다른 기기가 저장했으면 덮어쓰기 전에 잡는다
     }
   });
   window.addEventListener('beforeunload', markLeave);

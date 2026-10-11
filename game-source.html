@@ -3516,17 +3516,18 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 32.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 33.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
+// gift: { key, essence, label } — 그 줄 아래에 1회 한정 보상 버튼(세이브당 1번, S.giftsClaimed[key]). 줄이 만료되면 버튼도 사라진다.
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '💠 각성 개편 · 🔁 각인 자동 재설정',
+    version: 6, versionLabel: '1.0.5', title: '💠 각성 개편 · 🛠️ 무기의 정수 오류 수정 · 🎁 사과 보상',
     changes: [
-      { id: 29, date: '2026-10-08', text: '🔁 각인 자동 재설정 개선: ⚡ 빠르게 돌리기(5배)를 켤 수 있고, 멈출 조건을 "옵션 합"으로도 정할 수 있습니다. 줄마다 조건은 최소·최대·이탈 최대·직접 입력 중에서 고르면 됩니다.' },
-      { id: 30, date: '2026-10-08', text: '🔁 옵션 합 조건 변경: 옵션 하나의 3줄 합(예: 드롭률 합 100% 이상)에 추가 옵션(예: 공격력)을 함께 걸 수 있습니다. 합 기준이 두 줄로는 안 되는 값이면 추가 옵션은 자동으로 꺼집니다.' },
       { id: 31, date: '2026-10-10', text: '💠 각성 개편: 각성 등급이 일반~태초 8단계로 늘고, 무기 등급까지의 각성만 나옵니다(고대 무기는 고대까지). 일반~신화는 스탯 이름 그대로의 수치(전설 공격력 +100%, 신화 +150%), 고대·태초는 최종 공격력·치명타 피해·연타 피해·보스 피해에 곱해지는 옵션입니다. 기존 특수효과 슬롯은 같은 등급의 공격력으로 바뀝니다.' },
       { id: 32, date: '2026-10-10', text: '💠 고대·태초 각성 특수효과 추가: 회심의 연격(치명타 시 같은 피해 1회 추가, 여러 칸이면 확률 합산·최대 100%), 각성 공명(최종 공격력, 다른 고대·태초 칸이 많을수록 강해짐), 만물의 조화(최종 공격력·치명타 피해·연타 피해·보스 피해 동시 상승), 서고의 메아리(정수 획득 증가), 필멸자의 저항(강화 실패 패널티 무효 확률)이 고대·태초 각성에서 나옵니다.' },
+      { id: 33, date: '2026-10-11', text: '🛠️ 무기의 정수 관련 오류 수정: 무기의 정수가 모자랄 때 자동 강화(무기·보조무기)가 멈추지 않고 "정수 부족" 메시지만 계속 쌓이던 문제를 고쳤습니다. 이제 부족하면 한 번 안내하고 자동 강화를 멈춥니다. 불편을 드려 죄송합니다 — 아래 버튼으로 사과 보상을 받아가세요.',
+        gift: { key: 'essence-apology-20261011', essence: 50000, label: '🎁 사과 보상 받기 (📜 무기의 정수 5만 개)' } },
     ],
   },
 ];
@@ -8254,6 +8255,13 @@ function autoSubEnhanceTick() {
     log(`⚙️ 골드가 부족해 보조무기 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
     return;
   }
+  const essenceNeed = subAncientEssenceCost(cur) + subGenesisEssenceCost(cur);
+  if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) {
+    const target = autoSubEnhanceTarget;
+    stopAutoSubEnhance();
+    log(`⚙️ 무기의 정수가 부족해 보조무기 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(essenceNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad');
+    return;
+  }
   trySubEnhance(false, cur);
 }
 // ---- 사냥터 드롭(월드2 전용, 상자 상점과는 별개의 무료 획득 경로) ----
@@ -11451,6 +11459,14 @@ function autoEnhanceTick() {
     const target = autoEnhanceTarget;
     stopAutoEnhance();
     log(`⚙️ 골드가 부족해 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad');
+    return;
+  }
+  // 태초/고대 무기: 무기의 정수가 모자라면 중지(예전엔 확인이 없어 멈추지 않고 매 틱 "정수 부족" 로그만 쌓였다)
+  const essenceNeed = essenceCostFor(cur);
+  if (essenceNeed > 0 && BN.lt(S.weaponEssence, essenceNeed)) {
+    const target = autoEnhanceTarget;
+    stopAutoEnhance();
+    log(`⚙️ 무기의 정수가 부족해 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(essenceNeed)}, 보유 ${fmt(S.weaponEssence)}) — 고대의 도서관에서 획득하세요`, 'lg-bad');
     return;
   }
   const matNeed = highMatsNeeded(cur.enhance);
@@ -14796,14 +14812,40 @@ function renderPatchNotes() {
         ${unread ? '<span class="patchnote-new">NEW</span>' : ''}
       </div>
       <div class="patchnote-title">${p.title}</div>
-      <ul class="patchnote-changes">${p.changes.map(c => `<li>${c.text}${!c.quiet && c.id > lastSeen ? '<span class="patchnote-new">NEW</span>' : ''}</li>`).join('')}</ul>
+      <ul class="patchnote-changes">${p.changes.map(c => `<li>${c.text}${!c.quiet && c.id > lastSeen ? '<span class="patchnote-new">NEW</span>' : ''}${patchGiftHtml(c)}</li>`).join('')}</ul>
     </div>`;
   }).join('') : '<div class="patchnote-empty">최근 3일 동안 올라온 패치노트가 없습니다.</div>';
+  list.querySelectorAll('[data-patch-gift]').forEach(btn => { btn.onclick = () => claimPatchGift(btn.dataset.patchGift); });
   if (latestPatchChangeId() > lastSeen) {
     S.lastSeenPatchId = latestPatchChangeId();
     updatePatchNotesBadge();
     save();
   }
+}
+// 패치노트 1회 한정 보상(사과 보상 등): 세이브당 1번, 줄이 만료되면 함께 사라진다
+function patchGiftClaimed(key) { return !!(S && S.giftsClaimed && S.giftsClaimed[key]); }
+function unclaimedPatchGifts() {
+  const out = [];
+  for (const p of activePatchNotes()) for (const c of p.changes) if (c.gift && !patchGiftClaimed(c.gift.key)) out.push(c.gift);
+  return out;
+}
+function patchGiftHtml(c) {
+  if (!c.gift) return '';
+  return patchGiftClaimed(c.gift.key)
+    ? `<div style="margin-top:6px;font-size:12px;color:var(--sub)">✅ 보상을 받았습니다.</div>`
+    : `<div style="margin-top:6px;"><button class="primary" data-patch-gift="${c.gift.key}">${c.gift.label}</button></div>`;
+}
+function claimPatchGift(key) {
+  let gift = null;
+  for (const p of activePatchNotes()) for (const c of p.changes) if (c.gift && c.gift.key === key) gift = c.gift;
+  if (!gift || patchGiftClaimed(key)) return;
+  if (!S.giftsClaimed) S.giftsClaimed = {};
+  S.giftsClaimed[key] = Date.now();
+  if (gift.essence) S.weaponEssence = BN.add(S.weaponEssence, gift.essence);
+  log(`🎁 <b>사과 보상</b> 수령! 📜 무기의 정수 +${fmt(gift.essence || 0)}`, 'lg-prim');
+  floatText('🎁 보상 수령!');
+  save(); renderTop(); renderPatchNotes(); updatePatchNotesBadge();
+  if (currentTab === 'enhance') renderEnhance();
 }
 // 탭 배지 + 기타 그룹 헤더 배지 + 상단 배너를 한 번에 갱신한다.
 function updatePatchNotesBadge() {
@@ -14816,8 +14858,11 @@ function updatePatchNotesBadge() {
   const banner = $('patchNoteBanner');
   if (banner) {
     const latest = activePatchNotes()[0];
-    banner.hidden = !hasUnread || !latest;
-    if (latest) banner.textContent = `📜 패치노트가 업데이트됐어요! v${latest.versionLabel} ${latest.title} — 눌러서 확인하기`;
+    const gifts = unclaimedPatchGifts();
+    banner.hidden = !latest || (!hasUnread && !gifts.length);
+    if (latest) banner.textContent = gifts.length
+      ? `🎁 받지 않은 보상이 있어요! 패치노트에서 받아가세요 — 눌러서 확인하기`
+      : `📜 패치노트가 업데이트됐어요! v${latest.versionLabel} ${latest.title} — 눌러서 확인하기`;
   }
 }
 

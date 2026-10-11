@@ -7899,7 +7899,10 @@ function subweaponFlavorText(sw) {
 function subweaponGradeTag(sw) {
   const g = GRADES[sw.grade];
   const unbreakable = (isAncientSubweapon(sw) || isGenesisSubweapon(sw)) ? ' <span style="font-size:11px;color:var(--sub)">(파괴 불가)</span>' : '';
-  return `<span class="grade-${g.name}">${g.name} ${SUBWEAPON_TYPES[sw.typeIdx].icon} [${subweaponItemName(sw)}] +${sw.enhance}</span>${unbreakable}`;
+  // 보스 보조무기: 메인 보스무기와 같은 표시로 어느 사냥터 보스 것인지 붙인다
+  const boss = sw.bossFloor !== undefined && FLOORS[sw.bossFloor]
+    ? ` <span style="font-size:12px;color:#3ddfff;font-weight:bold">👹[${FLOORS[sw.bossFloor].name}]</span>` : '';
+  return `<span class="grade-${g.name}">${g.name} ${SUBWEAPON_TYPES[sw.typeIdx].icon} [${subweaponItemName(sw)}] +${sw.enhance}</span>${boss}${unbreakable}`;
 }
 function subweaponPower(sw) { return sw.grade * 1000 + sw.enhance; } // 대충 비교용(가방 정리 시 최약체 판정)
 // 보조무기 판매가 = 같은 등급·강화 메인 무기 판매가 × (보조무기 상자 ÷ 메인 랜덤박스 가격 비율, 약 1,113만 배).
@@ -12000,7 +12003,9 @@ function renderSubCodex() {
     const items = SUBWEAPON_BOSS_NAMES.map((bs, idx) => {
       const unlocked = !!(S.subBossCodexSeen && S.subBossCodexSeen[idx]);
       const t = SUBWEAPON_TYPES.find(x => x.name === bs.subType);
-      return { icon: t.icon, unlocked, name: bs.name, html: subCodexGradeCellHtml(t.icon, bs.name, bs.flavor) };
+      const src = FLOORS[WORLD2_START_FLOOR + idx];
+      const srcHtml = src ? `<div style="font-size:12px;color:#3ddfff;margin-bottom:4px;">👹 ${src.name} 보스 · ${src.boss ? (src.boss.name || src.boss) : ''}</div>` : '';
+      return { icon: t.icon, unlocked, name: bs.name, html: subCodexGradeCellHtml(t.icon, bs.name, bs.flavor) + srcHtml };
     });
     const unlockedCount = items.filter(i => i.unlocked).length;
     const section = document.createElement('div');
@@ -12030,8 +12035,8 @@ function renderSubCodex() {
     section.innerHTML = `<div class="codex-section-title grade-고대">고대 보조무기
       <span class="codex-section-count">${seen.filter(Boolean).length}/${SUBWEAPON_ANCIENTS.length}</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">${SUBWEAPON_ANCIENTS.map((a, i) => seen[i]
-        ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a2a1a;" title="${a.flavor}"><b style="color:var(--gold)">${a.icon} ${a.name}</b><div style="color:var(--sub)">${21 + i}층 · ${a.fxName}</div></div>`
-        : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${21 + i}층</div>`).join('')}</div>`;
+        ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a2a1a;" title="${a.flavor}"><b style="color:var(--gold)">${a.icon} ${a.name}</b><div style="color:var(--sub)">${FLOORS[WORLD2_START_FLOOR + i].name} · ${a.fxName}</div></div>`
+        : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${FLOORS[WORLD2_START_FLOOR + i].name}</div>`).join('')}</div>`;
     box.appendChild(section);
   }
   // 3-2) 태초 보조무기(장착형) — 획득한 적 있는 것만 이름 공개, 아직 설계 전인 층은 표시하지 않음
@@ -12043,8 +12048,8 @@ function renderSubCodex() {
     section.innerHTML = `<div class="codex-section-title grade-태초">태초 보조무기
       <span class="codex-section-count">${list.filter(x => seen[x.i]).length}/${list.length}</span></div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">${list.map(({ g, i }) => seen[i]
-        ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a1a2a;" title="${g.subtitle}"><b class="grade-태초">${g.icon} ${g.name}</b><div style="color:var(--sub)">${21 + i}층 · ${g.passiveName} · ${g.activeName}</div></div>`
-        : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${21 + i}층</div>`).join('')}</div>`;
+        ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a1a2a;" title="${g.subtitle}"><b class="grade-태초">${g.icon} ${g.name}</b><div style="color:var(--sub)">${FLOORS[WORLD2_START_FLOOR + i].name} · ${g.passiveName} · ${g.activeName}</div></div>`
+        : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${FLOORS[WORLD2_START_FLOOR + i].name}</div>`).join('')}</div>`;
     box.appendChild(section);
   }
   // 4) 황혼의 유산(수집품, 20종) — 고대의 유물(도서관 탭)과 동일한 카드 나열 스타일

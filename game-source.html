@@ -12979,6 +12979,56 @@ function showSyncPausedModal() {
 
 // 페이지 로드 시, 동기화 ID가 이미 있으면 게임을 시작하기 전에 서버 최신 데이터로 로컬을 덮어씀.
 // 아직 예전 위치에 있으면 이때 새 위치로 옮긴다.
+// ---------- 운영자 복구 지급(특정 동기화 ID 1회) ----------
+// 동기화 사고 등으로 잃은 아이템을 돌려줄 때 쓴다. ID는 SHA-256 해시로만 적어 코드에 노출하지 않는다.
+// 그 ID로 연결된 기기에서 게임을 열면 1번 지급(S.giftsClaimed[key]). 같은 아이템을 이미 갖고 있으면 그 아이템은
+// 건너뛰고, 골드는 "최소 그 값"으로만 맞춘다(낡은 세이브가 다시 열려도 중복 지급·골드 감소가 없게).
+const ADMIN_GRANTS = [
+  { key: 'restore-20261011-a', idHash: 'fc287fda80cfcf19bda9fa5e766fc01a1d8f3eef2cdf2367648e5b933a906cfd', until: '2026-10-25',
+    genesisSubFloors: [24], bossSubFloors: [36], goldAtLeast: 1.1e22 },
+];
+async function applyAdminGrants() {
+  const id = getSyncId();
+  if (!id || !S) return;
+  const today = todayKey();
+  let idHash = null;
+  for (const g of ADMIN_GRANTS) {
+    if (patchGiftClaimed(g.key) || (g.until && dateKeyOf(new Date(g.until + 'T00:00:00')) < today)) continue;
+    if (!idHash) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(id));
+      idHash = [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    if (idHash !== g.idHash) continue;
+    if (!Array.isArray(S.subweapons)) S.subweapons = [];
+    const got = [];
+    for (const f of g.genesisSubFloors || []) {
+      if (S.subweapons.some(x => x.genesisFloor === f)) continue;
+      const sw = makeGenesisSubweapon(f);
+      unlockSubCodexEntry(sw);
+      if (!Array.isArray(S.subGenesisSeen)) S.subGenesisSeen = [];
+      S.subGenesisSeen[f - WORLD2_START_FLOOR] = true;
+      S.subweapons.push(sw); // 가방 정원·자동판매와 무관하게 그대로 넣는다
+      got.push(subweaponGradeTag(sw));
+    }
+    for (const f of g.bossSubFloors || []) {
+      if (S.subweapons.some(x => x.bossFloor === f)) continue;
+      const bs = SUBWEAPON_BOSS_NAMES[f - WORLD2_START_FLOOR];
+      const sw = makeSubweapon(5, SUBWEAPON_TYPES.findIndex(t => t.name === bs.subType));
+      sw.bossFloor = f;
+      unlockSubCodexEntry(sw);
+      if (!Array.isArray(S.subBossCodexSeen)) S.subBossCodexSeen = [];
+      S.subBossCodexSeen[f - WORLD2_START_FLOOR] = true;
+      S.subweapons.push(sw);
+      got.push(subweaponGradeTag(sw));
+    }
+    if (g.goldAtLeast && BN.lt(S.gold, g.goldAtLeast)) { S.gold = BN.from(g.goldAtLeast); got.push(`💰 골드 ${fmt(S.gold)}`); }
+    if (!S.giftsClaimed) S.giftsClaimed = {};
+    S.giftsClaimed[g.key] = Date.now();
+    log(`🎁 <b>데이터 복구 지급</b>이 도착했습니다: ${got.length ? got.join(' · ') : '(이미 모두 보유 중)'}`, 'lg-prim');
+    save(); renderTop();
+    if (typeof currentTab !== 'undefined' && (currentTab === 'inventory' || currentTab === 'enhance')) switchTab(currentTab);
+  }
+}
 async function syncApplyOnLoad() {
   if (!syncConfigured() || SYNC_PAUSED) return;
   const id = getSyncId();
@@ -16017,6 +16067,7 @@ function init() {
       log('✊ <b>맨손</b>을 가방에 새로 받았습니다. (재미로 강화해볼 수 있어요!)', 'lg-good');
     }
   }
+  applyAdminGrants().catch(() => {}); // 운영자 복구 지급(해당 동기화 ID일 때만)
 
   // 탭
   document.querySelectorAll('.tab').forEach(t => t.onclick = () => switchTab(t.dataset.tab));

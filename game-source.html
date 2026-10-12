@@ -3757,7 +3757,7 @@ function gloveCodexBonusEff() {
 const GLOVE_ANCIENTS = [
   { name: '엔디미온의 잠든 양치기 장갑', icon: '🐑', fx: 'cushion', fxName: '양털 쿠션',
     flavor: '달이 사랑한 양치기는 영원히 잠들었지만, 그 손은 지금도 양떼를 지킨다.',
-    p: { every: 12, speed: 1.6, dur: 8 },
+    p: { every: 12, speed: 1.85, dur: 8 },
     desc: p => `${p.every}초마다 다음 보스 패턴 1번을 통째로 막고, 막을 때마다 ${p.dur}초간 공격속도 +${fmtRate(p.speed)}` },
   { name: '로토파고이의 연꽃 붕대', icon: '🪷', fx: 'lotus', fxName: '하품 옮기기',
     flavor: '이 꽃잎을 맛본 자는 돌아갈 길을 잊고, 서두를 이유도 잊는다.',
@@ -3805,7 +3805,7 @@ const GLOVE_ANCIENTS = [
     desc: p => `공격속도의 ${fmtRate(p.conv)}를 한 방 위력으로 바꿔 침(피해 +${fmtRate(p.conv * p.gain)}). 탈진으로 느려진 만큼은 전부 위력으로` },
   { name: '카리브디스의 소용돌이 장갑', icon: '🌊', fx: 'charybdis', fxName: '밀물과 썰물',
     flavor: '하루 세 번 바다를 삼키고, 하루 세 번 토해낸다.',
-    p: { cycle: 10, flood: 0.34, ebb: 0.29, perHit: 0.02, maxHits: 20 },
+    p: { cycle: 10, flood: 0.36, ebb: 0.31, perHit: 0.021, maxHits: 20 },
     desc: p => `${p.cycle / 2}초 밀물(공격속도 +${fmtRate(p.flood)})과 ${p.cycle / 2}초 썰물(피해 +${fmtRate(p.ebb)}, 밀물 때 친 1번마다 +${fmtRate(p.perHit)}, 최대 ${p.maxHits}번)이 번갈아 옴` },
   { name: '츠쿠요미의 초승달 장갑', icon: '🌙', fx: 'tsukuyomi', fxName: '달을 깎는 칼',
     flavor: '달의 신은 칼로 밤을 갈랐다. 깎여 나간 달빛이 칼날이 되었다.',
@@ -3833,7 +3833,7 @@ const GLOVE_ANCIENTS = [
     desc: p => `보스 패턴이 오기 직전 ${p.window}초 동안 주는 피해 +${fmtRate(p.dmg)}, 그 외에도 항상 +${fmtRate(p.base)}` },
   { name: '닉스의 검은 날개 장갑', icon: '🖤', fx: 'nyx', fxName: '새벽을 쥔 손',
     flavor: '신들의 왕조차 두려워한 밤. 그 검은 날개 아래에서 새벽은 허락받아야 온다.',
-    p: { weaken: 0.15, stacks: 5, burst: 200, every: 8 },
+    p: { weaken: 0.15, stacks: 5, burst: 280, every: 8 },
     desc: p => `모든 보스 패턴 세기 ${fmtRate(p.weaken)} 감소, 패턴이 올 때마다 그리고 ${p.every}초마다 새벽 +1 — ${p.stacks}개가 차면 평균 공격 피해의 ${p.burst}배로 터지고 다음 패턴 1번을 무효` },
 ];
 const GLOVE_ANCIENT_BASE_CHANCE = 1 / 14000000; // 고대 보조무기와 같은 기본 확률

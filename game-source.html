@@ -1103,7 +1103,7 @@
       <div class="panel">
         <h3>🧤 장갑 도감</h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-          월드3(성야국) 장갑 컬렉션입니다. 일반 장갑(8종류 × 일반~신화)과 41~60층 보스 장갑 두 트랙이고, 한 번 얻으면 도감에 남습니다(판매·분해·파괴해도 유지). 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
+          월드3(성야국) 장갑 컬렉션입니다. 일반 장갑(8종류 × 일반~신화), 41~60층 보스 장갑, 고대 장갑 세 트랙이고, 한 번 얻으면 도감에 남습니다(판매·분해·파괴해도 유지). 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
         </div>
         <div id="gloveCodexGrid"></div>
       </div>
@@ -3480,7 +3480,7 @@ function bdStrength(key) {
   const e = bd.list.find(x => x.key === key);
   if (!e) return 0;
   const counter = Math.min(1, gloveCounterValue(DISRUPTIONS[key].counter));
-  return e.base * (bd.enraged ? BOSS_ENRAGE_MULT : 1) * (1 - counter) * (1 - patternResistCached());
+  return e.base * (bd.enraged ? BOSS_ENRAGE_MULT : 1) * (1 - counter) * (1 - patternResistCached()) * gloveAncientStrengthMult(key);
 }
 const bdActiveFor = until => !!(bd && bossFight.elapsed < until);
 function bdSealed() { return bdActiveFor(bd ? bd.sealUntil : 0); }
@@ -3506,13 +3506,14 @@ function bdCombatView(w) {
   return { ...w, effect: null, spirit: null };
 }
 function bdHealBoss(n) {
-  if (n > 0) mon.hp = BN.min(mon.maxHp, BN.add(mon.hp, n));
+  if (n > 0) { mon.hp = BN.min(mon.maxHp, BN.add(mon.hp, n)); gloveAncientOnHeal(n); } // 고대 장갑(실밥 뜯기)
 }
 // dealMonDamage()에서 호출: 웅크리기·약화 → 분신 → 보호막 순으로 처리하고 본체가 받을 피해를 돌려준다
 function bdFilterDamage(amount) {
   if (!(amount > 0)) return 0;
   const raw = amount;
-  amount *= (1 - Math.min(0.95, bdStrength('guard'))) * Math.max(0.1, 1 - bd.weakenTotal);
+  const ign = gloveAncientReductionIgnore(); // 고대 장갑(은하 쟁기질): 웅크리기·약화 저주 감소 일부 무시
+  amount *= (1 - Math.min(0.95, bdStrength('guard')) * (1 - ign)) * Math.max(0.1, 1 - bd.weakenTotal * (1 - ign));
   if (bdHas('guard')) ancientSubBlocked(raw * Math.min(0.95, bdStrength('guard'))); // 웅크리기에 막힌 몫(압력 밸브)
   const pm = ancientSubPressureMult(); // 고대 보조무기(수압): 보호막·분신에 주는 피해 증가
   if (bd.illusions.length) {
@@ -3547,17 +3548,19 @@ function bdTrigger(key) {
   const t = bossFight.elapsed;
   const maxHp = BN.toNumber(mon.maxHp);
   if (genesisSubOnPattern()) return; // 태초 보조무기(걀라르호른): 액티브 중엔 패턴 무효 + 반격
+  if (gloveAncientOnPattern(key)) return; // 고대 장갑(양털 쿠션·번지는 물감·새벽): 이번 패턴 무효
   if (key !== 'timeDrain' && key !== 'thorns') ancientSubOnPattern(); // 고대 보조무기(허수아비)
   if (key === 'timeDrain') {
     const ts = s * (bd.timeScale || 1);
     bossFight.timeLeft -= ts;
     ancientSubOnTimeLoss(ts); // 고대 보조무기(뱃삯·허수아비)
+    gloveAncientOnTimeLoss(ts); // 고대 장갑(돌아오는 혜성)
     floatText(`⏳ 시간 잠식 -${ts.toFixed(1)}초`);
   } else if (key === 'thorns') {
     // 고정분(flat)은 기준값 대비 같은 비율로 약해진다(장갑 대응·광폭화 동일 적용)
     const e = bd.list.find(x => x.key === 'thorns');
     const loss = (d.flat / e.base + computeStats().critChance / 100) * s * (bd.timeScale || 1);
-    if (loss > 0) { bossFight.timeLeft -= loss; ancientSubOnTimeLoss(loss); floatText(`🌵 가시 반격 -${loss.toFixed(1)}초`); }
+    if (loss > 0) { bossFight.timeLeft -= loss; ancientSubOnTimeLoss(loss); gloveAncientOnTimeLoss(loss); floatText(`🌵 가시 반격 -${loss.toFixed(1)}초`); }
   } else if (key === 'blind') {
     bd.blindUntil = t + s; floatText('🌑 암흑!');
   } else if (key === 'stun') {
@@ -3586,7 +3589,7 @@ function bdTrigger(key) {
     const from = t - d.window;
     const recent = bd.rewindLog.filter(x => x.t >= from).reduce((sum, x) => sum + x.a, 0);
     bd.rewindLog = bd.rewindLog.filter(x => x.t >= from);
-    const heal = recent * s;
+    const heal = recent * s * gloveAncientRewindMult(); // 고대 장갑(꽃이 지는 순서): 역행 회복 상쇄
     if (heal > 0) { bdHealBoss(heal); floatText('⏪ 역행!'); }
   }
 }
@@ -3726,7 +3729,7 @@ const GLOVE_CODEX_TYPE_MASTERY = [ // index = GLOVE_TYPES 순서
   { effs: [['gloveDestroyReduce', 0.02]] },
 ];
 function gloveCodexKey(g) {
-  if (!g || g.bossFloor !== undefined || g.grade > 5) return null;
+  if (!g || g.bossFloor !== undefined || g.ancientFloor !== undefined || g.grade > 5) return null;
   return `g${g.grade}_${g.typeIdx}`;
 }
 function gloveCodexHas(key) { return !!(S && S.gloveCodexSeen && S.gloveCodexSeen[key]); }
@@ -3745,6 +3748,119 @@ function gloveCodexBonusEff() {
   for (const gs of GLOVE_CODEX_GRADE_SETS) if (gloveCodexGradeDone(gs.grade)) add(gs.effs);
   GLOVE_CODEX_TYPE_MASTERY.forEach((tm, i) => { if (gloveCodexTypeDone(i)) add(tm.effs); });
   return eff;
+}
+// ---------- 🏺 고대 장갑 (6등급, 월드3 41~60층 — 장착형) ----------
+// 층마다 1종, 종류는 그 층 보스 장갑과 같다. 대응 스탯(등급 배율 9.2) + 고대 효과 1개 + 넘치는 대응.
+// 그 층 몬스터 초저확률 드랍(보스 ×10·엘리트 ×5·보스 장갑 세트 ×3), 강화 실패 시 파괴 대신 +0 초기화,
+// 판매 불가(분해 가능). 효과 수치는 같은 종류 신화 +27 장갑 대비 패턴 보스전 필요 화력 ×1.6 기준으로 측정해 맞춘다.
+// index = 층 - WORLD3_START_FLOOR. 설계: design-notes/ancient-genesis-gloves.md
+const GLOVE_ANCIENTS = [
+  { name: '엔디미온의 잠든 양치기 장갑', icon: '🐑', fx: 'cushion', fxName: '양털 쿠션',
+    flavor: '달이 사랑한 양치기는 영원히 잠들었지만, 그 손은 지금도 양떼를 지킨다.',
+    p: { every: 12, speed: 1.85, dur: 8 },
+    desc: p => `${p.every}초마다 다음 보스 패턴 1번을 통째로 막고, 막을 때마다 ${p.dur}초간 공격속도 +${fmtRate(p.speed)}` },
+  { name: '로토파고이의 연꽃 붕대', icon: '🪷', fx: 'lotus', fxName: '하품 옮기기',
+    flavor: '이 꽃잎을 맛본 자는 돌아갈 길을 잊고, 서두를 이유도 잊는다.',
+    p: { per: 30, delay: 5, doze: 4, dozeDmg: 0.35 },
+    desc: p => `공격 ${p.per}번마다 보스에게 졸음이 차올라, 보스의 다음 패턴들이 ${p.delay}초씩 늦게 오고 ${p.doze}초 동안 꾸벅이는 보스가 받는 피해 +${fmtRate(p.dozeDmg)}` },
+  { name: '홀레 할머니의 깃털이불 장갑', icon: '🪶', fx: 'featherbed', fxName: '포근한 반동',
+    flavor: '이불을 털면 세상에 눈이 내린다. 포근하게 받아낸 만큼, 고스란히 쏟아진다.',
+    p: { rate: 0.9, every: 10, base: 0.4 },
+    desc: p => `보스 패턴 하나마다 반동이 쌓이고(대응 스탯으로 약하게 만들수록 최대 ${(1 / p.base).toFixed(1)}배 더), ${p.every}초마다 최근 초당 피해 × ${fmtRate(p.rate)} × 쌓인 몫만큼 한꺼번에 터짐` },
+  { name: '오르페우스의 자장가 장갑', icon: '🎼', fx: 'song', fxName: '끊기지 않는 노래',
+    flavor: '그의 노래가 이어지는 동안엔, 잠들지 않는 용조차 눈을 감았다.',
+    p: { perSec: 0.04, max: 1.2 },
+    desc: p => `방해(스턴·암흑·탈진) 없이 공격하는 동안 공격속도가 초당 +${fmtRate(p.perSec)}씩 올라 최대 +${fmtRate(p.max)}, 행동 방해에 걸리면 절반으로` },
+  { name: '피닉스의 재 장갑', icon: '🔥', fx: 'phoenix', fxName: '다시 켜는 불',
+    flavor: '꺼진 불은 재가 되고, 재는 다시 불이 된다. 몰아칠수록 더 밝게.',
+    p: { perLost: 1.3, enrageMult: 2, cancel: 0.5 },
+    desc: p => `보스가 잃은 체력만큼 불이 커져 주는 피해 증가(잃은 체력 1%당 +${+(p.perLost).toFixed(1)}%), 광폭화한 보스에게는 ${p.enrageMult}배로 타오르고 광폭화로 늘어나는 패턴 세기 ${fmtRate(p.cancel)} 상쇄` },
+  { name: '페르세포네의 석류 장갑', icon: '🌺', fx: 'pomegranate', fxName: '꽃이 지는 순서',
+    flavor: '꽃은 지는 순서를 기억한다. 가장 붉었던 꽃이 가장 먼저 다시 핀다.',
+    p: { every: 10, mult: 11, rewindCut: 0.5 },
+    desc: p => `이번 전투에서 공격 1회로 준 가장 큰 피해를 기억해 ${p.every}초마다 그 ${p.mult}배로 다시 피움. 역행 보스는 역행 순간 바로 터지고 역행 회복 ${fmtRate(p.rewindCut)} 상쇄` },
+  { name: '야곱의 사다리 장갑', icon: '🪜', fx: 'ladder', fxName: '끝없는 계단',
+    flavor: '꿈속의 사다리는 끝이 없지만, 한 칸도 헛디딘 적이 없다.',
+    p: { per: 0.016, max: 40 },
+    desc: p => `연속으로 맞힐 때마다 한 계단씩 올라 피해 +${fmtRate(p.per)}(최대 ${p.max}계단), 빗나가면 한 계단만 내려감` },
+  { name: '나르키소스의 거울 장갑', icon: '🪞', fx: 'mirror', fxName: '거울 손님 초대',
+    flavor: '거울 속의 그는 언제나 같은 손짓을 한다. 조금 늦게, 하지만 똑같이.',
+    p: { every: 15, dur: 6, frac: 3.7 },
+    desc: p => `${p.every}초마다 거울 손님이 ${p.dur}초 동안 내 공격(평균 총 피해)을 ${fmtRate(p.frac)} 위력으로 따라 침. 환영 분신을 쓰는 보스는 분신이 나올 때마다 손님 +1` },
+  { name: '페넬로페의 풀어내는 장갑', icon: '🧶', fx: 'unravel', fxName: '실밥 뜯기',
+    flavor: '낮에 짠 것을 밤마다 풀었다. 이 손이 푸는 것은, 다시는 엮이지 않는다.',
+    p: { perStack: 0.22, max: 30, dur: 4, healBack: 1.0 },
+    desc: p => `공격마다 출혈 +1(최대 ${p.max}, ${p.dur}초간 공격이 없으면 사라짐), 출혈 1당 초당 평균 공격 피해의 ${fmtRate(p.perStack)}. 보스가 재생·역행으로 회복한 양의 ${fmtRate(p.healBack)}를 피해로 되돌림` },
+  { name: '디오니소스의 가면 장갑', icon: '🎭', fx: 'mask', fxName: '독무대',
+    flavor: '가면이 입을 막으면, 무대는 더 크게 울린다.',
+    p: { sealAtk: 4.8, every: 15, dur: 5 },
+    desc: p => `봉인당한 동안 공격력 +${fmtRate(p.sealAtk)}(이 효과는 봉인 중에도 멈추지 않음). 봉인이 없는 보스에겐 ${p.every}초마다 ${p.dur}초간 +${fmtRate(p.sealAtk / 2)}` },
+  { name: '후예의 달 겨냥 장갑', icon: '🏹', fx: 'houyi', fxName: '진짜 달 겨냥',
+    flavor: '아홉 개의 해를 떨어뜨린 활잡이는, 물에 비친 달에는 화살을 쏘지 않았다.',
+    p: { perAcc: 0.45, overflow: 1.5 },
+    desc: p => `장갑의 🎯명중 1%당 치명타 확률 +${+(p.perAcc).toFixed(2)}%p(회피·암흑 보스는 2배), 100%를 넘친 치명타 확률은 1%p당 치명타 피해 +${+(p.overflow).toFixed(1)}%p` },
+  { name: '옥토끼의 방아 붕대', icon: '🐇', fx: 'rabbit', fxName: '달 방아',
+    flavor: '계수나무 아래, 천천히 찧을수록 더 깊이 박힌다.',
+    p: { conv: 0.3, gain: 4.0 },
+    desc: p => `공격속도의 ${fmtRate(p.conv)}를 한 방 위력으로 바꿔 침(피해 +${fmtRate(p.conv * p.gain)}). 탈진으로 느려진 만큼은 전부 위력으로` },
+  { name: '카리브디스의 소용돌이 장갑', icon: '🌊', fx: 'charybdis', fxName: '밀물과 썰물',
+    flavor: '하루 세 번 바다를 삼키고, 하루 세 번 토해낸다.',
+    p: { cycle: 10, flood: 0.36, ebb: 0.31, perHit: 0.021, maxHits: 20 },
+    desc: p => `${p.cycle / 2}초 밀물(공격속도 +${fmtRate(p.flood)})과 ${p.cycle / 2}초 썰물(피해 +${fmtRate(p.ebb)}, 밀물 때 친 1번마다 +${fmtRate(p.perHit)}, 최대 ${p.maxHits}번)이 번갈아 옴` },
+  { name: '츠쿠요미의 초승달 장갑', icon: '🌙', fx: 'tsukuyomi', fxName: '달을 깎는 칼',
+    flavor: '달의 신은 칼로 밤을 갈랐다. 깎여 나간 달빛이 칼날이 되었다.',
+    p: { perIns: 3.3, foresightCut: 0.5 },
+    desc: p => `장갑의 👁️간파 1%당 치명타 피해 +${+(p.perIns).toFixed(1)}%p, 예언(치명타 추가 피해 무시) 세기 ${fmtRate(p.foresightCut)} 감소` },
+  { name: '불개의 월식 장갑', icon: '🐕', fx: 'bulgae', fxName: '월식',
+    flavor: '해와 달을 물려다 번번이 놓치는 개. 그래도 문 자리엔 이빨 자국이 남는다.',
+    p: { at: 0.5, dur: 15, dmg: 8 },
+    desc: p => `보스 체력이 ${fmtRate(p.at)} 아래로 내려가는 순간 ${p.dur}초 동안 월식 — 그동안 주는 피해 +${fmtRate(p.dmg)}` },
+  { name: '견우의 은하 쟁기 장갑', icon: '🐂', fx: 'plow', fxName: '은하 쟁기질',
+    flavor: '은하수를 갈아엎는 쟁기에는, 막을 수 있는 둑이 없다.',
+    p: { perShatter: 1.0, noneBoss: 0.8 },
+    desc: p => `장갑의 🔨파쇄 수치 × ${fmtRate(p.perShatter)}만큼 웅크리기·약화 저주의 피해 감소를 무시. 둘 다 없는 보스에게는 파쇄 1%당 보스 피해 +${+(p.noneBoss).toFixed(1)}%` },
+  { name: '직녀의 베틀 장갑', icon: '🧵', fx: 'loom', fxName: '번지는 물감',
+    flavor: '하늘의 베틀에서 흘러내린 물감은, 지워져도 다른 자리에 다시 번진다.',
+    p: { perStack: 0.0115, max: 60, guard: 15 },
+    desc: p => `공격마다 보스에게 물감 얼룩 +1(최대 ${p.max}), 얼룩 1당 받는 피해 +${fmtRate(p.perStack)}. 흩어짐이 오면 얼룩 ${p.guard}개가 대신 지워져 흩어짐을 막음` },
+  { name: '핼리의 귀환 장갑', icon: '☄️', fx: 'halley', fxName: '돌아오는 혜성',
+    flavor: '사람의 한 생에 한 번, 그래도 반드시 돌아온다.',
+    p: { every: 15, base: 160, growth: 0.1 },
+    desc: p => `${p.every}초마다 혜성이 돌아와 평균 공격 피해의 ${p.base}배(돌아올 때마다 +${fmtRate(p.growth)}), 시간 잠식·가시 반격으로 잃은 시간만큼 빨리 옴` },
+  { name: '발키리의 오로라 장갑', icon: '🌌', fx: 'valkyrie', fxName: '커튼 너머',
+    flavor: '오로라는 그녀들의 갑옷에 비친 빛. 누가 쓰러질지 먼저 보는 눈.',
+    p: { window: 3, dmg: 2.0, base: 0.2 },
+    desc: p => `보스 패턴이 오기 직전 ${p.window}초 동안 주는 피해 +${fmtRate(p.dmg)}, 그 외에도 항상 +${fmtRate(p.base)}` },
+  { name: '닉스의 검은 날개 장갑', icon: '🖤', fx: 'nyx', fxName: '새벽을 쥔 손',
+    flavor: '신들의 왕조차 두려워한 밤. 그 검은 날개 아래에서 새벽은 허락받아야 온다.',
+    p: { weaken: 0.15, stacks: 5, burst: 280, every: 8 },
+    desc: p => `모든 보스 패턴 세기 ${fmtRate(p.weaken)} 감소, 패턴이 올 때마다 그리고 ${p.every}초마다 새벽 +1 — ${p.stacks}개가 차면 평균 공격 피해의 ${p.burst}배로 터지고 다음 패턴 1번을 무효` },
+];
+const GLOVE_ANCIENT_BASE_CHANCE = 1 / 14000000; // 고대 보조무기와 같은 기본 확률
+const GLOVE_ANCIENT_ESSENCE = { base: 100, growth: 1.3 }; // 강화 시 무기의 정수(+0 100개, 강화당 ×1.3) — 고대 보조무기와 같음
+// 넘치는 대응(고대·태초 장갑 공통): 그 보스가 쓰는 패턴의 대응 스탯이 100%를 넘은 만큼(넘친 %p 합 × K) 주는 피해 증가
+const GLOVE_OVERFLOW_K = 1.0;
+function gloveAncientDef(g) { return g && g.ancientFloor !== undefined ? GLOVE_ANCIENTS[g.ancientFloor - WORLD3_START_FLOOR] || null : null; }
+function isAncientGlove(g) { return !!gloveAncientDef(g); }
+function gloveEssenceCost(g) { return isAncientGlove(g) ? Math.ceil(GLOVE_ANCIENT_ESSENCE.base * Math.pow(GLOVE_ANCIENT_ESSENCE.growth, g.enhance || 0)) : 0; }
+function gloveAncientEffectLine(g) {
+  const ad = gloveAncientDef(g);
+  return ad ? `🏺 [고대 효과: ${ad.fxName}] ${ad.desc(ad.p)}` : '';
+}
+function makeAncientGlove(floorIdx) {
+  const idx = floorIdx - WORLD3_START_FLOOR;
+  return { id: uid++, typeIdx: GLOVE_BOSS_NAMES[idx].typeIdx, grade: 6, enhance: 0, ancientFloor: floorIdx };
+}
+function rollAncientGlove(floorIdx, kindMult) {
+  if (worldOf(floorIdx) !== 3 || !GLOVE_ANCIENTS[floorIdx - WORLD3_START_FLOOR]) return;
+  if (Math.random() >= GLOVE_ANCIENT_BASE_CHANCE * kindMult * genesisAncientDropMult(floorIdx)) return;
+  const g = makeAncientGlove(floorIdx);
+  addGlove(g);
+  if (!Array.isArray(S.gloveAncientSeen)) S.gloveAncientSeen = [];
+  S.gloveAncientSeen[floorIdx - WORLD3_START_FLOOR] = true;
+  const ad = gloveAncientDef(g);
+  log(`🏺🏺🏺 <b class="grade-고대">[고대 장갑] ${ad.icon} ${ad.name}</b>을(를) 획득했습니다!!! ${ad.flavor}`, 'lg-prim');
+  renderTop(); save();
 }
 function gloveBossInfo(g) { return g && g.bossFloor !== undefined ? GLOVE_BOSS_NAMES[g.bossFloor - WORLD3_START_FLOOR] || null : null; }
 function getEquippedGlove() { return (S && Array.isArray(S.gloves) ? S.gloves : []).find(g => g.id === S.gloveEquipped) || null; }
@@ -3811,6 +3927,8 @@ function gloveAtk(g) {
   return GRADES[g.grade].atk * SUBWEAPON_ATK_MULT * GLOVE_ATK_MULT * enhAtkMult(g.enhance, g.grade);
 }
 function gloveName(g) {
+  const ad = gloveAncientDef(g);
+  if (ad) return ad.name;
   const bi = gloveBossInfo(g);
   if (bi) return bi.name; // 보스 장갑은 등급 공용 이름 대신 그 층 전용 이름
   return GLOVE_TYPES[g.typeIdx].names[g.grade] || GLOVE_TYPES[g.typeIdx].names[0];
@@ -3819,7 +3937,9 @@ function gloveGradeTag(g) {
   const gname = GRADES[g.grade].name;
   const boss = g.bossFloor !== undefined && FLOORS[g.bossFloor]
     ? ` <span style="font-size:12px;color:#3ddfff;font-weight:bold">👹[${FLOORS[g.bossFloor].name}]</span>` : '';
-  return `<span class="grade-${gname}">${gname} ${GLOVE_TYPES[g.typeIdx].icon} [${gloveName(g)}] +${g.enhance}</span>${boss}`;
+  const ad = gloveAncientDef(g);
+  const icon = ad ? `🏺${ad.icon}` : GLOVE_TYPES[g.typeIdx].icon;
+  return `<span class="grade-${gname}">${gname} ${icon} [${gloveName(g)}] +${g.enhance}</span>${boss}`;
 }
 // 보조 스탯·자수는 증폭이 있으면 증폭 후 값을 같이 보여준다 (예: 집중 40% → 58%)
 function gloveStatText(g) {
@@ -3861,10 +3981,10 @@ function gloveAutoDispose(g, why) {
 function addGlove(g) {
   if (!Array.isArray(S.gloves)) S.gloves = [];
   unlockGloveCodexEntry(g); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록
-  const isBoss = g.bossFloor !== undefined;
+  const isBoss = g.bossFloor !== undefined || g.grade >= 6; // 보스·고대·태초 장갑은 정원을 넘겨서라도 넣는다
   if (gloveAutoSellMatch(g)) { gloveAutoDispose(g, '자동'); return false; }
   if (S.gloves.length >= GLOVE_BAG_MAX) {
-    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped && x.bossFloor === undefined && !disPresetLocked('g', x.id));
+    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped && x.bossFloor === undefined && x.grade < 6 && !disPresetLocked('g', x.id));
     const weakest = [...sellable].sort((a, b) => glovePower(a) - glovePower(b))[0];
     if (!isBoss && (!weakest || glovePower(weakest) > glovePower(g))) { gloveAutoDispose(g, '장갑 가방이 가득 차서 새 장갑 자동'); return false; }
     if (weakest) {
@@ -3919,6 +4039,7 @@ function sellGlove(id) {
   if (id === S.gloveEquipped) { log('장착 중인 장갑은 판매할 수 없습니다. 먼저 해제하세요.', 'lg-bad'); return; }
   const g = (S.gloves || []).find(x => x.id === id);
   if (!g) return;
+  if (g.grade >= 6) { log(`${GRADES[g.grade].name} 장갑은 판매할 수 없습니다. (분해기에서 분해할 수 있습니다)`, 'lg-bad'); return; }
   S.gloves = S.gloves.filter(x => x.id !== id);
   S.gold = BN.add(S.gold, gloveSellPrice(g));
   log(`판매: ${gloveGradeTag(g)} → +${fmt(gloveSellPrice(g))} 골드`);
@@ -3999,6 +4120,8 @@ function autoGloveEnhanceTick() {
   const cost = gloveTryCost(g, false);
   if (BN.lt(S.gold, cost.gold)) { stopAutoGloveEnhance(); log(`⚙️ 골드가 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
   if (BN.lt(S.steelThread || 0, cost.steel)) { stopAutoGloveEnhance(); log(`⚙️ 🧵 강철실이 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(cost.steel)}, 보유 ${fmt(S.steelThread || 0)})`, 'lg-bad'); return; }
+  const essNeed = gloveEssenceCost(g);
+  if (essNeed > 0 && BN.lt(S.weaponEssence, essNeed)) { stopAutoGloveEnhance(); log(`⚙️ 📜 무기의 정수가 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(essNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad'); return; }
   tryGloveEnhance(false);
 }
 function renderGloveAutoEnhance(g, maxed) {
@@ -4031,8 +4154,11 @@ function tryGloveEnhance(advanced) {
   const cost = gloveTryCost(g, advanced);
   if (BN.lt(S.gold, cost.gold)) { log(`골드가 부족합니다 (${fmt(cost.gold)} 필요)`, 'lg-bad'); return; }
   if (BN.lt(S.steelThread, cost.steel)) { log(`🧵 강철실이 부족합니다 (${fmt(cost.steel)}개 필요, 보유 ${fmt(S.steelThread)}개) — 토벌전 21단계 이상에서 획득하세요`, 'lg-bad'); return; }
+  const essNeed = gloveEssenceCost(g);
+  if (essNeed > 0 && BN.lt(S.weaponEssence, essNeed)) { log(`📜 무기의 정수가 부족합니다 (필요 ${fmt(essNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad'); return; }
   S.gold = BN.sub(S.gold, cost.gold);
   S.steelThread = BN.sub(S.steelThread, cost.steel);
+  if (essNeed > 0) S.weaponEssence = BN.sub(S.weaponEssence, essNeed);
   renderTop();
   gloveEnhanceRevealPending = true;
   startEnhanceCharge('gloveEnhPanel');
@@ -4059,6 +4185,12 @@ function resolveGloveEnhance(g, advanced) {
     if ((destroyHit || !stayHit) && tryUsePenaltyGuard('장갑 강화 실패')) {
       playEnhanceFx('protect', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'dust');
+    } else if (destroyHit && isAncientGlove(g)) {
+      // 고대 장갑은 파괴되지 않는 대신 +0으로 초기화된다(고대 무기·고대 보조무기와 같음)
+      g.enhance = 0;
+      playEnhanceFx('fail', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
+      playEnhancePanelReveal('gloveEnhPanel', 'crack');
+      log(`🏺💢 고대 장갑은 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gloveGradeTag(g)} (초기화 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
     } else if (destroyHit) {
       playEnhanceFx('destroy', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'crack');
@@ -4209,13 +4341,13 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 38.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 39.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 // gift: { key, essence, label } — 그 줄 아래에 1회 한정 보상 버튼(세이브당 1번, S.giftsClaimed[key]). 줄이 만료되면 버튼도 사라진다.
 const PATCH_NOTE_TTL_DAYS = 3;
 const PATCH_NOTES = [
   {
-    version: 6, versionLabel: '1.0.5', title: '🌌 월드3 성야국 · 🔗 세이브 동기화 개편 · 🌟 태초 보조무기 20종 · 💠 각성 개편',
+    version: 6, versionLabel: '1.0.5', title: '🏺 고대 장갑 · 🌌 월드3 성야국 · 🔗 세이브 동기화 개편 · 🌟 태초 보조무기 · 💠 각성 개편',
     changes: [
       { id: 31, date: '2026-10-10', text: '💠 각성 개편: 각성 등급이 일반~태초 8단계로 늘고, 무기 등급까지의 각성만 나옵니다(고대 무기는 고대까지). 일반~신화는 스탯 이름 그대로의 수치(전설 공격력 +100%, 신화 +150%), 고대·태초는 최종 공격력·치명타 피해·연타 피해·보스 피해에 곱해지는 옵션입니다. 기존 특수효과 슬롯은 같은 등급의 공격력으로 바뀝니다.' },
       { id: 32, date: '2026-10-10', text: '💠 고대·태초 각성 특수효과 추가: 회심의 연격(치명타 시 같은 피해 1회 추가, 여러 칸이면 확률 합산·최대 100%), 각성 공명(최종 공격력, 다른 고대·태초 칸이 많을수록 강해짐), 만물의 조화(최종 공격력·치명타 피해·연타 피해·보스 피해 동시 상승), 서고의 메아리(정수 획득 증가), 필멸자의 저항(강화 실패 패널티 무효 확률)이 고대·태초 각성에서 나옵니다.' },
@@ -4227,6 +4359,7 @@ const PATCH_NOTES = [
       { id: 37, date: '2026-10-12', text: '🛠️ 보조무기 강화 오류 수정: 강화에 실패했을 때 단계가 떨어질 확률이 무기(35%)보다 높게(50%) 잘못 남아 있던 문제를 고쳤습니다. 이제 보조무기도 무기와 같이 실패 시 유지 65% / 하락 35%이고, 태초 보조무기의 고급 강화는 하락 확률 10%입니다(장갑도 같이 수정). 불편을 드려 죄송합니다 — 아래 버튼으로 사과 보상을 받아가세요.',
         gift: { key: 'essence-subenh-fix-20261012', essence: 50000, label: '🎁 사과 보상 받기 (📜 무기의 정수 5만 개)' } },
       { id: 38, date: '2026-10-12', text: '🌳 세계수의 단말마 결산이 일요일로 바뀝니다: 한 주가 일요일~토요일이 되고, 전체 보상·칭호가 매주 일요일 0시에 지급돼 일요일 강화데이에 바로 쓸 수 있습니다. 이번 주만 월~토 6일로 계산되고, 10월 18일(일)에 첫 일요일 결산이 됩니다.' },
+      { id: 39, date: '2026-10-12', text: '🏺 고대 장갑 20종 추가: 성야국 41~60층마다 그 층에만 있는 고대 장갑이 생겼습니다. 그 층 몬스터에게서 아주 낮은 확률로 나오고(엘리트 5배, 층 보스 10배, 그 층 보스 장갑 세트 3배), 저마다 고유한 고대 효과가 붙어 있습니다. 강화에 실패해도 파괴되지 않고 +0으로 초기화되며, 대응 스탯이 100%를 넘으면 넘친 만큼 그 패턴을 쓰는 보스에게 주는 피해가 늘어납니다(넘치는 대응). 자세한 내용은 📘 가이드의 "고대 장갑" 참고.' },
     ],
   },
 ];
@@ -5491,7 +5624,7 @@ function grantGenesisArtifact(artifact) {
 // 반영하고, 그 사냥터의 보스 세트(보스 장신구 보유 + 그 층 보스무기 장착, bossSetFloor())를
 // 갖췄으면 3배.
 function genesisAncientDropMult(floorIdx) {
-  const setMatch = bossSetFloor() === floorIdx || subBossSetFloor() === floorIdx;
+  const setMatch = bossSetFloor() === floorIdx || subBossSetFloor() === floorIdx || gloveBossSetFloor() === floorIdx;
   const w = getEquipped();
   return (1 + accEff().luck + awakenStat(w, 'luck')) * (setMatch ? 3 : 1);
 }
@@ -7025,6 +7158,7 @@ function newState() {
     gloveAutoSellGrade: null, // 이 등급 이하 + 강화0 + 자수 없는 장갑은 획득 즉시 자동판매 (null=끔, 보스 장갑 제외)
     gloveAutoDisassemble: false, // 자동판매·가방 정원 초과 처리를 판매 대신 분해(🧵 강철실)로
     gloveCodexSeen: {},    // 일반 장갑 도감: 키 `g{grade}_{typeIdx}` — 8종류×6등급(0~5) 48종
+    gloveAncientSeen: [],  // 고대 장갑 도감(월드3): [true/false, ...] 20개, index = 층 번호(0=41층)
     genesisFeedPending: [], genesisFeedName: '', // 태초 획득 알림: 이름 입력·서버 업로드 대기 목록, 마지막으로 쓴 이름
     weeklyRaid: { week: null, days: {}, dayKey: null, dayCount: 0, title: null, titleWeek: null, bestRun: null, recordDay: null, rid: null, pushDirty: false, unsettled: [], lastSettled: null }, // 세계수의 단말마: week=주차키, days={날짜키: 일일 최고 피해}, dayKey/dayCount=오늘 도전 횟수, title/titleWeek=칭호와 그 칭호가 유효한 주, bestRun=역대 최고 1회 피해, recordDay=기록 보상 받은 날, rid=전체 합산용 익명 id(해시해서 키로 씀), pushDirty=이번 주 기록 업로드 대기, unsettled=전체 정산 대기 [{week,total}], lastSettled=마지막 전체 정산 결과
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
@@ -8111,6 +8245,7 @@ function dealMonDamage(amount) {
     if (amount <= 0) return;
   }
   ancientSubOnDamage(amount); // 고대 보조무기(외상 장부·조종) 누적
+  gloveAncientOnDamage(amount); // 고대 장갑(평균 공격 피해·초당 피해)
   genesisSubOnDamage(amount); // 태초 보조무기(평균 공격 피해)
   if (bossFight.active && bossFight.isPunch) punchDealtOverflow = BN.add(punchDealtOverflow, amount);
   if (bossFight.active && bossFight.isWeeklyRaid) weeklyRaidDealtOverflow = BN.add(weeklyRaidDealtOverflow, amount);
@@ -8137,6 +8272,7 @@ function floorHp(f) { return FLOORS[f].hp; }
 
 function spawnMonster() {
   fx.asub = null; // 고대 보조무기 전투 상태(대상 단위)
+  fx.agl = null;  // 고대 장갑 전투 상태(대상 단위)
   fx.gsub = null; // 태초 보조무기 전투 상태(대상 단위)
   mon.maxHp = BN.from(floorHp(S.floor));
   mon.hp = mon.maxHp;
@@ -8310,6 +8446,8 @@ function dropRoll() {
   rollSubweaponDrop(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 장갑: 월드3(41~60층) 전용 사냥 드롭 (엘리트는 5배)
   rollGloveHuntDrop(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
+  // 고대 장갑: 그 층 고유 고대 장갑 초저확률 드롭 (월드3 전용, 엘리트는 5배)
+  rollAncientGlove(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 황혼의 유산(수집품): 고대 무기와 같은 방식의 초저확률 고정 드롭 (월드2 전용, 엘리트는 5배)
   rollSubweaponRelic(S.floor, isU ? ANCIENT_ELITE_MULT : 1);
   // 고대 보조무기(장착형): 그 층 고유 고대 보조무기 초저확률 드롭 (월드2 전용, 엘리트는 5배)
@@ -9442,6 +9580,242 @@ function ancientSubTick(dt, w) {
   return null;
 }
 
+// ---------- 🏺 고대 장갑 전투 효과 ----------
+// 상태는 fx.agl(전투 단위) — resetTimedStacks()/spawnMonster()에서 초기화한다. 보스전에서만 동작하고,
+// 보스 패턴 "봉인" 중에는 고대 효과가 멈춘다(봉인을 다루는 독무대만 예외). 넘치는 대응은 봉인과 무관.
+function gloveAncientFx() {
+  const ad = gloveAncientDef(getEquippedGlove());
+  if (!ad || (bdSealed() && ad.fx !== 'mask')) return null;
+  return ad;
+}
+function aglState() {
+  if (!fx.agl) fx.agl = {
+    atkAcc: 0, avgAtk: 0, dmgAcc: 0, dps: 0, maxHit: 0,
+    cushionReady: true, cushionNext: 0, buffUntil: 0, drowsy: 0, rebound: 0, reboundNext: 0, song: 0,
+    echoNext: 0, steps: 0, guests: [], mirrorNext: 0, bleed: 0, bleedLast: -99, floodHits: 0, cyclePhase: -1,
+    eclipseDone: false, eclipseUntil: -1, stains: 0, cometNext: 0, cometCount: 0, dawn: 0, dawnCancel: false, dawnNext: 0,
+  };
+  return fx.agl;
+}
+// 고대 장갑 효과 자신의 피해는 평균 공격 피해·초당 피해 계산에서 제외(되먹임 방지)
+let aglNoTrack = false;
+function aglDeal(amount) { aglNoTrack = true; try { dealMonDamage(amount); } finally { aglNoTrack = false; } }
+function gloveAncientOnDamage(amount) {
+  if (!fx.agl || !bossFight.active || aglNoTrack) return;
+  fx.agl.atkAcc += amount;
+  fx.agl.dmgAcc += amount;
+}
+// 넘치는 대응(고대·태초 장갑): 그 보스가 쓰는 패턴들의 대응 스탯 중 100%를 넘은 몫의 합 × K 만큼 피해 증가
+function gloveOverflowMult() {
+  const g = getEquippedGlove();
+  if (!g || g.grade < 6 || !bd || !bossFight.active) return 1;
+  let over = 0;
+  for (const c of new Set(bd.list.map(e => DISRUPTIONS[e.key].counter))) over += Math.max(0, gloveCounterValue(c) - 1);
+  return 1 + GLOVE_OVERFLOW_K * over;
+}
+// 공격 시작 시: 평균 공격 피해(직전 공격 1회가 실제로 입힌 총 피해의 이동 평균) 갱신
+function gloveAncientPreAttack() {
+  if (!gloveAncientFx() || !bossFight.active) return;
+  const st = aglState();
+  if (st.atkAcc > 0) {
+    if (st.atkAcc > st.maxHit) st.maxHit = st.atkAcc; // 꽃이 지는 순서: 이번 전투에서 공격 1회가 입힌 가장 큰 총 피해
+    st.avgAtk = st.avgAtk ? st.avgAtk * 0.9 + st.atkAcc * 0.1 : st.atkAcc; st.atkAcc = 0;
+  }
+}
+function gloveAncientDmgMult() {
+  let m = gloveOverflowMult();
+  const ad = gloveAncientFx();
+  if (!ad || !bossFight.active) return m;
+  const st = aglState(), p = ad.p, el = bossFight.elapsed;
+  switch (ad.fx) {
+    case 'phoenix': {
+      const lost = Math.max(0, 1 - BN.toNumber(BN.div(mon.hp, mon.maxHp)));
+      m *= 1 + p.perLost * lost * (bd && bd.enraged ? p.enrageMult : 1);
+      break;
+    }
+    case 'ladder': m *= 1 + p.per * st.steps; break;
+    case 'lotus': if (el < (st.dozeUntil || -1)) m *= 1 + p.dozeDmg; break;
+    case 'mask':
+      if (bdSealed()) m *= 1 + p.sealAtk;
+      else if (!bdHas('seal') && (el % p.every) < p.dur) m *= 1 + p.sealAtk / 2;
+      break;
+    case 'rabbit':
+      m *= 1 + p.conv * p.gain;
+      if (bdSpeedMult() < 1) m /= bdSpeedMult(); // 탈진으로 느려진 만큼은 전부 위력으로
+      break;
+    case 'charybdis': if ((el % p.cycle) >= p.cycle / 2) m *= 1 + p.ebb + p.perHit * Math.min(p.maxHits, st.floodHits); break;
+    case 'bulgae': if (el < st.eclipseUntil) m *= 1 + p.dmg; break;
+    case 'plow': if (!bdHas('guard') && !bdHas('weaken')) m *= 1 + p.noneBoss * gloveCounterValue('shatter'); break;
+    case 'loom': m *= 1 + p.perStack * st.stains; break;
+    case 'valkyrie': {
+      let near = false;
+      if (bd) for (const k in bd.next) { const left = bd.next[k] - el; if (left >= 0 && left <= p.window) near = true; }
+      m *= 1 + p.base + (near ? p.dmg : 0);
+      break;
+    }
+  }
+  return m;
+}
+// 치명타 확률 추가(후예) — 상한(100%)을 넘친 몫은 gloveAncientCritDmgAdd()에서 치명타 피해로
+function gloveAncientCritAdd() {
+  const ad = gloveAncientFx();
+  if (!ad || ad.fx !== 'houyi' || !bossFight.active) return 0;
+  return gloveCounterValue('accuracy') * ad.p.perAcc * ((bdHas('evasion') || bdHas('blind')) ? 2 : 1);
+}
+function gloveAncientCritDmgAdd(rawCritChance) {
+  const ad = gloveAncientFx();
+  if (!ad || !bossFight.active) return 0;
+  if (ad.fx === 'houyi') return Math.max(0, rawCritChance - DMG_CAPS.critChance) * ad.p.overflow;
+  if (ad.fx === 'tsukuyomi') return gloveCounterValue('insight') * ad.p.perIns;
+  return 0;
+}
+function gloveAncientSpeedMult() {
+  const ad = gloveAncientFx();
+  if (!ad || !bossFight.active) return 1;
+  const st = aglState(), p = ad.p, el = bossFight.elapsed;
+  switch (ad.fx) {
+    case 'cushion': return el < st.buffUntil ? 1 + p.speed : 1;
+    case 'song': return 1 + st.song;
+    case 'rabbit': return 1 - p.conv;
+    case 'charybdis': return (el % p.cycle) < p.cycle / 2 ? 1 + p.flood : 1;
+  }
+  return 1;
+}
+// 주 타격 직후(dmg = 치명타까지 적용된 이번 공격의 주 타격 피해)
+function gloveAncientOnHit(dmg) {
+  const ad = gloveAncientFx();
+  if (!ad || !bossFight.active) return;
+  const st = aglState(), p = ad.p, el = bossFight.elapsed;
+  switch (ad.fx) {
+    case 'lotus':
+      if (++st.drowsy >= p.per) { st.drowsy = 0; st.dozeUntil = el + p.doze; if (bd) for (const k in bd.next) bd.next[k] += p.delay; floatText('🪷 하품…'); }
+      break;
+    case 'ladder': st.steps = Math.min(p.max, st.steps + 1); break;
+    case 'mirror':
+      st.guests = st.guests.filter(t => t > el);
+      if (st.guests.length && st.avgAtk > 0) aglDeal(st.avgAtk * p.frac * st.guests.length); // 공격 1회 평균 총 피해를 따라 침
+      break;
+    case 'unravel': st.bleed = Math.min(p.max, st.bleed + 1); st.bleedLast = el; break;
+    case 'charybdis': if ((el % p.cycle) < p.cycle / 2) st.floodHits++; break;
+    case 'loom': st.stains = Math.min(p.max, st.stains + 1); break;
+  }
+}
+function gloveAncientOnMiss() {
+  const ad = gloveAncientFx();
+  if (ad && ad.fx === 'ladder' && bossFight.active) { const st = aglState(); st.steps = Math.max(0, st.steps - 1); }
+}
+// bdTrigger() 맨 앞: true를 돌려주면 이번 패턴을 무효로 한다(양털 쿠션·번지는 물감·새벽)
+function gloveAncientOnPattern(key) {
+  const ad = gloveAncientFx();
+  if (!ad) return false;
+  const st = aglState(), p = ad.p, el = bossFight.elapsed;
+  switch (ad.fx) {
+    case 'cushion':
+      if (st.cushionReady) { st.cushionReady = false; st.cushionNext = el + p.every; st.buffUntil = el + p.dur; floatText('🐑 양털 쿠션!'); return true; }
+      break;
+    case 'song': if (key === 'stun' || key === 'blind' || key === 'exhaust') st.song /= 2; break;
+    case 'pomegranate': if (key === 'rewind' && st.maxHit > 0) { aglDeal(st.maxHit * p.mult); floatText('🌺 먼저 핀 꽃!'); } break;
+    case 'mirror': if (key === 'illusion') st.guests.push(el + p.dur); break;
+    case 'loom': if (key === 'scatter' && st.stains >= p.guard) { st.stains -= p.guard; floatText('🧵 얼룩이 대신 번졌다!'); return true; } break;
+    case 'nyx':
+      if (st.dawnCancel) { st.dawnCancel = false; floatText('🖤 새벽이 막았다!'); return true; }
+      nyxAddDawn(st, p);
+      break;
+  }
+  return false;
+}
+// 새벽 +1 — 다 차면 평균 공격 피해 × burst로 터지고 다음 패턴 1번 무효
+function nyxAddDawn(st, p) {
+  if (++st.dawn < p.stacks) return false;
+  st.dawn = 0; st.dawnCancel = true;
+  if (st.avgAtk > 0) aglDeal(st.avgAtk * p.burst);
+  floatText('🖤 새벽!');
+  return true;
+}
+// 패턴 세기 배율(bdStrength): 새벽(전체 감소)·달을 깎는 칼(예언 감소)·다시 켜는 불(광폭화 상쇄)
+function gloveAncientStrengthMult(key) {
+  const ad = gloveAncientFx();
+  if (!ad) return 1;
+  const p = ad.p;
+  if (ad.fx === 'nyx') return 1 - p.weaken;
+  if (ad.fx === 'tsukuyomi' && key === 'foresight') return 1 - p.foresightCut;
+  if (ad.fx === 'phoenix' && bd && bd.enraged) return (1 + (BOSS_ENRAGE_MULT - 1) * (1 - p.cancel)) / BOSS_ENRAGE_MULT;
+  return 1;
+}
+// 웅크리기·약화 저주 피해 감소 무시 비율(은하 쟁기질)
+function gloveAncientReductionIgnore() {
+  const ad = gloveAncientFx();
+  return ad && ad.fx === 'plow' ? Math.min(1, gloveCounterValue('shatter') * ad.p.perShatter) : 0;
+}
+function gloveAncientRewindMult() {
+  const ad = gloveAncientFx();
+  return ad && ad.fx === 'pomegranate' ? 1 - ad.p.rewindCut : 1;
+}
+// 보스가 재생·역행으로 회복할 때(실밥 뜯기: 회복량의 일부를 피해로 되돌림)
+function gloveAncientOnHeal(n) {
+  const ad = gloveAncientFx();
+  if (ad && ad.fx === 'unravel' && n > 0 && bossFight.active) aglDeal(n * ad.p.healBack);
+}
+function gloveAncientOnTimeLoss(loss) {
+  const ad = gloveAncientFx();
+  if (ad && ad.fx === 'halley' && bossFight.active) { const st = aglState(); if (st.cometNext) st.cometNext -= loss; }
+}
+// tick()에서 매 틱 호출. 처치가 일어나면 handleKill() 결과를 돌려준다.
+function gloveAncientTick(dt) {
+  const ad = gloveAncientFx();
+  if (!ad || !bossFight.active) return null;
+  const st = aglState(), p = ad.p, el = bossFight.elapsed;
+  if (dt > 0) { const inst = st.dmgAcc / dt; st.dps = st.dps ? st.dps * 0.97 + inst * 0.03 : inst; st.dmgAcc = 0; }
+  let hit = false;
+  switch (ad.fx) {
+    case 'cushion': if (!st.cushionReady && el >= st.cushionNext) st.cushionReady = true; break;
+    case 'featherbed': {
+      // 패턴 하나당 기본 몫(base) + 대응 스탯으로 약하게 만든 만큼 더 — 장갑 종류가 안 맞는 보스에게도 조금은 쌓인다
+      if (bd) { let mit = 0; for (const e of bd.list) mit += p.base + (1 - p.base) * Math.min(1, gloveCounterValue(DISRUPTIONS[e.key].counter)); st.rebound += st.dps * p.rate * mit * dt; }
+      if (!st.reboundNext) st.reboundNext = p.every;
+      while (el >= st.reboundNext) { st.reboundNext += p.every; if (st.rebound > 0) { aglDeal(st.rebound); st.rebound = 0; floatText('🪶 포근한 반동!'); hit = true; } }
+      break;
+    }
+    case 'song':
+      if (!(bd && (bdStunned() || bdActiveFor(bd.blindUntil) || bdSpeedMult() < 1))) st.song = Math.min(p.max, st.song + p.perSec * dt);
+      break;
+    case 'pomegranate':
+      if (!st.echoNext) st.echoNext = p.every;
+      while (el >= st.echoNext) { st.echoNext += p.every; if (st.maxHit > 0) { aglDeal(st.maxHit * p.mult); floatText('🌺 다시 피는 꽃!'); hit = true; } }
+      break;
+    case 'mirror':
+      if (!st.mirrorNext) st.mirrorNext = p.every;
+      while (el >= st.mirrorNext) { st.mirrorNext += p.every; st.guests.push(el + p.dur); floatText('🪞 거울 손님!'); }
+      break;
+    case 'unravel':
+      if (el - st.bleedLast > p.dur) st.bleed = 0;
+      if (st.bleed > 0 && st.avgAtk > 0) { aglDeal(st.avgAtk * p.perStack * st.bleed * dt); hit = true; }
+      break;
+    case 'charybdis': {
+      const phase = Math.floor(el / (p.cycle / 2)) % 2;
+      if (phase === 0 && st.cyclePhase === 1) st.floodHits = 0;
+      st.cyclePhase = phase;
+      break;
+    }
+    case 'bulgae':
+      if (!st.eclipseDone && BN.lte(mon.hp, BN.mul(mon.maxHp, p.at))) { st.eclipseDone = true; st.eclipseUntil = el + p.dur; floatText('🐕 월식!'); }
+      break;
+    case 'nyx':
+      if (!st.dawnNext) st.dawnNext = p.every;
+      while (el >= st.dawnNext) { st.dawnNext += p.every; if (nyxAddDawn(st, p)) hit = true; }
+      break;
+    case 'halley':
+      if (!st.cometNext) st.cometNext = p.every;
+      while (el >= st.cometNext) {
+        st.cometNext += p.every;
+        if (st.avgAtk > 0) { aglDeal(st.avgAtk * p.base * (1 + p.growth * st.cometCount)); st.cometCount++; floatText('☄️ 혜성 귀환!'); hit = true; }
+      }
+      break;
+  }
+  if (hit && BN.lte(mon.hp, 0)) return handleKill();
+  return null;
+}
+
 // ---------- 태초 보조무기 전투 효과 ----------
 // 상태는 fx.gsub(전투 단위) — resetTimedStacks()/spawnMonster()에서 초기화한다. 고대 보조무기와
 // 같이 보스 패턴 "봉인" 중에는 고유 효과(패시브·액티브 고유분)가 멈춘다. 위력은 s(0.5~1.0, 강화 단계)배.
@@ -10029,7 +10403,8 @@ function tick(dt) {
   // 고대 보조무기: 지연 피해·주기 효과
   if (ancientSubTick(dt, w) === 'boss') return;
   if (genesisSubTick(dt) === 'boss') return; // 태초 보조무기: 낫질·망자·뿔피리·복수
-  if (!bdStunned()) mon.atkTimer += dt * weaponSpeed(w) * bdSpeedMult() * ancientSubSpeedMult() * genesisSubSpeedMult();
+  if (gloveAncientTick(dt) === 'boss') return; // 고대 장갑: 반동·메아리·출혈·혜성 등
+  if (!bdStunned()) mon.atkTimer += dt * weaponSpeed(w) * bdSpeedMult() * ancientSubSpeedMult() * genesisSubSpeedMult() * gloveAncientSpeedMult();
   while (mon.atkTimer >= 1) {
     mon.atkTimer -= 1;
     attack(w);
@@ -10048,9 +10423,10 @@ function tick(dt) {
 
 function attack(w) {
   // 보스 방해(회피·암흑): 빗나가면 이번 공격의 모든 판정이 통째로 사라진다
-  if (bdRollMiss()) { floatText('MISS'); ancientSubOnMiss(); return; }
+  if (bdRollMiss()) { floatText('MISS'); ancientSubOnMiss(); gloveAncientOnMiss(); return; }
   const now = Date.now();
   const asubForce = ancientSubPreAttack(); // 고대 보조무기: 예정된 명중·코어 폭주
+  gloveAncientPreAttack(); // 고대 장갑: 평균 공격 피해 갱신
   genesisSubPreAttack(); // 태초 보조무기: 평균 공격 피해 갱신
   // 인과율의 룬(도서관 전용): 이전 공격에서 남겨둔 "잔향" 피해를 이번 공격 시작 시 그대로 적용
   if (fx.causalityEcho) {
@@ -10083,6 +10459,7 @@ function attack(w) {
   }
   dmg *= ancientSubDmgMult() * (1 + (asubForce.bonus || 0)); // 고대 보조무기(허수아비·뱃삯·족쇄·미완성 설계·황혼·정각의 종·예정된 명중)
   dmg *= genesisSubDmgMult(); // 태초 보조무기(황금 양털·두 얼굴)
+  dmg *= gloveAncientDmgMult(); // 고대 장갑(넘치는 대응·계단·독무대·썰물·월식·얼룩 등)
   // 포자 폭발(고대 에이션트 스피릿): "포자 만개" 활성 중엔 적이 받는 모든 피해 증가
   if (w.spirit === 'sporeburst' && now < fx.sporeburstUntil) {
     dmg *= 1 + (ANCIENT_SPIRITS.sporeburst.enemyDmgTakenBonus || 0);
@@ -10140,13 +10517,15 @@ function attack(w) {
   const fireFistCritChance = fireFistCount * (RUNE_SPECIALS.fireFist.critChance || 0);
   const fireFistCritDamage = fireFistCount * (RUNE_SPECIALS.fireFist.critDamage || 0);
   const otherCritChance = weaponRuneStat(w, 'critChance') / 100 + trainingValue('critChance') + typeTrait(w, 'critChance') + ae2.critChance + stormBonus + awakenStat(w, 'critChance') + fireFistCritChance + pandoraStackCritChanceBonus();
-  const critChance = Math.min(DMG_CAPS.critChance, (e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance');
+  const critRaw = (e && e.crit ? e.crit.chance : 0) + otherCritChance + gloveAncientCritAdd(); // 고대 장갑(후예): 명중 → 치명타 확률
+  const critChance = Math.min(DMG_CAPS.critChance, critRaw) * pandoraStatMult('critChance');
   // 확률의 역설(고대 에이션트 스피릿): 역전이 발동할 때마다 쌓인 영구 스택만큼 치명타 피해량 상승
   const paradoxCritBonus = (w.spirit === 'sealbreak') ? (w.paradoxStacks || 0) * (ANCIENT_SPIRITS.sealbreak.critDmgPerStack || 0) : 0;
   let critMult = Math.min(DMG_CAPS.critMult,
     (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5) + weaponRuneStat(w, 'critDamage') / 100 + trainingValue('critDamage') + typeTrait(w, 'critDamage') + ae2.critDamage + paradoxCritBonus + awakenStat(w, 'critDamage') + fireFistCritDamage + (raijinPhaseActive() ? FUJIN_RAIJIN.critMultBonus : 0) + behemothBossCritDmgBonus() + luciferCritDmgBonus()) * pandoraStatMult('critDamage') * awakenFinalMult(w, 'finalCritDmg');
   // 파쇄의 리듬/주문 작렬 전용 치명타 배율: 기본 배율은 그대로, 스탯으로 얻은 추가 상승분만
   // EFFECT_CRIT_DMG_SCALE만큼만 반영한다.
+  critMult += gloveAncientCritDmgAdd(critRaw); // 고대 장갑(후예: 넘친 치명타 확률, 츠쿠요미: 간파 → 치명타 피해)
   critMult += ancientSubCritDmgBonus() + genesisSubCritAdd(((e && e.crit ? e.crit.chance : 0) + otherCritChance) * pandoraStatMult('critChance')); // 고대 보조무기(등불·미완성 설계)·태초 보조무기(경계의 눈): 상한 밖 추가 치명타 피해
   const critMultBase = (e && e.crit && typeof e.crit.mult === 'number' ? e.crit.mult : 1.5);
   const effectCritMult = bdForesightMult(critMultBase + (critMult - critMultBase) * EFFECT_CRIT_DMG_SCALE);
@@ -10177,6 +10556,7 @@ function attack(w) {
     floatText('🔮 운명 역전!');
   }
   ancientSubOnHit(w, didCrit, dmg, preCritDmg); // 고대 보조무기(군령·수압·재심·별자리)
+  gloveAncientOnHit(dmg); // 고대 장갑(하품·계단·거울 손님·출혈·밀물·얼룩)
   genesisSubOnHit(didCrit, dmg); // 태초 보조무기(카인의 표식·복수)
   // 낙인 폭발의 룬(도서관 전용): 치명타 적중 시 표식을 남기고, 표식이 남아있는 동안 다시
   // 치명타가 적중하면 표식을 터뜨려 고정 피해를 추가로 입힌다.
@@ -10477,6 +10857,7 @@ function bossDmgBonus() {
 // 보스전·토벌전은 항상 스택 0인 상태에서 새로 시작한다.
 function resetTimedStacks() {
   fx.asub = null; // 고대 보조무기 전투 상태
+  fx.agl = null;  // 고대 장갑 전투 상태
   fx.gsub = null; // 태초 보조무기 전투 상태
   fx.divineBossDealt = 0; // 신벌 룬: 보스전당 누적 피해(상한 판정용)
   bd = null; // 보스 방해 상태는 토벌전 21단계 이상 시작 시에만 다시 켜진다(startBossDisruption)
@@ -11342,7 +11723,9 @@ function endBossFight(win) {
         S.subBossCodexSeen[idx] = true;
         log(`🗡️ <b>보스 보조무기 드롭!</b> ${subweaponGradeTag(sw)} — 보스 장신구와 세트 효과!`, 'lg-prim');
       }
-    } else if (worldOf(f) === 3 && Math.random() < BOSS.gloveDrop * (enrageBoss ? 2 : 1) * (1 + accEff().luck + awakenStat(w, 'luck')) * (1 + (accEff().gloveDropRate || 0))) {
+    }
+    if (worldOf(f) === 3) rollAncientGlove(f, ANCIENT_BOSS_MULT); // 고대 장갑: 보스 처치는 10배 확률로 시도
+    if (worldOf(f) === 3 && Math.random() < BOSS.gloveDrop * (enrageBoss ? 2 : 1) * (1 + accEff().luck + awakenStat(w, 'luck')) * (1 + (accEff().gloveDropRate || 0))) {
       // 41~60층(월드3): 그 층 전용 보스 장갑(GLOVE_BOSS_NAMES)
       const idx = f - WORLD3_START_FLOOR;
       if ((S.gloves || []).some(x => x.bossFloor === f)) {
@@ -13125,8 +13508,29 @@ function renderGloveCodex() {
     normalHtml += `<div class="codex-section"><div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name} 장갑
       <span class="codex-section-count">${have}/${GLOVE_TYPES.length}</span></div><div class="codex-grid" data-glove-grade="${grade}"></div></div>`;
   }
+  const ancSeen = S.gloveAncientSeen || [];
+  const ancCount = GLOVE_ANCIENTS.filter((a, i) => ancSeen[i]).length;
   box.innerHTML = normalHtml + `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
-    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div><div class="codex-grid" data-glove-boss></div></div>`;
+    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div><div class="codex-grid" data-glove-boss></div></div>`
+    + `<div class="codex-section"><div class="codex-section-title grade-고대">고대 장갑
+    <span class="codex-section-count">${ancCount}/${GLOVE_ANCIENTS.length}</span></div><div class="codex-grid" data-glove-ancient></div></div>`;
+  // 고대 장갑 — 얻은 적 있는 것만 이름·효과 공개(고대 보조무기 도감과 같음)
+  const agrid = box.querySelector('[data-glove-ancient]');
+  const acolor = GRADES[6].color;
+  GLOVE_ANCIENTS.forEach((ad, i) => {
+    const unlocked = !!ancSeen[i];
+    const F = FLOORS[WORLD3_START_FLOOR + i];
+    const cell = document.createElement('div');
+    cell.className = 'codex-cell' + (unlocked ? '' : ' locked');
+    cell.title = unlocked ? '' : '???';
+    cell.style.borderColor = unlocked ? acolor : '';
+    if (unlocked) cell.style.boxShadow = `0 0 8px ${acolor}`;
+    cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${acolor}` : ''}">${unlocked ? ad.icon : '❔'}</span>`;
+    cell.onclick = () => showCodexPopup(unlocked
+      ? subCodexGradeCellHtml(ad.icon, ad.name, ad.flavor) + `<div class="grade-고대" style="font-size:12px;">🏺 [${ad.fxName}] ${ad.desc(ad.p)}</div><div style="font-size:12px;color:#3ddfff;margin-top:4px;">${F ? F.name : ''} · ${GLOVE_TYPES[GLOVE_BOSS_NAMES[i].typeIdx].icon} 종류</div>`
+      : `<div style="color:var(--sub)">아직 얻지 못한 고대 장갑입니다. (${F ? F.name : ''} 몬스터에게서 아주 낮은 확률로 나옵니다)</div>`);
+    agrid.appendChild(cell);
+  });
   for (let grade = 0; grade <= 5; grade++) {
     const gcolor = GRADES[grade].color;
     const ngrid = box.querySelector(`[data-glove-grade="${grade}"]`);
@@ -13284,6 +13688,7 @@ function migrate(d) {
   if (!Array.isArray(d.gloveBossCodexSeen)) d.gloveBossCodexSeen = [];
   if (d.gloveAutoSellGrade === undefined) d.gloveAutoSellGrade = null;
   if (typeof d.gloveAutoDisassemble !== 'boolean') d.gloveAutoDisassemble = false;
+  if (!Array.isArray(d.gloveAncientSeen)) d.gloveAncientSeen = [];
   if (typeof d.gloveCodexSeen !== 'object' || d.gloveCodexSeen === null || Array.isArray(d.gloveCodexSeen)) d.gloveCodexSeen = {};
   // 장갑 도감 도입 전부터 가지고 있던 장갑은 도감에 바로 등록
   for (const g of Array.isArray(d.gloves) ? d.gloves : []) { const k = gloveCodexKey(g); if (k) d.gloveCodexSeen[k] = true; }
@@ -15292,7 +15697,7 @@ function renderGloveInventory() {
     div.className = 'invitem' + (equipped ? ' equipped' : '');
     div.innerHTML = `
       <div><div class="wn">${gloveGradeTag(g)}${equipped ? ' <span style="color:var(--unique);font-size:12px">✅ 장착중</span>' : ''}</div>
-      <div class="wi">${gloveStatText(g)} · 공격력 ${fmt(gloveAtk(g))}${g.enchant ? `<br>⚒️ 각인: ${g.enchant.lines.map(l => enchantLineTextOf('gMain', l)).join(' / ')}` : ''}${g.addEnchant ? `<br>✨ 에디셔널: ${g.addEnchant.lines.map(l => enchantLineTextOf('gAdd', l)).join(' / ')}` : ''}</div></div>
+      <div class="wi">${gloveStatText(g)} · 공격력 ${fmt(gloveAtk(g))}${isAncientGlove(g) ? `<br><span class="grade-고대">${gloveAncientEffectLine(g)}</span>` : ''}${g.enchant ? `<br>⚒️ 각인: ${g.enchant.lines.map(l => enchantLineTextOf('gMain', l)).join(' / ')}` : ''}${g.addEnchant ? `<br>✨ 에디셔널: ${g.addEnchant.lines.map(l => enchantLineTextOf('gAdd', l)).join(' / ')}` : ''}</div></div>
       <div class="btns"></div>`;
     const btns = div.querySelector('.btns');
     const emb = document.createElement('button');
@@ -15308,9 +15713,11 @@ function renderGloveInventory() {
       un.onclick = unequipGlove;
       btns.appendChild(un);
     } else {
-      const sell = document.createElement('button');
-      sell.textContent = '판매'; sell.onclick = () => sellGlove(g.id);
-      btns.appendChild(sell);
+      if (g.grade < 6) {
+        const sell = document.createElement('button');
+        sell.textContent = '판매'; sell.onclick = () => sellGlove(g.id);
+        btns.appendChild(sell);
+      }
       const eq = document.createElement('button');
       eq.className = 'primary'; eq.textContent = '장착'; eq.onclick = () => equipGlove(g.id);
       btns.appendChild(eq);
@@ -15334,17 +15741,19 @@ function renderGloveEnhance() {
   const chance = maxed ? 0 : gloveSuccessChance(g);
   const dChance = maxed ? 0 : gloveDestroyChance(g);
   const next = maxed ? null : { ...g, enhance: g.enhance + 1 };
+  const ancLine = gloveAncientEffectLine(g);
   box.innerHTML = `<div class="enhWepTitle">${gloveGradeTag(g)}</div>
     <div style="font-size:12px;color:var(--sub)">🧤 대응 스탯: ${gloveStatText(g)}</div>
+    ${ancLine ? `<div class="grade-고대" style="font-size:12px;margin-top:2px;">${ancLine}</div>` : ''}
     ${next ? `<div style="color:var(--gold);font-size:12px;margin-top:2px;">🔜 다음 강화(+${next.enhance}): ${gloveStatText(next)}</div>` : ''}`;
   $('gloveenhstat').innerHTML = `
     <div>공격력<b>${fmt(gloveAtk(g))}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(gloveAtk(next))}</b></div>
     <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : `${fmt(cost.gold)} + 🧵${cost.steel}`}</b></div>
-    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>`;
+    <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${!maxed && gloveEssenceCost(g) > 0 ? `<div>무기의 정수<b style="color:${BN.gte(S.weaponEssence, gloveEssenceCost(g)) ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence)}/${fmt(gloveEssenceCost(g))}</b></div>` : ''}`;
   $('gloveenhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${g.enhance}</b>`
-    : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${Math.round((100 - dChance) * downgradeBase(false, false, 0) * enhanceEventDowngradeMult(g.enhance) * 10) / 10}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`
+    : `${isAncientGlove(g) ? '🏺 고대 장갑은 파괴되지 않습니다. ' : ''}실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${Math.round((100 - dChance) * downgradeBase(false, false, 0) * enhanceEventDowngradeMult(g.enhance) * 10) / 10}%)</span>${dChance > 0 ? ` · <span class="warn">${isAncientGlove(g) ? '+0 초기화' : '파괴'} 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`
       + ((S.penaltyGuard || 0) > 0 ? `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>` : '');
   bindPenaltyGuardToggles();
   renderGloveAutoEnhance(g, maxed);
@@ -16065,6 +16474,18 @@ const GUIDE_SECTIONS = [
     <br>· <b>고대 보조무기(20종)</b>: 장착형 고대 보조무기의 획득 기록(아래 "고대 보조무기" 항목 참고)
     <br>· <b>🏺 황혼의 유산(20종)</b>: 월드2 사냥 중 아주 낮은 확률로 드롭되는 수집형 트린켓. 5/10/15/20개 수집 시 드롭률·뽑기 할인·강화 골드 절감·뽑기 고급 등급 확률 상향 보너스
     <br><br>보너스는 전부 보조무기 시스템 자체를 강화하는 sub* 스탯(패시브/액티브 증폭, 강화·파괴 확률, 드롭률, 뽑기 할인·비용)으로 지급됩니다.`,
+  },
+  {
+    icon: '🏺', title: '고대 장갑',
+    body: `월드3(성야국) 41~60층마다 그 층에만 있는 <b>고대 장갑</b>이 1종씩, 총 20종 있습니다. 종류는 그 층 보스 장갑과 같고, 대응 스탯(신화보다 큼) 위에 <b>고대 효과</b>가 하나씩 붙습니다.
+    <br><br><b>🌊 넘치는 대응</b>(고대·태초 장갑 공통): 장갑의 대응 스탯이 100%를 넘으면, 그 패턴을 쓰는 보스에게 넘친 만큼(%p) 주는 피해가 늘어납니다. 주 스탯과 같은 자수를 놓거나 강화를 끝까지 올린 만큼이 그대로 피해로 돌아옵니다.
+    <br><br><b>획득</b>: 그 층 몬스터를 처치할 때 아주 낮은 확률로 드롭됩니다(엘리트 5배, 층 보스 10배, 그 층 보스 장갑 세트 3배). 판매·자동판매 대상이 아니고, 분해하면 🧵 강철실을 많이 줍니다.
+    <br><br><b>강화</b>: 골드·🧵 강철실과 함께 📜 무기의 정수를 소모합니다. 실패해서 파괴 판정이 나면 파괴되지 않는 대신 <b>+0으로 초기화</b>됩니다.
+    <br><br>보스 패턴 <b>🔇 봉인</b> 중에는 고대 효과도 멈춥니다(디오니소스의 가면 장갑만 예외). 고대 효과는 보스전에서만 발동합니다.
+    <table class="guide-table">
+      <tr><th>사냥터</th><th>고대 장갑</th><th>고대 효과</th></tr>
+      ${GLOVE_ANCIENTS.map((a, i) => `<tr><td style="white-space:nowrap">${FLOORS[WORLD3_START_FLOOR + i].name}</td><td>${a.icon} ${a.name}<br><span style="color:var(--sub)">${GLOVE_TYPES[GLOVE_BOSS_NAMES[i].typeIdx].icon} ${GLOVE_TYPE_LABELS[GLOVE_BOSS_NAMES[i].typeIdx]} 계열</span></td><td><b>${a.fxName}</b>: ${a.desc(a.p)}</td></tr>`).join('')}
+    </table>`,
   },
   {
     icon: '🏺', title: '고대 보조무기',

@@ -3773,11 +3773,11 @@ const GLOVE_ANCIENTS = [
     desc: p => `방해(스턴·암흑·탈진) 없이 공격하는 동안 공격속도가 초당 +${fmtRate(p.perSec)}씩 올라 최대 +${fmtRate(p.max)}, 행동 방해에 걸리면 절반으로` },
   { name: '피닉스의 재 장갑', icon: '🔥', fx: 'phoenix', fxName: '다시 켜는 불',
     flavor: '꺼진 불은 재가 되고, 재는 다시 불이 된다. 몰아칠수록 더 밝게.',
-    p: { dmg: 4.0, cancel: 0.5, lowHp: 0.3 },
-    desc: p => `광폭화한 보스에게 주는 피해 +${fmtRate(p.dmg)}, 광폭화로 늘어나는 패턴 세기 ${fmtRate(p.cancel)} 상쇄. 광폭화가 없는 보스는 체력 ${fmtRate(p.lowHp)} 이하에서 피해 +${fmtRate(p.dmg / 2)}` },
+    p: { perLost: 1.5, enrageMult: 2, cancel: 0.5 },
+    desc: p => `보스가 잃은 체력만큼 불이 커져 주는 피해 증가(잃은 체력 1%당 +${+(p.perLost).toFixed(1)}%), 광폭화한 보스에게는 ${p.enrageMult}배로 타오르고 광폭화로 늘어나는 패턴 세기 ${fmtRate(p.cancel)} 상쇄` },
   { name: '페르세포네의 석류 장갑', icon: '🌺', fx: 'pomegranate', fxName: '꽃이 지는 순서',
     flavor: '꽃은 지는 순서를 기억한다. 가장 붉었던 꽃이 가장 먼저 다시 핀다.',
-    p: { every: 10, mult: 9, rewindCut: 0.5 },
+    p: { every: 10, mult: 10, rewindCut: 0.5 },
     desc: p => `이번 전투에서 공격 1회로 준 가장 큰 피해를 기억해 ${p.every}초마다 그 ${p.mult}배로 다시 피움. 역행 보스는 역행 순간 바로 터지고 역행 회복 ${fmtRate(p.rewindCut)} 상쇄` },
   { name: '야곱의 사다리 장갑', icon: '🪜', fx: 'ladder', fxName: '끝없는 계단',
     flavor: '꿈속의 사다리는 끝이 없지만, 한 칸도 헛디딘 적이 없다.',
@@ -3785,11 +3785,11 @@ const GLOVE_ANCIENTS = [
     desc: p => `연속으로 맞힐 때마다 한 계단씩 올라 피해 +${fmtRate(p.per)}(최대 ${p.max}계단), 빗나가면 한 계단만 내려감` },
   { name: '나르키소스의 거울 장갑', icon: '🪞', fx: 'mirror', fxName: '거울 손님 초대',
     flavor: '거울 속의 그는 언제나 같은 손짓을 한다. 조금 늦게, 하지만 똑같이.',
-    p: { every: 15, dur: 6, frac: 3.3 },
+    p: { every: 15, dur: 6, frac: 3.7 },
     desc: p => `${p.every}초마다 거울 손님이 ${p.dur}초 동안 내 공격(평균 총 피해)을 ${fmtRate(p.frac)} 위력으로 따라 침. 환영 분신을 쓰는 보스는 분신이 나올 때마다 손님 +1` },
   { name: '페넬로페의 풀어내는 장갑', icon: '🧶', fx: 'unravel', fxName: '실밥 뜯기',
     flavor: '낮에 짠 것을 밤마다 풀었다. 이 손이 푸는 것은, 다시는 엮이지 않는다.',
-    p: { perStack: 0.17, max: 30, dur: 4, healBack: 1.0 },
+    p: { perStack: 0.22, max: 30, dur: 4, healBack: 1.0 },
     desc: p => `공격마다 출혈 +1(최대 ${p.max}, ${p.dur}초간 공격이 없으면 사라짐), 출혈 1당 초당 평균 공격 피해의 ${fmtRate(p.perStack)}. 보스가 재생·역행으로 회복한 양의 ${fmtRate(p.healBack)}를 피해로 되돌림` },
   { name: '디오니소스의 가면 장갑', icon: '🎭', fx: 'mask', fxName: '독무대',
     flavor: '가면이 입을 막으면, 무대는 더 크게 울린다.',
@@ -3805,7 +3805,7 @@ const GLOVE_ANCIENTS = [
     desc: p => `공격속도의 ${fmtRate(p.conv)}를 한 방 위력으로 바꿔 침(피해 +${fmtRate(p.conv * p.gain)}). 탈진으로 느려진 만큼은 전부 위력으로` },
   { name: '카리브디스의 소용돌이 장갑', icon: '🌊', fx: 'charybdis', fxName: '밀물과 썰물',
     flavor: '하루 세 번 바다를 삼키고, 하루 세 번 토해낸다.',
-    p: { cycle: 10, flood: 0.4, ebb: 0.35, perHit: 0.025, maxHits: 20 },
+    p: { cycle: 10, flood: 0.3, ebb: 0.25, perHit: 0.017, maxHits: 20 },
     desc: p => `${p.cycle / 2}초 밀물(공격속도 +${fmtRate(p.flood)})과 ${p.cycle / 2}초 썰물(피해 +${fmtRate(p.ebb)}, 밀물 때 친 1번마다 +${fmtRate(p.perHit)}, 최대 ${p.maxHits}번)이 번갈아 옴` },
   { name: '츠쿠요미의 초승달 장갑', icon: '🌙', fx: 'tsukuyomi', fxName: '달을 깎는 칼',
     flavor: '달의 신은 칼로 밤을 갈랐다. 깎여 나간 달빛이 칼날이 되었다.',
@@ -3813,7 +3813,7 @@ const GLOVE_ANCIENTS = [
     desc: p => `장갑의 👁️간파 1%당 치명타 피해 +${+(p.perIns).toFixed(1)}%p, 예언(치명타 추가 피해 무시) 세기 ${fmtRate(p.foresightCut)} 감소` },
   { name: '불개의 월식 장갑', icon: '🐕', fx: 'bulgae', fxName: '월식',
     flavor: '해와 달을 물려다 번번이 놓치는 개. 그래도 문 자리엔 이빨 자국이 남는다.',
-    p: { at: 0.5, dur: 12, dmg: 6.7 },
+    p: { at: 0.5, dur: 15, dmg: 9 },
     desc: p => `보스 체력이 ${fmtRate(p.at)} 아래로 내려가는 순간 ${p.dur}초 동안 월식 — 그동안 주는 피해 +${fmtRate(p.dmg)}` },
   { name: '견우의 은하 쟁기 장갑', icon: '🐂', fx: 'plow', fxName: '은하 쟁기질',
     flavor: '은하수를 갈아엎는 쟁기에는, 막을 수 있는 둑이 없다.',
@@ -3821,11 +3821,11 @@ const GLOVE_ANCIENTS = [
     desc: p => `장갑의 🔨파쇄 수치 × ${fmtRate(p.perShatter)}만큼 웅크리기·약화 저주의 피해 감소를 무시. 둘 다 없는 보스에게는 파쇄 1%당 보스 피해 +${+(p.noneBoss).toFixed(1)}%` },
   { name: '직녀의 베틀 장갑', icon: '🧵', fx: 'loom', fxName: '번지는 물감',
     flavor: '하늘의 베틀에서 흘러내린 물감은, 지워져도 다른 자리에 다시 번진다.',
-    p: { perStack: 0.0094, max: 60, guard: 15 },
+    p: { perStack: 0.0105, max: 60, guard: 15 },
     desc: p => `공격마다 보스에게 물감 얼룩 +1(최대 ${p.max}), 얼룩 1당 받는 피해 +${fmtRate(p.perStack)}. 흩어짐이 오면 얼룩 ${p.guard}개가 대신 지워져 흩어짐을 막음` },
   { name: '핼리의 귀환 장갑', icon: '☄️', fx: 'halley', fxName: '돌아오는 혜성',
     flavor: '사람의 한 생에 한 번, 그래도 반드시 돌아온다.',
-    p: { every: 20, base: 120, growth: 0.6 },
+    p: { every: 15, base: 100, growth: 0.1 },
     desc: p => `${p.every}초마다 혜성이 돌아와 평균 공격 피해의 ${p.base}배(돌아올 때마다 +${fmtRate(p.growth)}), 시간 잠식·가시 반격으로 잃은 시간만큼 빨리 옴` },
   { name: '발키리의 오로라 장갑', icon: '🌌', fx: 'valkyrie', fxName: '커튼 너머',
     flavor: '오로라는 그녀들의 갑옷에 비친 빛. 누가 쓰러질지 먼저 보는 눈.',
@@ -3833,7 +3833,7 @@ const GLOVE_ANCIENTS = [
     desc: p => `보스 패턴이 오기 직전 ${p.window}초 동안 주는 피해 +${fmtRate(p.dmg)}, 그 외에도 항상 +${fmtRate(p.base)}` },
   { name: '닉스의 검은 날개 장갑', icon: '🖤', fx: 'nyx', fxName: '새벽을 쥔 손',
     flavor: '신들의 왕조차 두려워한 밤. 그 검은 날개 아래에서 새벽은 허락받아야 온다.',
-    p: { weaken: 0.15, stacks: 6, burst: 90 },
+    p: { weaken: 0.15, stacks: 5, burst: 300 },
     desc: p => `모든 보스 패턴 세기 ${fmtRate(p.weaken)} 감소, 패턴이 올 때마다 새벽 +1 — ${p.stacks}개가 차면 평균 공격 피해의 ${p.burst}배로 터지고 다음 패턴 1번을 무효` },
 ];
 const GLOVE_ANCIENT_BASE_CHANCE = 1 / 14000000; // 고대 보조무기와 같은 기본 확률
@@ -9627,10 +9627,11 @@ function gloveAncientDmgMult() {
   if (!ad || !bossFight.active) return m;
   const st = aglState(), p = ad.p, el = bossFight.elapsed;
   switch (ad.fx) {
-    case 'phoenix':
-      if (bd && bd.enraged) m *= 1 + p.dmg;
-      else if (!(bd && bd.enrageable) && BN.lte(mon.hp, BN.mul(mon.maxHp, p.lowHp))) m *= 1 + p.dmg / 2;
+    case 'phoenix': {
+      const lost = Math.max(0, 1 - BN.toNumber(BN.div(mon.hp, mon.maxHp)));
+      m *= 1 + p.perLost * lost * (bd && bd.enraged ? p.enrageMult : 1);
       break;
+    }
     case 'ladder': m *= 1 + p.per * st.steps; break;
     case 'lotus': if (el < (st.dozeUntil || -1)) m *= 1 + p.dozeDmg; break;
     case 'mask':

@@ -3765,8 +3765,8 @@ const GLOVE_ANCIENTS = [
     desc: p => `공격 ${p.per}번마다 보스에게 졸음이 차올라, 보스의 다음 패턴들이 ${p.delay}초씩 늦게 옴` },
   { name: '홀레 할머니의 깃털이불 장갑', icon: '🪶', fx: 'featherbed', fxName: '포근한 반동',
     flavor: '이불을 털면 세상에 눈이 내린다. 포근하게 받아낸 만큼, 고스란히 쏟아진다.',
-    p: { rate: 0.5, every: 10 },
-    desc: p => `대응 스탯으로 약하게 만든 패턴 세기만큼 반동이 쌓여(최근 초당 피해 × 막아낸 비율 × ${fmtRate(p.rate)}), ${p.every}초마다 한꺼번에 터짐` },
+    p: { rate: 0.5, every: 10, base: 0.4 },
+    desc: p => `보스 패턴 하나마다 반동이 쌓이고(대응 스탯으로 약하게 만들수록 최대 ${(1 / p.base).toFixed(1)}배 더), ${p.every}초마다 최근 초당 피해 × ${fmtRate(p.rate)} × 쌓인 몫만큼 한꺼번에 터짐` },
   { name: '오르페우스의 자장가 장갑', icon: '🎼', fx: 'song', fxName: '끊기지 않는 노래',
     flavor: '그의 노래가 이어지는 동안엔, 잠들지 않는 용조차 눈을 감았다.',
     p: { perSec: 0.04, max: 1.2 },
@@ -9757,7 +9757,8 @@ function gloveAncientTick(dt) {
   switch (ad.fx) {
     case 'cushion': if (!st.cushionReady && el >= st.cushionNext) st.cushionReady = true; break;
     case 'featherbed': {
-      if (bd) { let mit = 0; for (const e of bd.list) mit += Math.min(1, gloveCounterValue(DISRUPTIONS[e.key].counter)); st.rebound += st.dps * p.rate * mit * dt; }
+      // 패턴 하나당 기본 몫(base) + 대응 스탯으로 약하게 만든 만큼 더 — 장갑 종류가 안 맞는 보스에게도 조금은 쌓인다
+      if (bd) { let mit = 0; for (const e of bd.list) mit += p.base + (1 - p.base) * Math.min(1, gloveCounterValue(DISRUPTIONS[e.key].counter)); st.rebound += st.dps * p.rate * mit * dt; }
       if (!st.reboundNext) st.reboundNext = p.every;
       while (el >= st.reboundNext) { st.reboundNext += p.every; if (st.rebound > 0) { aglDeal(st.rebound); st.rebound = 0; floatText('🪶 포근한 반동!'); hit = true; } }
       break;

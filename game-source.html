@@ -748,6 +748,7 @@
           <div id="gloveEnhFxOverlay" class="enhFxOverlay"></div>
         </div>
         <div id="gloveAdvancedEnhanceBox" style="margin-top:8px;"></div>
+        <div id="gloveAutoEnhanceBox" style="margin-top:8px;"></div>
         <div class="panelFxOverlay"></div>
       </div>
     </div>
@@ -910,6 +911,7 @@
           🗑️ 자동판매:
           <select id="gloveAutoSellSelect" style="background:var(--panel2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:3px 6px;"></select>
           이하 장갑은 강화 0단계·자수 없음일 때 획득 즉시 판매 (보스 장갑 제외)
+          <label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="gloveAutoDisCheck"> 🔨 판매 대신 분해(🧵 강철실)</label>
           <button id="gloveAutoSellCleanBtn" style="margin-left:auto;">지금 가방 일괄 정리</button>
         </div>
         <div id="gloveinvlist"></div>
@@ -1101,14 +1103,14 @@
       <div class="panel">
         <h3>🧤 장갑 도감</h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-          월드3(성야국) 보스 장갑 컬렉션입니다. 41~60층 보스가 그 층 전용 장갑을 드롭하고, 한 번 얻으면 도감에 남습니다(판매·파괴해도 유지). 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
+          월드3(성야국) 장갑 컬렉션입니다. 일반 장갑(8종류 × 일반~신화)과 41~60층 보스 장갑 두 트랙이고, 한 번 얻으면 도감에 남습니다(판매·분해·파괴해도 유지). 아이콘을 클릭하면 상세 정보가 팝업으로 뜹니다.
         </div>
         <div id="gloveCodexGrid"></div>
       </div>
       <div class="panel">
-        <h3>🏆 보스 장갑 수집 효과</h3>
+        <h3>🏆 장갑 컬렉션 효과</h3>
         <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
-          모은 보스 장갑 종류 수에 따라 자동으로 활성화되는 효과입니다. 월드 구분 없이 항상 적용됩니다(드롭률만 월드 규칙을 따름).
+          등급별 8종 전부·종류별 6등급 전부·보스 장갑 수집 수에 따라 자동으로 활성화되는 효과입니다. 월드 구분 없이 항상 적용됩니다(드롭률만 월드 규칙을 따름).
         </div>
         <div id="gloveCodexBonusList"></div>
       </div>
@@ -1158,6 +1160,23 @@
         일반 각인이 있는 보조무기에 3줄짜리 각인을 하나 더 새깁니다. 높은 수치와 승급이 훨씬 드물고, 비용은 보조무기 각인의 1.5배(무기 각인의 3배)입니다.
       </div>
       <div id="subAddEnchantBox"></div>
+    </div>
+    <div class="panel">
+      <h3>🧤 장갑 각인</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        <b style="color:var(--unique)">+15 이상</b> 강화한 장갑에 각인을 새길 수 있습니다(장착하지 않은 장갑도 가방에서 골라 새길 수 있음). 등급·승급 규칙은 무기 각인과 같고 비용(증표·골드)은 무기 각인의 3배이며,
+        옵션은 드롭률·골드 획득·보스 피해량·장갑 보조 스탯·자수 증폭·패턴 저항·강철실 획득량 중에서 나옵니다.
+        드롭률은 다른 월드(1~40층)에서 사냥할 때 절반만 적용되고, 패턴 저항은 모든 보스 패턴을 그만큼 약하게 만듭니다(합계 최대 50%).
+      </div>
+      <div id="gloveEnchantTargetBar" style="margin-bottom:8px;"></div>
+      <div id="gloveEnchantBox"></div>
+    </div>
+    <div class="panel">
+      <h3>✨ 장갑 에디셔널 각인</h3>
+      <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
+        일반 각인이 있는 장갑에 3줄짜리 각인을 하나 더 새깁니다. 높은 수치와 승급이 훨씬 드물고, 비용은 무기 각인의 4배입니다.
+      </div>
+      <div id="gloveAddEnchantBox"></div>
     </div>
     <div class="panel">
       <h3>🎲 삼중 재설정</h3>
@@ -2769,6 +2788,8 @@ function codexStatText(stat, value, cap) {
     gloveDestroyReduce: v => `🛡️ 장갑 강화 파괴 확률 -${Math.round(v * 100)}%p`,
     gloveAmp: v => `🧤 장갑 보조 스탯·자수 증폭 +${Math.round(v * 100)}%`,
     embroideryDiscount: v => `🪡 자수 정수 비용 -${Math.round(v * 100)}%`,
+    patternResist: v => `🛡️ 패턴 저항 +${+(v * 100).toFixed(1)}%`,
+    steelGain: v => `🧵 강철실 획득량 +${Math.round(v * 100)}%`,
   };
   return (map[stat] || (v => `+${v}`))(value);
 }
@@ -3439,13 +3460,13 @@ function startDisruptionList(list, opts) {
   };
 }
 function bdHas(key) { return !!(bd && bd.list.some(e => e.key === key)); }
-// 효과 세기 = 기준값 × 광폭화 × (1 - 장갑 대응 스탯)
+// 효과 세기 = 기준값 × 광폭화 × (1 - 장갑 대응 스탯) × (1 - 패턴 저항)
 function bdStrength(key) {
   if (!bd) return 0;
   const e = bd.list.find(x => x.key === key);
   if (!e) return 0;
   const counter = Math.min(1, gloveCounterValue(DISRUPTIONS[key].counter));
-  return e.base * (bd.enraged ? BOSS_ENRAGE_MULT : 1) * (1 - counter);
+  return e.base * (bd.enraged ? BOSS_ENRAGE_MULT : 1) * (1 - counter) * (1 - patternResistCached());
 }
 const bdActiveFor = until => !!(bd && bossFight.elapsed < until);
 function bdSealed() { return bdActiveFor(bd ? bd.sealUntil : 0); }
@@ -3668,6 +3689,49 @@ function gloveBossMilestoneEff() {
   }
   return eff;
 }
+// ---- 🧤 일반 장갑 도감 (8종류 × 일반~신화 = 48칸) — 보조무기 도감과 같은 두 축(등급 세트·종류 마스터리) ----
+// 얻은 순간 등록(판매·분해·파괴해도 유지). 보스 장갑은 별도 트랙(S.gloveBossCodexSeen).
+// gloveEnh는 표시용(text) — 실제 강화 확률은 GLOVE_ENH_BONUS_SOURCES에서 기준 단계 방식으로 적용.
+const GLOVE_TYPE_LABELS = ['사냥', '권투', '점술', '광부', '백정', '초병', '수련', '태엽'];
+const GLOVE_CODEX_GRADE_SETS = [
+  { grade: 0, effs: [['gloveDropRate', 0.05]] },
+  { grade: 1, effs: [['gloveEnh', 0.02]], text: '🧤 장갑 강화 확률 +2%p (+14강 기준, 높은 단계일수록 줄어듦)' },
+  { grade: 2, effs: [['embroideryDiscount', 0.05]] },
+  { grade: 3, effs: [['gloveDestroyReduce', 0.03]] },
+  { grade: 4, effs: [['gloveAmp', 0.03]] },
+  { grade: 5, effs: [['gloveAmp', 0.05], ['steelGain', 0.10]] },
+];
+const GLOVE_CODEX_TYPE_MASTERY = [ // index = GLOVE_TYPES 순서
+  { effs: [['gloveDropRate', 0.03]] },
+  { effs: [['gloveEnh', 0.015]], text: '🧤 장갑 강화 확률 +1.5%p (+16강 기준, 높은 단계일수록 줄어듦)' },
+  { effs: [['embroideryDiscount', 0.03]] },
+  { effs: [['gloveDestroyReduce', 0.02]] },
+  { effs: [['gloveDropRate', 0.03]] },
+  { effs: [['gloveEnh', 0.015]], text: '🧤 장갑 강화 확률 +1.5%p (+16강 기준, 높은 단계일수록 줄어듦)' },
+  { effs: [['embroideryDiscount', 0.03]] },
+  { effs: [['gloveDestroyReduce', 0.02]] },
+];
+function gloveCodexKey(g) {
+  if (!g || g.bossFloor !== undefined || g.grade > 5) return null;
+  return `g${g.grade}_${g.typeIdx}`;
+}
+function gloveCodexHas(key) { return !!(S && S.gloveCodexSeen && S.gloveCodexSeen[key]); }
+function unlockGloveCodexEntry(g, quiet) {
+  const key = gloveCodexKey(g);
+  if (!key || gloveCodexHas(key)) return;
+  if (!S.gloveCodexSeen || typeof S.gloveCodexSeen !== 'object') S.gloveCodexSeen = {};
+  S.gloveCodexSeen[key] = true;
+  if (!quiet) log(`🧤 <b>장갑 도감</b>에 새 항목이 등록되었습니다: ${GLOVE_TYPES[g.typeIdx].icon} ${GLOVE_TYPES[g.typeIdx].names[g.grade]}`, 'lg-prim');
+}
+function gloveCodexGradeDone(grade) { return GLOVE_TYPES.every((t, i) => gloveCodexHas(`g${grade}_${i}`)); }
+function gloveCodexTypeDone(typeIdx) { return [0, 1, 2, 3, 4, 5].every(gr => gloveCodexHas(`g${gr}_${typeIdx}`)); }
+function gloveCodexBonusEff() {
+  const eff = {};
+  const add = effs => { for (const [k, v] of effs) eff[k] = (eff[k] || 0) + v; };
+  for (const gs of GLOVE_CODEX_GRADE_SETS) if (gloveCodexGradeDone(gs.grade)) add(gs.effs);
+  GLOVE_CODEX_TYPE_MASTERY.forEach((tm, i) => { if (gloveCodexTypeDone(i)) add(tm.effs); });
+  return eff;
+}
 function gloveBossInfo(g) { return g && g.bossFloor !== undefined ? GLOVE_BOSS_NAMES[g.bossFloor - WORLD3_START_FLOOR] || null : null; }
 function getEquippedGlove() { return (S && Array.isArray(S.gloves) ? S.gloves : []).find(g => g.id === S.gloveEquipped) || null; }
 function gloveStats(g) {
@@ -3677,12 +3741,16 @@ function gloveStats(g) {
 }
 // 장갑 보조 스탯·자수 증폭(월드3 장신구·꿈조각) — 주 스탯은 등급·강화로만 오르고(강화 가치 보존),
 // 증폭은 보조 스탯과 자수 수치에만 곱해진다. 패턴 세기를 피해마다 계산하므로 0.5초 캐시
-let gloveAmpCache = { t: 0, v: 0 };
-function gloveAmpCached() {
+// 패턴 저항(장갑 각인)도 같은 캐시에 묶는다 — 모든 보스 패턴 세기 감소, 합계 최대 PATTERN_RESIST_CAP
+const PATTERN_RESIST_CAP = 0.5;
+let gloveAmpCache = { t: 0, v: 0, r: 0 };
+function gloveFxRefresh() {
   const now = Date.now();
-  if (now - gloveAmpCache.t > 500) gloveAmpCache = { t: now, v: accEff().gloveAmp || 0 };
-  return gloveAmpCache.v;
+  if (now - gloveAmpCache.t > 500) { const e = accEff(); gloveAmpCache = { t: now, v: e.gloveAmp || 0, r: Math.min(PATTERN_RESIST_CAP, e.patternResist || 0) }; }
+  return gloveAmpCache;
 }
+function gloveAmpCached() { return gloveFxRefresh().v; }
+function patternResistCached() { return gloveFxRefresh().r; }
 function gloveCounterValue(key) {
   const g = getEquippedGlove();
   if (!g) return 0;
@@ -3758,26 +3826,36 @@ function gloveAutoSellMatch(g) {
 }
 // 가방에 넣었으면 true, 자동판매됐으면 false. 보스 장갑은 어떤 경우에도 자동판매하지 않는다
 // (가방이 꽉 차 있고 팔 수 있는 장갑이 없으면 정원을 넘겨서라도 넣는다).
+// 🧤 장갑은 모든 등급을 분해할 수 있고 🧵 강철실을 준다(랜덤박스가 없어서 분해가 강철실 수급처 역할).
+// 기준: 성야국 사냥 드롭(시간당 약 4개)을 전부 분해하면 하루 약 2천 개 — 신화 장갑 +20→+30(일반 강화 약 9천 개)의
+// 상당 부분을 사냥으로 채울 수 있게. 고대·태초 장갑(3차)은 대량.
+const GLOVE_DISASSEMBLE_STEEL = [8, 15, 30, 60, 120, 300, 5000, 20000]; // 일반~태초
+function gloveDisassembleSteel(g) {
+  return Math.floor((GLOVE_DISASSEMBLE_STEEL[g.grade] || 0) * Math.pow(DISASSEMBLE_ENH_GROWTH, g.enhance || 0));
+}
+// 자동 처리(자동판매·가방 정원 초과): "판매 대신 분해"를 켜면 골드 대신 🧵 강철실을 받는다.
+function gloveAutoDispose(g, why) {
+  if (S.gloveAutoDisassemble) {
+    const steel = gloveDisassembleSteel(g);
+    S.steelThread = BN.add(S.steelThread || BN.from(0), steel);
+    log(`🔨 ${why}분해: ${gloveGradeTag(g)} → 🧵 ${fmt(steel)}`);
+  } else {
+    S.gold = BN.add(S.gold, gloveSellPrice(g));
+    log(`🗑️ ${why}판매: ${gloveGradeTag(g)} → +${fmt(gloveSellPrice(g))} 골드`);
+  }
+}
 function addGlove(g) {
   if (!Array.isArray(S.gloves)) S.gloves = [];
+  unlockGloveCodexEntry(g); // 도감은 실제 소유 여부와 무관하게 "획득"한 순간 등록
   const isBoss = g.bossFloor !== undefined;
-  if (gloveAutoSellMatch(g)) {
-    S.gold = BN.add(S.gold, gloveSellPrice(g));
-    log(`🗑️ 자동판매: ${gloveGradeTag(g)} → +${fmt(gloveSellPrice(g))} 골드`);
-    return false;
-  }
+  if (gloveAutoSellMatch(g)) { gloveAutoDispose(g, '자동'); return false; }
   if (S.gloves.length >= GLOVE_BAG_MAX) {
-    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped && x.bossFloor === undefined);
+    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped && x.bossFloor === undefined && !disPresetLocked('g', x.id));
     const weakest = [...sellable].sort((a, b) => glovePower(a) - glovePower(b))[0];
-    if (!isBoss && (!weakest || glovePower(weakest) > glovePower(g))) {
-      S.gold = BN.add(S.gold, gloveSellPrice(g));
-      log(`🧤 장갑 가방이 가득 차서 새 장갑을 자동 판매: ${gloveGradeTag(g)}`);
-      return false;
-    }
+    if (!isBoss && (!weakest || glovePower(weakest) > glovePower(g))) { gloveAutoDispose(g, '장갑 가방이 가득 차서 새 장갑 자동'); return false; }
     if (weakest) {
-      S.gold = BN.add(S.gold, gloveSellPrice(weakest));
       S.gloves = S.gloves.filter(x => x.id !== weakest.id);
-      log(`🧤 장갑 가방이 가득 차서 가장 약한 장갑 자동 판매: ${gloveGradeTag(weakest)}`);
+      gloveAutoDispose(weakest, '장갑 가방이 가득 차서 가장 약한 장갑 자동');
     }
   }
   S.gloves.push(g);
@@ -3846,6 +3924,9 @@ const GLOVE_ENH_BONUS_SOURCES = [
   { cap: 20, value: 4, has: () => (S.accEquipped || []).some(a => a.floor === 59) },  // 60층 장신구
   { cap: 12, value: 2, has: () => gloveBossCodexCount() >= 1 },               // 보스 장갑 1종 수집
   { cap: 22, value: 6, has: () => gloveBossCodexCount() >= 12 },              // 보스 장갑 12종 수집
+  { cap: 14, value: 2, has: () => gloveCodexGradeDone(1) },                    // 장갑 도감: 레어 세트
+  { cap: 16, value: 1.5, has: () => gloveCodexTypeDone(1) },                   // 장갑 도감: 🥊 권투 마스터리
+  { cap: 16, value: 1.5, has: () => gloveCodexTypeDone(5) },                   // 장갑 도감: 🧱 초병 마스터리
 ];
 function gloveEnhTierBonus(enhance) {
   let bonus = subEnhanceEventSuccessBonus(enhance);
@@ -3872,6 +3953,61 @@ function gloveTryCost(g, advanced) {
   };
 }
 let gloveEnhanceRevealPending = false;
+// ---- ⚙️ 장갑 자동 강화 — 보조무기 자동 강화와 같은 방식(일반 강화만, 목표 단계까지) ----
+// 장착 중인 장갑만 강화할 수 있어서, 대상 장갑이 장착 해제·파괴되면 멈춘다. 골드·강철실이 모자라도 멈춘다.
+const AUTO_GLOVE_ENHANCE_INTERVAL_MS = 300;
+let autoGloveEnhanceTimer = null, autoGloveEnhanceTarget = null, autoGloveEnhanceId = null;
+function isAutoGloveEnhanceRunning() { return !!autoGloveEnhanceTimer; }
+function startAutoGloveEnhance(targetInput) {
+  const g = getEquippedGlove();
+  if (!g) { log('장착된 장갑이 없습니다.', 'lg-bad'); return; }
+  const target = Math.max(g.enhance + 1, Math.min(SUB_ENH.maxLevel, Math.floor(+targetInput || 0)));
+  if (!(target > g.enhance)) return;
+  stopAutoGloveEnhance(true);
+  autoGloveEnhanceTarget = target;
+  autoGloveEnhanceId = g.id;
+  log(`⚙️ 장갑 자동 강화 시작: +${g.enhance} → +${target} 목표`, 'lg-prim');
+  autoGloveEnhanceTimer = setInterval(autoGloveEnhanceTick, AUTO_GLOVE_ENHANCE_INTERVAL_MS);
+  renderEnhance();
+}
+function stopAutoGloveEnhance(silent) {
+  if (autoGloveEnhanceTimer) clearInterval(autoGloveEnhanceTimer);
+  autoGloveEnhanceTimer = null; autoGloveEnhanceTarget = null; autoGloveEnhanceId = null;
+  if (!silent) renderEnhance();
+}
+function autoGloveEnhanceTick() {
+  if (gloveEnhanceRevealPending) return; // 앞 시도의 연출이 끝날 때까지 대기
+  const target = autoGloveEnhanceTarget;
+  const g = (S.gloves || []).find(x => x.id === autoGloveEnhanceId);
+  if (!g) { stopAutoGloveEnhance(); log(`⚙️ 강화 대상 장갑이 사라져(파괴 포함) 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
+  if (S.gloveEquipped !== g.id) { stopAutoGloveEnhance(); log(`⚙️ 장갑을 바꿔 끼어 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
+  if (g.enhance >= target) { stopAutoGloveEnhance(); log(`⚙️ 장갑 자동 강화 완료! 목표 +${target} 달성`, 'lg-good'); return; }
+  const cost = gloveTryCost(g, false);
+  if (BN.lt(S.gold, cost.gold)) { stopAutoGloveEnhance(); log(`⚙️ 골드가 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
+  if (BN.lt(S.steelThread || 0, cost.steel)) { stopAutoGloveEnhance(); log(`⚙️ 🧵 강철실이 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(cost.steel)}, 보유 ${fmt(S.steelThread || 0)})`, 'lg-bad'); return; }
+  tryGloveEnhance(false);
+}
+function renderGloveAutoEnhance(g, maxed) {
+  const box = $('gloveAutoEnhanceBox');
+  if (!box) return;
+  if (isAutoGloveEnhanceRunning()) {
+    box.innerHTML = `
+      <div style="display:flex; gap:8px; align-items:center;">
+        <div style="flex:1; font-size:13px;">⚙️ 자동 강화 진행 중... 현재 <b>+${g.enhance}</b> → 목표 <b>+${autoGloveEnhanceTarget}</b></div>
+        <button class="danger" id="gloveAutoEnhanceStopBtn">중지</button>
+      </div>`;
+    $('gloveAutoEnhanceStopBtn').onclick = () => stopAutoGloveEnhance();
+    return;
+  }
+  if (maxed) { box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div style="display:flex; gap:8px; align-items:center;">
+      <div style="flex:1; font-size:13px;">⚙️ 자동 강화 목표</div>
+      <input type="number" id="gloveAutoEnhanceInput" min="${g.enhance + 1}" max="${SUB_ENH.maxLevel}" value="${SUB_ENH.maxLevel}" style="width:60px;">
+      <button class="primary" id="gloveAutoEnhanceStartBtn">자동 강화 시작</button>
+    </div>`;
+  $('gloveAutoEnhanceStartBtn').onclick = () => startAutoGloveEnhance($('gloveAutoEnhanceInput').value);
+}
 function tryGloveEnhance(advanced) {
   if (gloveEnhanceRevealPending) return;
   const g = getEquippedGlove();
@@ -3903,13 +4039,20 @@ function resolveGloveEnhance(g, advanced) {
     log(`✨ 장갑 강화 성공! ${gloveGradeTag(g)} (확률 ${chance.toFixed(2)}%)${advTag}`, 'lg-good');
   } else {
     const dChance = gloveDestroyChance(g) * (advanced ? ADVANCED_ENH_DESTROY_MULT : 1);
-    if (Math.random() * 100 < dChance) {
+    // 파괴·하락 판정은 먼저 한 번만 굴리고, 패널티(파괴·하락)가 나오면 방지권을 먼저 확인한다(보조무기와 같은 방식)
+    const destroyHit = Math.random() * 100 < dChance;
+    const stayHit = Math.random() < 1 - 0.5 * enhanceEventDowngradeMult(g.enhance);
+    if ((destroyHit || !stayHit) && tryUsePenaltyGuard('장갑 강화 실패')) {
+      playEnhanceFx('protect', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
+      playEnhancePanelReveal('gloveEnhPanel', 'dust');
+    } else if (destroyHit) {
       playEnhanceFx('destroy', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'crack');
       log(`💥 장갑이 파괴되었습니다!! ${gloveGradeTag(g)} (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
       S.gloves = S.gloves.filter(x => x.id !== g.id);
       if (S.gloveEquipped === g.id) S.gloveEquipped = null;
-    } else if (Math.random() < 1 - 0.5 * enhanceEventDowngradeMult(g.enhance)) {
+      if (enchantPickId.glove === g.id) enchantPickId.glove = null;
+    } else if (stayHit) {
       playEnhanceFx('fail', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'dust');
       log(`😮‍💨 장갑 강화 실패... 다행히 단계는 유지됨 (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
@@ -4020,7 +4163,7 @@ function honorAwakenAmount() { const d = Math.max(0, (S.library.best || 0) - 1);
 function honorSteelAmount() { return Math.max(1, librarySteelReward(LIBRARY_EXT.start)); }
 const HONOR_SHOP = [
   { id: 'effectReroll',   name: '🎲 특수효과 변경권', cost: 30, desc: '장착 무기의 특수효과를 같은 등급 내 다른 효과로 무작위 변경합니다.' },
-  { id: 'penaltyGuard',   name: () => `🛡️ 강화 패널티 방지권 (보유 ${S.penaltyGuard || 0}장)`, cost: 60, desc: '강화(무기·보조무기)가 실패해서 파괴·+0 초기화·단계 하락이 나올 때 1장을 써서 "유지"로 바꿉니다. 강화기에서 사용 여부를 켜고 끌 수 있습니다.' },
+  { id: 'penaltyGuard',   name: () => `🛡️ 강화 패널티 방지권 (보유 ${S.penaltyGuard || 0}장)`, cost: 60, desc: '강화(무기·보조무기·장갑)가 실패해서 파괴·+0 초기화·단계 하락이 나올 때 1장을 써서 "유지"로 바꿉니다. 강화기에서 사용 여부를 켜고 끌 수 있습니다.' },
   { id: 'raidTicket',     name: '🚩 토벌전 추가 도전권', cost: 15, desc: '오늘 토벌전 도전 횟수 +1회 (자정에 사라짐)' },
   { id: 'libraryTicket',  name: '📖 도서관 추가 도전권', cost: 40, desc: '이번 초기화 주기 도서관 도전 횟수 +1회' },
   { id: 'enchantPity',    name: '⚒️ 각인 승급 진행도 +10', cost: 50, desc: '장착 무기의 일반 각인 천장 카운트 +10회' },
@@ -6848,6 +6991,8 @@ function newState() {
     gloveEquipped: null,   // 장착 중인 장갑 id
     gloveBossCodexSeen: [], // 보스 장갑 컬렉션(월드3): [true/false, ...] 20개, index = 층 번호(0=41층)
     gloveAutoSellGrade: null, // 이 등급 이하 + 강화0 + 자수 없는 장갑은 획득 즉시 자동판매 (null=끔, 보스 장갑 제외)
+    gloveAutoDisassemble: false, // 자동판매·가방 정원 초과 처리를 판매 대신 분해(🧵 강철실)로
+    gloveCodexSeen: {},    // 일반 장갑 도감: 키 `g{grade}_{typeIdx}` — 8종류×6등급(0~5) 48종
     genesisFeedPending: [], genesisFeedName: '', // 태초 획득 알림: 이름 입력·서버 업로드 대기 목록, 마지막으로 쓴 이름
     weeklyRaid: { week: null, days: {}, dayKey: null, dayCount: 0, title: null, titleWeek: null, bestRun: null, recordDay: null, rid: null, pushDirty: false, unsettled: [], lastSettled: null }, // 세계수의 단말마: week=주차키, days={날짜키: 일일 최고 피해}, dayKey/dayCount=오늘 도전 횟수, title/titleWeek=칭호와 그 칭호가 유효한 주, bestRun=역대 최고 1회 피해, recordDay=기록 보상 받은 날, rid=전체 합산용 익명 id(해시해서 키로 씀), pushDirty=이번 주 기록 업로드 대기, unsettled=전체 정산 대기 [{week,total}], lastSettled=마지막 전체 정산 결과
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
@@ -7350,7 +7495,7 @@ function accEff() {
     subAmp: 0, subEnh: 0, subDestroyReduce: 0, subActiveDmg: 0, subActiveDuration: 0, subDropRate: 0, subGachaDiscount: 0, subEnhGoldReduce: 0,
     // 장갑 전용 스탯(월드3 장신구/꿈조각) — gloveAmp: 장갑 보조 스탯·자수 증폭(주 스탯 제외), gloveEnh: 장갑 강화 확률(%p, 0.06=6%p),
     // gloveDropRate: 장갑 드롭률, gloveEnhGoldReduce: 장갑 강화 골드 감소, embroideryDiscount: 자수 정수 비용 감소
-    gloveAmp: 0, gloveEnh: 0, gloveDropRate: 0, gloveEnhGoldReduce: 0, embroideryDiscount: 0, gloveDestroyReduce: 0,
+    gloveAmp: 0, gloveEnh: 0, gloveDropRate: 0, gloveEnhGoldReduce: 0, embroideryDiscount: 0, gloveDestroyReduce: 0, patternResist: 0, steelGain: 0,
   };
   const world1 = isWorld1BonusActive();
   // 장신구/보스장신구는 "그 장신구가 몇 층 것인가"(eq.floor)로 개별 판정한다 — 21~40층
@@ -7418,8 +7563,20 @@ function accEff() {
   }
   // 🌙 꿈조각(월드3 보스 수집품) 개수 마일스톤 — 계정 범용, 드롭률만 월드3 소스 규칙
   if (S) { const ds = dreamShardMilestoneEff(); for (const k of Object.keys(ds)) eff[k] = (eff[k] || 0) + (k === 'luck' ? luckFor(ds[k], 'w3') : ds[k]); }
-  // 🧤 보스 장갑 수집 마일스톤 — 계정 범용, 드롭률만 월드3 소스 규칙
-  if (S) { const gb = gloveBossMilestoneEff(); for (const k of Object.keys(gb)) eff[k] = (eff[k] || 0) + (k === 'luck' ? luckFor(gb[k], 'w3') : gb[k]); }
+  // 🧤 보스 장갑 수집 마일스톤 + 일반 장갑 도감 — 계정 범용, 드롭률만 월드3 소스 규칙
+  if (S) for (const gb of [gloveBossMilestoneEff(), gloveCodexBonusEff()]) for (const k of Object.keys(gb)) eff[k] = (eff[k] || 0) + (k === 'luck' ? luckFor(gb[k], 'w3') : gb[k]);
+  // 🧤 장갑 각인·에디셔널 각인(41~60층 소스): 드롭률은 월드3 소스 규칙(아래 월드에서 절반)
+  const enchantGl = S && getEquippedGlove();
+  if (enchantGl) {
+    for (const [kind, en] of [['gMain', enchantGl.enchant], ['gAdd', enchantGl.addEnchant]]) {
+      if (!en) continue;
+      for (const line of en.lines) {
+        const st = enchantLineStat(kind, line);
+        if (!st) continue;
+        eff[st.stat] = (eff[st.stat] || 0) + (st.stat === 'luck' ? luckFor(st.value, 'w3') : st.value);
+      }
+    }
+  }
   // 능력치 훈련 (장비와 무관하게 항상 적용, 월드 구분 없음)
   // 세계수의 단말마 칭호: 모든 사냥터에 그대로(다른 월드 절반 규칙 없음)
   const raidTitle = S && S.weeklyRaid ? activeRaidTitle() : null;
@@ -10475,7 +10632,7 @@ function endRaidFight(win) {
     const redcapMult = redcapBossRewardMult();
     const tokens = Math.round(raidTokenReward(stage) * redcapMult);
     const gold = Math.floor(raidGoldReward(stage) * redcapMult);
-    const steel = Math.round(raidSteelReward(stage) * redcapMult);
+    const steel = Math.round(raidSteelReward(stage) * redcapMult * (1 + (accEff().steelGain || 0)));
     S.gold = BN.add(S.gold, gold);
     S.raidTokens = BN.add(S.raidTokens, tokens);
     if (steel > 0) S.steelThread = BN.add(S.steelThread, steel);
@@ -10839,7 +10996,7 @@ function endLibraryFight(win) {
     let msg = `🏆 <b>고대의 도서관 승리!</b> 제${depth + 1}서고 돌파! 📜 무기의 정수 +${fmt(essence)}, 💠 각성의 정수 +${fmt(awaken)}`;
     // 21서고 이상: 강철실 · 금서의 페이지 · 비전서 낱장 · 장갑
     if (depth >= LIBRARY_EXT.start) {
-      const steel = Math.round(librarySteelReward(depth) * redcapMult);
+      const steel = Math.round(librarySteelReward(depth) * redcapMult * (1 + (accEff().steelGain || 0)));
       S.steelThread = BN.add(S.steelThread, steel);
       let pages = libraryForbiddenPageReward(depth);
       msg += `, 🧵 강철실 +${fmt(steel)}개`;
@@ -11106,7 +11263,7 @@ function endBossFight(win) {
       log(`📜 보스 처치 보상: 무기의 정수 +${fmt(essence)}`, 'lg-good');
     }
     if (enrageBoss) {
-      const steel = Math.round(20 * Math.pow(1.1, f - WORLD3_START_FLOOR));
+      const steel = Math.round(20 * Math.pow(1.1, f - WORLD3_START_FLOOR) * (1 + (accEff().steelGain || 0)));
       S.steelThread = BN.add(S.steelThread || BN.from(0), steel);
       log(`🔥 광폭화 보스 추가 보상: 🧵 강철실 +${fmt(steel)}개 (골드 ×3 · 재료 ×2 · 드롭 확률 ×2 적용)`, 'lg-prim');
     }
@@ -11298,6 +11455,18 @@ const SUB_ENCHANT_OPTIONS = {
   subActiveDuration: { name: '액티브 지속시간',     stat: 'subActiveDuration', unit: '초', div: 1,   dec: 2, ranges: scaleEnchantRanges(2 / 137.5, 2) },
 };
 const SUB_ENCHANT_OPTION_KEYS = Object.keys(SUB_ENCHANT_OPTIONS);
+// ---------- 장갑 각인 옵션 ----------
+// 보조무기 각인처럼 파밍·장갑 계열 6종. 증폭은 보조무기 증폭 각인과 같은 비율(×0.2), 패턴 저항은 ×0.1
+// (태초 한 줄 최대 13.75%, 합계 상한 PATTERN_RESIST_CAP), 강철실 획득량은 ×0.4(태초 최대 55%).
+// 드롭률은 41~60층 소스라 월드1·2에서는 절반만 적용(accEff 참고).
+const GLOVE_ENCHANT_OPTIONS = {
+  luck:          { name: '드롭률',                  stat: 'luck',          unit: '%', div: 100, dec: 1, ranges: ENCHANT_BASE_RANGES },
+  gold:          { name: '골드 획득',               stat: 'gold',          unit: '%', div: 100, dec: 1, ranges: ENCHANT_BASE_RANGES },
+  bossDmg:       { name: '보스 피해량',             stat: 'bossDmg',       unit: '%', div: 100, dec: 1, ranges: ENCHANT_BASE_RANGES },
+  gloveAmp:      { name: '장갑 보조 스탯·자수 증폭', stat: 'gloveAmp',      unit: '%', div: 100, dec: 1, ranges: scaleEnchantRanges(0.2, 1) },
+  patternResist: { name: '패턴 저항',               stat: 'patternResist', unit: '%', div: 100, dec: 2, ranges: scaleEnchantRanges(0.1, 2) },
+  steelGain:     { name: '강철실 획득량',           stat: 'steelGain',     unit: '%', div: 100, dec: 1, ranges: scaleEnchantRanges(0.4, 1) },
+};
 // ---------- 각인 엔진 (무기/보조무기 × 일반/에디셔널) ----------
 // 네 종류가 같은 규칙을 공유하고 설정값만 다르다.
 // - 3줄: 첫 줄은 각인 등급, 둘째·셋째 줄은 한 단계 아래 등급이며 각각 deviation 확률로 각인 등급("이탈").
@@ -11308,17 +11477,21 @@ const SUB_ENCHANT_OPTION_KEYS = Object.keys(SUB_ENCHANT_OPTIONS);
 // - 비용: 등급별 증표·골드 × costMult(에디셔널 1.5배, 증표는 올림).
 // - 에디셔널 각인은 일반 각인이 있어야 부여할 수 있다.
 // 보조무기 각인은 무기 각인보다 비싸다(증표·골드 모두 2배, 에디셔널은 여기에 1.5배를 더 곱해 3배).
+// 장갑 각인은 무기 각인의 3배, 에디셔널 4배. 장비를 더 추가하면 같은 규칙으로 일반 ×(앞 장비 +1), 에디셔널 ×(일반 +1).
 const SUB_ENCHANT_COST_MULT = 2;
+const GLOVE_ENCHANT_COST_MULT = 3, GLOVE_ADD_ENCHANT_COST_MULT = 4;
 const ENCHANT_KINDS = {
   wMain: { target: 'weapon', field: 'enchant',    label: '무기 각인',              boxId: 'enchantBox',       options: ENCHANT_OPTIONS,     deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: 1 },
   wAdd:  { target: 'weapon', field: 'addEnchant', label: '무기 에디셔널 각인',     boxId: 'addEnchantBox',    options: ENCHANT_OPTIONS,     deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 },
   sMain: { target: 'sub',    field: 'enchant',    label: '보조무기 각인',          boxId: 'subEnchantBox',    options: SUB_ENCHANT_OPTIONS, deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: SUB_ENCHANT_COST_MULT },
   sAdd:  { target: 'sub',    field: 'addEnchant', label: '보조무기 에디셔널 각인', boxId: 'subAddEnchantBox', options: SUB_ENCHANT_OPTIONS, deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: 1.5 * SUB_ENCHANT_COST_MULT },
+  gMain: { target: 'glove',  field: 'enchant',    label: '장갑 각인',              boxId: 'gloveEnchantBox',    options: GLOVE_ENCHANT_OPTIONS, deviation: ENCHANT_DEVIATION_CHANCE, skew: 2, ceilMult: 1, earlyMult: 1,   costMult: GLOVE_ENCHANT_COST_MULT },
+  gAdd:  { target: 'glove',  field: 'addEnchant', label: '장갑 에디셔널 각인',     boxId: 'gloveAddEnchantBox', options: GLOVE_ENCHANT_OPTIONS, deviation: 0.02,                     skew: 4, ceilMult: 2, earlyMult: 0.5, costMult: GLOVE_ADD_ENCHANT_COST_MULT },
 };
 // 같은 옵션 이탈: 2·3줄이 1줄과 같은 옵션이면 이탈 확률을 따로 쓴다. 특정 옵션의 "올이탈"(3줄 모두 그 옵션이고
 // 2·3줄 모두 이탈)이 평균 target번 재설정에 한 번 나오도록 역산 — (1/옵션 수)³ × p² = 1/target.
 // 일반 각인 1.5만 회, 에디셔널 2.5만 회(무기 옵션 9종: 22.0%·17.1%, 보조무기 옵션 6종: 12.0%·9.3%).
-const ENCHANT_SAME_DEV_TARGET = { wMain: 15000, sMain: 15000, wAdd: 25000, sAdd: 25000 };
+const ENCHANT_SAME_DEV_TARGET = { wMain: 15000, sMain: 15000, gMain: 15000, wAdd: 25000, sAdd: 25000, gAdd: 25000 };
 function enchantSameDeviation(kind) {
   const n = Object.keys(ENCHANT_KINDS[kind].options).length;
   return Math.sqrt(Math.pow(n, 3) / ENCHANT_SAME_DEV_TARGET[kind]);
@@ -11331,16 +11504,23 @@ const ENCHANT_AUTO_INTERVAL_MS = 1500;
 const ENCHANT_AUTO_FAST_INTERVAL_MS = 300; // 빠르게 돌리기(5배)
 function enchantOpt(kind, key) { return ENCHANT_KINDS[kind].options[key]; }
 // 각인 대상: 기본은 장착 장비, 강화기처럼 가방의 다른 무기·보조무기를 골라둘 수 있다(세션 한정, 무기·에디셔널 공용).
-const enchantPickId = { weapon: null, sub: null };
-const enchantPickerOpen = { weapon: false, sub: false };
+const enchantPickId = { weapon: null, sub: null, glove: null };
+const enchantPickerOpen = { weapon: false, sub: false, glove: false };
+// 각인 대상 장비 종류별 정보(무기·보조무기·장갑)
+const ENCHANT_TARGET_INFO = {
+  weapon: { what: '무기',     icon: '⚔️', barId: 'enchantTargetBar',      list: () => S.weapons.filter(x => !isFist(x)), equipped: () => getEquipped(),          tag: x => gradeTag(x) },
+  sub:    { what: '보조무기', icon: '🗡️', barId: 'subEnchantTargetBar',   list: () => S.subweapons || [],                equipped: () => getEquippedSubweapon(), tag: x => subweaponGradeTag(x) },
+  glove:  { what: '장갑',     icon: '🧤', barId: 'gloveEnchantTargetBar', list: () => S.gloves || [],                    equipped: () => getEquippedGlove(),     tag: x => gloveGradeTag(x) },
+};
 function enchantTargetOf(target) {
+  const T = ENCHANT_TARGET_INFO[target];
   const id = enchantPickId[target];
   if (id != null) {
-    const it = (target === 'weapon' ? S.weapons : (S.subweapons || [])).find(x => x.id === id);
+    const it = (target === 'weapon' ? S.weapons : T.list()).find(x => x.id === id);
     if (it) return it;
     enchantPickId[target] = null; // 판매·분해·파괴로 사라짐 → 장착 장비로
   }
-  return target === 'weapon' ? getEquipped() : getEquippedSubweapon();
+  return T.equipped();
 }
 function enchantTarget(kind) { return enchantTargetOf(ENCHANT_KINDS[kind].target); }
 function setEnchantPick(target, id) {
@@ -11351,22 +11531,23 @@ function setEnchantPick(target, id) {
   renderBlacksmith();
 }
 function renderEnchantTargetBar(target) {
-  const bar = $(target === 'weapon' ? 'enchantTargetBar' : 'subEnchantTargetBar');
+  const T = ENCHANT_TARGET_INFO[target];
+  const bar = $(T.barId);
   if (!bar) return;
-  const what = target === 'weapon' ? '무기' : '보조무기';
+  const what = T.what;
   const cur = enchantTargetOf(target); // 사라진 대상이면 여기서 장착 장비로 돌아간다
   const usingBag = enchantPickId[target] != null;
-  const tagOf = x => target === 'weapon' ? gradeTag(x) : subweaponGradeTag(x);
+  const tagOf = T.tag;
   let html = '';
   if (usingBag) {
     html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
       <div style="flex:1;font-size:12px;color:var(--sub)">🎒 가방의 ${what}에 각인 중입니다 (미장착 — 효과는 장착해야 적용)</div>
-      <button data-ec-back style="font-size:12px;">${target === 'weapon' ? '⚔️' : '🗡️'} 장착 ${what}로</button>
+      <button data-ec-back style="font-size:12px;">${T.icon} 장착 ${what}로</button>
     </div>`;
   }
   html += `<button data-ec-toggle style="width:100%;font-size:12px;">${enchantPickerOpen[target] ? '▴ 닫기' : `🎒 가방에서 다른 ${what}에 각인하기`}</button>`;
   if (enchantPickerOpen[target]) {
-    const pool = target === 'weapon' ? S.weapons.filter(x => !isFist(x)) : (S.subweapons || []);
+    const pool = T.list();
     const list = pool.filter(x => x !== cur && x.enhance >= ENCHANT_MIN_ENHANCE);
     html += `<div style="margin-top:6px;max-height:220px;overflow-y:auto;">` + (list.length
       ? list.map(x => `
@@ -11381,7 +11562,7 @@ function renderEnchantTargetBar(target) {
   const back = bar.querySelector('[data-ec-back]'); if (back) back.onclick = () => setEnchantPick(target, null);
   bar.querySelectorAll('[data-ec-pick]').forEach(b => { b.onclick = () => setEnchantPick(target, +b.dataset.ecPick); });
 }
-function enchantTargetTag(kind, it) { return ENCHANT_KINDS[kind].target === 'weapon' ? gradeTag(it) : subweaponGradeTag(it); }
+function enchantTargetTag(kind, it) { return ENCHANT_TARGET_INFO[ENCHANT_KINDS[kind].target].tag(it); }
 function enchantCeiling(kind, grade) { const c = ENCHANT_CEILING[grade]; return c ? c * ENCHANT_KINDS[kind].ceilMult : null; }
 function enchantEarlyChance(kind, grade) { return enchantEarlyPromoteChance(grade) * ENCHANT_KINDS[kind].earlyMult; }
 function enchantCost(kind, grade) {
@@ -11784,7 +11965,7 @@ function renderEnchantKind(kind) {
   const box = $(K.boxId);
   if (!box) return;
   const it = enchantTarget(kind);
-  const what = K.target === 'weapon' ? '무기' : '보조무기';
+  const what = ENCHANT_TARGET_INFO[K.target].what;
   if (!it || (K.target === 'weapon' && isFist(it))) { box.innerHTML = `<div style="color:var(--sub);font-size:13px;">장착된 ${what}가 없습니다.</div>`; return; }
   if (it.enhance < ENCHANT_MIN_ENHANCE) {
     box.innerHTML = `<div style="color:var(--sub);font-size:13px;">각인은 <b style="color:var(--unique)">+${ENCHANT_MIN_ENHANCE}</b> 이상 강화한 ${what}부터 부여할 수 있습니다. (현재 ${enchantTargetTag(kind, it)})</div>`;
@@ -11891,7 +12072,7 @@ function renderEnchantTripleBox() {
   const b = $('buyEnchantTripleBtn'); if (b) b.onclick = buyEnchantTriple;
 }
 function renderEnchantBox() {
-  renderEnchantTargetBar('weapon'); renderEnchantTargetBar('sub');
+  renderEnchantTargetBar('weapon'); renderEnchantTargetBar('sub'); renderEnchantTargetBar('glove');
   for (const kind of Object.keys(ENCHANT_KINDS)) renderEnchantKind(kind);
   renderEnchantTripleBox();
 }
@@ -12901,9 +13082,35 @@ function renderGloveCodex() {
     return { icon: t.icon, unlocked: !!seen[idx], name: bg.name, html };
   });
   const unlockedCount = items.filter(i => i.unlocked).length;
-  box.innerHTML = `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
-    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div><div class="codex-grid"></div></div>`;
-  const grid = box.querySelector('.codex-grid');
+  // 1) 일반 장갑 (등급별 섹션, 8종류) — 획득한 적 있는 것만 색이 들어온다
+  let normalHtml = '';
+  for (let grade = 0; grade <= 5; grade++) {
+    const have = GLOVE_TYPES.filter((t, i) => gloveCodexHas(`g${grade}_${i}`)).length;
+    normalHtml += `<div class="codex-section"><div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name} 장갑
+      <span class="codex-section-count">${have}/${GLOVE_TYPES.length}</span></div><div class="codex-grid" data-glove-grade="${grade}"></div></div>`;
+  }
+  box.innerHTML = normalHtml + `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
+    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div><div class="codex-grid" data-glove-boss></div></div>`;
+  for (let grade = 0; grade <= 5; grade++) {
+    const gcolor = GRADES[grade].color;
+    const ngrid = box.querySelector(`[data-glove-grade="${grade}"]`);
+    GLOVE_TYPES.forEach((t, i) => {
+      const unlocked = gloveCodexHas(`g${grade}_${i}`);
+      const stats = gloveStats({ typeIdx: i, grade, enhance: 0 });
+      const statLine = Object.entries(stats).map(([k, v]) => `${DISRUPT_COUNTERS[k].icon} ${DISRUPT_COUNTERS[k].name} ${fmtRate(v, 1)}`).join(' · ');
+      const cell = document.createElement('div');
+      cell.className = 'codex-cell' + (unlocked ? '' : ' locked');
+      cell.title = unlocked ? '' : '???';
+      cell.style.borderColor = unlocked ? gcolor : '';
+      if (unlocked && grade >= 5) cell.style.boxShadow = `0 0 8px ${gcolor}`;
+      cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolor}` : ''}">${t.icon}</span>`;
+      cell.onclick = () => showCodexPopup(unlocked
+        ? subCodexGradeCellHtml(t.icon, t.names[grade], '') + `<div style="font-size:12px;"><span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> · ${GLOVE_TYPE_LABELS[i]} 계열 · +0 대응 스탯: ${statLine}</div>`
+        : `<div style="color:var(--sub)">아직 얻지 못한 장갑입니다. (<span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> ${t.icon} ${GLOVE_TYPE_LABELS[i]} 계열)</div>`);
+      ngrid.appendChild(cell);
+    });
+  }
+  const grid = box.querySelector('[data-glove-boss]');
   items.forEach(it => {
     const cell = document.createElement('div');
     cell.className = 'codex-cell' + (it.unlocked ? '' : ' locked');
@@ -12916,19 +13123,32 @@ function renderGloveCodex() {
   });
   const listBox = $('gloveCodexBonusList');
   if (!listBox) return;
-  const row = (m, on) => `
+  // 세트 효과 행: 일반 도감 등급 세트·종류 마스터리 + 보스 장갑 수집 마일스톤
+  const effText = x => x.text || x.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ');
+  const rowsAll = [];
+  for (const gs of GLOVE_CODEX_GRADE_SETS) {
+    const have = GLOVE_TYPES.filter((t, i) => gloveCodexHas(`g${gs.grade}_${i}`)).length;
+    rowsAll.push({ grade: gs.grade, label: `[${GRADES[gs.grade].name}] 장갑 8종 전부`, text: effText(gs), have, need: GLOVE_TYPES.length });
+  }
+  GLOVE_CODEX_TYPE_MASTERY.forEach((tm, i) => {
+    const have = [0, 1, 2, 3, 4, 5].filter(gr => gloveCodexHas(`g${gr}_${i}`)).length;
+    rowsAll.push({ grade: 3, label: `${GLOVE_TYPES[i].icon} ${GLOVE_TYPE_LABELS[i]} 계열 6등급 전부`, text: effText(tm), have, need: 6 });
+  });
+  for (const m of GLOVE_BOSS_MILESTONES) rowsAll.push({ grade: 5, label: `[보스 장갑] ${m.count}종 수집`, text: effText(m), have: unlockedCount, need: m.count });
+  const row = (x, on) => `
     <div class="invitem${on ? ' equipped' : ''}"${on ? '' : ' style="opacity:0.55"'}>
-      <div><div class="wn"><span class="grade-신화">[보스 장갑] ${m.count}종 수집</span>${on ? '' : ` <span style="color:var(--sub);font-size:12px">${unlockedCount}/${m.count}</span>`}</div>
-      <div class="wi">${m.text || m.effs.map(([stat, val]) => codexStatText(stat, val)).join(', ')}</div></div>
+      <div><div class="wn"><span class="grade-${GRADES[x.grade].name}">${x.label}</span>${on ? '' : ` <span style="color:var(--sub);font-size:12px">${x.have}/${x.need}</span>`}</div>
+      <div class="wi">${x.text}</div></div>
     </div>`;
-  const active = GLOVE_BOSS_MILESTONES.filter(m => unlockedCount >= m.count);
-  const pending = GLOVE_BOSS_MILESTONES.filter(m => unlockedCount < m.count);
-  const totals = gloveBossMilestoneEff();
-  const totalLines = Object.entries(totals).filter(([k]) => k !== 'gloveEnh')
+  const active = rowsAll.filter(x => x.have >= x.need);
+  const pending = rowsAll.filter(x => x.have < x.need).sort((a, b) => b.have / b.need - a.have / a.need);
+  const totals = {};
+  for (const e of [gloveBossMilestoneEff(), gloveCodexBonusEff()]) for (const [k, v] of Object.entries(e)) totals[k] = (totals[k] || 0) + v;
+  const totalLines = Object.entries(totals).filter(([k]) => k !== 'gloveEnh') // 강화 확률은 단계마다 달라 합계에서 뺀다
     .map(([k, v]) => `<div style="font-size:13px;margin-bottom:2px;">${codexStatText(k, v).replace(' ', ' 총 ')}</div>`).join('');
-  listBox.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">📊 현재 보스 장갑 수집 효과 합계</div>${totalLines || '<div style="color:var(--sub);font-size:13px;">아직 합산될 효과가 없습니다.</div>'}
+  listBox.innerHTML = `<div style="font-weight:bold;margin-bottom:6px;">📊 현재 장갑 컬렉션 효과 합계</div>${totalLines || '<div style="color:var(--sub);font-size:13px;">아직 합산될 효과가 없습니다.</div>'}
     <div style="font-weight:bold;margin:12px 0 6px;">✅ 활성화된 효과 (${active.length}개)</div>${active.length ? active.map(m => row(m, true)).join('') : '<div style="color:var(--sub);font-size:13px;">아직 활성화된 효과가 없습니다.</div>'}
-    <div style="font-weight:bold;margin:12px 0 6px;">⏳ 다음 효과</div>${pending.map(m => row(m, false)).join('')}`;
+    <div style="font-weight:bold;margin:12px 0 6px;">⏳ 미완성 효과</div>${pending.map(m => row(m, false)).join('')}`;
 }
 
 // 대장장이 탭 렌더링 — 무기 각인 UI
@@ -13027,6 +13247,10 @@ function migrate(d) {
   if (!Array.isArray(d.dreamShards)) d.dreamShards = [];
   if (!Array.isArray(d.gloveBossCodexSeen)) d.gloveBossCodexSeen = [];
   if (d.gloveAutoSellGrade === undefined) d.gloveAutoSellGrade = null;
+  if (typeof d.gloveAutoDisassemble !== 'boolean') d.gloveAutoDisassemble = false;
+  if (typeof d.gloveCodexSeen !== 'object' || d.gloveCodexSeen === null || Array.isArray(d.gloveCodexSeen)) d.gloveCodexSeen = {};
+  // 장갑 도감 도입 전부터 가지고 있던 장갑은 도감에 바로 등록
+  for (const g of Array.isArray(d.gloves) ? d.gloves : []) { const k = gloveCodexKey(g); if (k) d.gloveCodexSeen[k] = true; }
   if (!Array.isArray(d.subBossCodexSeen)) d.subBossCodexSeen = [];
   if (!Array.isArray(d.subRelics)) d.subRelics = [];
   if (!Array.isArray(d.subweapons)) d.subweapons = [];
@@ -14979,20 +15203,29 @@ function setupGloveAutoSellControls() {
     sel.innerHTML = '<option value="">끔</option>' + GRADES.slice(0, 6).map((g, i) => `<option value="${i}">${g.name}</option>`).join('');
     sel.dataset.built = '1';
     sel.onchange = () => { S.gloveAutoSellGrade = sel.value === '' ? null : +sel.value; save(); };
+    $('gloveAutoDisCheck').onchange = e => { S.gloveAutoDisassemble = e.target.checked; save(); };
     $('gloveAutoSellCleanBtn').onclick = () => {
       if (S.gloveAutoSellGrade == null) { log('먼저 자동판매 등급을 선택하세요.', 'lg-bad'); return; }
-      const targets = (S.gloves || []).filter(g => g.id !== S.gloveEquipped && gloveAutoSellMatch(g));
+      const targets = (S.gloves || []).filter(g => g.id !== S.gloveEquipped && !disPresetLocked('g', g.id) && gloveAutoSellMatch(g));
       if (!targets.length) { log('정리할 장갑이 없습니다.'); return; }
-      let total = 0;
-      for (const g of targets) total += gloveSellPrice(g);
-      S.gold = BN.add(S.gold, total);
       const ids = new Set(targets.map(g => g.id));
       S.gloves = S.gloves.filter(g => !ids.has(g.id));
-      log(`🗑️ 장갑 가방 일괄 정리: ${targets.length}개 판매 → +${fmt(total)} 골드`, 'lg-good');
+      if (S.gloveAutoDisassemble) {
+        let total = 0;
+        for (const g of targets) total += gloveDisassembleSteel(g);
+        S.steelThread = BN.add(S.steelThread || BN.from(0), total);
+        log(`🔨 장갑 가방 일괄 정리: ${targets.length}개 분해 → 🧵 ${fmt(total)}`, 'lg-good');
+      } else {
+        let total = 0;
+        for (const g of targets) total += gloveSellPrice(g);
+        S.gold = BN.add(S.gold, total);
+        log(`🗑️ 장갑 가방 일괄 정리: ${targets.length}개 판매 → +${fmt(total)} 골드`, 'lg-good');
+      }
       renderGloveInventory(); renderTop(); save();
     };
   }
   sel.value = S.gloveAutoSellGrade == null ? '' : String(S.gloveAutoSellGrade);
+  $('gloveAutoDisCheck').checked = !!S.gloveAutoDisassemble;
 }
 function renderGloveInventory() {
   setupGloveAutoSellControls();
@@ -15016,7 +15249,7 @@ function renderGloveInventory() {
     div.className = 'invitem' + (equipped ? ' equipped' : '');
     div.innerHTML = `
       <div><div class="wn">${gloveGradeTag(g)}${equipped ? ' <span style="color:var(--unique);font-size:12px">✅ 장착중</span>' : ''}</div>
-      <div class="wi">${gloveStatText(g)} · 공격력 ${fmt(gloveAtk(g))}</div></div>
+      <div class="wi">${gloveStatText(g)} · 공격력 ${fmt(gloveAtk(g))}${g.enchant ? `<br>⚒️ 각인: ${g.enchant.lines.map(l => enchantLineTextOf('gMain', l)).join(' / ')}` : ''}${g.addEnchant ? `<br>✨ 에디셔널: ${g.addEnchant.lines.map(l => enchantLineTextOf('gAdd', l)).join(' / ')}` : ''}</div></div>
       <div class="btns"></div>`;
     const btns = div.querySelector('.btns');
     const emb = document.createElement('button');
@@ -15049,7 +15282,7 @@ function renderGloveEnhance() {
   const btn = $('gloveEnhBtn');
   if (!g) {
     box.innerHTML = '<div style="color:var(--sub)">장착된 장갑이 없습니다. 🎒 가방 → 🧤 장갑에서 장착하세요.</div>';
-    $('gloveenhstat').innerHTML = ''; $('gloveenhrates').innerHTML = ''; $('gloveAdvancedEnhanceBox').innerHTML = '';
+    $('gloveenhstat').innerHTML = ''; $('gloveenhrates').innerHTML = ''; $('gloveAdvancedEnhanceBox').innerHTML = ''; $('gloveAutoEnhanceBox').innerHTML = '';
     btn.disabled = true; btn.textContent = '강화하기';
     return;
   }
@@ -15068,7 +15301,10 @@ function renderGloveEnhance() {
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>`;
   $('gloveenhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${g.enhance}</b>`
-    : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`;
+    : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`
+      + ((S.penaltyGuard || 0) > 0 ? `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>` : '');
+  bindPenaltyGuardToggles();
+  renderGloveAutoEnhance(g, maxed);
   btn.innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost.gold)} + 🧵 ${cost.steel} (성공 ${chance.toFixed(1)}% / 파괴 ${dChance.toFixed(1)}%)</span>`;
   btn.disabled = maxed || gloveEnhanceRevealPending;
   btn.onclick = () => { if (!maxed) tryGloveEnhance(false); };
@@ -15681,7 +15917,13 @@ const GUIDE_SECTIONS = [
     </table>
     <br><b>획득</b>: 토벌전 21단계 이상 승리 시 30%, 도서관 21서고 이상 승리 시 50% 확률(도서관 쪽이 등급이 더 높음). 🌌 성야국(41~60층) 몬스터 사냥 시 0.15%, 성야국 층 보스 승리 시 그 층 전용 <b>보스 장갑</b> 0.4%(광폭화 보스 0.8%). 절반은 그 보스의 패턴을 막는 종류가 나옵니다.
     <br><br><b>👹 보스 장갑</b>: 성야국 층마다 1종(20종), 신화 고정. 같은 층 보스 장신구와 세트가 되어 그 층에서 공격력 +30%·골드 +50%·드롭률 +50%. 지금 갖고 있으면 골드로 대신 받고, 판매하거나 파괴됐으면 다시 나옵니다. 모은 종류 수(1/2/4/…/20종)에 따라 장갑 강화 확률·파괴 확률·드롭률·증폭 등 수집 효과가 붙습니다(📘 도감 → 🧤 장갑 도감).
-    <br><br><b>🗑️ 자동판매</b>: 🎒 가방 → 🧤 장갑에서 등급을 고르면 그 등급 이하·강화 0단계·자수 없는 장갑을 얻자마자 판매합니다. 보스 장갑은 항상 남깁니다.
+    <br><br><b>🗑️ 자동판매·🔨 분해</b>: 🎒 가방 → 🧤 장갑에서 등급을 고르면 그 등급 이하·강화 0단계·자수 없는 장갑을 얻자마자 판매합니다. "판매 대신 분해"를 켜면 골드 대신 🧵 강철실을 받습니다. 보스 장갑은 항상 남깁니다. 🔨 분해기 탭에서는 모든 등급의 장갑을 골라 분해할 수 있습니다(장착·프리셋 장갑 제외).
+    <table class="guide-table"><tr><th>등급</th><th>분해 시 🧵 강철실 (+0 기준)</th></tr>
+      ${GLOVE_DISASSEMBLE_STEEL.map((v, gr) => `<tr><td><span class="grade-${GRADES[gr].name}">${GRADES[gr].name}</span></td><td>${fmt(v)}개 <span style="color:var(--sub)">(강화 1단계마다 ×1.08 — +20이면 약 ×4.7)</span></td></tr>`).join('')}
+    </table>
+    <br><b>⚙️ 자동 강화</b>: 장갑 강화기에서 목표 단계를 정하면 일반 강화를 자동으로 반복합니다. 목표 도달·골드나 강철실 부족·장갑 파괴·장갑 교체 시 멈춥니다. 🛡️ <b>강화 패널티 방지권</b>도 장갑 강화에 쓰입니다(파괴·단계 하락을 막고 유지).
+    <br><br><b>⚒️ 각인</b>: +15 이상 장갑에 대장장이 탭에서 각인·에디셔널 각인을 새길 수 있습니다. 비용은 무기 각인의 3배(에디셔널 4배)이고, 옵션은 드롭률·골드·보스 피해량·장갑 보조 스탯·자수 증폭·<b>패턴 저항</b>(모든 보스 패턴 세기 감소, 합계 최대 50%)·<b>강철실 획득량</b>(토벌전·도서관·성야국 광폭화 보스)입니다.
+    <br><br><b>📘 장갑 도감</b>: 얻은 적 있는 일반 장갑(8종류 × 일반~신화)이 등록됩니다. 한 등급 8종을 다 모으거나 한 종류의 6등급을 다 모으면 장갑 드롭률·강화 확률·파괴 확률·자수 비용·증폭·강철실 획득량 보너스가 붙습니다.
     <br><br><b>강화</b>: 골드와 <b>🧵 강철실</b>(토벌전 21단계·도서관 21서고 이상 보상)이 필요합니다. 성공·파괴 확률은 보조무기와 같고, +15부터는 강철실 30배로 파괴 확률을 절반으로 낮추는 고급 강화를 쓸 수 있습니다. 장신구·수집 효과의 "장갑 강화 확률 +N%p"는 보조무기처럼 기준 단계에서 그 수치이고, 그보다 높은 단계일수록 확률표 비율만큼 줄어듭니다. 강화는 장착 중인 장갑만 할 수 있습니다.
     <br><br><b>🪡 자수</b>: 도서관 21서고 이상에서 얻는 <b>📄 금서의 페이지</b> 1장과 📜 무기의 정수로, 장갑에 대응 스탯 하나를 무작위로 수놓습니다(장갑마다 1칸). 다시 수놓으면 기존 자수를 덮어쓰고, 같은 장갑에 수놓을수록 정수 비용이 오릅니다. 주 스탯과 같은 스탯이 나오면 그대로 더해져서, 신화 +30 장갑(주 스탯 80%)이면 그 패턴을 완전히 무효로 만들 수도 있습니다. 보통은 장갑이 못 막는 두 번째 패턴의 스탯을 노리는 것이 좋습니다.
     <br><br><b>🌌 보조 스탯·자수 증폭</b>: 성야국 장신구·꿈조각의 증폭 효과는 장착한 장갑의 <b>보조 스탯과 자수</b> 수치에 곱해집니다. <b>주 스탯은 증폭되지 않고</b> 등급과 강화로만 오르므로, 강화는 주 패턴을, 증폭은 두 번째·세 번째 패턴을 막는 역할입니다. 증폭이 있으면 장갑 정보에 "40% → 58%"처럼 증폭 후 값이 함께 표시됩니다.`,
@@ -15757,6 +15999,8 @@ const GUIDE_SECTIONS = [
     ${enchantRangeTableHtml(ENCHANT_OPTIONS)}
     <br>· <b>🗡️ 보조무기 각인</b> (보조무기 효과 증폭·액티브 피해량·액티브 지속시간은 보조무기 각인 전용)
     ${enchantRangeTableHtml(SUB_ENCHANT_OPTIONS)}
+    <br>· <b>🧤 장갑 각인</b> (비용 무기 각인의 3배·에디셔널 4배, 장갑 보조 스탯·자수 증폭·패턴 저항·강철실 획득량은 장갑 각인 전용, 드롭률은 월드1·2에서 절반)
+    ${enchantRangeTableHtml(GLOVE_ENCHANT_OPTIONS)}
     <br>골드 획득·드롭률 줄은 다른 1~20층 소스와 마찬가지로 월드2(황혼국) 사냥 중엔 적용되지 않습니다(전투 스탯 줄은 월드 구분 없이 그대로 적용). 자세한 내용은 아래 "월드1·월드2 효과 적용 범위" 참고.`,
   },
   {
@@ -15996,6 +16240,8 @@ function accEffText(eff) {
   if (eff.gloveEnhGoldReduce) parts.push(`🧤 장갑 강화 골드 -${Math.round(eff.gloveEnhGoldReduce * 100)}%`);
   if (eff.embroideryDiscount) parts.push(`🪡 자수 정수 비용 -${Math.round(eff.embroideryDiscount * 100)}%`);
   if (eff.gloveDestroyReduce) parts.push(`🛡️ 장갑 강화 파괴 확률 -${Math.round(eff.gloveDestroyReduce * 100)}%p`);
+  if (eff.patternResist) parts.push(`🛡️ 패턴 저항 +${+(eff.patternResist * 100).toFixed(1)}%`);
+  if (eff.steelGain) parts.push(`🧵 강철실 획득량 +${Math.round(eff.steelGain * 100)}%`);
   return parts.join(' · ');
 }
 
@@ -16109,17 +16355,24 @@ function renderAccTab() {
 // 없으면 다시 드랍된다). 신화는 자동판매처럼 획득 즉시 자동분해(강화 0단계)를 켤 수 있다.
 const DISASSEMBLE_REWARD = { 5: { leaves: 1000, essence: 0 }, 6: { leaves: 200000, essence: 50000 }, 7: { leaves: 2000000, essence: 500000 } };
 const DISASSEMBLE_ENH_GROWTH = 1.08;
-function disassembleReward(it) {
+function disassembleReward(it, kind) {
+  if (kind === 'g') return { leaves: 0, essence: 0, steel: gloveDisassembleSteel(it) };
   const base = DISASSEMBLE_REWARD[it.grade];
   if (!base) return null;
   const m = Math.pow(DISASSEMBLE_ENH_GROWTH, it.enhance || 0);
-  return { leaves: Math.floor(base.leaves * m), essence: Math.floor(base.essence * m) };
+  return { leaves: Math.floor(base.leaves * m), essence: Math.floor(base.essence * m), steel: 0 };
 }
 function disPresetLocked(kind, id) {
-  return (S.presets || []).some(p => p && (kind === 'w' ? p.weaponId === id : p.subWeaponId === id));
+  return (S.presets || []).some(p => p && (kind === 'w' ? p.weaponId === id : kind === 'g' ? p.gloveId === id : p.subWeaponId === id));
 }
 function disassemblable(kind, it) {
-  if (!it || !DISASSEMBLE_REWARD[it.grade]) return false;
+  if (!it) return false;
+  if (kind === 'g') {
+    if (it.id === S.gloveEquipped || disPresetLocked('g', it.id)) return false;
+    if (it.bossFloor !== undefined && !(S.disassemble && S.disassemble.boss)) return false;
+    return GLOVE_DISASSEMBLE_STEEL[it.grade] > 0;
+  }
+  if (!DISASSEMBLE_REWARD[it.grade]) return false;
   if (kind === 'w' && (isFist(it) || it.id === S.equipped)) return false;
   if (kind === 's' && it.id === S.subEquipped) return false;
   if (disPresetLocked(kind, it.id)) return false;
@@ -16153,15 +16406,25 @@ function autoDisassembleMatch(kind, it) {
   return !!t && d.subTypes.includes(t.name);
 }
 function grantDisassembleReward(r) {
-  S.worldTreeLeaf = BN.add(S.worldTreeLeaf || BN.from(0), r.leaves);
+  if (r.leaves > 0) S.worldTreeLeaf = BN.add(S.worldTreeLeaf || BN.from(0), r.leaves);
   if (r.essence > 0) S.weaponEssence = BN.add(S.weaponEssence, r.essence);
+  if (r.steel > 0) S.steelThread = BN.add(S.steelThread || BN.from(0), r.steel);
 }
-function disRewardText(r) { return `🍃 ${fmt(r.leaves)}${r.essence > 0 ? ` · 📜 ${fmt(r.essence)}` : ''}`; }
+function disRewardText(r) {
+  const parts = [];
+  if (r.leaves > 0) parts.push(`🍃 ${fmt(r.leaves)}`);
+  if (r.essence > 0) parts.push(`📜 ${fmt(r.essence)}`);
+  if (r.steel > 0) parts.push(`🧵 ${fmt(r.steel)}`);
+  return parts.join(' · ') || '🍃 0';
+}
 // 실제 분해(검사·확인은 호출부). 가방에서 빼고 보상 지급.
 function doDisassemble(kind, it) {
-  const r = disassembleReward(it);
+  const r = disassembleReward(it, kind);
   if (!r) return null;
-  if (kind === 'w') {
+  if (kind === 'g') {
+    S.gloves = S.gloves.filter(x => x.id !== it.id);
+    if (enchantPickId.glove === it.id) enchantPickId.glove = null;
+  } else if (kind === 'w') {
     if (Array.isArray(it.runes) && it.runes.length) { S.runes.push(...it.runes); it.runes = []; }
     S.weapons = S.weapons.filter(x => x.id !== it.id);
     if (it.genesisId && Array.isArray(S.genesisOwned)) S.genesisOwned = S.genesisOwned.filter(id => id !== it.genesisId);
@@ -16178,16 +16441,18 @@ function disItems() {
   const list = [];
   for (const w of S.weapons || []) if (disassemblable('w', w)) list.push({ kind: 'w', it: w });
   for (const sw of S.subweapons || []) if (disassemblable('s', sw)) list.push({ kind: 's', it: sw });
+  for (const g of S.gloves || []) if (disassemblable('g', g)) list.push({ kind: 'g', it: g });
   list.sort((a, b) => b.it.grade - a.it.grade || (b.it.enhance || 0) - (a.it.enhance || 0));
   return list;
 }
-function disTag(kind, it) { return kind === 'w' ? gradeTag(it) : subweaponGradeTag(it); }
+function disTag(kind, it) { return kind === 'w' ? gradeTag(it) : kind === 'g' ? gloveGradeTag(it) : subweaponGradeTag(it); }
+const DIS_KIND_ICON = { w: '⚔️', s: '🗡️', g: '🧤' };
 // 분해 요청: 고대·태초가 섞여 있으면 경고 팝업으로 한 번 더 확인받는다.
 function requestDisassemble(entries) {
   entries = entries.filter(e => disassemblable(e.kind, e.it));
   if (!entries.length) { log('분해할 장비가 없습니다.', 'lg-bad'); return; }
-  const total = { leaves: 0, essence: 0 };
-  for (const e of entries) { const r = disassembleReward(e.it); total.leaves += r.leaves; total.essence += r.essence; }
+  const total = { leaves: 0, essence: 0, steel: 0 };
+  for (const e of entries) { const r = disassembleReward(e.it, e.kind); total.leaves += r.leaves; total.essence += r.essence; total.steel += r.steel; }
   const run = () => {
     let n = 0;
     for (const e of entries) if (disassemblable(e.kind, e.it) && doDisassemble(e.kind, e.it)) n++;
@@ -16205,7 +16470,7 @@ function disFilterHtml() {
   const d = disCfg();
   const chk = (attr, on, label) => `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" ${attr} ${on ? 'checked' : ''}> ${label}</label>`;
   return `
-    <div style="font-size:13px;margin-bottom:6px;">${chk('data-dis-boss', d.boss, '👹 보스 장비도 분해 <span style="font-size:11px;color:var(--sub)">(끄면 보스 무기·보스 보조무기는 목록·자동분해에서 제외)</span>')}</div>
+    <div style="font-size:13px;margin-bottom:6px;">${chk('data-dis-boss', d.boss, '👹 보스 장비도 분해 <span style="font-size:11px;color:var(--sub)">(끄면 보스 무기·보스 보조무기·보스 장갑은 목록·자동분해에서 제외)</span>')}</div>
     <div class="guide-card" style="margin-bottom:8px;">
       <div class="guide-head" data-dis-auto-toggle>⚙️ 신화 자동분해 (획득 즉시, 강화 0단계)<span class="guide-arrow">▾</span></div>
       <div class="guide-body" data-dis-auto-body hidden>
@@ -16230,25 +16495,25 @@ function renderDisassembleTab() {
   const keyOf = e => `${e.kind}:${e.it.id}`;
   for (const k of [...disSelected]) if (!items.some(e => keyOf(e) === k)) disSelected.delete(k);
   const sel = items.filter(e => disSelected.has(keyOf(e)));
-  const selTotal = sel.reduce((a, e) => { const r = disassembleReward(e.it); a.leaves += r.leaves; a.essence += r.essence; return a; }, { leaves: 0, essence: 0 });
+  const selTotal = sel.reduce((a, e) => { const r = disassembleReward(e.it, e.kind); a.leaves += r.leaves; a.essence += r.essence; a.steel += r.steel; return a; }, { leaves: 0, essence: 0, steel: 0 });
   box.innerHTML = `
     ${disFilterHtml()}
-    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">보유 🍃 ${fmt(S.worldTreeLeaf || 0)} · 📜 ${fmt(S.weaponEssence || 0)} — 장착 중이거나 프리셋에 저장된 장비는 목록에 나오지 않습니다.</div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">보유 🍃 ${fmt(S.worldTreeLeaf || 0)} · 📜 ${fmt(S.weaponEssence || 0)} · 🧵 ${fmt(S.steelThread || 0)} — 장착 중이거나 프리셋에 저장된 장비는 목록에 나오지 않습니다. 🧤 장갑은 모든 등급을 분해할 수 있습니다(🧵 강철실, 자동분해는 🎒 가방 → 🧤 장갑의 "판매 대신 분해").</div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
       <button class="primary" data-dis-run ${sel.length ? '' : 'disabled'}>🔨 선택 분해 (${sel.length}개${sel.length ? ` → ${disRewardText(selTotal)}` : ''})</button>
       <button data-dis-allmyth ${items.some(e => e.it.grade === 5) ? '' : 'disabled'}>신화 전체 선택</button>
       <button data-dis-clear ${sel.length ? '' : 'disabled'}>선택 해제</button>
     </div>
     ${items.length ? items.map(e => {
-      const r = disassembleReward(e.it);
+      const r = disassembleReward(e.it, e.kind);
       return `<div class="invitem" style="align-items:center;">
         <label style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;">
           <input type="checkbox" data-dis-sel="${keyOf(e)}" ${disSelected.has(keyOf(e)) ? 'checked' : ''}>
-          <div style="min-width:0;"><div class="wn">${e.kind === 'w' ? '⚔️' : '🗡️'} ${disTag(e.kind, e.it)}</div><div class="wi">${disRewardText(r)}</div></div>
+          <div style="min-width:0;"><div class="wn">${DIS_KIND_ICON[e.kind]} ${disTag(e.kind, e.it)}</div><div class="wi">${disRewardText(r)}</div></div>
         </label>
         <div class="btns"><button data-dis-one="${keyOf(e)}">분해</button></div>
       </div>`;
-    }).join('') : '<div style="color:var(--sub);font-size:13px;">분해할 수 있는 신화·고대·태초 장비가 없습니다.</div>'}`;
+    }).join('') : '<div style="color:var(--sub);font-size:13px;">분해할 수 있는 신화·고대·태초 장비나 장갑이 없습니다.</div>'}`;
   const find = k => items.find(e => keyOf(e) === k);
   box.querySelectorAll('[data-dis-sel]').forEach(cb => { cb.onchange = () => { if (cb.checked) disSelected.add(cb.dataset.disSel); else disSelected.delete(cb.dataset.disSel); renderDisassembleTab(); }; });
   box.querySelectorAll('[data-dis-one]').forEach(b => { b.onclick = () => { const e = find(b.dataset.disOne); if (e) requestDisassemble([e]); }; });

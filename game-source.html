@@ -4693,10 +4693,10 @@ const AWAKENING_FINALS = {
 };
 const AWAKENING_FINAL_KEYS = Object.keys(AWAKENING_FINALS);
 // 고대·태초 전용 특수효과(예전 에픽·전설 특수효과를 수치 상향해 재활용). 값은 [고대, 태초].
-// 같은 효과 여러 칸은 합산(회심의 연격·필멸자의 저항은 확률이라 최대 100%).
+// 같은 효과 여러 칸은 합산(회심의 연격은 확률이라 최대 100%). 필멸자의 저항만 중복 없이 가장 높은 1칸.
 const AWAKENING_SPECIALS = {
   libraryEcho:  { label: '서고의 메아리', values: [0.80, 1.50], desc: v => `무기·각성의 정수 획득 +${Math.round(v * 100)}%` },
-  unbreakable:  { label: '필멸자의 저항', values: [0.25, 0.40], desc: v => `강화 실패 시 ${Math.round(v * 100)}% 확률로 패널티(초기화·하락) 무효` },
+  unbreakable:  { label: '필멸자의 저항', values: [0.25, 0.40], desc: v => `강화 실패 시 ${Math.round(v * 100)}% 확률로 패널티(초기화·하락) 무효 (여러 칸이어도 가장 높은 1칸만)` },
   critFollowup: { label: '회심의 연격',   values: [0.30, 0.50], desc: v => `치명타 시 ${Math.round(v * 100)}% 확률로 같은 피해 1회 추가` },
   // 각성 공명: 최종 공격력 기본값 + 다른 고대·태초 칸 수에 비례. 고대 = 20% + 다른 고대·태초 칸당 5%(전부면 40%),
   // 태초 = 25% + 다른 태초 칸당 10%·고대 칸당 5%(전부 태초면 65%).
@@ -4785,9 +4785,10 @@ function awakenCritFollowup(w, dmg) {
   const p = Math.min(1, awakenSpecialSum(w, 'critFollowup'));
   if (p > 0 && Math.random() < p) { dealMonDamage(dmg); floatText('⚡ 회심의 연격!'); }
 }
-// 필멸자의 저항: 강화 실패 패널티(초기화·하락)를 확률적으로 무효(여러 칸이면 확률 합산, 최대 100%)
+// 필멸자의 저항: 강화 실패 패널티(초기화·하락)를 확률적으로 무효 — 중복 적용 없이 가장 높은 1칸만
 function awakenResistPenalty(w) {
-  const p = Math.min(1, awakenSpecialSum(w, 'unbreakable'));
+  const p = Array.isArray(w.awakening)
+    ? Math.max(0, ...w.awakening.map(s => s && s.key === 'unbreakable' ? awakenSlotValue(s) : 0)) : 0;
   if (!(p > 0 && Math.random() < p)) return false;
   log(`🛡️ <b>필멸자의 저항</b>(각성) 발동! 강화 실패 패널티를 막고 단계를 유지했습니다.`, 'lg-prim');
   return true;

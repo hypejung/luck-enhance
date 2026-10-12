@@ -3757,12 +3757,12 @@ function gloveCodexBonusEff() {
 const GLOVE_ANCIENTS = [
   { name: '엔디미온의 잠든 양치기 장갑', icon: '🐑', fx: 'cushion', fxName: '양털 쿠션',
     flavor: '달이 사랑한 양치기는 영원히 잠들었지만, 그 손은 지금도 양떼를 지킨다.',
-    p: { every: 15, speed: 0.6, dur: 6 },
+    p: { every: 12, speed: 1.0, dur: 8 },
     desc: p => `${p.every}초마다 다음 보스 패턴 1번을 통째로 막고, 막을 때마다 ${p.dur}초간 공격속도 +${fmtRate(p.speed)}` },
   { name: '로토파고이의 연꽃 붕대', icon: '🪷', fx: 'lotus', fxName: '하품 옮기기',
     flavor: '이 꽃잎을 맛본 자는 돌아갈 길을 잊고, 서두를 이유도 잊는다.',
-    p: { per: 30, delay: 5 },
-    desc: p => `공격 ${p.per}번마다 보스에게 졸음이 차올라, 보스의 다음 패턴들이 ${p.delay}초씩 늦게 옴` },
+    p: { per: 30, delay: 5, doze: 4, dozeDmg: 1.0 },
+    desc: p => `공격 ${p.per}번마다 보스에게 졸음이 차올라, 보스의 다음 패턴들이 ${p.delay}초씩 늦게 오고 ${p.doze}초 동안 꾸벅이는 보스가 받는 피해 +${fmtRate(p.dozeDmg)}` },
   { name: '홀레 할머니의 깃털이불 장갑', icon: '🪶', fx: 'featherbed', fxName: '포근한 반동',
     flavor: '이불을 털면 세상에 눈이 내린다. 포근하게 받아낸 만큼, 고스란히 쏟아진다.',
     p: { rate: 0.5, every: 10, base: 0.4 },
@@ -3778,7 +3778,7 @@ const GLOVE_ANCIENTS = [
   { name: '페르세포네의 석류 장갑', icon: '🌺', fx: 'pomegranate', fxName: '꽃이 지는 순서',
     flavor: '꽃은 지는 순서를 기억한다. 가장 붉었던 꽃이 가장 먼저 다시 핀다.',
     p: { every: 10, mult: 4, rewindCut: 0.5 },
-    desc: p => `이번 전투의 가장 큰 한 방을 기억해 ${p.every}초마다 그 ${p.mult}배로 다시 피움. 역행 보스는 역행 순간 바로 터지고 역행 회복 ${fmtRate(p.rewindCut)} 상쇄` },
+    desc: p => `이번 전투에서 공격 1회로 준 가장 큰 피해를 기억해 ${p.every}초마다 그 ${p.mult}배로 다시 피움. 역행 보스는 역행 순간 바로 터지고 역행 회복 ${fmtRate(p.rewindCut)} 상쇄` },
   { name: '야곱의 사다리 장갑', icon: '🪜', fx: 'ladder', fxName: '끝없는 계단',
     flavor: '꿈속의 사다리는 끝이 없지만, 한 칸도 헛디딘 적이 없다.',
     p: { per: 0.025, max: 40 },
@@ -3786,7 +3786,7 @@ const GLOVE_ANCIENTS = [
   { name: '나르키소스의 거울 장갑', icon: '🪞', fx: 'mirror', fxName: '거울 손님 초대',
     flavor: '거울 속의 그는 언제나 같은 손짓을 한다. 조금 늦게, 하지만 똑같이.',
     p: { every: 15, dur: 6, frac: 0.9 },
-    desc: p => `${p.every}초마다 거울 손님이 ${p.dur}초 동안 내 공격을 ${fmtRate(p.frac)} 위력으로 따라 침. 환영 분신을 쓰는 보스는 분신이 나올 때마다 손님 +1` },
+    desc: p => `${p.every}초마다 거울 손님이 ${p.dur}초 동안 내 공격(평균 총 피해)을 ${fmtRate(p.frac)} 위력으로 따라 침. 환영 분신을 쓰는 보스는 분신이 나올 때마다 손님 +1` },
   { name: '페넬로페의 풀어내는 장갑', icon: '🧶', fx: 'unravel', fxName: '실밥 뜯기',
     flavor: '낮에 짠 것을 밤마다 풀었다. 이 손이 푸는 것은, 다시는 엮이지 않는다.',
     p: { perStack: 0.04, max: 30, dur: 4, healBack: 1.0 },
@@ -3805,8 +3805,8 @@ const GLOVE_ANCIENTS = [
     desc: p => `공격속도의 ${fmtRate(p.conv)}를 한 방 위력으로 바꿔 침(피해 +${fmtRate(p.conv * p.gain)}). 탈진으로 느려진 만큼은 전부 위력으로` },
   { name: '카리브디스의 소용돌이 장갑', icon: '🌊', fx: 'charybdis', fxName: '밀물과 썰물',
     flavor: '하루 세 번 바다를 삼키고, 하루 세 번 토해낸다.',
-    p: { cycle: 10, flood: 0.6, ebb: 0.6, perHit: 0.04 },
-    desc: p => `${p.cycle / 2}초 밀물(공격속도 +${fmtRate(p.flood)})과 ${p.cycle / 2}초 썰물(피해 +${fmtRate(p.ebb)}, 밀물 때 친 1번마다 +${fmtRate(p.perHit)})이 번갈아 옴` },
+    p: { cycle: 10, flood: 0.6, ebb: 0.6, perHit: 0.04, maxHits: 20 },
+    desc: p => `${p.cycle / 2}초 밀물(공격속도 +${fmtRate(p.flood)})과 ${p.cycle / 2}초 썰물(피해 +${fmtRate(p.ebb)}, 밀물 때 친 1번마다 +${fmtRate(p.perHit)}, 최대 ${p.maxHits}번)이 번갈아 옴` },
   { name: '츠쿠요미의 초승달 장갑', icon: '🌙', fx: 'tsukuyomi', fxName: '달을 깎는 칼',
     flavor: '달의 신은 칼로 밤을 갈랐다. 깎여 나간 달빛이 칼날이 되었다.',
     p: { perIns: 2.5, foresightCut: 0.5 },
@@ -9616,7 +9616,10 @@ function gloveOverflowMult() {
 function gloveAncientPreAttack() {
   if (!gloveAncientFx() || !bossFight.active) return;
   const st = aglState();
-  if (st.atkAcc > 0) { st.avgAtk = st.avgAtk ? st.avgAtk * 0.9 + st.atkAcc * 0.1 : st.atkAcc; st.atkAcc = 0; }
+  if (st.atkAcc > 0) {
+    if (st.atkAcc > st.maxHit) st.maxHit = st.atkAcc; // 꽃이 지는 순서: 이번 전투에서 공격 1회가 입힌 가장 큰 총 피해
+    st.avgAtk = st.avgAtk ? st.avgAtk * 0.9 + st.atkAcc * 0.1 : st.atkAcc; st.atkAcc = 0;
+  }
 }
 function gloveAncientDmgMult() {
   let m = gloveOverflowMult();
@@ -9629,6 +9632,7 @@ function gloveAncientDmgMult() {
       else if (!(bd && bd.enrageable) && BN.lte(mon.hp, BN.mul(mon.maxHp, p.lowHp))) m *= 1 + p.dmg / 2;
       break;
     case 'ladder': m *= 1 + p.per * st.steps; break;
+    case 'lotus': if (el < (st.dozeUntil || -1)) m *= 1 + p.dozeDmg; break;
     case 'mask':
       if (bdSealed()) m *= 1 + p.sealAtk;
       else if (!bdHas('seal') && (el % p.every) < p.dur) m *= 1 + p.sealAtk / 2;
@@ -9637,7 +9641,7 @@ function gloveAncientDmgMult() {
       m *= 1 + p.conv * p.gain;
       if (bdSpeedMult() < 1) m /= bdSpeedMult(); // 탈진으로 느려진 만큼은 전부 위력으로
       break;
-    case 'charybdis': if ((el % p.cycle) >= p.cycle / 2) m *= 1 + p.ebb + p.perHit * st.floodHits; break;
+    case 'charybdis': if ((el % p.cycle) >= p.cycle / 2) m *= 1 + p.ebb + p.perHit * Math.min(p.maxHits, st.floodHits); break;
     case 'bulgae': if (el < st.eclipseUntil) m *= 1 + p.dmg; break;
     case 'plow': if (!bdHas('guard') && !bdHas('weaken')) m *= 1 + p.noneBoss * gloveCounterValue('shatter'); break;
     case 'loom': m *= 1 + p.perStack * st.stains; break;
@@ -9680,15 +9684,14 @@ function gloveAncientOnHit(dmg) {
   const ad = gloveAncientFx();
   if (!ad || !bossFight.active) return;
   const st = aglState(), p = ad.p, el = bossFight.elapsed;
-  if (dmg > st.maxHit) st.maxHit = dmg;
   switch (ad.fx) {
     case 'lotus':
-      if (bd && ++st.drowsy >= p.per) { st.drowsy = 0; for (const k in bd.next) bd.next[k] += p.delay; floatText('🪷 하품…'); }
+      if (++st.drowsy >= p.per) { st.drowsy = 0; st.dozeUntil = el + p.doze; if (bd) for (const k in bd.next) bd.next[k] += p.delay; floatText('🪷 하품…'); }
       break;
     case 'ladder': st.steps = Math.min(p.max, st.steps + 1); break;
     case 'mirror':
       st.guests = st.guests.filter(t => t > el);
-      if (st.guests.length) aglDeal(dmg * p.frac * st.guests.length);
+      if (st.guests.length && st.avgAtk > 0) aglDeal(st.avgAtk * p.frac * st.guests.length); // 공격 1회 평균 총 피해를 따라 침
       break;
     case 'unravel': st.bleed = Math.min(p.max, st.bleed + 1); st.bleedLast = el; break;
     case 'charybdis': if ((el % p.cycle) < p.cycle / 2) st.floodHits++; break;

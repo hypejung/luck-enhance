@@ -1390,12 +1390,26 @@ function effectiveDestroyChance(w) {
   // 하는데, 예전엔 비율 곱연산(base*(1-reduce))으로 새고 있었다. %p 차감으로 고치되, 저강화
   // 구간이 통째로 0%가 되지 않도록 소스 수치 자체를 낮게 재설계했다(신화까지 합계 8%p로,
   // +16강까지만 0%가 되는 수준).
-  const reduce = Math.min(0.95, typeTrait(w, 'destroyReduce') + accEff().destroyReduce + awakenStat(w, 'destroyReduce'));
+  const reduce = weaponDestroyReduce(w);
   let chance = Math.max(0, Math.round((base - reduce * 100) * 10) / 10);
   // 강화데이: 전 구간 파괴확률 절반. 고급강화(이미 ×0.5)와 곱연산되어 1/4까지 낮아진다.
   if (enhanceEventActive()) chance = Math.round(chance * ENHANCE_EVENT.destroyMult * 10) / 10;
   return chance;
 }
+function weaponDestroyReduce(w) {
+  return Math.min(0.95, typeTrait(w, 'destroyReduce') + accEff().destroyReduce + awakenStat(w, 'destroyReduce'));
+}
+// ---- 실패 시 "하락" 확률(파괴·초기화가 아닌 실패 중 단계 -1이 나올 확률, 강화데이 배율 적용 전) ----
+// 무기·보조무기·장갑 공통: 유지 65% / 하락 35%, 태초 고급 강화는 유지 90% / 하락 10%.
+// (2026-10-12 버그 수정: 9/21에 메인 무기만 65/35로 바꾸고 보조무기·장갑은 50/50으로 남아 있었다.)
+// 태초는 파괴가 없으므로 파괴 확률 감소 스탯을 하락 확률 감소(%p)로 쓴다 — 단 원래 하락 확률의 절반 밑으로는 안 내려간다.
+const ENH_DOWN_BASE = 0.35, ENH_DOWN_GENESIS_ADV = 0.10, ENH_DOWN_GENESIS_FLOOR = 0.5;
+function downgradeBase(isGenesis, advanced, destroyReduce) {
+  const base = isGenesis && advanced ? ENH_DOWN_GENESIS_ADV : ENH_DOWN_BASE;
+  if (!isGenesis) return base;
+  return Math.max(base * ENH_DOWN_GENESIS_FLOOR, base - (destroyReduce || 0));
+}
+function weaponDowngradeBase(w, advanced) { return downgradeBase(isGenesisWeapon(w), advanced, isGenesisWeapon(w) ? weaponDestroyReduce(w) : 0); }
 // DPS = atk * dmgMult * speed  → 종류별로 체감이 다르지만 평균적으로 비슷(+고유 특성으로 개성 부여)
 
 // ---------- 무기 이름 (등급별로 작명 규칙 자체가 다름) ----------
@@ -4041,7 +4055,7 @@ function resolveGloveEnhance(g, advanced) {
     const dChance = gloveDestroyChance(g) * (advanced ? ADVANCED_ENH_DESTROY_MULT : 1);
     // 파괴·하락 판정은 먼저 한 번만 굴리고, 패널티(파괴·하락)가 나오면 방지권을 먼저 확인한다(보조무기와 같은 방식)
     const destroyHit = Math.random() * 100 < dChance;
-    const stayHit = Math.random() < 1 - 0.5 * enhanceEventDowngradeMult(g.enhance);
+    const stayHit = Math.random() < 1 - downgradeBase(false, advanced, 0) * enhanceEventDowngradeMult(g.enhance);
     if ((destroyHit || !stayHit) && tryUsePenaltyGuard('장갑 강화 실패')) {
       playEnhanceFx('protect', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'dust');
@@ -4180,7 +4194,7 @@ const HONOR_SHOP = [
 // 사라진다(버전 항목은 남은 줄이 하나도 없으면 통째로 숨겨짐). id는 지금까지 쓴 최대값+1로
 // 계속 증가시킨다 — 플레이어가 마지막으로 확인한 id보다 큰 줄이 있으면 배너/배지가 뜬다.
 // 형식: { version: 6, versionLabel: '1.0.5', title: '...', changes: [{ id: 1, date: 'YYYY-MM-DD', text: '...', quiet?: true }] }
-// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 36.
+// 마지막으로 발행한 버전: v1.0.5 (version 6). 마지막으로 쓴 change id: 37.
 // quiet: true인 줄은 패치노트 탭에만 보이고 배너·배지·NEW 표시는 띄우지 않는다("배너엔 올리지마").
 // gift: { key, essence, label } — 그 줄 아래에 1회 한정 보상 버튼(세이브당 1번, S.giftsClaimed[key]). 줄이 만료되면 버튼도 사라진다.
 const PATCH_NOTE_TTL_DAYS = 3;
@@ -4195,6 +4209,8 @@ const PATCH_NOTES = [
       { id: 34, date: '2026-10-11', text: '🌟 태초 보조무기 20종 완성: 황혼국의 모든 사냥터에 그 사냥터에만 있는 태초 보조무기가 1종씩 생겼습니다. 그 사냥터 몬스터에게서 아주 낮은 확률로 드롭되며, 파괴·초기화되지 않고, 저마다 고유 패시브와 고유 액티브를 가집니다. 자세한 내용은 📘 가이드의 "태초 보조무기" 참고.' },
       { id: 35, date: '2026-10-11', text: '🔗 세이브 동기화 개편: 이제 여러 기기를 오가도 진행이 날아가지 않습니다. 게임을 켜 둔 시간(플레이타임)을 함께 저장해서 접속할 때 더 진행된 데이터를 고르고, 다른 기기가 그사이 저장했으면 덮어쓰지 않고 그 데이터를 불러오거나 어느 쪽으로 이어갈지 물어봅니다. 바뀌기 직전 데이터는 기기에 최근 5개까지 백업되어 🔗 동기화 → 💾 백업에서 복구할 수 있습니다. (업데이트 직후 첫 접속은 가장 최신 데이터가 있는 기기에서 해주세요)' },
       { id: 36, date: '2026-10-11', text: '🌌 월드3 성야국(41~60층) 오픈: 40층 보스를 잡고 토벌전 25단계를 클리어하면 열립니다. 성야국 보스는 저마다 방해 패턴을 쓰고, 45·50·55·60층 보스는 광폭화하는 대신 골드 ×3·재료 ×2·보스 장신구/꿈조각 확률 ×2·🧵 강철실을 줍니다. 보스 장신구·사냥터 장신구 41~60(🧤 장갑 강화 확률·장갑 보조 스탯·자수 증폭 포함)과 보스 수집품 🌙 꿈조각 20종(테마 세트 완성 시 고강화 확률 상승)이 추가됐습니다. 자세한 내용은 📘 가이드의 "성야국" 참고.' },
+      { id: 37, date: '2026-10-12', text: '🛠️ 보조무기 강화 오류 수정: 강화에 실패했을 때 단계가 떨어질 확률이 무기(35%)보다 높게(50%) 잘못 남아 있던 문제를 고쳤습니다. 이제 보조무기도 무기와 같이 실패 시 유지 65% / 하락 35%이고, 태초 보조무기의 고급 강화는 하락 확률 10%입니다(장갑도 같이 수정). 불편을 드려 죄송합니다 — 아래 버튼으로 사과 보상을 받아가세요.',
+        gift: { key: 'essence-subenh-fix-20261012', essence: 50000, label: '🎁 사과 보상 받기 (📜 무기의 정수 5만 개)' } },
     ],
   },
 ];
@@ -8845,6 +8861,11 @@ function subSuccessChance(sw) {
   const base = subGradeAdjustedSuccess(isGenesisSubweapon(sw) ? GENESIS_SUB_SUCCESS_GRADE : sw.grade, sw.enhance);
   return Math.min(100, base + subEnhTierBonus(sw.enhance));
 }
+// 보조무기 하락 확률(강화데이 배율 전) — 메인 무기와 같은 규칙(downgradeBase), 태초는 보조무기 파괴 확률 감소가 하락 감소로
+function subDowngradeBase(sw, advanced) {
+  const g = isGenesisSubweapon(sw);
+  return downgradeBase(g, advanced, g ? Math.min(0.95, accEff().subDestroyReduce || 0) : 0);
+}
 function subDestroyChance(sw) {
   if (isGenesisSubweapon(sw)) return 0; // 태초 보조무기는 파괴·초기화 없음(실패 시 유지 또는 하락뿐)
   const base = SUB_ENH.destroy[sw.enhance] || 0;
@@ -8919,7 +8940,7 @@ function resolveSubEnhance(sw, advanced) {
     // 고대 보조무기가 초기화 판정을 피해도 다음 분기에서 다시 굴려 "파괴"되는 이중 판정 버그가 있었다.
     const destroyHit = Math.random() * 100 < dChance;
     const subStayRoll = Math.random();
-    const subStayChance = 1 - (advanced && isGenesisSubweapon(sw) ? 0.25 : 0.5) * enhanceEventDowngradeMult(sw.enhance);
+    const subStayChance = 1 - subDowngradeBase(sw, advanced) * enhanceEventDowngradeMult(sw.enhance);
     if ((destroyHit || subStayRoll >= subStayChance) && tryUsePenaltyGuard('보조무기 강화 실패')) {
       playEnhanceFx('protect', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'dust');
@@ -8941,7 +8962,6 @@ function resolveSubEnhance(sw, advanced) {
       if (wasEquipped) S.subEquipped = null;
       if (sw.id === subEnhanceTargetId) subEnhanceTargetId = null;
     } else if (subStayRoll < subStayChance) {
-      // 태초 보조무기의 고급 강화: 파괴가 없는 대신 하락 확률(50%)을 절반(25%)으로
       playEnhanceFx('fail', attemptLevel, 'subEnhBtn', 'subEnhFxOverlay');
       playEnhancePanelReveal('subEnhPanel', 'dust');
       log(`😮‍💨 보조무기 강화 실패... 다행히 단계는 유지됨${isGenesisSubweapon(sw) ? '' : ` (${isAncientSubweapon(sw) ? '초기화' : '파괴'} 확률이었음: ${dChance.toFixed(1)}%)`}${advTag}`, 'lg-bad');
@@ -12211,9 +12231,9 @@ function resolveEnhance(w, advanced) {
     // 태초 무기는 파괴/초기화가 없는 대신, 고급 강화 시 "단계 하락" 확률 자체가 더 줄어든다
     // (일반/고대의 고급 강화가 파괴·초기화 확률을 절반으로 낮추는 것과 대응되는 태초 전용 효과 —
     // 기존과 동일하게 +0.25만큼 유지 확률을 추가로 올리는 구조를 유지).
-    const baseStayChance = (advanced && isGenesisWeapon(w)) ? 0.90 : 0.65;
+    // 태초는 파괴 확률 감소가 하락 확률 감소로 들어간다(weaponDowngradeBase 참고).
     // 강화데이: "하락" 확률(=1-stayChance)에 배율을 곱해서 상대적으로 줄인다(유지 확률은 그만큼 상승)
-    const stayChance = 1 - (1 - baseStayChance) * enhanceEventDowngradeMult(attemptLevel);
+    const stayChance = 1 - weaponDowngradeBase(w, advanced) * enhanceEventDowngradeMult(attemptLevel);
     // 파괴/초기화 여부는 단 한 번만 굴려서(destroyRoll) 재사용한다 — 분기마다 새로 굴리면
     // "파괴 대신 초기화" 분기가 빗나가도 바로 아래 일반 파괴 분기가 또 한 번 굴려 파괴로
     // 새어나가는 이중 판정 버그가 생긴다.
@@ -14371,11 +14391,11 @@ function renderEnhance() {
   // 하락 확률(실패한 시도 전체 중, 단계가 유지되지 않고 -1될 확률) — 기존엔 "성공 확률"만 크게
   // 보이고 이 수치가 화면에 없어서, 실패 시 체감 손실이 왜 이렇게 큰지 플레이어가 가늠하기
   // 어렵다는 피드백을 반영해 표시한다. resolveEnhance()와 동일하게 "파괴/초기화가 아닌 실패"
-  // 몫((100-dChance)%)에 유지/하락 비율(0.65/0.35)을 곱해야 한다 — dChance가 커지는 고강화
+  // 몫((100-dChance)%)에 하락 비율(weaponDowngradeBase, 기본 0.35)을 곱해야 한다 — dChance가 커지는 고강화
   // 구간(+20강 이상)에서 파괴 확률이 하락 확률의 분모(=파괴가 아닌 실패 몫)를 갉아먹는 걸
   // 반영하지 않고 그냥 35%를 고정 표시하면, 파괴 확률과 서로 다른 기준(분모)이라 두 수치를
   // 나란히 비교할 수 없어 오해를 준다(둘 다 "실패 전체 대비 %"로 통일).
-  const downgradeChance = maxed ? 0 : Math.round((100 - dChance) * 0.35 * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
+  const downgradeChance = maxed ? 0 : Math.round((100 - dChance) * weaponDowngradeBase(w, false) * enhanceEventDowngradeMult(w.enhance) * 10) / 10;
   const matNeed = maxed ? 0 : highMatsNeeded(w.enhance);
   const matSt = highMatStatus(false, matNeed);
   const matOk = matSt.ok;
@@ -14417,7 +14437,7 @@ function renderEnhance() {
       : isAncientWeapon(w)
         ? `🏺 고대 무기는 파괴되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%)</span> / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance}%)` : ''}${matNote} · 현재 <b>+${w.enhance}</b>`
         : isGenesisWeapon(w)
-          ? `🌌 태초 무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%, 고급 강화 시 유지 확률 상승)</span>${matNote} · 현재 <b>+${w.enhance}</b>`
+          ? `🌌 태초 무기는 파괴·초기화되지 않습니다(파괴 확률 감소는 하락 확률 감소로 적용). 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%, 고급 강화 시 더 낮아짐)</span>${matNote} · 현재 <b>+${w.enhance}</b>`
           : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${downgradeChance}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance}%</span>` : ' (파괴 없음)'}${matNote} · 현재 <b>+${w.enhance}</b>`;
   if (!maxed && (S.penaltyGuard || 0) > 0) $('enhrates').innerHTML += `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>`;
   bindPenaltyGuardToggles();
@@ -14477,14 +14497,18 @@ function renderAdvancedEnhance(w, maxed) {
   // 태초는 파괴/초기화가 없으니 "단계 하락" 확률을 절반으로, 고대·맨손은 "초기화" 확률을,
   // 그 외 등급은 "파괴" 확률을 절반으로 낮춘다는 걸 정확히 표기한다.
   const riskLabel = isGenesisWeapon(w) ? '하락' : (isAncientWeapon(w) || isFist(w)) ? '초기화' : '파괴';
-  // resolveEnhance()의 advanced 분기 공식과 동일하게 계산 — 태초는 baseStayChance 0.90(유지 확률
-  // 상승, 하락 10%), 그 외는 dChance*ADVANCED_ENH_DESTROY_MULT(0.5)를 그대로 재사용.
+  // resolveEnhance()의 advanced 분기 공식과 동일하게 계산 — 태초는 weaponDowngradeBase(w, true)(하락 10%,
+  // 파괴 확률 감소만큼 더 낮음), 그 외는 dChance*ADVANCED_ENH_DESTROY_MULT(0.5)를 그대로 재사용.
   const advRiskValue = isGenesisWeapon(w)
-    ? Math.round(10 * enhanceEventDowngradeMult(w.enhance) * 10) / 10
+    ? Math.round(weaponDowngradeBase(w, true) * 100 * enhanceEventDowngradeMult(w.enhance) * 10) / 10
     : Math.round(effectiveDestroyChance(w) * ADVANCED_ENH_DESTROY_MULT * 10) / 10;
+  // 태초: 하락 확률이 일반 강화 값에서 고급 강화 값으로 바뀐다(절반이 아님) / 그 외: 파괴·초기화 확률 절반
+  const advRiskText = isGenesisWeapon(w)
+    ? `하락 확률 ${Math.round(weaponDowngradeBase(w, false) * 100 * enhanceEventDowngradeMult(w.enhance) * 10) / 10}% → ${advRiskValue}%`
+    : `${riskLabel} 확률 ${advRiskValue}%로 절반`;
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="advancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
-      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${riskLabel} 확률 ${advRiskValue}%로 절반, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
+      🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${advRiskText}, 💰 ${fmt(goldNeed)} + 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
     </button>`;
   const btn = $('advancedEnhBtn');
   if (btn) btn.onclick = () => tryEnhance(true);
@@ -14990,8 +15014,11 @@ function renderSubAdvancedEnhance(sw, maxed) {
   const affordable = matSt.ok && BN.gte(S.gold, goldNeed) && !subEnhanceRevealPending;
   const tokenNote = matSt.shortfall > 0 ? ` · 부족분 🍃${matSt.shortfall}개 대체 가능` : '';
   const advRiskValue = Math.round(subDestroyChance(sw) * ADVANCED_ENH_DESTROY_MULT * 10) / 10;
-  // 태초 보조무기는 파괴가 없으므로 고급 강화가 "하락 확률 절반"으로 작동한다(태초 무기와 같은 대응)
-  const advRiskText = isGenesisSubweapon(sw) ? '하락 확률 절반' : `${isAncientSubweapon(sw) ? '초기화' : '파괴'} 확률 ${advRiskValue}%로 절반`;
+  // 태초 보조무기는 파괴가 없으므로 고급 강화가 하락 확률을 낮춘다(태초 무기와 같은 대응: 35% → 10%, 파괴 확률 감소만큼 더 낮음)
+  const evDown = enhanceEventDowngradeMult(sw.enhance);
+  const advRiskText = isGenesisSubweapon(sw)
+    ? `하락 확률 ${Math.round(subDowngradeBase(sw, false) * 100 * evDown * 10) / 10}% → ${Math.round(subDowngradeBase(sw, true) * 100 * evDown * 10) / 10}%`
+    : `${isAncientSubweapon(sw) ? '초기화' : '파괴'} 확률 ${advRiskValue}%로 절반`;
   box.innerHTML = `
     <button class="${affordable ? 'primary' : ''}" id="subAdvancedEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
       🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${advRiskText}, 💰 ${fmt(goldNeed)} + ${highMatFloorLabel(true)} 고급 재료 ${fmt(matSt.have)}/${fmt(matSt.need)}${tokenNote} 소모)</span>
@@ -15048,14 +15075,14 @@ function renderSubEquippedBox() {
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(nextAtk)}</b></div>
     <div>강화 비용<b style="color:${maxed || subGoldOk ? 'var(--gold)' : '#ff7a7a'}">${maxed ? 'MAX' : fmt(cost)}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${subEssNeed > 0 ? `<div>무기의 정수<b style="color:${subEssOk ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence)}/${fmt(subEssNeed)}</b></div>` : ''}`;
-  // 하락 확률: 메인 무기와 같은 기준(실패 전체 대비 %) — resolveSubEnhance()의 유지/하락 비율 0.5/0.5
-  const subDowngradeChance = maxed ? 0 : Math.round((100 - dChance) * 0.5 * enhanceEventDowngradeMult(sw.enhance) * 10) / 10;
+  // 하락 확률: 메인 무기와 같은 기준(실패 전체 대비 %) — resolveSubEnhance()와 같은 subDowngradeBase
+  const subDowngradeChance = maxed ? 0 : Math.round((100 - dChance) * subDowngradeBase(sw, false) * enhanceEventDowngradeMult(sw.enhance) * 10) / 10;
   $('subenhrates').innerHTML = (maxed
     ? `🏆 최대 강화 달성! <b>+${sw.enhance}</b>`
     : isAncientSubweapon(sw)
       ? `🏺 고대 보조무기는 파괴되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%)</span> / <span class="warn">+0 초기화</span>${dChance > 0 ? ` (초기화 확률 ${dChance.toFixed(1)}%)` : ''} · 현재 <b>+${sw.enhance}</b>`
       : isGenesisSubweapon(sw)
-        ? `🌌 태초 보조무기는 파괴·초기화되지 않습니다. 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%, 고급 강화 시 유지 확률 상승)</span> · 현재 <b>+${sw.enhance}</b>`
+        ? `🌌 태초 보조무기는 파괴·초기화되지 않습니다(파괴 확률 감소는 하락 확률 감소로 적용). 실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%, 고급 강화 시 더 낮아짐)</span> · 현재 <b>+${sw.enhance}</b>`
         : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${subDowngradeChance}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 현재 <b>+${sw.enhance}</b>`)
     + (!maxed && (!subGoldOk || !subEssOk) ? `<div style="margin-top:4px;color:#ff7a7a;">⚠️ ${!subGoldOk ? '골드' : '무기의 정수'}가 부족해서 강화할 수 없습니다.</div>` : '')
     + (!maxed && (S.penaltyGuard || 0) > 0 ? `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>` : '');
@@ -15301,7 +15328,7 @@ function renderGloveEnhance() {
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>`;
   $('gloveenhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${g.enhance}</b>`
-    : `실패 시: 유지 / 단계 -1${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`
+    : `실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${Math.round((100 - dChance) * downgradeBase(false, false, 0) * enhanceEventDowngradeMult(g.enhance) * 10) / 10}%)</span>${dChance > 0 ? ` · <span class="warn">파괴 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`
       + ((S.penaltyGuard || 0) > 0 ? `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>` : '');
   bindPenaltyGuardToggles();
   renderGloveAutoEnhance(g, maxed);
@@ -15880,7 +15907,7 @@ const GUIDE_SECTIONS = [
     icon: '🌌', title: '태초의 유물',
     body: `사냥터마다 1개씩 존재하는 최상위 등급(태초) 무기로, 아주 낮은 확률로 드랍됩니다(엘리트 몬스터는 5배, 보스는 10배 확률).
     <br><br>획득 후 <b>가방에서 직접 장착해야</b> 효과가 발동합니다 — 보유만 하고 있으면 아무 효과도 없습니다. 동시에 하나의 태초 무기만 장착할 수 있어, 발동하는 효과도 항상 하나뿐입니다.
-    <br><br>판매·파괴가 불가능하고, 강화 실패는 유지/하락만 있을 뿐 파괴나 초기화는 없습니다. 대신 강화 시 골드 외에 "무기의 정수"가 추가로 필요합니다(고대 무기보다 소모량이 훨씬 큽니다).`,
+    <br><br>판매·파괴가 불가능하고, 강화 실패는 유지/하락만 있을 뿐 파괴나 초기화는 없습니다. 실패 시 하락 확률은 35%(고급 강화 10%)이고, <b>파괴 확률 감소 효과는 태초에서 하락 확률 감소로 적용</b>됩니다(원래 하락 확률의 절반까지). 대신 강화 시 골드 외에 "무기의 정수"가 추가로 필요합니다(고대 무기보다 소모량이 훨씬 큽니다).`,
   },
   {
     icon: '🚩', title: '토벌전 21~40단계',
@@ -16038,7 +16065,7 @@ const GUIDE_SECTIONS = [
     icon: '🌟', title: '태초 보조무기',
     body: `월드2(황혼국) 사냥터마다 그 사냥터에만 있는 <b>태초 보조무기</b>가 1종씩, 총 20종 있습니다. 보조무기의 최고 등급으로, 종류는 그 사냥터 보스 보조무기와 같습니다. 종류 패시브와 결전의 기백 위에 <b>태초 고유 패시브</b>와 <b>태초 고유 액티브</b>(보조무기마다 이름이 다름)가 붙습니다.
     <br><br><b>획득</b>: 그 사냥터 몬스터를 처치할 때 고대 보조무기보다도 훨씬 낮은 확률로 드롭됩니다(엘리트·보스·고대·태초 드롭률 보너스 적용). 이미 가진 사냥터의 태초 보조무기는 다시 나오지 않으며, 판매·자동판매 대상이 아닙니다.
-    <br><br><b>강화</b>: 골드와 함께 📜 무기의 정수를 소모합니다. <b>파괴·초기화되지 않고</b>, 실패하면 유지 또는 단계 하락뿐입니다.
+    <br><br><b>강화</b>: 골드와 함께 📜 무기의 정수를 소모합니다. <b>파괴·초기화되지 않고</b>, 실패하면 유지 또는 단계 하락뿐입니다(하락 확률 35%, 고급 강화 10%). 보조무기 파괴 확률 감소 효과는 태초 보조무기에서 하락 확률 감소로 적용됩니다(원래 하락 확률의 절반까지).
     <br><br><b>단계</b>: 고유 패시브·액티브의 위력은 강화 3단계마다 한 단계씩(0~10단계) 커지며, 10단계(+29)에서 최대가 됩니다. 효과 설명에는 숫자 대신 단계만 표시됩니다.
     <br><br>보스 패턴 <b>🔇 봉인</b> 중에는 고유 효과가 멈춥니다. 전투가 길어질수록 강해지는 것, 초반에 몰아치는 것, 치명타·연타·공격속도를 많이 쌓을수록 강해지는 것 등 성격이 제각각이니 컨텐츠와 세팅에 맞춰 골라 쓰세요.
     <div style="overflow-x:auto"><table class="guide-table">

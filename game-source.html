@@ -3886,7 +3886,7 @@ const GLOVE_GENESES = [
     counterText: '흔들어 깨우려는 순간, 고인 잠이 한꺼번에 쏟아진다.',
     // 공격마다 잠 +perHit(최대 max), 잠 1당 보스가 받는 피해 +perSleep / 패턴이 오면 잠을 다 쏟아 잠 sleepPer당 1초(최대 sleepMax초)
     // 그 패턴을 미루고, 자는 동안 받는 피해 ×(1+sleepDmg). 깨면 잠 0.
-    p: { perHit: 3, max: 100, perSleep: 0.015, sleepPer: 25, sleepMax: 4, sleepDmg: 1.5 },
+    p: { perHit: 3, max: 100, perSleep: 0.018, sleepPer: 25, sleepMax: 4, sleepDmg: 1.9 },
     lore: `양을 세다 잠든 아이는
 백 번째 양을 끝내 보지 못한다.
 
@@ -3911,7 +3911,7 @@ const GLOVE_GENESES = [
     counterText: '흔들릴수록 꿈은 더 짙어지고, 꿈속의 손은 더 무거워진다.',
     // 공격마다 꿈속의 내가 평균 공격 피해 × frac로 한 번 더(행동 방해를 받지 않아 스턴·암흑·탈진 중에도 원래 공속으로)
     // / 패턴이 오면 dur초 동안 꿈속의 나 위력 ×boost
-    p: { frac: 0.5, boost: 3, dur: 6 },
+    p: { frac: 0.75, boost: 3, dur: 6 },
     lore: `양귀비가 무성한 동굴 깊은 곳,
 잠의 신의 천 명의 아들 가운데
 가장 솜씨 좋은 아들이 있었다.
@@ -3935,9 +3935,9 @@ const GLOVE_GENESES = [
     passiveName: '포만', counterName: '악몽 삼키기',
     passiveText: '삼킨 악몽만큼 배가 부르고, 배가 부를수록 이빨은 날카로워진다.',
     counterText: '덮쳐 오는 악몽을, 한입에.',
-    // 포만 1당 모든 피해 +per(최대 max, 전투 단위), every초마다 포만 +1, 보호막·환영 분신에 주는 피해 ×layerMult
+    // 포만 1당 모든 피해 +per(최대 max, 전투 단위, 보스전 시작 때 start), every초마다 포만 +1, 보호막·환영 분신에 주는 피해 ×layerMult
     // / 패턴이 오면 통째로 삼켜 무효 + 포만 +eat, 그 뒤 digest초는 소화 중(패턴은 그대로 오고 포만 +digestGain)
-    p: { per: 0.10, max: 15, every: 10, layerMult: 3, eat: 2, digest: 8, digestGain: 1 },
+    p: { per: 0.11, max: 15, start: 4, every: 5, layerMult: 3, eat: 3, digest: 6, digestGain: 1 },
     lore: `코끼리의 코, 코뿔소의 눈,
 소의 꼬리와 범의 다리.
 신이 세상을 다 빚고 남은 조각을 모아
@@ -3963,7 +3963,7 @@ const GLOVE_GENESES = [
     counterText: '끝까지 버틴 자에게, 노래는 바다가 되어 돌아온다.',
     // 보스가 받는 피해 +base, 내가 받은 피해 감소(약화 저주·웅크리기) × perReduce만큼 더(추가분 최대 reduceCap)
     // / 패턴이 오면 평균 공격 피해 × burst × (floor + (1-floor)×대응 스탯 + overK×넘친 몫)의 노래 폭발
-    p: { base: 0.4, perReduce: 2, reduceCap: 1.0, burst: 12, floor: 0.4, overK: 2 },
+    p: { base: 0.8, perReduce: 2, reduceCap: 1.0, burst: 18, floor: 0.4, overK: 2 },
     lore: `바위섬 위에서 부르는 노래는
 지나는 배마다 뱃머리를 돌려세웠다.
 
@@ -3987,7 +3987,7 @@ const GLOVE_GENESES = [
     counterText: '무언가 다가오는 순간, 세상의 불이 하나씩 꺼진다.',
     // 어둠(보스 암흑 시간 + 장막) 속에선 빗나가지 않고 치명타 확정 + 치명타 피해 +critDmg
     // / 패턴이 오면 dur초(광폭화 중 enrageDur초) 장막 — 암흑 패턴이면 그 원래 시간과 비교해 긴 쪽
-    p: { critDmg: 1.5, dur: 5, enrageDur: 8 },
+    p: { critDmg: 3.0, dur: 6, enrageDur: 9 },
     lore: `처음에 혼돈이 있었고,
 혼돈에서 두 어둠이 태어났다.
 하나는 밤이었고,
@@ -10256,6 +10256,7 @@ function gloveGenesisTick(dt, w) {
   if (!x || !bossFight.active) return null;
   const st = gglState(), p = x.p, el = bossFight.elapsed;
   const hp0 = mon.hp; // 이번 틱에 태초 장갑 피해로 쓰러졌을 때만 처치 처리
+  if (!st.init) { st.init = true; if (x.id === 'baku') st.sat = p.start; } // 바쿠: 보스전 시작 포만
   // 패턴 보스가 GLOVE_GENESIS_FAKE_EVERY초 동안 패턴을 쓰지 않으면 그때도 반격(상시 패턴만 쓰는 보스·주기가 긴 패턴)
   // — 첫 발동은 주기 패턴과 같은 1/4 시점
   if (bd && bd.list.length && el - st.lastPattern >= GLOVE_GENESIS_FAKE_EVERY) gloveGenesisOnPattern(null);

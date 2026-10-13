@@ -496,6 +496,7 @@
     border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: baseline;
   }
   .codex-section-count { font-size: 11px; color: var(--sub); font-weight: normal; }
+  .src-line { font-size: 11px; color: #8fd3ff; margin: 0 0 6px; line-height: 1.4; }
   .codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
   .codex-cell {
     position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
@@ -11805,6 +11806,7 @@ function renderLibraryBox() {
     ${arcaneTomesHtml()}
     <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
       <div style="font-size:13px;margin-bottom:6px;">📖 고대의 유물 (${relicCollectedCount()}/${RELICS.length})</div>
+      ${srcLine(`고대의 도서관 서고를 돌파하면 ${fmtRate(LIBRARY.relicDropChance)} 확률로 아직 없는 유물 중 하나`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">
         ${RELICS.map((r, i) => S.relics[i]
           ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a2a1a;" title="${r.flavor}"><b style="color:var(--gold)">${r.name}</b></div>`
@@ -11835,6 +11837,7 @@ function arcaneTomesHtml() {
   }).join('');
   return `<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
     <div style="font-size:13px;margin-bottom:6px;">📚 비전서 (${LIBRARY_BANDS.filter((b, i) => arcaneTomeComplete(i)).length}/${LIBRARY_BANDS.length}권 완성)</div>
+    ${srcLine(`21서고 이상을 돌파하면 ${fmtRate(LIBRARY_EXT.pageDropChance)} 확률로 그 구간 비전서의 낱장 하나 (이미 가진 낱장이면 금서의 페이지 ${LIBRARY_EXT.dupPages}장)`)}
     <div style="display:grid;gap:6px;">${cards}</div></div>`;
 }
 
@@ -13564,6 +13567,31 @@ const CODEX_MAIN_SUBTAB_OPTIONS = [
   { v: 'subweapon', label: '🗡️ 보조무기 도감' },
   { v: 'glove', label: '🧤 장갑 도감' },
 ];
+// ---------- 수집형 컨텐츠 획득처 안내 ----------
+// 도감·유물·인장·꿈조각·보스 장신구 등 수집 화면에 "어디서 나오는지"를 📍 한 줄로 보여준다.
+// 확률·층 범위는 실제 드롭 코드(dropRoll·endBossFight·토벌전/도서관 승리)와 맞춰 둔다.
+function srcLine(text) { return `<div class="src-line">📍 ${text}</div>`; }
+const SRC_ULTRA_NOTE = '엘리트 5배 · 그 층 보스 세트 3배 · 드롭률 적용';
+// 랜덤박스(무기)·보조무기 상자는 등급표가 같다 — 그 등급이 들어 있는 상자
+const SRC_BOX_NAMES = ['일반·고급', '일반·고급·희귀', '모든', '고급·희귀·전설·신화', '희귀·전설·신화', '전설·신화'];
+const SRC_WEAPON_HUNT = ['1~12층', '모든 층', '6층부터', '11층부터', '16층부터, 드묾', '19층부터, 매우 드묾'];
+function weaponCodexSourceText(group) {
+  if (group === 'boss') return `1~20층 사냥터 보스를 이기면 ${fmtRate(BOSS.weaponDrop, 1)} 확률로 그 층 보스 무기 (드롭률 적용)`;
+  if (group === 6) return `1~20층 사냥터 몬스터에게서 아주 낮은 확률로 그 층 고대 무기 (${SRC_ULTRA_NOTE})`;
+  if (group >= 0 && group <= 5) return `사냥 드롭(${SRC_WEAPON_HUNT[group]}) · 📦 ${SRC_BOX_NAMES[group]} 랜덤박스`;
+  return '';
+}
+function weaponCodexItemSource(ent) {
+  const F = ent.floor != null ? FLOORS[ent.floor] : null;
+  if (ent.isBossSet && F) return srcLine(`${ent.floor + 1}층 ${F.name} 보스 「${F.boss.name}」 처치 시 ${fmtRate(BOSS.weaponDrop, 1)}`);
+  if (ent.grade === 6 && F) return srcLine(`${ent.floor + 1}층 ${F.name}의 ${F.monster}에게서 아주 낮은 확률 (${SRC_ULTRA_NOTE})`);
+  return srcLine(weaponCodexSourceText(ent.grade));
+}
+function subCodexSourceText(grade) { return `황혼국(21~40층) 사냥 드롭 · 📦 ${SRC_BOX_NAMES[grade]} 보조무기 상자`; }
+// 장갑: 성야국 사냥(일반~신화) + 토벌전 21단계~(GLOVE_DROP_GRADES) + 도서관 21서고~(LIBRARY_GLOVE_GRADES)
+const SRC_GLOVE_EXTRA = ['', ' · 토벌전 21~25단계', ' · 토벌전 21~30단계', ' · 토벌전 21~35단계 · 도서관 21~25서고', ' · 토벌전 21~40단계 · 도서관 21서고~', ' · 토벌전 26~40단계 · 도서관 21서고~'];
+function gloveCodexSourceText(grade) { return `성야국(41~60층) 사냥 드롭${SRC_GLOVE_EXTRA[grade] || ''}`; }
+
 function renderCodex() {
   renderEquipSubTabBar('codexMainSubTabBar', codexMainSubTab, (v) => { codexMainSubTab = v; renderCodex(); }, CODEX_MAIN_SUBTAB_OPTIONS);
   $('codexWeaponSection').style.display = codexMainSubTab === 'weapon' ? '' : 'none';
@@ -13596,6 +13624,7 @@ function renderCodex() {
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title ${isBoss ? 'grade-신화' : `grade-${GRADES[grade].name}`}">${sectionTitle}
       <span class="codex-section-count">${unlockedCount}/${ents.length}</span></div>
+      ${srcLine(weaponCodexSourceText(grade))}
       <div class="codex-grid"></div>`;
     const grid = section.querySelector('.codex-grid');
     for (const ent of ents) {
@@ -13614,7 +13643,7 @@ function renderCodex() {
       const revealDetail = unlocked || (ent.grade >= 4 && !ent.undesigned);
       cell.onclick = () => {
         if (revealDetail) { renderCodexDetail(ent, key); showCodexPopup(codexDetailHtml(ent)); }
-        else showCodexPopup(`<div style="color:var(--sub);font-style:italic;">${ent.name}</div>`);
+        else showCodexPopup(`<div style="color:var(--sub);font-style:italic;margin-bottom:4px;">${ent.name}</div>` + weaponCodexItemSource(ent));
       };
       grid.appendChild(cell);
     }
@@ -13628,7 +13657,7 @@ function codexDetailHtml(ent) {
   return `
     <div class="grade-${GRADES[ent.grade].name}" style="font-size:15px;font-weight:bold;margin-bottom:4px;">${ent.icon} [${GRADES[ent.grade].name}] ${ent.name}</div>
     ${ent.flavor ? `<div style="font-style:italic;color:var(--sub);margin-bottom:6px;">${ent.flavor}</div>` : ''}
-    ${spiritInfo}`;
+    ${spiritInfo}${ent.undesigned ? '' : weaponCodexItemSource(ent)}`;
 }
 function renderCodexDetail(ent, key) {
   $('codexDetail').innerHTML = codexDetailHtml(ent);
@@ -13667,13 +13696,14 @@ function renderSubCodex() {
       const name = subweaponItemName(fakeSw);
       const flavor = subweaponFlavorText(fakeSw);
       const revealDetail = unlocked || grade >= 4; // 레전더리 이상은 미보유라도 수집 목표로 미리 공개
-      return { icon: t.icon, unlocked, name, html: revealDetail ? subCodexGradeCellHtml(t.icon, name, flavor) : `<div style="color:var(--sub);font-style:italic;">${name}</div>` };
+      return { icon: t.icon, unlocked, name, html: (revealDetail ? subCodexGradeCellHtml(t.icon, name, flavor) : `<div style="color:var(--sub);font-style:italic;margin-bottom:4px;">${name}</div>`) + srcLine(subCodexSourceText(grade)) };
     });
     const unlockedCount = items.filter(i => i.unlocked).length;
     const section = document.createElement('div');
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name}
       <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>
+      ${srcLine(subCodexSourceText(grade))}
       <div class="codex-grid"></div>`;
     const grid = section.querySelector('.codex-grid');
     items.forEach(it => {
@@ -13695,7 +13725,7 @@ function renderSubCodex() {
       const unlocked = !!(S.subBossCodexSeen && S.subBossCodexSeen[idx]);
       const t = SUBWEAPON_TYPES.find(x => x.name === bs.subType);
       const src = FLOORS[WORLD2_START_FLOOR + idx];
-      const srcHtml = src ? `<div style="font-size:12px;color:#3ddfff;margin-bottom:4px;">👹 ${src.name} 보스 · ${src.boss ? (src.boss.name || src.boss) : ''}</div>` : '';
+      const srcHtml = src ? srcLine(`${WORLD2_START_FLOOR + idx + 1}층 ${src.name} 보스 「${src.boss ? (src.boss.name || src.boss) : ''}」 처치 시 ${fmtRate(BOSS.subweaponDrop, 1)}`) : '';
       return { icon: t.icon, unlocked, name: bs.name, html: subCodexGradeCellHtml(t.icon, bs.name, bs.flavor) + srcHtml };
     });
     const unlockedCount = items.filter(i => i.unlocked).length;
@@ -13703,6 +13733,7 @@ function renderSubCodex() {
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title grade-신화">보스 보조무기
       <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>
+      ${srcLine(`21~40층 사냥터 보스를 이기면 ${fmtRate(BOSS.subweaponDrop, 1)} 확률로 그 층 보스 보조무기 (드롭률 적용)`)}
       <div class="codex-grid"></div>`;
     const grid = section.querySelector('.codex-grid');
     items.forEach(it => {
@@ -13725,6 +13756,7 @@ function renderSubCodex() {
     const seen = S.subAncientSeen || [];
     section.innerHTML = `<div class="codex-section-title grade-고대">고대 보조무기
       <span class="codex-section-count">${seen.filter(Boolean).length}/${SUBWEAPON_ANCIENTS.length}</span></div>
+      ${srcLine(`21~40층 사냥터 몬스터에게서 아주 낮은 확률로 그 층 고대 보조무기 (${SRC_ULTRA_NOTE}) — 아래 ❓는 나오는 사냥터`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">${SUBWEAPON_ANCIENTS.map((a, i) => seen[i]
         ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a2a1a;" title="${a.flavor}"><b style="color:var(--gold)">${a.icon} ${a.name}</b><div style="color:var(--sub)">${FLOORS[WORLD2_START_FLOOR + i].name} · ${a.fxName}</div></div>`
         : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${FLOORS[WORLD2_START_FLOOR + i].name}</div>`).join('')}</div>`;
@@ -13738,6 +13770,7 @@ function renderSubCodex() {
     const list = SUBWEAPON_GENESES.map((g, i) => ({ g, i })).filter(x => x.g);
     section.innerHTML = `<div class="codex-section-title grade-태초">태초 보조무기
       <span class="codex-section-count">${list.filter(x => seen[x.i]).length}/${list.length}</span></div>
+      ${srcLine(`21~40층 사냥터 몬스터에게서 고대보다도 훨씬 낮은 확률로 그 층 태초 보조무기 (${SRC_ULTRA_NOTE}, 이미 가진 층은 다시 안 나옴)`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">${list.map(({ g, i }) => seen[i]
         ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a1a2a;" title="${g.subtitle}"><b class="grade-태초">${g.icon} ${g.name}</b><div style="color:var(--sub)">${FLOORS[WORLD2_START_FLOOR + i].name} · ${g.passiveName} · ${g.activeName}</div></div>`
         : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${FLOORS[WORLD2_START_FLOOR + i].name}</div>`).join('')}</div>`;
@@ -13749,6 +13782,7 @@ function renderSubCodex() {
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title grade-고대">🏺 황혼의 유산
       <span class="codex-section-count">${subRelicCollectedCount()}/${SUBWEAPON_RELICS.length}</span></div>
+      ${srcLine(`21~40층 사냥터 몬스터에게서 아주 낮은 확률로 그 층의 유산 (${SRC_ULTRA_NOTE}) — 아래 ❓는 나오는 사냥터`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;"></div>`;
     const grid = section.querySelector('div[style*="grid-template-columns"]');
     SUBWEAPON_RELICS.forEach((r, i) => {
@@ -13762,7 +13796,7 @@ function renderSubCodex() {
       } else {
         cell.style.color = 'var(--sub)';
         cell.style.opacity = '0.5';
-        cell.innerHTML = '❓ 미발견';
+        cell.innerHTML = `❓ ${FLOORS[WORLD2_START_FLOOR + i] ? FLOORS[WORLD2_START_FLOOR + i].name : '미발견'}`;
       }
       grid.appendChild(cell);
     });
@@ -13839,7 +13873,7 @@ function renderGloveCodex() {
     const statLine = Object.entries(stats).map(([k, v]) => `${DISRUPT_COUNTERS[k].icon} ${DISRUPT_COUNTERS[k].name} ${fmtRate(v, 1)}`).join(' · ');
     const html = subCodexGradeCellHtml(t.icon, bg.name, bg.flavor)
       + `<div style="font-size:12px;margin-bottom:4px;">신화 ${t.icon} · +0 대응 스탯: ${statLine}</div>`
-      + (F ? `<div style="font-size:12px;color:#3ddfff;">👹 ${F.name} 보스 · ${F.boss.name || F.boss} — 같은 층 보스 장신구와 세트</div>` : '');
+      + (F ? srcLine(`${WORLD3_START_FLOOR + idx + 1}층 ${F.name} 보스 「${F.boss.name || F.boss}」 처치 시 ${fmtRate(BOSS.gloveDrop, 1)}(광폭화 보스 2배) — 같은 층 보스 장신구와 세트`) : '');
     return { icon: t.icon, unlocked: !!seen[idx], name: bg.name, html };
   });
   const unlockedCount = items.filter(i => i.unlocked).length;
@@ -13848,14 +13882,15 @@ function renderGloveCodex() {
   for (let grade = 0; grade <= 5; grade++) {
     const have = GLOVE_TYPES.filter((t, i) => gloveCodexHas(`g${grade}_${i}`)).length;
     normalHtml += `<div class="codex-section"><div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name} 장갑
-      <span class="codex-section-count">${have}/${GLOVE_TYPES.length}</span></div><div class="codex-grid" data-glove-grade="${grade}"></div></div>`;
+      <span class="codex-section-count">${have}/${GLOVE_TYPES.length}</span></div>${srcLine(gloveCodexSourceText(grade))}<div class="codex-grid" data-glove-grade="${grade}"></div></div>`;
   }
   const ancSeen = S.gloveAncientSeen || [];
   const ancCount = GLOVE_ANCIENTS.filter((a, i) => ancSeen[i]).length;
-  box.innerHTML = normalHtml + `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
-    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div><div class="codex-grid" data-glove-boss></div></div>`
+  const gloveIntro = srcLine(`일반 장갑: 성야국 사냥 처치당 ${fmtRate(GLOVE_HUNT_DROP_CHANCE, 2)}(엘리트 5배) · 토벌전 21단계 이상 승리 ${fmtRate(GLOVE_DROP_CHANCE)} · 도서관 21서고 이상 승리 ${fmtRate(LIBRARY_EXT.gloveDropChance)} — 절반은 그 보스 패턴을 막는 종류로 나옵니다`);
+  box.innerHTML = gloveIntro + normalHtml + `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
+    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>${srcLine(`41~60층 사냥터 보스를 이기면 ${fmtRate(BOSS.gloveDrop, 1)} 확률로 그 층 보스 장갑 (광폭화 보스 2배, 드롭률 적용)`)}<div class="codex-grid" data-glove-boss></div></div>`
     + `<div class="codex-section"><div class="codex-section-title grade-고대">고대 장갑
-    <span class="codex-section-count">${ancCount}/${GLOVE_ANCIENTS.length}</span></div><div class="codex-grid" data-glove-ancient></div></div>`;
+    <span class="codex-section-count">${ancCount}/${GLOVE_ANCIENTS.length}</span></div>${srcLine(`41~60층 사냥터 몬스터에게서 아주 낮은 확률로 그 층 고대 장갑 (엘리트 5배 · 층 보스 10배 · 보스 장갑 세트 3배 · 드롭률 적용)`)}<div class="codex-grid" data-glove-ancient></div></div>`;
   // 고대 장갑 — 얻은 적 있는 것만 이름·효과 공개(고대 보조무기 도감과 같음)
   const agrid = box.querySelector('[data-glove-ancient]');
   const acolor = GRADES[6].color;
@@ -13870,7 +13905,7 @@ function renderGloveCodex() {
     cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${acolor}` : ''}">${unlocked ? ad.icon : '❔'}</span>`;
     cell.onclick = () => showCodexPopup(unlocked
       ? subCodexGradeCellHtml(ad.icon, ad.name, ad.flavor) + `<div class="grade-고대" style="font-size:12px;">🏺 [${ad.fxName}] ${ad.desc(ad.p)}</div><div style="font-size:12px;color:#3ddfff;margin-top:4px;">${F ? F.name : ''} · ${GLOVE_TYPES[GLOVE_BOSS_NAMES[i].typeIdx].icon} 종류</div>`
-      : `<div style="color:var(--sub)">아직 얻지 못한 고대 장갑입니다. (${F ? F.name : ''} 몬스터에게서 아주 낮은 확률로 나옵니다)</div>`);
+      : `<div style="color:var(--sub);margin-bottom:4px;">아직 얻지 못한 고대 장갑입니다.</div>` + srcLine(`${WORLD3_START_FLOOR + i + 1}층 ${F ? F.name : ''}의 ${F ? F.monster : ''}에게서 아주 낮은 확률 (엘리트 5배 · 층 보스 10배 · 보스 장갑 세트 3배)`));
     agrid.appendChild(cell);
   });
   for (let grade = 0; grade <= 5; grade++) {
@@ -13887,8 +13922,8 @@ function renderGloveCodex() {
       if (unlocked && grade >= 5) cell.style.boxShadow = `0 0 8px ${gcolor}`;
       cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolor}` : ''}">${t.icon}</span>`;
       cell.onclick = () => showCodexPopup(unlocked
-        ? subCodexGradeCellHtml(t.icon, t.names[grade], '') + `<div style="font-size:12px;"><span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> · ${GLOVE_TYPE_LABELS[i]} 계열 · +0 대응 스탯: ${statLine}</div>`
-        : `<div style="color:var(--sub)">아직 얻지 못한 장갑입니다. (<span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> ${t.icon} ${GLOVE_TYPE_LABELS[i]} 계열)</div>`);
+        ? subCodexGradeCellHtml(t.icon, t.names[grade], '') + `<div style="font-size:12px;margin-bottom:4px;"><span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> · ${GLOVE_TYPE_LABELS[i]} 계열 · +0 대응 스탯: ${statLine}</div>` + srcLine(gloveCodexSourceText(grade))
+        : `<div style="color:var(--sub);margin-bottom:4px;">아직 얻지 못한 장갑입니다. (<span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> ${t.icon} ${GLOVE_TYPE_LABELS[i]} 계열)</div>` + srcLine(gloveCodexSourceText(grade)));
       ngrid.appendChild(cell);
     });
   }
@@ -15539,7 +15574,8 @@ function renderGenesisList() {
         </div>`;
     } else {
       div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(${FLOORS[a.floor].name} — ${FLOORS[a.floor].monster})</span></div>
-        <div class="wi" style="font-style:italic;">이 사냥터 어딘가에도 태초의 잔영이 잠들어 있다고 전해진다 — 아직, 그 흔적조차 찾아내지 못했다.</div></div>`;
+        <div class="wi" style="font-style:italic;">이 사냥터 어딘가에도 태초의 잔영이 잠들어 있다고 전해진다 — 아직, 그 흔적조차 찾아내지 못했다.</div>
+        ${srcLine(`${a.floor + 1}층 ${FLOORS[a.floor].name}의 ${FLOORS[a.floor].monster}에게서 극히 낮은 확률 (${SRC_ULTRA_NOTE})`)}</div>`;
     }
     box.appendChild(div);
   }
@@ -15547,7 +15583,7 @@ function renderGenesisList() {
 function renderAncientSealList() {
   const box = $('ancientSealList');
   if (!box) return;
-  box.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:8px;">장착 슬롯 ${S.sealEquipped.length}/${ANCIENT_SEAL_SLOTS}</div>`;
+  box.innerHTML = srcLine(`토벌전 1~20단계를 이기면 ${fmtRate(ANCIENT_SEAL_DROP_CHANCE, 1)} 확률로 그 단계의 인장 (이미 가진 인장이면 골드)`) + `<div style="font-size:12px;color:var(--sub);margin-bottom:8px;">장착 슬롯 ${S.sealEquipped.length}/${ANCIENT_SEAL_SLOTS}</div>`;
   for (const seal of ANCIENT_SEALS) {
     const owned = hasSeal(seal.id);
     const equipped = sealEquippedHas(seal.id);
@@ -15572,7 +15608,7 @@ function renderAncientSealList() {
       }
       div.querySelector('.btns').appendChild(btn);
     } else {
-      div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(${FLOORS[seal.floor].name} 토벌전)</span></div>
+      div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(토벌전 ${ANCIENT_SEALS.indexOf(seal) + 1}단계 · ${FLOORS[seal.floor].name})</span></div>
         <div class="wi" style="font-style:italic;">아직 발견하지 못한 고대의 인장입니다.</div></div>`;
     }
     box.appendChild(div);
@@ -17822,6 +17858,11 @@ function sellMat(key, n) {
 }
 
 // 보스 장신구 목록 & 장착
+// 보스 장신구 획득처(월드별 층 범위, 성야국은 광폭화 보스 2배)
+function bossAccSourceText(wNum) {
+  const [lo, hi] = worldFloorRange(wNum);
+  return `${lo + 1}~${hi}층 사냥터 보스를 이기면 ${fmtRate(BOSS.accDrop, 1)} 확률로 그 층 보스 장신구${wNum === 3 ? ' (광폭화 보스 2배)' : ''} · 드롭률 적용`;
+}
 function renderBossAccs() {
   const box = $('bossaccbox');
   if (!box) return;
@@ -17830,13 +17871,13 @@ function renderBossAccs() {
   const owned = S.bossAccs.filter(f => f >= rangeLo && f < rangeHi).sort((a, b) => a - b);
   const shardHtml = wNum === 3 ? dreamShardPanelHtml() : '';
   if (!owned.length) {
-    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">아직 보스 장신구가 없습니다. 각 사냥터의 보스를 격파해 획득하세요! (0.9%)</div>' + shardHtml;
+    box.innerHTML = srcLine(bossAccSourceText(wNum)) + '<div style="color:var(--sub);font-size:13px;">아직 보스 장신구가 없습니다.</div>' + shardHtml;
     return;
   }
   // 세트 효과 파트너는 월드1=메인 보스무기, 월드2=보스 보조무기, 월드3=보스 장갑으로 다르다.
   const world1 = wNum === 1;
   const activeSetFloor = wNum === 1 ? bossSetFloor() : wNum === 2 ? subBossSetFloor() : gloveBossSetFloor();
-  box.innerHTML = '';
+  box.innerHTML = srcLine(bossAccSourceText(wNum));
   for (const f of owned) {
     const b = BOSS_ACCS[f];
     if (!b) continue;

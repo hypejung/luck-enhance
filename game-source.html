@@ -496,6 +496,7 @@
     border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: baseline;
   }
   .codex-section-count { font-size: 11px; color: var(--sub); font-weight: normal; }
+  .src-line { font-size: 11px; color: #8fd3ff; margin: 0 0 6px; line-height: 1.4; }
   .codex-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
   .codex-cell {
     position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center;
@@ -3430,6 +3431,7 @@ const BOSS_DISRUPTIONS = {
   38: ['foresight', 'illusion', 'blind'], 39: ['rewind', 'scatter', 'thorns'],
 };
 const BOSS_ENRAGE_MULT = 1.5;
+const BD_FIRST_FRAC = 0.25; // 주기 패턴의 첫 발동 시점(주기 대비), 그 뒤로는 원래 주기마다
 const BOSS_ENRAGE_HP = 0.3;
 function bossDisruptionList(stage) {
   return disruptionListFromRaw(BOSS_DISRUPTIONS[stage]);
@@ -3464,8 +3466,9 @@ function startBossDisruption(stage) { startDisruptionList(bossDisruptionList(sta
 // opts.enrage: 패턴 개수와 무관하게 광폭화(월드3 45·50·55·60층 보스), opts.timeScale: 시간 계열(시간 잠식·가시 반격) 세기 배율
 function startDisruptionList(list, opts) {
   if (!list.length) { bd = null; return; }
+  // 첫 발동은 주기의 BD_FIRST_FRAC 시점(10초 주기면 2.5초) — 결전의 기백 폭딜로 패턴을 보기도 전에 끝나지 않게
   const next = {};
-  for (const e of list) if (DISRUPTIONS[e.key].every) next[e.key] = DISRUPTIONS[e.key].every;
+  for (const e of list) if (DISRUPTIONS[e.key].every) next[e.key] = DISRUPTIONS[e.key].every * BD_FIRST_FRAC;
   bd = {
     list, next, enrageable: opts && opts.enrage != null ? !!opts.enrage : list.length >= 3, enraged: false,
     timeScale: (opts && opts.timeScale) || 1,
@@ -4299,6 +4302,21 @@ function activeRaidTitle() {
   const wr = S && S.weeklyRaid;
   return wr && wr.title && wr.titleWeek === weekKey() && WEEKLY_RAID_TITLES[wr.title] ? WEEKLY_RAID_TITLES[wr.title] : null;
 }
+// 기여도 순위(1~3위) — 결산 때 전체 기여 보상 × mult(전체 구간이 0이어도 1구간 기준) + 강화 패널티 방지권,
+// 그리고 다음 한 주 동안 순위 칭호. 순위 칭호는 위 기여 구간 칭호와 따로 붙고 둘 다 적용된다.
+const WEEKLY_RAID_RANK = { mults: [4, 3, 2], guards: [3, 2, 1] };
+const WEEKLY_RAID_RANK_TITLES = {
+  r1: { name: '세계수가 택한 수호자',     emoji: '👑', luck: 0.15, gold: 0.15, badge: 't1' },
+  r2: { name: '뿌리 끝의 처형자',         emoji: '⚔️', luck: 0.10, gold: 0.10, badge: 't2' },
+  r3: { name: '썩은 수액을 태우는 불꽃', emoji: '🔥', luck: 0.05, gold: 0.05, badge: 't3' },
+};
+// 레이드 이름: 레이드 탭에서 직접 정한다. 처음 정할 땐 무료, 바꿀 땐 1b(100경) 골드.
+const WEEKLY_RAID_NAME = { maxLen: 12, changeCost: 1e18 };
+function activeRaidRankTitle() {
+  const wr = S && S.weeklyRaid;
+  return wr && wr.rankTitle && wr.rankTitleWeek === weekKey() && WEEKLY_RAID_RANK_TITLES[wr.rankTitle] ? WEEKLY_RAID_RANK_TITLES[wr.rankTitle] : null;
+}
+function activeRaidTitles() { return S && S.weeklyRaid ? [activeRaidRankTitle(), activeRaidTitle()].filter(Boolean) : []; }
 
 // 순위 보상 골드의 기준값 — "사냥터(1~20층) 보스 처치 보상"과 완전히 같은 산출 방식을
 // 20층(월드1 마지막 사냥터) 기준으로 재사용한다(endBossFight()의 승리 골드 계산부와 동일한
@@ -6832,8 +6850,7 @@ function unlockEgg(id) {
 function renderRaidTitleBadge() {
   const el = $('raidTitleBadge');
   if (!el) return;
-  const t = S && S.weeklyRaid ? activeRaidTitle() : null;
-  el.innerHTML = t ? `<span title="세계수의 단말마 칭호 — 이번 주 모든 사냥터 드롭률 +${Math.round(t.luck * 100)}%, 골드 획득 +${Math.round(t.gold * 100)}%" style="margin-left:6px;font-size:12px;cursor:help;color:var(--gold);">${t.emoji} ${t.name}</span>` : '';
+  el.innerHTML = activeRaidTitles().map(t => `<span title="세계수의 단말마 칭호 — 이번 주 모든 사냥터 드롭률 +${Math.round(t.luck * 100)}%, 골드 획득 +${Math.round(t.gold * 100)}%" style="margin-left:6px;font-size:12px;cursor:help;color:var(--gold);">${t.emoji} ${t.name}</span>`).join('');
 }
 function renderEggBadges() {
   renderRaidTitleBadge();
@@ -7276,7 +7293,7 @@ function newState() {
     gloveCodexSeen: {},    // 일반 장갑 도감: 키 `g{grade}_{typeIdx}` — 8종류×6등급(0~5) 48종
     gloveAncientSeen: [],  // 고대 장갑 도감(월드3): [true/false, ...] 20개, index = 층 번호(0=41층)
     genesisFeedPending: [], genesisFeedName: '', // 태초 획득 알림: 이름 입력·서버 업로드 대기 목록, 마지막으로 쓴 이름
-    weeklyRaid: { week: null, days: {}, dayKey: null, dayCount: 0, title: null, titleWeek: null, bestRun: null, recordDay: null, rid: null, pushDirty: false, unsettled: [], lastSettled: null }, // 세계수의 단말마: week=주차키, days={날짜키: 일일 최고 피해}, dayKey/dayCount=오늘 도전 횟수, title/titleWeek=칭호와 그 칭호가 유효한 주, bestRun=역대 최고 1회 피해, recordDay=기록 보상 받은 날, rid=전체 합산용 익명 id(해시해서 키로 씀), pushDirty=이번 주 기록 업로드 대기, unsettled=전체 정산 대기 [{week,total}], lastSettled=마지막 전체 정산 결과
+    weeklyRaid: { week: null, days: {}, dayKey: null, dayCount: 0, title: null, titleWeek: null, bestRun: null, recordDay: null, rid: null, pushDirty: false, unsettled: [], lastSettled: null, name: '', namePushDirty: false, setupPending: null, rankTitle: null, rankTitleWeek: null }, // 세계수의 단말마(name=레이드 이름, setupPending=올릴 세팅 요약, rankTitle/rankTitleWeek=순위 칭호): week=주차키, days={날짜키: 일일 최고 피해}, dayKey/dayCount=오늘 도전 횟수, title/titleWeek=칭호와 그 칭호가 유효한 주, bestRun=역대 최고 1회 피해, recordDay=기록 보상 받은 날, rid=전체 합산용 익명 id(해시해서 키로 씀), pushDirty=이번 주 기록 업로드 대기, unsettled=전체 정산 대기 [{week,total}], lastSettled=마지막 전체 정산 결과
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
   };
 }
@@ -7861,8 +7878,8 @@ function accEff() {
   }
   // 능력치 훈련 (장비와 무관하게 항상 적용, 월드 구분 없음)
   // 세계수의 단말마 칭호: 모든 사냥터에 그대로(다른 월드 절반 규칙 없음)
-  const raidTitle = S && S.weeklyRaid ? activeRaidTitle() : null;
-  if (raidTitle) { eff.luck += raidTitle.luck; eff.gold += raidTitle.gold; }
+  // 기여 구간 칭호 + 순위 칭호(1~3위)는 따로 붙고 둘 다 적용
+  for (const t of activeRaidTitles()) { eff.luck += t.luck; eff.gold += t.gold; }
   eff.atk += trainingValue('atk');
   eff.speed += trainingValue('atkSpeed');
   // 도감 컬렉션 보너스(쌍/타입 풀세트/사냥터 풀세트/보스의 무력) — 전부 1~20층 결부형이라 월드1 한정.
@@ -11309,6 +11326,152 @@ function weeklyRaidGlobalSum(node, myKey, myTotal) {
   if (myTotal && BN.gt(myTotal, 0)) { sum = BN.add(sum, BN.from(myTotal)); count++; }
   return { sum, count };
 }
+// ---------- 기여도 순위 (1~3위 표시·보상) ----------
+// 서버 기록을 기여 내림차순으로(같으면 먼저 기록한 사람이 위). 내 기록은 서버 값 대신 로컬 값.
+function weeklyRaidRanking(node, myKey, myTotal) {
+  const list = [];
+  for (const [k, v] of Object.entries(node || {})) {
+    if (k === myKey || !weeklyRaidEntryValid(v)) continue;
+    list.push({ key: k, total: { m: v.m, e: v.e }, at: typeof v.at === 'number' ? v.at : Infinity });
+  }
+  if (myTotal && BN.gt(myTotal, 0)) {
+    const mine = node && node[myKey];
+    const at = mine && typeof mine.at === 'number' && weeklyRaidEntryValid(mine) && BN.eq({ m: mine.m, e: mine.e }, BN.from(myTotal)) ? mine.at : Date.now();
+    list.push({ key: myKey, total: BN.from(myTotal), at, me: true });
+  }
+  list.sort((a, b) => BN.gt(a.total, b.total) ? -1 : BN.lt(a.total, b.total) ? 1 : a.at - b.at);
+  return list;
+}
+// 레이드 이름(Firebase raidNames/{익명 키} = { name, at }) — 다른 유저가 올린 값이라 화면엔 항상 escHtml
+function weeklyRaidNameValid(n) { return typeof n === 'string' && n.trim().length >= 1 && n.length <= WEEKLY_RAID_NAME.maxLen; }
+function weeklyRaidNameOf(names, key, myKey) {
+  if (key === myKey && weeklyRaidNameValid(S.weeklyRaid.name)) return S.weeklyRaid.name;
+  const v = names && names[key];
+  return v && weeklyRaidNameValid(v.name) ? v.name : null;
+}
+let weeklyRaidNamePushBusy = false;
+async function weeklyRaidPushName() {
+  const wr = weeklyRaidNormalize();
+  if (!wr.namePushDirty || weeklyRaidNamePushBusy || !syncConfigured() || !weeklyRaidNameValid(wr.name)) return;
+  weeklyRaidNamePushBusy = true;
+  const name = wr.name;
+  try {
+    const key = await weeklyRaidKey();
+    const res = await fetch(`${SYNC_DB_URL}/raidNames/${key}.json`, { method: 'PUT', body: JSON.stringify({ name, at: { '.sv': 'timestamp' } }) });
+    if (res.ok && S.weeklyRaid.name === name) { S.weeklyRaid.namePushDirty = false; save(); }
+  } catch (e) { /* 1분 주기 재시도 */ } finally { weeklyRaidNamePushBusy = false; }
+}
+// 이름 정하기/바꾸기 — 처음은 무료, 바꿀 땐 1b 골드
+function openWeeklyRaidNameModal() {
+  const wr = weeklyRaidNormalize();
+  const has = weeklyRaidNameValid(wr.name);
+  const cost = BN.from(WEEKLY_RAID_NAME.changeCost);
+  showAlertModal(`<p style="text-align:left">🏷️ <b>레이드 이름</b> (1~${WEEKLY_RAID_NAME.maxLen}자) — 기여도 순위에 이 이름으로 표시됩니다.<br>
+    <span style="font-size:12px;color:var(--sub)">${has ? `이름을 바꾸려면 💰 <b>${fmt(cost)}</b> 골드가 듭니다. (보유 ${fmt(S.gold)})` : '처음 한 번은 무료이고, 그 뒤로 바꿀 땐 💰 ' + fmt(cost) + ' 골드가 듭니다.'}</span></p>
+    <input id="raidNameInput" maxlength="${WEEKLY_RAID_NAME.maxLen}" style="width:100%;box-sizing:border-box;margin-bottom:6px;" value="${escHtml(has ? wr.name : '')}">
+    <div id="raidNameErr" style="font-size:12px;color:#ff7a7a;min-height:16px;"></div>
+    <div style="display:flex;gap:8px;margin-top:6px;"><button id="raidNameCancel" style="flex:1;width:auto;">취소</button><button id="raidNameOk" class="primary" style="flex:1;width:auto;">${has ? `바꾸기 (💰 ${fmt(cost)})` : '정하기'}</button></div>`);
+  const input = $('raidNameInput');
+  setTimeout(() => { try { input.focus(); } catch (e) {} }, 0);
+  const submit = () => {
+    const name = input.value.trim();
+    const err = $('raidNameErr');
+    if (!weeklyRaidNameValid(name)) { err.textContent = `이름은 1~${WEEKLY_RAID_NAME.maxLen}자로 적어주세요.`; return; }
+    if (has && name === wr.name) { hideAlertModal(); return; }
+    if (has) {
+      if (BN.lt(S.gold, cost)) { err.textContent = `골드가 부족합니다. (필요 ${fmt(cost)})`; return; }
+      S.gold = BN.sub(S.gold, cost);
+    }
+    wr.name = name; wr.namePushDirty = true;
+    hideAlertModal();
+    log(`🏷️ 레이드 이름을 <b>${escHtml(name)}</b>(으)로 ${has ? `바꿨습니다. (💰 -${fmt(cost)})` : '정했습니다.'}`, 'lg-good');
+    weeklyRaidPushName();
+    renderTop(); renderWorldRaidTab(); save();
+  };
+  $('raidNameOk').onclick = submit;
+  $('raidNameCancel').onclick = hideAlertModal;
+  input.onkeydown = e => { if (e.key === 'Enter') submit(); };
+}
+// 세팅 요약 — 기록을 갱신한 순간의 세팅을 weeklyRaidSetup/{주차}/{익명 키} = { s: JSON 문자열, at }에 올려
+// 순위 1~3위의 "세팅 보기"에 쓴다. 기록 업로드와 경로를 나눠 실패해도 기록에는 영향이 없다.
+function countedNames(names) {
+  const m = {};
+  for (const n of names) if (n) m[n] = (m[n] || 0) + 1;
+  return Object.entries(m).map(([n, c]) => c > 1 ? `${n} ×${c}` : n);
+}
+function raidSetupSnapshot() {
+  const snap = { v: 1, at: Date.now() };
+  const part = (k, f) => { try { snap[k] = f(); } catch (e) { console.error('세팅 요약 실패:', k, e); } };
+  const w = getEquipped();
+  part('stats', () => {
+    const st = computeStats();
+    return [`${atkLabel(w)} ${fmt(st.atk)}`, `공격속도 ${st.spd.toFixed(2)}/초`,
+      `치명타 ${st.critChance.toFixed(1)}% · 피해 ${st.critMultPct.toFixed(0)}%`,
+      `연타 ${st.extraChance.toFixed(1)}% · 피해 ${st.extraAtkDmgPct.toFixed(0)}%`, `보스 피해량 +${st.bossBonus.toFixed(0)}%`];
+  });
+  part('training', () => Object.keys(TRAINING).map(k => `${TRAINING[k].name} Lv.${trainingLevel(k)}`));
+  if (w) part('weapon', () => {
+    const lines = [stripTags(gradeTag(w))];
+    if (w.genesisId) { const ga = GENESIS_ARTIFACTS.find(a => a && a.id === w.genesisId); if (ga) lines.push(`태초: ${ga.name}`); }
+    if (w.effect && EFFECTS[w.effect]) lines.push(`특수효과: ${EFFECTS[w.effect].name}`);
+    if (w.spirit && ANCIENT_SPIRITS[w.spirit]) lines.push(`에이션트 스피릿: ${ANCIENT_SPIRITS[w.spirit].name}`);
+    if (Array.isArray(w.runes) && w.runes.length) lines.push(`룬: ${countedNames(w.runes.map(r => runeName(r))).join(', ')}`);
+    if (Array.isArray(w.awakening)) lines.push(...w.awakening.map((a, i) => a ? `각성 ★${i + 1}: [${AWAKENING_RARITY_LABEL[a.rarity]}] ${awakenSlotLabel(a)}` : null).filter(Boolean));
+    return lines;
+  });
+  const sw = getEquippedSubweapon();
+  if (sw) part('sub', () => {
+    const pe = subweaponPassiveEff(sw, accEff().subAmp);
+    const passive = Object.entries(pe).map(([k, v]) => { const d = SUB_PASSIVE_STAT_LABELS[k]; return `${d ? d.label : k} +${(v * 100).toFixed(1)}${d ? d.unit : '%'}`; }).join(', ');
+    const lines = [stripTags(subweaponGradeTag(sw)), `패시브: ${passive}`, `결전의 기백 발동: ${sw.activeTiming || 0}초`];
+    const ad = subAncientDef(sw); if (ad) lines.push(`고대 효과: ${ad.fxName}`);
+    const gd = subGenesisDef(sw); if (gd) lines.push(`태초: ${gd.passiveName} · ${gd.activeName}`);
+    return lines;
+  });
+  const g = getEquippedGlove();
+  if (g) part('glove', () => [stripTags(gloveGradeTag(g)), stripTags(gloveStatText(g))]);
+  part('accs', () => (S.accEquipped || []).map(a => `${GRADES[a.grade] ? GRADES[a.grade].name : ''} ${ACCESSORIES[a.floor] ? ACCESSORIES[a.floor].name : ''}`.trim()));
+  part('seals', () => (S.sealEquipped || []).map(id => (ANCIENT_SEALS.find(x => x.id === id) || {}).name).filter(Boolean));
+  return snap;
+}
+let weeklyRaidSetupPushBusy = false;
+async function weeklyRaidPushSetup() {
+  const wr = weeklyRaidNormalize();
+  const p = wr.setupPending;
+  if (!p || weeklyRaidSetupPushBusy || !syncConfigured()) return;
+  if (p.week !== wr.week) { wr.setupPending = null; return; } // 지난 주 세팅은 버림
+  weeklyRaidSetupPushBusy = true;
+  try {
+    const key = await weeklyRaidKey();
+    const res = await fetch(`${SYNC_DB_URL}/weeklyRaidSetup/${p.week}/${key}.json`, { method: 'PUT', body: JSON.stringify({ s: p.s, at: { '.sv': 'timestamp' } }) });
+    if (res.ok && S.weeklyRaid.setupPending === p) { S.weeklyRaid.setupPending = null; save(); }
+  } catch (e) { /* 1분 주기 재시도 */ } finally { weeklyRaidSetupPushBusy = false; }
+}
+function raidSetupHtml(name, total, snap) {
+  const head = `<div style="font-size:15px;font-weight:bold;margin-bottom:2px;">${escHtml(name)}</div>
+    <div style="color:var(--sub);margin-bottom:8px;">주간 기여 ${fmt(total)}${snap && snap.at ? ` · 기록 당시 세팅 (${escHtml(new Date(snap.at).toLocaleString())})` : ''}</div>`;
+  if (snap === undefined) return head + '<div style="color:var(--sub);">세팅 정보를 불러오는 중...</div>';
+  if (!snap || typeof snap !== 'object') return head + '<div style="color:var(--sub);">세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.</div>';
+  const sec = (title, lines) => {
+    const arr = Array.isArray(lines) ? lines.filter(x => x != null && x !== '') : [];
+    return `<div style="margin-top:8px;"><b>${title}</b>${arr.length ? arr.map(l => `<div style="font-size:12px;">· ${escHtml(l)}</div>`).join('') : '<div style="font-size:12px;color:var(--sub);">없음</div>'}</div>`;
+  };
+  return head + sec('📊 능력치', snap.stats) + sec('🏋️ 훈련', snap.training) + sec('⚔️ 무기', snap.weapon)
+    + sec('🗡️ 보조무기', snap.sub) + sec('🧤 장갑', snap.glove) + sec('📿 장신구', snap.accs) + sec('🌫️ 고대의 인장', snap.seals);
+}
+async function showRaidSetup(week, key, name, total) {
+  showCodexPopup(raidSetupHtml(name, total, undefined));
+  let snap = null;
+  try {
+    const v = await syncFetchJson(`weeklyRaidSetup/${week}/${key}`, 8000);
+    if (v && typeof v.s === 'string' && v.s.length < 20000) snap = JSON.parse(v.s);
+  } catch (e) {
+    showCodexPopup(raidSetupHtml(name, total, null).replace('세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.', '세팅 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'));
+    return;
+  }
+  showCodexPopup(raidSetupHtml(name, total, snap));
+}
+
 // 이번 주 기록 업로드(기록 갱신 때 + 실패했으면 1분마다 재시도)
 let weeklyRaidPushBusy = false;
 function weeklyRaidPushCurrent() {
@@ -11326,17 +11489,19 @@ function weeklyRaidPushCurrent() {
     });
 }
 // 이번 주 전체 합(레이드 탭 표시용, 1분 캐시)
-let weeklyRaidLive = null; // { week, sum, count, at }
+let weeklyRaidLive = null; // { week, others, count, at, node, prevWeek, prevNode, names }
 let weeklyRaidLiveBusy = false;
 function weeklyRaidRefreshLive(force) {
   const wk = weekKey();
   if (!syncConfigured() || weeklyRaidLiveBusy) return;
   if (!force && weeklyRaidLive && weeklyRaidLive.week === wk && Date.now() - weeklyRaidLive.at < 60000) return;
   weeklyRaidLiveBusy = true;
-  Promise.all([syncFetchJson(`weeklyRaid2/${wk}`, 8000), weeklyRaidKey()])
-    .then(([node, myKey]) => {
+  const pwk = prevWeekKey();
+  Promise.all([syncFetchJson(`weeklyRaid2/${wk}`, 8000), weeklyRaidKey(),
+    syncFetchJson(`weeklyRaid2/${pwk}`, 8000).catch(() => null), syncFetchJson('raidNames', 8000).catch(() => null)])
+    .then(([node, myKey, prevNode, names]) => {
       const others = weeklyRaidGlobalSum(node, myKey, null);
-      weeklyRaidLive = { week: wk, others: others.sum, count: others.count, at: Date.now() };
+      weeklyRaidLive = { week: wk, others: others.sum, count: others.count, at: Date.now(), node: node || {}, myKey, prevWeek: pwk, prevNode: prevNode || {}, names: names || {} };
       const tab = $('tab-worldraid');
       if (tab && tab.style.display !== 'none' && !(bossFight.active && bossFight.isWeeklyRaid)) renderWorldRaidTab();
     })
@@ -11367,23 +11532,38 @@ async function weeklyRaidSettleGlobal() {
     const myKey = await weeklyRaidKey();
     const g = weeklyRaidGlobalSum(node, myKey, total);
     const tier = weeklyRaidGlobalTierOf(g.sum);
-    const r = weeklyRaidGlobalReward(tier);
+    let r = weeklyRaidGlobalReward(tier);
+    // 기여도 1~3위: 전체 보상 × mult(전체 구간 0이어도 1구간 기준) + 방지권. 서버에 닿았을 때만(오프라인 정산은 순위 없음)
+    let rank = 0;
+    if (!offline) {
+      const i = weeklyRaidRanking(node, myKey, total).findIndex(x => x.me);
+      if (i >= 0 && i < 3) rank = i + 1;
+    }
+    if (rank) {
+      const base = weeklyRaidGlobalReward(Math.max(1, tier));
+      const mult = WEEKLY_RAID_RANK.mults[rank - 1];
+      r = { honor: base.honor * mult, goldMult: Math.round(base.goldMult * mult * 10) / 10, leaves: base.leaves * mult, guards: base.guards + WEEKLY_RAID_RANK.guards[rank - 1] };
+      // 순위 칭호는 바로 지난주 결산일 때만 이번 주에 건다(몇 주 쉬었다 오면 보상만)
+      if (entry.week === prevWeekKey()) { S.weeklyRaid.rankTitle = 'r' + rank; S.weeklyRaid.rankTitleWeek = weekKey(); }
+    }
     S.weeklyRaid.unsettled.shift();
-    S.weeklyRaid.lastSettled = { week: entry.week, sum: g.sum, count: g.count, tier };
+    S.weeklyRaid.lastSettled = { week: entry.week, sum: g.sum, count: g.count, tier, rank };
     let msg;
+    const rt = rank ? WEEKLY_RAID_RANK_TITLES['r' + rank] : null;
+    const rankMsg = rank ? ` <b style="color:var(--gold)">🏆 기여도 ${rank}위!</b> 보상 ×${WEEKLY_RAID_RANK.mults[rank - 1]}${entry.week === prevWeekKey() ? `, 칭호 ${rt.emoji} <b>[${rt.name}]</b> (이번 주 드롭률·골드 +${Math.round(rt.luck * 100)}%)` : ''}` : '';
     if (r) {
       const gold = Math.floor(worldRaidBossGoldRef() * r.goldMult);
       S.gold = BN.add(S.gold, gold);
       S.honorEssence = BN.add(S.honorEssence, r.honor);
       S.worldTreeLeaf = BN.add(S.worldTreeLeaf || BN.from(0), r.leaves);
       if (r.guards) S.penaltyGuard = (S.penaltyGuard || 0) + r.guards;
-      msg = `🌳 <b>[세계수의 단말마 주간 결산]</b> 전체 ${g.count}명의 기여 합 ${fmt(g.sum)} → <b>전체 ${tier}구간</b>! (내 기여 ${fmt(total)}) +${fmt(gold)} 골드, 🎖️ 명예의 정수 +${r.honor}, 🍃 세계수의 잎 +${fmt(r.leaves)}${r.guards ? `, 🛡️ 강화 패널티 방지권 +${r.guards}장` : ''}`;
+      msg = `🌳 <b>[세계수의 단말마 주간 결산]</b> 전체 ${g.count}명의 기여 합 ${fmt(g.sum)} → <b>전체 ${tier}구간</b>! (내 기여 ${fmt(total)})${rankMsg} +${fmt(gold)} 골드, 🎖️ 명예의 정수 +${r.honor}, 🍃 세계수의 잎 +${fmt(r.leaves)}${r.guards ? `, 🛡️ 강화 패널티 방지권 +${r.guards}장` : ''}`;
     } else {
       msg = `🌳 <b>[세계수의 단말마 주간 결산]</b> 전체 ${g.count}명의 기여 합 ${fmt(g.sum)} — 아직 전체 1구간(${fmt(WEEKLY_RAID_GLOBAL.floor)})에 닿지 못해 보상이 없습니다.`;
     }
     log(msg, 'lg-prim');
     try { showAlertModal(`<p style="text-align:left">${msg}</p><button class="primary" id="alertOkBtn">확인</button>`); $('alertOkBtn').onclick = hideAlertModal; } catch (e) {}
-    renderTop(); renderWorldRaidTab(); save();
+    renderTop(); renderRaidTitleBadge(); renderWorldRaidTab(); save();
   } finally {
     weeklyRaidSettleBusy = false;
   }
@@ -11445,7 +11625,11 @@ function endWeeklyRaidFight() {
   weeklyRaidEnsureWeek();
   const wr = S.weeklyRaid;
   const isRecord = BN.gt(dealt, weeklyRaidTodayBest());
-  if (isRecord) { wr.days[todayKey()] = BN.from(dealt); wr.pushDirty = true; }
+  if (isRecord) {
+    wr.days[todayKey()] = BN.from(dealt); wr.pushDirty = true;
+    // 주간 기여를 올린 세팅 — 순위 1~3위 "세팅 보기"용(별도 경로, 실패해도 기록과 무관)
+    try { wr.setupPending = { week: wr.week, s: JSON.stringify(raidSetupSnapshot()) }; } catch (e) { console.error(e); }
+  }
   // 개인 기록 보상: 역대 최고 1회 기록의 1.2배 이상(하루 1회). 역대 최고는 보상 여부와 무관하게 항상 갱신.
   const best = BN.from(wr.bestRun || 0);
   let recordMsg = '';
@@ -11462,7 +11646,7 @@ function endWeeklyRaidFight() {
   }
   if (BN.gt(dealt, best)) wr.bestRun = BN.from(dealt);
   log(`🌳 <b>세계수의 단말마 측정 종료!</b> 이번 시도 피해: <b style="color:var(--gold)">${fmt(dealt)}</b>${isRecord ? ' <span class="lg-prim">🎉 오늘 최고 기록 갱신!</span>' : ` (오늘 최고: ${fmt(weeklyRaidTodayBest())})`} · 이번 주 내 기여 <b>${fmt(weeklyRaidTotal())}</b>${recordMsg}`, 'lg-prim');
-  weeklyRaidPushCurrent();
+  weeklyRaidPushCurrent(); weeklyRaidPushSetup();
   spawnMonster();
   renderBossBtn(); renderTop(); renderWorldRaidTab(); save();
 }
@@ -11622,6 +11806,7 @@ function renderLibraryBox() {
     ${arcaneTomesHtml()}
     <div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
       <div style="font-size:13px;margin-bottom:6px;">📖 고대의 유물 (${relicCollectedCount()}/${RELICS.length})</div>
+      ${srcLine(`고대의 도서관 서고를 돌파하면 ${fmtRate(LIBRARY.relicDropChance)} 확률로 아직 없는 유물 중 하나`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">
         ${RELICS.map((r, i) => S.relics[i]
           ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a2a1a;" title="${r.flavor}"><b style="color:var(--gold)">${r.name}</b></div>`
@@ -11652,10 +11837,49 @@ function arcaneTomesHtml() {
   }).join('');
   return `<div style="margin-top:14px;padding-top:10px;border-top:1px solid var(--border);">
     <div style="font-size:13px;margin-bottom:6px;">📚 비전서 (${LIBRARY_BANDS.filter((b, i) => arcaneTomeComplete(i)).length}/${LIBRARY_BANDS.length}권 완성)</div>
+    ${srcLine(`21서고 이상을 돌파하면 ${fmtRate(LIBRARY_EXT.pageDropChance)} 확률로 그 구간 비전서의 낱장 하나 (이미 가진 낱장이면 금서의 페이지 ${LIBRARY_EXT.dupPages}장)`)}
     <div style="display:grid;gap:6px;">${cards}</div></div>`;
 }
 
 // ---------- 주간 통합 레이드 UI ----------
+// 기여도 순위 1~3위 + 내 순위 + 지난주 명예의 전당. 세팅 보기 링크는 data-idx로 이 배열을 가리킨다.
+let weeklyRaidSetupLinks = [];
+function weeklyRaidRankHtml(live, myTotal) {
+  const wr = S.weeklyRaid;
+  const medals = ['🥇', '🥈', '🥉'];
+  weeklyRaidSetupLinks = [];
+  const nameLine = weeklyRaidNameValid(wr.name)
+    ? `🏷️ 내 이름: <b>${escHtml(wr.name)}</b> <button id="raidNameBtn" style="font-size:11px;width:auto;padding:2px 8px;">✏️ 바꾸기 (💰${fmt(BN.from(WEEKLY_RAID_NAME.changeCost))})</button>`
+    : `🏷️ 아직 레이드 이름이 없습니다(순위엔 "이름 없는 사냥꾼"). <button id="raidNameBtn" class="primary" style="font-size:11px;width:auto;padding:2px 8px;">✏️ 이름 정하기 (무료)</button>`;
+  const row = (e, i, week, myKey, names, withTitle) => {
+    const name = weeklyRaidNameOf(names, e.key, myKey) || '이름 없는 사냥꾼';
+    weeklyRaidSetupLinks.push({ week, key: e.key, name, total: e.total });
+    const t = withTitle ? WEEKLY_RAID_RANK_TITLES['r' + (i + 1)] : null;
+    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 2px;border-bottom:1px solid var(--border);font-size:13px;">
+      <span style="font-size:16px">${medals[i]}</span>
+      <div style="flex:1;min-width:0;"><b>${escHtml(name)}</b>${e.key === myKey ? ' <span style="color:var(--gold);font-size:11px;">(나)</span>' : ''}${t ? ` <span class="raidtitle raidtitle-${t.badge}">${t.emoji} ${t.name}</span>` : ''}
+        <div style="font-size:11px;color:var(--sub);">주간 기여 ${fmt(e.total)} · <a href="#" class="raid-setup-link" data-idx="${weeklyRaidSetupLinks.length - 1}" style="color:inherit;text-decoration:underline dotted;">세팅 보기</a></div></div></div>`;
+  };
+  let body;
+  if (!live || !live.node) {
+    body = '<div style="font-size:12px;color:var(--sub);">서버에서 순위를 불러오는 중… (오프라인이면 표시되지 않음)</div>';
+  } else {
+    const list = weeklyRaidRanking(live.node, live.myKey, myTotal);
+    const top = list.slice(0, 3);
+    const mi = list.findIndex(x => x.me);
+    body = (top.length ? top.map((e, i) => row(e, i, live.week, live.myKey, live.names, false)).join('') : '<div style="font-size:12px;color:var(--sub);">아직 이번 주 기록이 없습니다.</div>')
+      + `<div style="font-size:12px;margin-top:6px;">내 순위: ${mi >= 0 ? `<b style="color:var(--gold)">${mi + 1}위</b> / ${list.length}명` : '<span style="color:var(--sub)">아직 이번 주 기록 없음</span>'}</div>`;
+    const prev = weeklyRaidRanking(live.prevNode, null, null).slice(0, 3);
+    if (prev.length) body += `<div style="font-size:13px;margin-top:10px;margin-bottom:4px;">🏛️ 지난주 명예의 전당</div>` + prev.map((e, i) => row(e, i, live.prevWeek, live.myKey, live.names, true)).join('');
+  }
+  const R = WEEKLY_RAID_RANK;
+  return `<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
+    <div style="font-size:13px;margin-bottom:6px;">🏆 이번 주 기여도 순위</div>
+    <div style="font-size:12px;margin-bottom:8px;">${nameLine}</div>
+    ${body}
+    <div style="font-size:11px;color:var(--sub);margin-top:6px;">순위 보상(일요일 결산): ${[0, 1, 2].map(i => `${medals[i]} 전체 기여 보상 ×${R.mults[i]} + 🛡️${R.guards[i]}장`).join(' · ')} (전체 구간이 0이어도 1구간 기준).<br>순위 칭호(다음 한 주, 기여 구간 칭호와 함께 적용): ${['r1', 'r2', 'r3'].map(k => `${WEEKLY_RAID_RANK_TITLES[k].emoji} ${WEEKLY_RAID_RANK_TITLES[k].name} 드롭률·골드 +${Math.round(WEEKLY_RAID_RANK_TITLES[k].luck * 100)}%`).join(' · ')}</div>
+  </div>`;
+}
 function renderWorldRaidTab() {
   const battlePanel = $('worldRaidBattlePanel');
   const box = $('worldRaidBox');
@@ -11689,7 +11913,6 @@ function renderWorldRaidTab() {
     const isToday = dateKeyOf(d) === todayKey();
     return `<div style="min-width:0;text-align:center;padding:4px 1px;border:1px solid ${isToday ? 'var(--gold)' : 'var(--border)'};border-radius:6px;font-size:11px;overflow-wrap:anywhere;"><div style="color:var(--sub)">${nm}</div><div style="font-size:10px;line-height:1.2">${v ? fmt(v) : '-'}</div></div>`;
   }).join('');
-  const t = activeRaidTitle();
   const nextTitleKey = ['t3', 't2', 't1'].find(k => myTier < WEEKLY_RAID_TITLES[k].minTier);
   const nextTitle = nextTitleKey ? WEEKLY_RAID_TITLES[nextTitleKey] : null;
   const best = BN.from(wr.bestRun || 0);
@@ -11709,10 +11932,11 @@ function renderWorldRaidTab() {
       <div style="font-size:13px;margin-top:4px;">이번 주 내 기여: <b style="color:var(--gold)">${fmt(total)}</b> · 개인 ${myTier}구간${nextTitle ? ` · ${nextTitle.emoji} 칭호까지 ${fmt(BN.sub(BN.from(weeklyRaidTierFloor(nextTitle.minTier)), total))}` : ''}</div>
       <div style="font-size:13px;margin-top:4px;">🏅 역대 최고 1회: <b>${fmt(best)}</b> · ${recordToday ? '오늘 기록 보상 받음' : recordNeed ? `${fmt(recordNeed)} 이상이면 기록 보상` : '첫 도전 시 기록 보상'}</div>
       <div style="display:grid;grid-template-columns:repeat(${wDays.length},minmax(0,1fr));gap:3px;margin:8px 0;">${dayCells}</div>
-      ${t ? `<div style="font-size:12px;margin-bottom:6px;">현재 칭호: ${t.emoji} <b>${t.name}</b> (드롭률·골드 +${Math.round(t.luck * 100)}%, 이번 주 동안)</div>` : ''}
+      ${activeRaidTitles().length ? `<div style="font-size:12px;margin-bottom:6px;">현재 칭호: ${activeRaidTitles().map(x => `${x.emoji} <b>${x.name}</b> (드롭률·골드 +${Math.round(x.luck * 100)}%)`).join(' · ')} — 이번 주 동안</div>` : ''}
       <button class="primary" id="worldRaidChallengeBtn" ${available ? '' : 'disabled'}>🩸 그르마에게 도전 (${WEEKLY_RAID.duration}초)</button>
       <div style="font-size:12px;color:var(--sub);margin-top:6px;">${bossFight.active ? '이미 다른 전투가 진행 중입니다.' : left <= 0 ? '오늘 도전 횟수를 모두 사용했습니다. 내일 다시 도전할 수 있습니다.' : '하루 3회, 그날의 최고 피해가 일일 기록이 되고 일~토 기록을 합친 값이 내 주간 기여가 됩니다. 시간 연장 룬은 적용되지 않습니다.'}</div>
     </div>
+    ${weeklyRaidRankHtml(live, total)}
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
       <div style="font-size:13px;margin-bottom:6px;">🎁 전체 기여 보상 — 모든 유저의 주간 기여 합이 10배가 될 때마다 한 구간(상한 없음). 높은 구간일수록 한 구간 오를 때 보상이 더 크게 늘어나고, ${WEEKLY_RAID_GLOBAL.guardFrom}구간부터 강화 패널티 방지권도 줍니다. 매주 <b>일요일(강화데이) 0시</b>에 결산되어, 그 주에 기록을 남긴 모두가 일요일 첫 접속 때 받습니다.</div>
       <div style="overflow-x:auto"><table class="guide-table" style="white-space:nowrap"><tr><th>구간</th><th>전체 합</th><th>명예</th><th>골드</th><th>잎</th><th>방지권</th></tr>${rows.join('')}</table></div>
@@ -11728,6 +11952,11 @@ function renderWorldRaidTab() {
     </div>`;
   const btn = $('worldRaidChallengeBtn');
   if (btn) btn.onclick = startWeeklyRaidFight;
+  const nb = $('raidNameBtn');
+  if (nb) nb.onclick = openWeeklyRaidNameModal;
+  box.querySelectorAll('.raid-setup-link').forEach(a => {
+    a.onclick = ev => { ev.preventDefault(); const l = weeklyRaidSetupLinks[+a.dataset.idx]; if (l) showRaidSetup(l.week, l.key, l.name, l.total); };
+  });
   box.querySelectorAll('.honor-buy-btn').forEach(b => b.onclick = () => buyHonorShop(b.dataset.id));
 }
 
@@ -13338,6 +13567,31 @@ const CODEX_MAIN_SUBTAB_OPTIONS = [
   { v: 'subweapon', label: '🗡️ 보조무기 도감' },
   { v: 'glove', label: '🧤 장갑 도감' },
 ];
+// ---------- 수집형 컨텐츠 획득처 안내 ----------
+// 도감·유물·인장·꿈조각·보스 장신구 등 수집 화면에 "어디서 나오는지"를 📍 한 줄로 보여준다.
+// 확률·층 범위는 실제 드롭 코드(dropRoll·endBossFight·토벌전/도서관 승리)와 맞춰 둔다.
+function srcLine(text) { return `<div class="src-line">📍 ${text}</div>`; }
+const SRC_ULTRA_NOTE = '엘리트 5배 · 그 층 보스 세트 3배 · 드롭률 적용';
+// 랜덤박스(무기)·보조무기 상자는 등급표가 같다 — 그 등급이 들어 있는 상자
+const SRC_BOX_NAMES = ['일반·고급', '일반·고급·희귀', '모든', '고급·희귀·전설·신화', '희귀·전설·신화', '전설·신화'];
+const SRC_WEAPON_HUNT = ['1~12층', '모든 층', '6층부터', '11층부터', '16층부터, 드묾', '19층부터, 매우 드묾'];
+function weaponCodexSourceText(group) {
+  if (group === 'boss') return `1~20층 사냥터 보스를 이기면 ${fmtRate(BOSS.weaponDrop, 1)} 확률로 그 층 보스 무기 (드롭률 적용)`;
+  if (group === 6) return `1~20층 사냥터 몬스터에게서 아주 낮은 확률로 그 층 고대 무기 (${SRC_ULTRA_NOTE})`;
+  if (group >= 0 && group <= 5) return `사냥 드롭(${SRC_WEAPON_HUNT[group]}) · 📦 ${SRC_BOX_NAMES[group]} 랜덤박스`;
+  return '';
+}
+function weaponCodexItemSource(ent) {
+  const F = ent.floor != null ? FLOORS[ent.floor] : null;
+  if (ent.isBossSet && F) return srcLine(`${ent.floor + 1}층 ${F.name} 보스 「${F.boss.name}」 처치 시 ${fmtRate(BOSS.weaponDrop, 1)}`);
+  if (ent.grade === 6 && F) return srcLine(`${ent.floor + 1}층 ${F.name}의 ${F.monster}에게서 아주 낮은 확률 (${SRC_ULTRA_NOTE})`);
+  return srcLine(weaponCodexSourceText(ent.grade));
+}
+function subCodexSourceText(grade) { return `황혼국(21~40층) 사냥 드롭 · 📦 ${SRC_BOX_NAMES[grade]} 보조무기 상자`; }
+// 장갑: 성야국 사냥(일반~신화) + 토벌전 21단계~(GLOVE_DROP_GRADES) + 도서관 21서고~(LIBRARY_GLOVE_GRADES)
+const SRC_GLOVE_EXTRA = ['', ' · 토벌전 21~25단계', ' · 토벌전 21~30단계', ' · 토벌전 21~35단계 · 도서관 21~25서고', ' · 토벌전 21~40단계 · 도서관 21서고~', ' · 토벌전 26~40단계 · 도서관 21서고~'];
+function gloveCodexSourceText(grade) { return `성야국(41~60층) 사냥 드롭${SRC_GLOVE_EXTRA[grade] || ''}`; }
+
 function renderCodex() {
   renderEquipSubTabBar('codexMainSubTabBar', codexMainSubTab, (v) => { codexMainSubTab = v; renderCodex(); }, CODEX_MAIN_SUBTAB_OPTIONS);
   $('codexWeaponSection').style.display = codexMainSubTab === 'weapon' ? '' : 'none';
@@ -13370,6 +13624,7 @@ function renderCodex() {
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title ${isBoss ? 'grade-신화' : `grade-${GRADES[grade].name}`}">${sectionTitle}
       <span class="codex-section-count">${unlockedCount}/${ents.length}</span></div>
+      ${srcLine(weaponCodexSourceText(grade))}
       <div class="codex-grid"></div>`;
     const grid = section.querySelector('.codex-grid');
     for (const ent of ents) {
@@ -13388,7 +13643,7 @@ function renderCodex() {
       const revealDetail = unlocked || (ent.grade >= 4 && !ent.undesigned);
       cell.onclick = () => {
         if (revealDetail) { renderCodexDetail(ent, key); showCodexPopup(codexDetailHtml(ent)); }
-        else showCodexPopup(`<div style="color:var(--sub);font-style:italic;">${ent.name}</div>`);
+        else showCodexPopup(`<div style="color:var(--sub);font-style:italic;margin-bottom:4px;">${ent.name}</div>` + weaponCodexItemSource(ent));
       };
       grid.appendChild(cell);
     }
@@ -13402,7 +13657,7 @@ function codexDetailHtml(ent) {
   return `
     <div class="grade-${GRADES[ent.grade].name}" style="font-size:15px;font-weight:bold;margin-bottom:4px;">${ent.icon} [${GRADES[ent.grade].name}] ${ent.name}</div>
     ${ent.flavor ? `<div style="font-style:italic;color:var(--sub);margin-bottom:6px;">${ent.flavor}</div>` : ''}
-    ${spiritInfo}`;
+    ${spiritInfo}${ent.undesigned ? '' : weaponCodexItemSource(ent)}`;
 }
 function renderCodexDetail(ent, key) {
   $('codexDetail').innerHTML = codexDetailHtml(ent);
@@ -13441,13 +13696,14 @@ function renderSubCodex() {
       const name = subweaponItemName(fakeSw);
       const flavor = subweaponFlavorText(fakeSw);
       const revealDetail = unlocked || grade >= 4; // 레전더리 이상은 미보유라도 수집 목표로 미리 공개
-      return { icon: t.icon, unlocked, name, html: revealDetail ? subCodexGradeCellHtml(t.icon, name, flavor) : `<div style="color:var(--sub);font-style:italic;">${name}</div>` };
+      return { icon: t.icon, unlocked, name, html: (revealDetail ? subCodexGradeCellHtml(t.icon, name, flavor) : `<div style="color:var(--sub);font-style:italic;margin-bottom:4px;">${name}</div>`) + srcLine(subCodexSourceText(grade)) };
     });
     const unlockedCount = items.filter(i => i.unlocked).length;
     const section = document.createElement('div');
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name}
       <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>
+      ${srcLine(subCodexSourceText(grade))}
       <div class="codex-grid"></div>`;
     const grid = section.querySelector('.codex-grid');
     items.forEach(it => {
@@ -13469,7 +13725,7 @@ function renderSubCodex() {
       const unlocked = !!(S.subBossCodexSeen && S.subBossCodexSeen[idx]);
       const t = SUBWEAPON_TYPES.find(x => x.name === bs.subType);
       const src = FLOORS[WORLD2_START_FLOOR + idx];
-      const srcHtml = src ? `<div style="font-size:12px;color:#3ddfff;margin-bottom:4px;">👹 ${src.name} 보스 · ${src.boss ? (src.boss.name || src.boss) : ''}</div>` : '';
+      const srcHtml = src ? srcLine(`${WORLD2_START_FLOOR + idx + 1}층 ${src.name} 보스 「${src.boss ? (src.boss.name || src.boss) : ''}」 처치 시 ${fmtRate(BOSS.subweaponDrop, 1)}`) : '';
       return { icon: t.icon, unlocked, name: bs.name, html: subCodexGradeCellHtml(t.icon, bs.name, bs.flavor) + srcHtml };
     });
     const unlockedCount = items.filter(i => i.unlocked).length;
@@ -13477,6 +13733,7 @@ function renderSubCodex() {
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title grade-신화">보스 보조무기
       <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>
+      ${srcLine(`21~40층 사냥터 보스를 이기면 ${fmtRate(BOSS.subweaponDrop, 1)} 확률로 그 층 보스 보조무기 (드롭률 적용)`)}
       <div class="codex-grid"></div>`;
     const grid = section.querySelector('.codex-grid');
     items.forEach(it => {
@@ -13499,6 +13756,7 @@ function renderSubCodex() {
     const seen = S.subAncientSeen || [];
     section.innerHTML = `<div class="codex-section-title grade-고대">고대 보조무기
       <span class="codex-section-count">${seen.filter(Boolean).length}/${SUBWEAPON_ANCIENTS.length}</span></div>
+      ${srcLine(`21~40층 사냥터 몬스터에게서 아주 낮은 확률로 그 층 고대 보조무기 (${SRC_ULTRA_NOTE}) — 아래 ❓는 나오는 사냥터`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">${SUBWEAPON_ANCIENTS.map((a, i) => seen[i]
         ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a2a1a;" title="${a.flavor}"><b style="color:var(--gold)">${a.icon} ${a.name}</b><div style="color:var(--sub)">${FLOORS[WORLD2_START_FLOOR + i].name} · ${a.fxName}</div></div>`
         : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${FLOORS[WORLD2_START_FLOOR + i].name}</div>`).join('')}</div>`;
@@ -13512,6 +13770,7 @@ function renderSubCodex() {
     const list = SUBWEAPON_GENESES.map((g, i) => ({ g, i })).filter(x => x.g);
     section.innerHTML = `<div class="codex-section-title grade-태초">태초 보조무기
       <span class="codex-section-count">${list.filter(x => seen[x.i]).length}/${list.length}</span></div>
+      ${srcLine(`21~40층 사냥터 몬스터에게서 고대보다도 훨씬 낮은 확률로 그 층 태초 보조무기 (${SRC_ULTRA_NOTE}, 이미 가진 층은 다시 안 나옴)`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;">${list.map(({ g, i }) => seen[i]
         ? `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;background:#2a1a2a;" title="${g.subtitle}"><b class="grade-태초">${g.icon} ${g.name}</b><div style="color:var(--sub)">${FLOORS[WORLD2_START_FLOOR + i].name} · ${g.passiveName} · ${g.activeName}</div></div>`
         : `<div style="font-size:11px;padding:6px;border:1px solid var(--border);border-radius:6px;color:var(--sub);opacity:.5;">❓ ${FLOORS[WORLD2_START_FLOOR + i].name}</div>`).join('')}</div>`;
@@ -13523,6 +13782,7 @@ function renderSubCodex() {
     section.className = 'codex-section';
     section.innerHTML = `<div class="codex-section-title grade-고대">🏺 황혼의 유산
       <span class="codex-section-count">${subRelicCollectedCount()}/${SUBWEAPON_RELICS.length}</span></div>
+      ${srcLine(`21~40층 사냥터 몬스터에게서 아주 낮은 확률로 그 층의 유산 (${SRC_ULTRA_NOTE}) — 아래 ❓는 나오는 사냥터`)}
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;"></div>`;
     const grid = section.querySelector('div[style*="grid-template-columns"]');
     SUBWEAPON_RELICS.forEach((r, i) => {
@@ -13536,7 +13796,7 @@ function renderSubCodex() {
       } else {
         cell.style.color = 'var(--sub)';
         cell.style.opacity = '0.5';
-        cell.innerHTML = '❓ 미발견';
+        cell.innerHTML = `❓ ${FLOORS[WORLD2_START_FLOOR + i] ? FLOORS[WORLD2_START_FLOOR + i].name : '미발견'}`;
       }
       grid.appendChild(cell);
     });
@@ -13613,7 +13873,7 @@ function renderGloveCodex() {
     const statLine = Object.entries(stats).map(([k, v]) => `${DISRUPT_COUNTERS[k].icon} ${DISRUPT_COUNTERS[k].name} ${fmtRate(v, 1)}`).join(' · ');
     const html = subCodexGradeCellHtml(t.icon, bg.name, bg.flavor)
       + `<div style="font-size:12px;margin-bottom:4px;">신화 ${t.icon} · +0 대응 스탯: ${statLine}</div>`
-      + (F ? `<div style="font-size:12px;color:#3ddfff;">👹 ${F.name} 보스 · ${F.boss.name || F.boss} — 같은 층 보스 장신구와 세트</div>` : '');
+      + (F ? srcLine(`${WORLD3_START_FLOOR + idx + 1}층 ${F.name} 보스 「${F.boss.name || F.boss}」 처치 시 ${fmtRate(BOSS.gloveDrop, 1)}(광폭화 보스 2배) — 같은 층 보스 장신구와 세트`) : '');
     return { icon: t.icon, unlocked: !!seen[idx], name: bg.name, html };
   });
   const unlockedCount = items.filter(i => i.unlocked).length;
@@ -13622,14 +13882,15 @@ function renderGloveCodex() {
   for (let grade = 0; grade <= 5; grade++) {
     const have = GLOVE_TYPES.filter((t, i) => gloveCodexHas(`g${grade}_${i}`)).length;
     normalHtml += `<div class="codex-section"><div class="codex-section-title grade-${GRADES[grade].name}">${GRADES[grade].name} 장갑
-      <span class="codex-section-count">${have}/${GLOVE_TYPES.length}</span></div><div class="codex-grid" data-glove-grade="${grade}"></div></div>`;
+      <span class="codex-section-count">${have}/${GLOVE_TYPES.length}</span></div>${srcLine(gloveCodexSourceText(grade))}<div class="codex-grid" data-glove-grade="${grade}"></div></div>`;
   }
   const ancSeen = S.gloveAncientSeen || [];
   const ancCount = GLOVE_ANCIENTS.filter((a, i) => ancSeen[i]).length;
-  box.innerHTML = normalHtml + `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
-    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div><div class="codex-grid" data-glove-boss></div></div>`
+  const gloveIntro = srcLine(`일반 장갑: 성야국 사냥 처치당 ${fmtRate(GLOVE_HUNT_DROP_CHANCE, 2)}(엘리트 5배) · 토벌전 21단계 이상 승리 ${fmtRate(GLOVE_DROP_CHANCE)} · 도서관 21서고 이상 승리 ${fmtRate(LIBRARY_EXT.gloveDropChance)} — 절반은 그 보스 패턴을 막는 종류로 나옵니다`);
+  box.innerHTML = gloveIntro + normalHtml + `<div class="codex-section"><div class="codex-section-title grade-신화">보스 장갑
+    <span class="codex-section-count">${unlockedCount}/${items.length}</span></div>${srcLine(`41~60층 사냥터 보스를 이기면 ${fmtRate(BOSS.gloveDrop, 1)} 확률로 그 층 보스 장갑 (광폭화 보스 2배, 드롭률 적용)`)}<div class="codex-grid" data-glove-boss></div></div>`
     + `<div class="codex-section"><div class="codex-section-title grade-고대">고대 장갑
-    <span class="codex-section-count">${ancCount}/${GLOVE_ANCIENTS.length}</span></div><div class="codex-grid" data-glove-ancient></div></div>`;
+    <span class="codex-section-count">${ancCount}/${GLOVE_ANCIENTS.length}</span></div>${srcLine(`41~60층 사냥터 몬스터에게서 아주 낮은 확률로 그 층 고대 장갑 (엘리트 5배 · 층 보스 10배 · 보스 장갑 세트 3배 · 드롭률 적용)`)}<div class="codex-grid" data-glove-ancient></div></div>`;
   // 고대 장갑 — 얻은 적 있는 것만 이름·효과 공개(고대 보조무기 도감과 같음)
   const agrid = box.querySelector('[data-glove-ancient]');
   const acolor = GRADES[6].color;
@@ -13644,7 +13905,7 @@ function renderGloveCodex() {
     cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${acolor}` : ''}">${unlocked ? ad.icon : '❔'}</span>`;
     cell.onclick = () => showCodexPopup(unlocked
       ? subCodexGradeCellHtml(ad.icon, ad.name, ad.flavor) + `<div class="grade-고대" style="font-size:12px;">🏺 [${ad.fxName}] ${ad.desc(ad.p)}</div><div style="font-size:12px;color:#3ddfff;margin-top:4px;">${F ? F.name : ''} · ${GLOVE_TYPES[GLOVE_BOSS_NAMES[i].typeIdx].icon} 종류</div>`
-      : `<div style="color:var(--sub)">아직 얻지 못한 고대 장갑입니다. (${F ? F.name : ''} 몬스터에게서 아주 낮은 확률로 나옵니다)</div>`);
+      : `<div style="color:var(--sub);margin-bottom:4px;">아직 얻지 못한 고대 장갑입니다.</div>` + srcLine(`${WORLD3_START_FLOOR + i + 1}층 ${F ? F.name : ''}의 ${F ? F.monster : ''}에게서 아주 낮은 확률 (엘리트 5배 · 층 보스 10배 · 보스 장갑 세트 3배)`));
     agrid.appendChild(cell);
   });
   for (let grade = 0; grade <= 5; grade++) {
@@ -13661,8 +13922,8 @@ function renderGloveCodex() {
       if (unlocked && grade >= 5) cell.style.boxShadow = `0 0 8px ${gcolor}`;
       cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolor}` : ''}">${t.icon}</span>`;
       cell.onclick = () => showCodexPopup(unlocked
-        ? subCodexGradeCellHtml(t.icon, t.names[grade], '') + `<div style="font-size:12px;"><span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> · ${GLOVE_TYPE_LABELS[i]} 계열 · +0 대응 스탯: ${statLine}</div>`
-        : `<div style="color:var(--sub)">아직 얻지 못한 장갑입니다. (<span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> ${t.icon} ${GLOVE_TYPE_LABELS[i]} 계열)</div>`);
+        ? subCodexGradeCellHtml(t.icon, t.names[grade], '') + `<div style="font-size:12px;margin-bottom:4px;"><span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> · ${GLOVE_TYPE_LABELS[i]} 계열 · +0 대응 스탯: ${statLine}</div>` + srcLine(gloveCodexSourceText(grade))
+        : `<div style="color:var(--sub);margin-bottom:4px;">아직 얻지 못한 장갑입니다. (<span class="grade-${GRADES[grade].name}">${GRADES[grade].name}</span> ${t.icon} ${GLOVE_TYPE_LABELS[i]} 계열)</div>` + srcLine(gloveCodexSourceText(grade)));
       ngrid.appendChild(cell);
     });
   }
@@ -15313,7 +15574,8 @@ function renderGenesisList() {
         </div>`;
     } else {
       div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(${FLOORS[a.floor].name} — ${FLOORS[a.floor].monster})</span></div>
-        <div class="wi" style="font-style:italic;">이 사냥터 어딘가에도 태초의 잔영이 잠들어 있다고 전해진다 — 아직, 그 흔적조차 찾아내지 못했다.</div></div>`;
+        <div class="wi" style="font-style:italic;">이 사냥터 어딘가에도 태초의 잔영이 잠들어 있다고 전해진다 — 아직, 그 흔적조차 찾아내지 못했다.</div>
+        ${srcLine(`${a.floor + 1}층 ${FLOORS[a.floor].name}의 ${FLOORS[a.floor].monster}에게서 극히 낮은 확률 (${SRC_ULTRA_NOTE})`)}</div>`;
     }
     box.appendChild(div);
   }
@@ -15321,7 +15583,7 @@ function renderGenesisList() {
 function renderAncientSealList() {
   const box = $('ancientSealList');
   if (!box) return;
-  box.innerHTML = `<div style="font-size:12px;color:var(--sub);margin-bottom:8px;">장착 슬롯 ${S.sealEquipped.length}/${ANCIENT_SEAL_SLOTS}</div>`;
+  box.innerHTML = srcLine(`토벌전 1~20단계를 이기면 ${fmtRate(ANCIENT_SEAL_DROP_CHANCE, 1)} 확률로 그 단계의 인장 (이미 가진 인장이면 골드)`) + `<div style="font-size:12px;color:var(--sub);margin-bottom:8px;">장착 슬롯 ${S.sealEquipped.length}/${ANCIENT_SEAL_SLOTS}</div>`;
   for (const seal of ANCIENT_SEALS) {
     const owned = hasSeal(seal.id);
     const equipped = sealEquippedHas(seal.id);
@@ -15346,7 +15608,7 @@ function renderAncientSealList() {
       }
       div.querySelector('.btns').appendChild(btn);
     } else {
-      div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(${FLOORS[seal.floor].name} 토벌전)</span></div>
+      div.innerHTML = `<div><div class="wn" style="color:var(--sub)">🌫️ ??? <span style="font-size:12px">(토벌전 ${ANCIENT_SEALS.indexOf(seal) + 1}단계 · ${FLOORS[seal.floor].name})</span></div>
         <div class="wi" style="font-style:italic;">아직 발견하지 못한 고대의 인장입니다.</div></div>`;
     }
     box.appendChild(div);
@@ -16538,7 +16800,7 @@ const GUIDE_SECTIONS = [
   {
     icon: '🚩', title: '토벌전 21~40단계',
     body: `토벌전 <b>21~40단계</b>는 황혼국 사냥터를 모두 해금하고, <b>바로 앞 단계를 클리어</b>해야 한 단계씩 도전할 수 있습니다. 도전 횟수는 1~20단계와 같은 하루 횟수를 함께 씁니다.
-    <br><br>이 구간 보스는 전부 <b>👹 보스 패턴</b>(1~3개)을 가지고 있고, 토벌전 목록에서 보스마다 어떤 패턴을 쓰는지 미리 확인할 수 있습니다. 패턴에 맞는 <b>🧤 장갑</b>을 끼고 도전하세요.
+    <br><br>이 구간 보스는 전부 <b>👹 보스 패턴</b>(1~3개)을 가지고 있고, 토벌전 목록에서 보스마다 어떤 패턴을 쓰는지 미리 확인할 수 있습니다. 주기가 있는 패턴은 <b>첫 발동이 주기의 1/4 시점</b>(10초 주기면 2.5초)에 오고, 그 뒤로는 주기마다 옵니다. 패턴에 맞는 <b>🧤 장갑</b>을 끼고 도전하세요.
     <br><br>승리 보상: 골드 · 🎫 토벌의 증표 · <b>🧵 강철실</b>(21단계 10개부터 단계가 오를수록 증가) · 30% 확률로 <b>🧤 장갑</b>(단계가 높을수록 높은 등급, 절반은 그 보스의 패턴을 막는 종류).`,
   },
   {
@@ -16750,13 +17012,16 @@ const GUIDE_SECTIONS = [
     icon: '🌳', title: '주간 통합 레이드 (세계수의 단말마)',
     body: `니드호그가 끝없이 갉아온 세계수의 뿌리는 이미 돌이킬 수 없이 썩었고, 그걸 지키던 루멘 아르카(20층 보스)조차 신성을 버리고 등을 돌렸습니다. 매주 그 썩은 수액이 응어리져 터져 나오는 <b>그르마</b>와, 전용 탭에서 사냥터 진행도와 무관하게 맞섭니다.
     <br><br>매커니즘은 펀치기계와 같습니다 — 체력이 사실상 무한인 상대에게 <b>120초</b> 동안 실제로 들어간 누적 피해를 측정합니다(시간 연장 룬은 적용되지 않음). <b>하루 3회</b> 도전할 수 있고, 그날의 최고 기록이 일일 기록이 됩니다. 일~토 일일 기록을 모두 더한 값이 그 주의 <b>주간 기여</b>입니다.
-    <br><br>🌍 <b>전체 기여 보상</b> — 모든 유저의 주간 기여를 합친 값이 10a(1경)를 넘으면 전체 1구간, 그 뒤로 10배마다 한 구간씩 올라가며 상한이 없습니다. 한 주는 일요일~토요일이고, 매주 <b>일요일(강화데이) 0시</b>에 결산되어 그 주에 한 번이라도 기록을 남긴 사람 모두가 일요일 첫 접속 때 같은 구간의 보상을 받습니다(누가 얼마나 쳤는지는 공개되지 않습니다). 받은 강화 패널티 방지권·세계수의 잎을 그날 강화데이에 바로 쓸 수 있습니다.
+    <br><br>🌍 <b>전체 기여 보상</b> — 모든 유저의 주간 기여를 합친 값이 10a(1경)를 넘으면 전체 1구간, 그 뒤로 10배마다 한 구간씩 올라가며 상한이 없습니다. 한 주는 일요일~토요일이고, 매주 <b>일요일(강화데이) 0시</b>에 결산되어 그 주에 한 번이라도 기록을 남긴 사람 모두가 일요일 첫 접속 때 같은 구간의 보상을 받습니다(기여도 1~3위는 아래 순위 보상을 더 받습니다). 받은 강화 패널티 방지권·세계수의 잎을 그날 강화데이에 바로 쓸 수 있습니다.
     <br>· 보상은 구간^1.5에 비례해서 높은 구간일수록 크게 늘어납니다: 🎖️ 명예의 정수 30×구간^1.5 · 💰 골드 "사냥터 보스 처치 보상"×(구간^1.5) · 🍃 세계수의 잎 8,000×구간^1.5 (예: 7구간 = 명예 556, 골드 ×18.5, 잎 14.8만)
     <br>· 5구간부터 🛡️ 강화 패널티 방지권 (구간−4)장 (7구간 = 3장)
     <br><br>🏅 <b>기록 보상</b> — 1회 도전 피해가 내 역대 최고 기록의 <b>1.2배 이상</b>이면 하루 1회 즉시 보상을 받습니다. 기준이 "역대 최고"라서 일부러 약하게 쳐도 기준은 내려가지 않습니다.
     <br>· 그 기록의 개인 구간(10억부터 1구간, 10배마다 한 구간, 최소 1)마다 🎖️ +5 · 🍃 +3,000
     <br><br>🏷️ <b>칭호</b> — 내 주간 기여가 기준을 넘으면 얻고, 다음 한 주 동안 모든 사냥터에서 효과가 적용됩니다(가장 높은 것 하나, 제목 옆에 표시).
     <br>· 🍂 절규를 들은 자 (기여 1조): 드롭률·골드 +10% · 🪓 뿌리를 가른 자 (100a): +20% · 🌳 단말마를 삼킨 자 (1c): +30%
+    <br><br>🏆 <b>기여도 순위</b> — 레이드 탭에서 <b>레이드 이름</b>을 정하면(처음은 무료, 바꿀 땐 1b 골드) 이번 주 기여도 1~3위와 내 순위, 지난주 명예의 전당이 그 이름으로 표시됩니다. 1~3위는 이름 옆 "세팅 보기"로 그 기록을 낸 세팅을 볼 수 있습니다.
+    <br>· 일요일 결산 때 1위는 전체 기여 보상 ×4 + 🛡️ 방지권 3장, 2위 ×3 + 2장, 3위 ×2 + 1장 (전체 구간이 0이어도 1구간 기준)
+    <br>· 다음 한 주 동안 순위 칭호(기여 구간 칭호와 함께 적용): 👑 세계수가 택한 수호자 +15% · ⚔️ 뿌리 끝의 처형자 +10% · 🔥 썩은 수액을 태우는 불꽃 +5% (드롭률·골드)
     <br><br>🎖️ <b>명예의 정수 상점</b>: 특수효과 변경권, 강화 패널티 방지권(실패 시 파괴·초기화·하락을 1회 막음), 토벌전·도서관 추가 도전권, 각인 승급 진행도 +10, 강철실, 무기의 정수·각성의 정수(도서관 최고 서고 1회의 10%), 토벌의 증표, 세계수의 잎을 교환할 수 있습니다.`,
   },
   {
@@ -17593,6 +17858,11 @@ function sellMat(key, n) {
 }
 
 // 보스 장신구 목록 & 장착
+// 보스 장신구 획득처(월드별 층 범위, 성야국은 광폭화 보스 2배)
+function bossAccSourceText(wNum) {
+  const [lo, hi] = worldFloorRange(wNum);
+  return `${lo + 1}~${hi}층 사냥터 보스를 이기면 ${fmtRate(BOSS.accDrop, 1)} 확률로 그 층 보스 장신구${wNum === 3 ? ' (광폭화 보스 2배)' : ''} · 드롭률 적용`;
+}
 function renderBossAccs() {
   const box = $('bossaccbox');
   if (!box) return;
@@ -17601,13 +17871,13 @@ function renderBossAccs() {
   const owned = S.bossAccs.filter(f => f >= rangeLo && f < rangeHi).sort((a, b) => a - b);
   const shardHtml = wNum === 3 ? dreamShardPanelHtml() : '';
   if (!owned.length) {
-    box.innerHTML = '<div style="color:var(--sub);font-size:13px;">아직 보스 장신구가 없습니다. 각 사냥터의 보스를 격파해 획득하세요! (0.9%)</div>' + shardHtml;
+    box.innerHTML = srcLine(bossAccSourceText(wNum)) + '<div style="color:var(--sub);font-size:13px;">아직 보스 장신구가 없습니다.</div>' + shardHtml;
     return;
   }
   // 세트 효과 파트너는 월드1=메인 보스무기, 월드2=보스 보조무기, 월드3=보스 장갑으로 다르다.
   const world1 = wNum === 1;
   const activeSetFloor = wNum === 1 ? bossSetFloor() : wNum === 2 ? subBossSetFloor() : gloveBossSetFloor();
-  box.innerHTML = '';
+  box.innerHTML = srcLine(bossAccSourceText(wNum));
   for (const f of owned) {
     const b = BOSS_ACCS[f];
     if (!b) continue;
@@ -17882,7 +18152,7 @@ function init() {
 
   // 세계수의 단말마: 주가 바뀌었으면 지난주 기여 정산(로컬). 탭을 켜둔 채 주가 바뀌어도 1분마다 확인.
   weeklyRaidEnsureWeek(); save();
-  setInterval(() => { const wk = S.weeklyRaid.week; weeklyRaidEnsureWeek(); weeklyRaidPushCurrent(); if (S.weeklyRaid.week !== wk) { renderTop(); renderRaidTitleBadge(); save(); } }, 60000);
+  setInterval(() => { const wk = S.weeklyRaid.week; weeklyRaidEnsureWeek(); weeklyRaidPushCurrent(); weeklyRaidPushName(); weeklyRaidPushSetup(); if (S.weeklyRaid.week !== wk) { renderTop(); renderRaidTitleBadge(); save(); } }, 60000);
   // 태초 획득 알림: 시작 시 + 5분마다 새로 읽고, 1분마다 하루 지난 것은 배너에서 내린다. 이름을 못 받은 것은 다시 묻는다.
   genesisFeedRefresh(); genesisFeedProcess();
   setInterval(genesisFeedRefresh, 5 * 60000);

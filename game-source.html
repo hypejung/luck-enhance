@@ -3871,8 +3871,8 @@ function rollAncientGlove(floorIdx, kindMult) {
 }
 // ---- 🌟 태초 장갑 (월드3 41~60층, 7등급) ----
 // 그 층 보스 장갑과 같은 종류. 고유 효과 2개: 패시브(보스전 내내) + 반격(보스 패턴이 오는 순간).
-// 반격은 대응 스탯으로 패턴 세기가 0이 돼도 패턴이 "오는 순간" 터지고, 상시 패턴(회피·웅크리기·예언·재생)만
-// 쓰는 보스는 GLOVE_GENESIS_FAKE_EVERY초마다 패턴이 온 것으로 친다. 봉인 중엔 패시브가 멈추지만 반격은 터진다.
+// 반격은 대응 스탯으로 패턴 세기가 0이 돼도 패턴이 "오는 순간" 터지고, 패턴이 GLOVE_GENESIS_FAKE_EVERY초 동안
+// 오지 않으면(상시 패턴만 쓰는 보스·주기가 긴 패턴) 그때도 패턴이 온 것으로 친다. 봉인 중엔 패시브가 멈추지만 반격은 터진다.
 // 위력은 태초 보조무기처럼 3강마다 1단계(0~10) — 0단계 = 최대치의 절반. 화면엔 숫자 없이 분위기 문구 + 단계만.
 // 파괴·초기화 없음(실패 시 유지·하락), 판매 불가, 분해 강철실 20,000. 이미 가진 층의 태초 장갑은 다시 나오지 않는다.
 const GLOVE_GENESIS_BASE_CHANCE = 1 / 61000000; // 태초 보조무기와 같은 기본 확률(풀세팅 약 39일)
@@ -10148,7 +10148,7 @@ function gloveGenesisFx() {
 function gloveGenesisPassive() { const x = gloveGenesisFx(); return x && bossFight.active && !bdSealed() ? x : null; }
 function gglState() {
   if (!fx.ggl) fx.ggl = { atkAcc: 0, avgAtk: 0, sleep: 0, sleepUntil: -1, delayed: [], dreamUntil: -1, dreamAcc: 0,
-    sat: 0, satNext: 0, digestUntil: -1, darkUntil: -1, fakeNext: 0 };
+    sat: 0, satNext: 0, digestUntil: -1, darkUntil: -1, lastPattern: GLOVE_GENESIS_FAKE_EVERY * (BD_FIRST_FRAC - 1) };
   return fx.ggl;
 }
 // 태초 장갑 효과 자신의 피해는 평균 공격 피해에서 제외(되먹임 방지). 미뤄 둔 패턴을 다시 부를 땐 반격을 건너뛴다.
@@ -10214,6 +10214,7 @@ function gloveGenesisOnPattern(key) {
   const x = gloveGenesisFx();
   if (!x || !bossFight.active) return false;
   const st = gglState(), p = x.p, el = bossFight.elapsed;
+  st.lastPattern = el;
   switch (x.id) {
     case 'hypnos': {
       if (st.sleep <= 0 || el < st.sleepUntil) return false;
@@ -10255,11 +10256,9 @@ function gloveGenesisTick(dt, w) {
   if (!x || !bossFight.active) return null;
   const st = gglState(), p = x.p, el = bossFight.elapsed;
   const hp0 = mon.hp; // 이번 틱에 태초 장갑 피해로 쓰러졌을 때만 처치 처리
-  // 상시 패턴만 쓰는 보스: GLOVE_GENESIS_FAKE_EVERY초마다 패턴이 온 것으로(첫 발동은 주기 패턴과 같은 1/4 시점)
-  if (bd && bd.list.length && !bd.list.some(e => DISRUPTIONS[e.key].every)) {
-    if (!st.fakeNext) st.fakeNext = GLOVE_GENESIS_FAKE_EVERY * BD_FIRST_FRAC;
-    while (el >= st.fakeNext) { st.fakeNext += GLOVE_GENESIS_FAKE_EVERY; gloveGenesisOnPattern(null); }
-  }
+  // 패턴 보스가 GLOVE_GENESIS_FAKE_EVERY초 동안 패턴을 쓰지 않으면 그때도 반격(상시 패턴만 쓰는 보스·주기가 긴 패턴)
+  // — 첫 발동은 주기 패턴과 같은 1/4 시점
+  if (bd && bd.list.length && el - st.lastPattern >= GLOVE_GENESIS_FAKE_EVERY) gloveGenesisOnPattern(null);
   // 히프노스: 잠든 사이 미뤄 둔 패턴이 깨어날 때 온다
   if (st.delayed.length && bd) {
     const due = st.delayed.filter(d => el >= d.at);
@@ -17320,7 +17319,7 @@ const GUIDE_SECTIONS = [
   {
     icon: '🌟', title: '태초 장갑',
     body: `월드3(성야국) 41~60층마다 그 층에만 있는 <b>태초 장갑</b>이 1종씩 있습니다(지금 41~45층 5종, 나머지는 차례로 추가). 종류는 그 층 보스 장갑과 같고, 대응 스탯이 고대보다 크며(+30에서 주 스탯 115%) <b>🌊 넘치는 대응</b>도 그대로 적용됩니다.
-    <br><br><b>고유 효과 2개</b>: 보스전 내내 켜져 있는 <b>패시브</b>와, 보스 패턴이 <b>오는 순간</b> 터지는 <b>반격</b>입니다. 대응 스탯으로 패턴 세기가 0이 돼도 패턴이 오는 순간 반격은 터지고, 회피·웅크리기·예언·재생처럼 상시 패턴만 쓰는 보스는 ${GLOVE_GENESIS_FAKE_EVERY}초마다 패턴이 온 것으로 칩니다. 🔇 봉인 중에는 패시브가 멈추지만 반격은 터집니다.
+    <br><br><b>고유 효과 2개</b>: 보스전 내내 켜져 있는 <b>패시브</b>와, 보스 패턴이 <b>오는 순간</b> 터지는 <b>반격</b>입니다. 대응 스탯으로 패턴 세기가 0이 돼도 패턴이 오는 순간 반격은 터지고, 패턴이 ${GLOVE_GENESIS_FAKE_EVERY}초 동안 오지 않으면(회피·웅크리기처럼 상시 패턴만 쓰는 보스, 주기가 긴 패턴) 그때도 패턴이 온 것으로 칩니다. 🔇 봉인 중에는 패시브가 멈추지만 반격은 터집니다.
     <br><br>위력은 <b>3강마다 1단계</b>씩(0~10단계) 커지며, 0단계는 최대치의 절반입니다. 화면에는 숫자 대신 효과 문구와 단계만 보입니다.
     <br><br><b>획득</b>: 그 층 몬스터를 처치할 때 극히 낮은 확률로 드롭됩니다(엘리트 5배, 층 보스 10배, 그 층 보스 장갑 세트 3배). 이미 가진 층의 태초 장갑은 다시 나오지 않고, 판매 대상이 아니며 분해하면 🧵 강철실 20,000개(강화 단계에 따라 증가)를 줍니다.
     <br><br><b>강화</b>: 골드·🧵 강철실과 📜 무기의 정수를 소모합니다. <b>파괴·초기화가 없고</b> 실패하면 유지 또는 단계 하락(35%, 고급 강화 10%)뿐이며, 장갑 파괴 확률 감소는 하락 확률 감소로 들어갑니다(절반까지).

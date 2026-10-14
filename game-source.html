@@ -4034,7 +4034,7 @@ const GLOVE_GENESES = [
     passiveText: '빗나간 자리에는, 거꾸로 찍힌 발자국이 남는다.',
     counterText: '무언가 다가오는 순간, 신발에 날개가 돋는다.',
     // 공격속도 +speed, 빗나간 공격(회피·암흑)은 한 번 더 굴림 / 패턴이 오면 dur초 동안 공격속도 +boost
-    p: { speed: 0.7, boost: 1.1, dur: 5 },
+    p: { speed: 0.75, boost: 1.25, dur: 5 },
     lore: `태어난 지 하루 만에 요람을 빠져나온 아이가
 이웃 신의 소 떼를 훔쳤다.
 
@@ -4081,7 +4081,7 @@ const GLOVE_GENESES = [
     passiveText: '버려진 것들이 하나씩 눈을 뜨고, 곁에서 같이 싸운다.',
     counterText: '눈뜬 것들이 한꺼번에, 한 줄로 돌진한다.',
     // every초마다 깨어난 물건 +1(최대 max), 물건마다 매초 평균 공격 피해 × dps / 패턴이 오면 물건 전부가 평균 공격 피해 × charge씩 돌진, 물건 +1
-    p: { every: 4, max: 8, dps: 0.9, charge: 6 },
+    p: { every: 4, max: 10, dps: 1.3, charge: 9 },
     lore: `물건이 백 년을 지나면
 혼이 깃든다고 한다.
 
@@ -4104,7 +4104,7 @@ const GLOVE_GENESES = [
     passiveText: '이야기가 길어질수록, 끝을 내는 손은 날카로워진다.',
     counterText: '가장 좋은 대목에서, 이야기는 멈춘다.',
     // every초마다 피해 +per 누적(최대 max회) / 패턴이 오면 남은 시간 +time초(전투당 최대 timeCap초) + dur초 동안 피해 +boost
-    p: { every: 10, per: 0.16, max: 10, time: 1.5, timeCap: 15, dur: 3, boost: 1.3 },
+    p: { every: 10, per: 0.18, max: 10, time: 1.5, timeCap: 15, dur: 3, boost: 1.6 },
     lore: `왕은 매일 밤 새 신부를 맞고
 날이 밝으면 죽였다.
 

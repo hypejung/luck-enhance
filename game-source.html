@@ -510,6 +510,11 @@
     font-size: 10px; font-weight: bold; line-height: 1; color: #fff;
     border-radius: 50%; border: 1.5px solid var(--bg); box-shadow: 0 0 3px rgba(0,0,0,.6);
   }
+  .codex-cell .codex-floor {
+    position: absolute; left: 2px; top: 2px; padding: 0 3px; height: 14px; display: flex; align-items: center;
+    font-size: 9px; font-weight: bold; line-height: 1; color: #8fd3ff; background: rgba(0,0,0,.55);
+    border-radius: 4px; pointer-events: none;
+  }
   .codex-cell .codex-badge.v0 { background: #5b8def; }
   .codex-cell .codex-badge.v1 { background: #2ecc71; }
   .codex-cell .codex-badge.v2 { background: #f5a623; }
@@ -14095,6 +14100,8 @@ const CODEX_MAIN_SUBTAB_OPTIONS = [
 // ---------- 수집형 컨텐츠 획득처 안내 ----------
 // 도감·유물·인장·꿈조각·보스 장신구 등 수집 화면에 "어디서 나오는지"를 📍 한 줄로 보여준다.
 // 확률·층 범위는 실제 드롭 코드(dropRoll·endBossFight·토벌전/도서관 승리)와 맞춰 둔다.
+// 도감 칸 왼쪽 위에 "나오는 층" 번호(층 번호 f는 0부터라 +1) — 눌러 보기 전에도 어디서 나오는지 보이게
+function floorBadge(f) { return f != null && f >= 0 ? `<span class="codex-floor" title="${f + 1}층">${f + 1}층</span>` : ''; }
 function srcLine(text) { return `<div class="src-line">📍 ${text}</div>`; }
 const SRC_ULTRA_NOTE = '엘리트 5배 · 그 층 보스 세트 3배 · 드롭률 적용';
 // 랜덤박스(무기)·보조무기 상자는 등급표가 같다 — 그 등급이 들어 있는 상자
@@ -14161,7 +14168,7 @@ function renderCodex() {
       cell.style.borderColor = unlocked ? gcolor : '';
       if (unlocked && ent.grade >= 5) cell.style.boxShadow = `0 0 8px ${gcolor}`;
       const badge = ent.variant !== undefined ? `<span class="codex-badge v${ent.variant}">${VARIANT_BADGES[ent.variant] || ''}</span>` : '';
-      cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolor}` : ''}">${ent.icon}</span>${badge}`;
+      cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolor}` : ''}">${ent.icon}</span>${badge}${floorBadge(ent.floor)}`;
       // 클릭/터치 시 팝업으로 설명 표시 (모바일은 호버가 안 되므로 title 툴팁 대신 사용).
       // 레전더리 이상(4~6등급)은 미보유 상태라도 이름·설명·스피릿을 미리 볼 수 있게 공개
       // (수집 목표를 미리 보여주는 취지). 실제 등급 아이콘 실루엣/카운트는 그대로 유지.
@@ -14251,7 +14258,7 @@ function renderSubCodex() {
       const t = SUBWEAPON_TYPES.find(x => x.name === bs.subType);
       const src = FLOORS[WORLD2_START_FLOOR + idx];
       const srcHtml = src ? srcLine(`${WORLD2_START_FLOOR + idx + 1}층 ${src.name} 보스 「${src.boss ? (src.boss.name || src.boss) : ''}」 처치 시 ${fmtRate(BOSS.subweaponDrop, 1)}`) : '';
-      return { icon: t.icon, unlocked, name: bs.name, html: subCodexGradeCellHtml(t.icon, bs.name, bs.flavor) + srcHtml };
+      return { icon: t.icon, unlocked, name: bs.name, floor: WORLD2_START_FLOOR + idx, html: subCodexGradeCellHtml(t.icon, bs.name, bs.flavor) + srcHtml };
     });
     const unlockedCount = items.filter(i => i.unlocked).length;
     const section = document.createElement('div');
@@ -14267,7 +14274,7 @@ function renderSubCodex() {
       cell.title = it.unlocked ? '' : it.name;
       cell.style.borderColor = it.unlocked ? GRADES[5].color : '';
       if (it.unlocked) cell.style.boxShadow = `0 0 8px ${GRADES[5].color}`;
-      cell.innerHTML = `<span class="codex-icon" style="${it.unlocked ? `color:${GRADES[5].color}` : ''}">${it.icon}</span>`;
+      cell.innerHTML = `<span class="codex-icon" style="${it.unlocked ? `color:${GRADES[5].color}` : ''}">${it.icon}</span>${floorBadge(it.floor)}`;
       cell.onclick = () => showCodexPopup(it.html); // 보스 보조무기는 미보유라도 목표 미리보기(무기 도감 "보스의 무력"과 동일한 취급)
       grid.appendChild(cell);
     });
@@ -14399,7 +14406,7 @@ function renderGloveCodex() {
     const html = subCodexGradeCellHtml(t.icon, bg.name, bg.flavor)
       + `<div style="font-size:12px;margin-bottom:4px;">신화 ${t.icon} · +0 대응 스탯: ${statLine}</div>`
       + (F ? srcLine(`${WORLD3_START_FLOOR + idx + 1}층 ${F.name} 보스 「${F.boss.name || F.boss}」 처치 시 ${fmtRate(BOSS.gloveDrop, 1)}(광폭화 보스 2배) — 같은 층 보스 장신구와 세트`) : '');
-    return { icon: t.icon, unlocked: !!seen[idx], name: bg.name, html };
+    return { icon: t.icon, unlocked: !!seen[idx], name: bg.name, floor: WORLD3_START_FLOOR + idx, html };
   });
   const unlockedCount = items.filter(i => i.unlocked).length;
   // 1) 일반 장갑 (등급별 섹션, 8종류) — 획득한 적 있는 것만 색이 들어온다
@@ -14431,7 +14438,7 @@ function renderGloveCodex() {
     cell.title = unlocked ? '' : '???';
     cell.style.borderColor = unlocked ? gcolorG : '';
     if (unlocked) cell.style.boxShadow = `0 0 8px ${gcolorG}`;
-    cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolorG}` : ''}">${unlocked ? gd.icon : '❔'}</span>`;
+    cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${gcolorG}` : ''}">${unlocked ? gd.icon : '❔'}</span>${floorBadge(WORLD3_START_FLOOR + i)}`;
     const where = srcLine(`${WORLD3_START_FLOOR + i + 1}층 ${F ? F.name : ''}의 ${F ? F.monster : ''}에게서 극히 낮은 확률 (엘리트 5배 · 층 보스 10배 · 보스 장갑 세트 3배)`);
     cell.onclick = () => showCodexPopup(unlocked
       ? subCodexGradeCellHtml(gd.icon, gd.name, gd.subtitle) + `<div style="font-size:12px;color:var(--prim);">🌟 [${gd.passiveName}] ${gd.passiveText}<br>🌟 [반격: ${gd.counterName}] ${gd.counterText}</div><div style="font-size:12px;color:#3ddfff;margin-top:4px;">${F ? F.name : ''} · ${GLOVE_TYPES[GLOVE_BOSS_NAMES[i].typeIdx].icon} 종류</div>` + where
@@ -14449,7 +14456,7 @@ function renderGloveCodex() {
     cell.title = unlocked ? '' : '???';
     cell.style.borderColor = unlocked ? acolor : '';
     if (unlocked) cell.style.boxShadow = `0 0 8px ${acolor}`;
-    cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${acolor}` : ''}">${unlocked ? ad.icon : '❔'}</span>`;
+    cell.innerHTML = `<span class="codex-icon" style="${unlocked ? `color:${acolor}` : ''}">${unlocked ? ad.icon : '❔'}</span>${floorBadge(WORLD3_START_FLOOR + i)}`;
     cell.onclick = () => showCodexPopup(unlocked
       ? subCodexGradeCellHtml(ad.icon, ad.name, ad.flavor) + `<div class="grade-고대" style="font-size:12px;">🏺 [${ad.fxName}] ${ad.desc(ad.p)}</div><div style="font-size:12px;color:#3ddfff;margin-top:4px;">${F ? F.name : ''} · ${GLOVE_TYPES[GLOVE_BOSS_NAMES[i].typeIdx].icon} 종류</div>`
       : `<div style="color:var(--sub);margin-bottom:4px;">아직 얻지 못한 고대 장갑입니다.</div>` + srcLine(`${WORLD3_START_FLOOR + i + 1}층 ${F ? F.name : ''}의 ${F ? F.monster : ''}에게서 아주 낮은 확률 (엘리트 5배 · 층 보스 10배 · 보스 장갑 세트 3배)`));
@@ -14481,7 +14488,7 @@ function renderGloveCodex() {
     cell.title = it.unlocked ? '' : it.name;
     cell.style.borderColor = it.unlocked ? GRADES[5].color : '';
     if (it.unlocked) cell.style.boxShadow = `0 0 8px ${GRADES[5].color}`;
-    cell.innerHTML = `<span class="codex-icon" style="${it.unlocked ? `color:${GRADES[5].color}` : ''}">${it.icon}</span>`;
+    cell.innerHTML = `<span class="codex-icon" style="${it.unlocked ? `color:${GRADES[5].color}` : ''}">${it.icon}</span>${floorBadge(it.floor)}`;
     cell.onclick = () => showCodexPopup(it.html); // 미보유도 목표 미리보기(보스 보조무기와 같은 취급)
     grid.appendChild(cell);
   });

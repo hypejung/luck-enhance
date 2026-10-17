@@ -12701,6 +12701,38 @@ function endDuelFight() {
   renderBossBtn(); renderTop(); renderWorldRaidTab(); save();
 }
 
+// ---- 🛒 황혼 상점 (🌆 황혼의 정수) — 명예의 정수 상점과 같은 방식. 🌑 황혼의 그림자는 팔지 않는다(순위로만 얻음). ----
+const TWILIGHT_SHOP = [
+  { id: 'weaponEssence', name: () => `📜 무기의 정수 ${fmt(honorEssenceAmount())}개`, cost: 20, desc: '도서관 최고 서고 1회 보상의 10%' },
+  { id: 'awakenEssence', name: () => `💠 각성의 정수 ${fmt(honorAwakenAmount())}개`, cost: 20, desc: '도서관 최고 서고 1회 보상의 10%' },
+  { id: 'raidTokens', name: '🎫 토벌의 증표 50개', cost: 15, desc: '각인 재설정 재료' },
+  { id: 'steelThread', name: () => `🧵 강철실 ${fmt(honorSteelAmount())}개`, cost: 15, desc: '도서관 21서고 1회분 (장갑 강화 재료)' },
+  { id: 'penaltyGuard', name: () => `🛡️ 강화 패널티 방지권 (보유 ${S.penaltyGuard || 0}장)`, cost: 80, desc: '강화(무기·보조무기·장갑)가 실패해서 파괴·초기화·단계 하락이 될 때 대신 막아 줍니다.' },
+];
+function buyTwilightShop(id) {
+  const item = TWILIGHT_SHOP.find(h => h.id === id);
+  if (!item) return;
+  if (BN.lt(S.twilightEssence || 0, item.cost)) { log('황혼의 정수가 부족합니다.', 'lg-bad'); return; }
+  S.twilightEssence = BN.sub(S.twilightEssence, item.cost);
+  if (id === 'weaponEssence') {
+    const n = honorEssenceAmount(); S.weaponEssence = BN.add(S.weaponEssence, n);
+    log(`📜 [황혼 상점] 무기의 정수 +${fmt(n)} 획득!`, 'lg-good');
+  } else if (id === 'awakenEssence') {
+    const n = honorAwakenAmount(); S.awakeningEssence = BN.add(S.awakeningEssence, n);
+    log(`💠 [황혼 상점] 각성의 정수 +${fmt(n)} 획득!`, 'lg-good');
+  } else if (id === 'raidTokens') {
+    S.raidTokens = BN.add(S.raidTokens, 50);
+    log('🎫 [황혼 상점] 토벌의 증표 +50개 획득!', 'lg-good');
+  } else if (id === 'steelThread') {
+    const n = honorSteelAmount(); S.steelThread = BN.add(S.steelThread || BN.from(0), n);
+    log(`🧵 [황혼 상점] 강철실 +${fmt(n)}개 획득!`, 'lg-good');
+  } else if (id === 'penaltyGuard') {
+    S.penaltyGuard = (S.penaltyGuard || 0) + 1;
+    log(`🛡️ [황혼 상점] 강화 패널티 방지권 +1장 (보유 ${S.penaltyGuard}장)`, 'lg-good');
+  }
+  renderTop(); renderWorldRaidTab(); save();
+}
+
 // ---- 레이드 탭 보기 전환(🌳 세계수의 단말마 / ⚔️ 종언의 결투장) + 결투장 화면 ----
 let raidTabView = 'tree';
 function raidViewToggleHtml() {
@@ -12781,6 +12813,14 @@ function renderDuelTab(box) {
       <div style="font-size:11px;color:var(--sub);margin-top:4px;">🌑 황혼의 그림자는 상점에서 살 수 없는, 순위로만 얻는 재료입니다.</div>
       <div style="font-size:13px;margin:10px 0 6px;">🏷️ 순위 칭호 (결산 후 한 주 동안)</div>
       <table class="guide-table"><tr><th>순위</th><th>칭호</th><th>효과</th></tr>${titleRows}</table>
+    </div>
+    <div style="border-top:1px solid var(--border);padding-top:10px;">
+      <div style="font-size:13px;margin-bottom:6px;">🛒 황혼 상점 (보유: 🌆 <b style="color:var(--gold)">${fmt(S.twilightEssence || 0)}</b>)</div>
+      ${TWILIGHT_SHOP.map(h => `
+        <div class="invitem">
+          <div><div class="wn">${typeof h.name === 'function' ? h.name() : h.name}</div>${h.desc ? `<div class="wi">${h.desc}</div>` : ''}</div>
+          <div class="btns"><button class="twilight-buy-btn" data-id="${h.id}" ${BN.gte(S.twilightEssence || 0, h.cost) ? '' : 'disabled'}>🌆${h.cost}</button></div>
+        </div>`).join('')}
     </div>`;
   const btn = $('duelChallengeBtn');
   if (btn) btn.onclick = startDuelFight;
@@ -12789,6 +12829,7 @@ function renderDuelTab(box) {
   box.querySelectorAll('.duel-setup-link').forEach(a => {
     a.onclick = ev => { ev.preventDefault(); const l = weeklyRaidSetupLinks[+a.dataset.idx]; if (l) showRaidSetup(l.week, l.key, l.name, l.total, 'duelSetup', '최고 기록'); };
   });
+  box.querySelectorAll('.twilight-buy-btn').forEach(b => b.onclick = () => buyTwilightShop(b.dataset.id));
   bindRaidViewToggle(box);
 }
 

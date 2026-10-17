@@ -750,8 +750,9 @@
     <div id="enhGlovePanels" style="display:none">
       <div class="panel enhSuspensePanel" id="gloveEnhPanel">
         <h3>🧤 장갑 강화기</h3>
+        <div id="gloveEnhTargetBar" style="margin-bottom:8px;"></div>
         <div style="font-size:12px; color:var(--sub); margin-bottom:8px;">
-          장착 중인 장갑을 강화합니다. 토벌전 21단계·도서관 21서고 이상 👹 보스 패턴을 약하게 만드는 의복 · 강화에 🧵 강철실 필요
+          장착 중인 장갑(또는 가방에서 고른 장갑)을 강화합니다. 토벌전 21단계·도서관 21서고 이상 👹 보스 패턴을 약하게 만드는 의복 · 강화에 🧵 강철실 필요
         </div>
         <div id="gloveenhweapon" class="enhWeaponBox"></div>
         <div id="gloveenhstat" class="enhStatGrid"></div>
@@ -4751,8 +4752,8 @@ const AUTO_GLOVE_ENHANCE_INTERVAL_MS = 300;
 let autoGloveEnhanceTimer = null, autoGloveEnhanceTarget = null, autoGloveEnhanceId = null;
 function isAutoGloveEnhanceRunning() { return !!autoGloveEnhanceTimer; }
 function startAutoGloveEnhance(targetInput) {
-  const g = getEquippedGlove();
-  if (!g) { log('장착된 장갑이 없습니다.', 'lg-bad'); return; }
+  const g = getGloveEnhanceTarget();
+  if (!g) { log('강화할 장갑이 없습니다. 장갑을 장착하거나 가방에서 골라 주세요.', 'lg-bad'); return; }
   const target = Math.max(g.enhance + 1, Math.min(SUB_ENH.maxLevel, Math.floor(+targetInput || 0)));
   if (!(target > g.enhance)) return;
   stopAutoGloveEnhance(true);
@@ -4772,7 +4773,7 @@ function autoGloveEnhanceTick() {
   const target = autoGloveEnhanceTarget;
   const g = (S.gloves || []).find(x => x.id === autoGloveEnhanceId);
   if (!g) { stopAutoGloveEnhance(); log(`⚙️ 강화 대상 장갑이 사라져(파괴 포함) 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
-  if (S.gloveEquipped !== g.id) { stopAutoGloveEnhance(); log(`⚙️ 장갑을 바꿔 끼어 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
+  if (getGloveEnhanceTarget() !== g) { stopAutoGloveEnhance(); log(`⚙️ 강화 대상 장갑을 바꿔 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
   if (g.enhance >= target) { stopAutoGloveEnhance(); log(`⚙️ 장갑 자동 강화 완료! 목표 +${target} 달성`, 'lg-good'); return; }
   const cost = gloveTryCost(g, false);
   if (BN.lt(S.gold, cost.gold)) { stopAutoGloveEnhance(); log(`⚙️ 골드가 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
@@ -4803,10 +4804,59 @@ function renderGloveAutoEnhance(g, maxed) {
     </div>`;
   $('gloveAutoEnhanceStartBtn').onclick = () => startAutoGloveEnhance($('gloveAutoEnhanceInput').value);
 }
+// 장갑 강화기의 강화 대상: 무기·보조무기 강화기와 같은 패턴 — 기본은 장착 장갑이지만, 가방의 다른 장갑을 장착하지 않고도 골라서 강화할 수 있다.
+let gloveEnhanceTargetId = null;
+let gloveEnhTargetPickerOpen = false;
+function getGloveEnhanceTarget() {
+  if (gloveEnhanceTargetId != null) {
+    const g = (S.gloves || []).find(x => x.id === gloveEnhanceTargetId);
+    if (g) return g;
+    gloveEnhanceTargetId = null; // 대상이 판매·분해·파괴 등으로 사라짐 → 장착 장갑으로 복귀
+  }
+  return getEquippedGlove();
+}
+function renderGloveEnhTargetBar() {
+  const bar = $('gloveEnhTargetBar');
+  if (!bar) return;
+  const usingBag = gloveEnhanceTargetId != null && (S.gloves || []).some(x => x.id === gloveEnhanceTargetId);
+  const cur = getGloveEnhanceTarget();
+  let html = '';
+  if (usingBag) {
+    html += `<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px;">
+      <div style="flex:1;font-size:12px;color:var(--sub)">🎒 가방의 장갑을 강화 중입니다 (미장착 — 효과는 장착해야 적용)</div>
+      <button id="gloveEnhBackBtn" style="font-size:12px;">🧤 장착 장갑으로</button>
+    </div>`;
+  }
+  html += `<button id="gloveEnhPickBtn" style="width:100%;font-size:12px;">${gloveEnhTargetPickerOpen ? '▴ 닫기' : '🎒 가방에서 다른 장갑 강화하기'}</button>`;
+  if (gloveEnhTargetPickerOpen) {
+    const list = (S.gloves || []).filter(x => !cur || x.id !== cur.id).sort((a, b) => glovePower(b) - glovePower(a));
+    html += `<div style="margin-top:6px;max-height:220px;overflow-y:auto;">`;
+    html += list.length
+      ? list.map(x => `
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 4px;border-bottom:1px solid var(--border);">
+          <div style="flex:1;font-size:12px;">${gloveGradeTag(x)}${x.id === S.gloveEquipped ? ' <span style="color:var(--unique)">✅ 장착중</span>' : ''}<div style="color:var(--sub)">${gloveStatText(x)}</div></div>
+          <button class="primary" data-glovepick="${x.id}" style="font-size:12px;">선택</button>
+        </div>`).join('')
+      : `<div style="font-size:12px;color:var(--sub);text-align:center;padding:8px;">강화할 다른 장갑이 없습니다.</div>`;
+    html += `</div>`;
+  }
+  bar.innerHTML = html;
+  $('gloveEnhPickBtn').onclick = () => { gloveEnhTargetPickerOpen = !gloveEnhTargetPickerOpen; renderGloveEnhTargetBar(); };
+  const back = $('gloveEnhBackBtn');
+  if (back) back.onclick = () => { gloveEnhanceTargetId = null; gloveEnhTargetPickerOpen = false; renderEnhance(); };
+  bar.querySelectorAll('[data-glovepick]').forEach(btn => {
+    btn.onclick = () => {
+      const id = +btn.dataset.glovepick;
+      gloveEnhanceTargetId = id === S.gloveEquipped ? null : id;
+      gloveEnhTargetPickerOpen = false;
+      renderEnhance();
+    };
+  });
+}
 function tryGloveEnhance(advanced) {
   if (gloveEnhanceRevealPending) return;
-  const g = getEquippedGlove();
-  if (!g) { log('장착된 장갑이 없습니다.', 'lg-bad'); return; }
+  const g = getGloveEnhanceTarget();
+  if (!g) { log('강화할 장갑이 없습니다. 장갑을 장착하거나 가방에서 골라 주세요.', 'lg-bad'); return; }
   if (g.enhance >= SUB_ENH.maxLevel) { log('이미 최대 강화 단계입니다.', 'lg-bad'); return; }
   if (advanced && g.enhance < GLOVE_ENH.advancedMinLevel) { log(`고급 강화는 +${GLOVE_ENH.advancedMinLevel} 이상부터 사용할 수 있습니다.`, 'lg-bad'); return; }
   const cost = gloveTryCost(g, advanced);
@@ -4857,6 +4907,7 @@ function resolveGloveEnhance(g, advanced) {
       log(`💥 장갑이 파괴되었습니다!! ${gloveGradeTag(g)} (파괴 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
       S.gloves = S.gloves.filter(x => x.id !== g.id);
       if (S.gloveEquipped === g.id) S.gloveEquipped = null;
+      if (gloveEnhanceTargetId === g.id) gloveEnhanceTargetId = null;
       if (enchantPickId.glove === g.id) enchantPickId.glove = null;
     } else if (stayHit) {
       playEnhanceFx('fail', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
@@ -17663,10 +17714,11 @@ function renderGloveInventory() {
 function renderGloveEnhance() {
   const box = $('gloveenhweapon');
   if (!box) return;
-  const g = getEquippedGlove();
+  renderGloveEnhTargetBar();
+  const g = getGloveEnhanceTarget();
   const btn = $('gloveEnhBtn');
   if (!g) {
-    box.innerHTML = '<div style="color:var(--sub)">장착된 장갑이 없습니다. 🎒 가방 → 🧤 장갑에서 장착하세요.</div>';
+    box.innerHTML = '<div style="color:var(--sub)">장착된 장갑이 없습니다. 🎒 가방 → 🧤 장갑에서 장착하거나, 위 버튼으로 가방의 장갑을 골라 강화하세요.</div>';
     $('gloveenhstat').innerHTML = ''; $('gloveenhrates').innerHTML = ''; $('gloveAdvancedEnhanceBox').innerHTML = ''; $('gloveAutoEnhanceBox').innerHTML = '';
     btn.disabled = true; btn.textContent = '강화하기';
     return;

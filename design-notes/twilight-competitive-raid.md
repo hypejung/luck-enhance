@@ -91,3 +91,34 @@
 - **측정**(+27, 같은 종류 신화 +27 대비, 60층 보스 / 토벌 35 / 도서관 30): 🧘(저항·집중) 4.49/2.04/2.44 → ×2.82, 🏹(명중·간파) 3.56/2.04/1.37 → ×2.15, 평균 ×2.48. 이번 주 적응한 종류에 따라 위력이 달라지는 게 설계다(`tools/test/measure-nightmare.js 종류,종류`).
 - 테스트: `tools/test/nightmare.js`.
 
+### Firebase 규칙 (정정판, 2026-10-18)
+처음 안내한 규칙은 `$other: { ".validate": false }`만 있고 `m`·`e`·`at`(`s`) 자식 규칙이 없어서 **모든 쓰기가 거절**됐다(와일드카드가 명시되지 않은 자식을 전부 막는다). 자식마다 `".validate": true`를 명시해서 고쳤다. 값 검사는 부모 `.validate`에서 한다.
+```json
+"duelRecords": {
+  "$week": {
+    ".read": true,
+    "$key": {
+      ".write": "newData.exists()",
+      ".validate": "$week.matches(/^[0-9]{8}$/) && $key.matches(/^[0-9a-f]{64}$/) && newData.hasChildren(['m', 'e', 'at']) && newData.child('m').isNumber() && newData.child('m').val() >= 1 && newData.child('m').val() < 10 && newData.child('e').isNumber() && newData.child('e').val() % 1 === 0 && newData.child('e').val() >= 0 && newData.child('e').val() <= 30 && newData.child('at').val() === now && (!data.exists() || newData.child('e').val() > data.child('e').val() || (newData.child('e').val() === data.child('e').val() && newData.child('m').val() >= data.child('m').val()))",
+      "m": { ".validate": true },
+      "e": { ".validate": true },
+      "at": { ".validate": true },
+      "$other": { ".validate": false }
+    }
+  }
+},
+"duelSetup": {
+  "$week": {
+    "$key": {
+      ".read": true,
+      ".write": "newData.exists()",
+      ".validate": "$week.matches(/^[0-9]{8}$/) && $key.matches(/^[0-9a-f]{64}$/) && newData.hasChildren(['s', 'at']) && newData.child('s').isString() && newData.child('s').val().length < 20000 && newData.child('at').val() === now",
+      "s": { ".validate": true },
+      "at": { ".validate": true },
+      "$other": { ".validate": false }
+    }
+  }
+}
+```
+- 클라이언트: 서버가 기록을 거절해도 버리지 않고 1분마다 재시도하며, 결투장 탭에 업로드 상태(올리는 중 / 올라감 / 실패 사유)를 표시한다. 이번 주 기록이 서버에 올라갔다는 확인(`S.duel.pushedOk`)이 없으면 다시 올린다. 테스트: `tools/test/duel-sync.js`.
+

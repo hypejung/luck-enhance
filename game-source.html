@@ -12845,17 +12845,37 @@ async function duelPushEntry(week, best) {
   const res = await fetch(`${SYNC_DB_URL}/duelRecords/${week}/${key}.json`, { method: 'PUT', body: JSON.stringify({ m: b.m, e: b.e, at: { '.sv': 'timestamp' } }) });
   if (!res.ok) { const err = new Error('http ' + res.status); err.status = res.status; throw err; }
 }
+function duelStatusHtml() {
+  const d = S.duel;
+  if (!BN.gt(d.best, 0)) return '';
+  if (duelPushStatus.startsWith('fail:') && d.pushDirty) {
+    const code = duelPushStatus.slice(5);
+    const why = code === '401' || code === '403' ? '서버 규칙이 기록을 거절했습니다 — 운영자에게 알려 주세요' : code === 'net' ? '네트워크 오류' : '오류 ' + code;
+    return `<div id="duelStatusLine" style="font-size:12px;color:#ff7a7a;margin-top:4px;">☁️ 서버 업로드 실패 (${why}). 기록은 이 기기에 보관돼 있고 1분마다 다시 시도합니다.</div>`;
+  }
+  return `<div id="duelStatusLine" style="font-size:12px;color:var(--sub);margin-top:4px;">${d.pushDirty ? '☁️ 서버에 올리는 중…' : '☁️ 이번 주 기록이 서버에 올라가 있습니다.'}</div>`;
+}
+function renderDuelStatusLine() {
+  const el = $('duelStatusLine');
+  if (!el) return;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = duelStatusHtml();
+  if (tmp.firstChild) el.replaceWith(tmp.firstChild); else el.remove();
+}
 let duelPushBusy = false;
+let duelPushStatus = ''; // '' | 'ok' | 'fail:<http 상태 또는 net>' — 결투장 탭에 업로드 상태로 표시
 function duelPushCurrent() {
   const d = duelNormalize();
   if (!d.pushDirty || duelPushBusy || !d.week) return;
   duelPushBusy = true;
   const week = d.week, best = BN.from(d.best);
   duelPushEntry(week, best)
-    .then(() => { if (S.duel.week === week && BN.eq(S.duel.best, best)) { S.duel.pushDirty = false; save(); } })
-    .catch(e => { if (e && e.status === 401 && S.duel.week === week && BN.eq(S.duel.best, best)) S.duel.pushDirty = false; })
+    .then(() => { duelPushStatus = 'ok'; if (S.duel.week === week && BN.eq(S.duel.best, best)) { S.duel.pushDirty = false; S.duel.pushedOk = true; save(); } })
+    // 서버가 거절(규칙 오류·권한)해도 버리지 않는다 — 규칙이 고쳐지면 1분 주기 재시도로 그대로 올라간다
+    .catch(e => { duelPushStatus = 'fail:' + ((e && e.status) || 'net'); })
     .finally(() => {
       duelPushBusy = false;
+      renderDuelStatusLine();
       if (S.duel.pushDirty && S.duel.week === week && !BN.eq(S.duel.best, best)) duelPushCurrent();
     });
 }
@@ -12946,8 +12966,11 @@ function duelEnsureWeek() {
     d.week = wk;
     d.best = BN.from(0);
     d.pushDirty = false;
+    d.pushedOk = false;
     d.setupPending = null;
   }
+  // 이번 주 기록이 서버에 올라갔다는 확인이 없으면(예전 버전에서 거절된 기록 포함) 다시 올린다
+  if (BN.gt(d.best, 0) && d.pushedOk !== true) d.pushDirty = true;
   nightmareAdapt();
   if (d.unsettled.length) duelSettle();
 }
@@ -12994,7 +13017,7 @@ function endDuelFight() {
   const d = S.duel;
   const isBest = BN.gt(dealt, d.best);
   if (isBest) {
-    d.best = BN.from(dealt); d.pushDirty = true;
+    d.best = BN.from(dealt); d.pushDirty = true; d.pushedOk = false;
     try { d.setupPending = { week: d.week, s: JSON.stringify(raidSetupSnapshot()) }; } catch (e) { console.error(e); }
   }
   log(`⚔️ <b>종언의 결투장 측정 종료!</b> 이번 시도 피해: <b style="color:var(--gold)">${fmt(dealt)}</b>${isBest ? ' <span class="lg-prim">🎉 이번 주 최고 기록 갱신!</span>' : ` (이번 주 최고: ${fmt(d.best)})`}`, 'lg-prim');
@@ -13103,6 +13126,7 @@ function renderDuelTab(box) {
       <div>🌆 황혼의 정수: <b style="color:var(--gold)">${fmt(S.twilightEssence || 0)}</b> · 🌑 황혼의 그림자: <b style="color:var(--gold)">${fmt(S.twilightShadow || 0)}</b></div>
       <div style="margin-top:6px;">⚠️ 이번 주 패턴: ${pats}</div>
       <div style="margin-top:6px;">오늘 도전: <b>${duelTodayCount()}/${DUEL.dailyAttempts}</b> · 이번 주 내 최고: <b style="color:var(--gold)">${BN.gt(best, 0) ? fmt(best) : '기록 없음'}</b></div>
+      ${duelStatusHtml()}
       ${T ? `<div style="font-size:12px;margin-top:4px;">현재 칭호: ${T.emoji} <b>${T.name}</b> (보조무기 효과 증폭 +${Math.round(T.subAmp * 100)}%, 액티브 피해량 +${Math.round(T.subActiveDmg * 100)}%p)</div>` : ''}
       ${ls ? `<div style="font-size:11px;color:var(--sub);margin-top:4px;">지난 결산: ${ls.rank ? `${ls.n}명 중 ${ls.rank}위 (${ls.label})` : '참가'} → 🌆${ls.essence} 🌑${ls.shadow}</div>` : ''}
     </div>

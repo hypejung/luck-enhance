@@ -240,6 +240,9 @@
   #monbox, #raidMonBox, #punchMonBox, #libraryMonBox, #worldRaidMonBox { text-align: center; padding: 10px 0; position: relative; }
   #monemoji, #raidMonEmoji, #punchMonEmoji, #libraryMonEmoji, #worldRaidMonEmoji { font-size: 64px; line-height: 1.2; }
   #monname, #raidMonName, #punchMonName, #libraryMonName, #worldRaidMonName { font-size: 18px; margin: 4px 0; }
+  .buffbar { position: absolute; left: 6px; top: 6px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; z-index: 6; pointer-events: none; text-align: left; }
+  .buffchip { font-size: 11px; line-height: 1.3; padding: 1px 6px; border-radius: 8px; background: rgba(20, 20, 32, 0.78); border: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+  .buffchip b { color: var(--gold); font-variant-numeric: tabular-nums; }
   .floatmsg {
     position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
     font-weight: bold; font-size: 15px; color: var(--unique);
@@ -3574,13 +3577,13 @@ function bdTrigger(key) {
     const loss = (d.flat / e.base + computeStats().critChance / 100) * s * (bd.timeScale || 1);
     if (loss > 0) { bossFight.timeLeft -= loss; ancientSubOnTimeLoss(loss); gloveAncientOnTimeLoss(loss); floatText(`🌵 가시 반격 -${loss.toFixed(1)}초`); }
   } else if (key === 'blind') {
-    bd.blindUntil = t + s; floatText('🌑 암흑!');
+    bd.blindUntil = t + s; 
   } else if (key === 'stun') {
-    bd.stunUntil = t + s; floatText('💫 스턴!');
+    bd.stunUntil = t + s; 
   } else if (key === 'exhaust') {
-    bd.exhaustUntil = t + s; floatText('😮‍💨 탈진!');
+    bd.exhaustUntil = t + s; 
   } else if (key === 'seal') {
-    bd.sealUntil = t + s; floatText('🔇 봉인!');
+    bd.sealUntil = t + s; 
   } else if (key === 'weaken') {
     bd.weakenTotal = Math.min(0.9, bd.weakenTotal + s);
     floatText(`🕸️ 약화 저주 -${fmtRate(bd.weakenTotal)}`);
@@ -6536,7 +6539,7 @@ function tiangouTick(now) {
     fx.tiangouNext = now + TIANGOU.interval * 1000;
     fx.tiangouUntil = now + TIANGOU.duration * 1000;
     fx.tiangouAccum = 0;
-    floatText('🌕 만월!');
+    
   }
   if (fx.tiangouUntil && now >= fx.tiangouUntil) {
     const accum = fx.tiangouAccum || 0;
@@ -6711,7 +6714,7 @@ function nephilimTick(now) {
   if (!fx.nephilimUntil) {
     fx.nephilimPhase = 'general';
     fx.nephilimUntil = now + NEPHILIM.generalDur * 1000;
-    floatText('⚔️ 오크 제너럴!');
+    
     return;
   }
   if (now < fx.nephilimUntil) return;
@@ -6764,7 +6767,7 @@ function arachneOnAttack() {
     const now = Date.now();
     fx.arachneVenomUntil = now + ARACHNE.venomDur * 1000;
     fx.arachneVenomTickNext = now + ARACHNE.venomTickInterval * 1000;
-    floatText('🧵 맹독의 실!');
+    
   }
 }
 // 대상이 받는 모든 피해에 곱연산으로 적용 — dealMonDamage()에서 호출
@@ -6872,12 +6875,12 @@ function draugrTick(now) {
   if (fx.draugrPhase === 'alive') {
     fx.draugrPhase = 'dead';
     fx.draugrPhaseUntil = now + DRAUGR.deadDur * 1000;
-    floatText('💀 쓰러지다...');
+    
   } else {
     fx.draugrRevives = (fx.draugrRevives || 0) + 1;
     fx.draugrPhase = 'alive';
     fx.draugrPhaseUntil = now + DRAUGR.aliveDur * 1000;
-    floatText('💀 다시 일어서다!');
+    
   }
 }
 // 부활 횟수에 비례한 공격력 복리 배율 — dealMonDamage()에서 호출
@@ -6987,7 +6990,7 @@ function pandoraOnAttack() {
   fx.pandoraStacks = 0;
   fx.pandoraDownStat = PANDORA.pool[Math.floor(Math.random() * PANDORA.pool.length)];
   fx.pandoraBurstUntil = Date.now() + PANDORA.burstDur * 1000;
-  floatText('📖 마지막 장!');
+  
 }
 
 // ---------- 풍신뇌신도(태초의 유물) 전용 전투 효과 ----------
@@ -7184,7 +7187,7 @@ function luciferOnAttack() {
   if (!hasLucifer() || luciferFallActive()) return;
   if (Math.random() < LUCIFER.fallChance) {
     fx.luciferFallUntil = Date.now() + LUCIFER.fallDur * 1000;
-    floatText('🔥 타락!');
+    
   }
 }
 // tick()에서 매번 호출 — 타락 중일 때만 경과 시간(dt)에 비례해 보유 골드를 실시간으로 소모한다.
@@ -8269,8 +8272,61 @@ function weaponHasSpecial(w, specialKey) { return weaponSpecialCount(w, specialK
 function weaponBossTimeBonus(w) { return weaponSpecialCount(w, 'timedilation') * RUNE_SPECIALS.timedilation.bonus; }
 function weaponCooldownMult(w) { return Math.pow(RUNE_SPECIALS.bossrush.mult, weaponSpecialCount(w, 'bossrush')); }
 // 전투 화면에 잠깐 떠오르는 효과 발동 텍스트
+function fightHostId() { return bossFight.isRaid ? 'raidMonBox' : bossFight.isPunch ? 'punchMonBox' : bossFight.isLibrary ? 'libraryMonBox' : bossFight.isWeeklyRaid ? 'worldRaidMonBox' : 'monbox'; }
+// ---------- 지속 효과 표시줄 ----------
+// 몇 초 동안 이어지는 효과(결전의 기백·각종 버프)는 떠올랐다 사라지는 floatText 대신, 전투 화면 왼쪽 위에 남은 시간과 함께 계속 보여 준다.
+// 목록은 상태에서 매번 읽어 오므로(활성 여부·남은 시간) 효과 쪽 코드는 따로 등록하지 않는다.
+const BUFF_FX = [ // fx.*Until (Date.now 밀리초)
+  ['tiangouUntil', '🌕', '천구의 만월'], ['redcapFarmBuffUntil', '💰', '레드캡 전리품 폭발'], ['oathBuffUntil', '😈', '위험한 서약'], ['oathDebuffUntil', '🩸', '서약의 대가'],
+  ['sporeburstUntil', '🍄', '포자 만개'], ['pandoraBurstUntil', '📖', '마지막 장'], ['nephilimUntil', '⚔️', '네피림의 위상'], ['luciferFallUntil', '🔥', '타락'],
+  ['draugrPhaseUntil', '💀', '드라우그의 위상'], ['floodUntil', '🌊', '침수'], ['brandUntil', '🩸', '낙인'], ['stormShockUntil', '⚡', '낙뢰 충격'],
+  ['quakeDebuffUntil', '💥', '지진파 약화'], ['poisonUntil', '☠️', '맹독'], ['bloodThirstUntil', '🩸', '피의 갈증'], ['arachneVenomUntil', '🧵', '맹독의 실'],
+  ['chargeBossUntil', '🔋', '충전'], ['sprintUntil', '🔁', '여운'], ['momentUntil', '⏳', '찰나'], ['judgmentUntil', '⚖️', '심판의 가호'],
+  ['infiniteUntil', '💨', '가속 폭주'], ['glideUntil', '🪽', '활강 여운'],
+];
+const BUFF_GGL = [ // fx.ggl.*Until (전투 경과 초)
+  ['sleepUntil', '💤', '신들조차 잠든 밤'], ['dreamUntil', '💭', '깨지 않는 꿈'], ['hermesUntil', '👟', '날개 달린 신발'], ['mirrorSpeedUntil', '🌚', '연기 나는 거울(공속)'],
+  ['mirrorDmgUntil', '🌚', '연기 나는 거울(피해)'], ['tellUntil', '🪔', '이야기는 내일 밤에'], ['darkUntil', '🕳️', '드리우는 장막'], ['arrowUntil', '🏹', '달빛 사냥'],
+  ['moonUntil', '🌕', '달로 떠오르는 항아'], ['kairosUntil', '⏳', '앞머리를 잡다'], ['mirageUntil', '🌫️', '진짜는 하나'], ['curseUntil', '🔮', '세 갈래 저주'],
+  ['fateUntil', '🧵', '실을 끊는 가위'], ['nightUntil', '🌑', '되새김'],
+];
+const BUFF_AGL = [ // fx.agl.*Until (전투 경과 초)
+  ['buffUntil', '🐑', '양털 쿠션'], ['dozeUntil', '🪷', '하품'], ['eclipseUntil', '🐕', '월식'],
+];
+function activeBuffs() {
+  const out = [], now = Date.now();
+  for (const [k, icon, name] of BUFF_FX) { const u = fx[k]; if (u > now) out.push({ icon, name, left: (u - now) / 1000 }); }
+  if (!bossFight.active) return out;
+  if (bossFight.dmgBonus > 0 && bossFight.subActiveEndAt > now) {
+    const sw = getEquippedSubweapon();
+    out.push({ icon: '🗡️', name: sw ? subweaponActiveName(sw) : '결전의 기백', left: (bossFight.subActiveEndAt - now) / 1000 });
+  }
+  const el = bossFight.elapsed;
+  const pick = (st, table, relabel) => {
+    if (!st) return;
+    for (const [k, icon, name] of table) { const u = st[k]; if (typeof u === 'number' && u > el) out.push({ icon, name, left: u - el }); }
+    if (relabel && typeof st.eclipseUntil === 'number' && st.eclipseUntil > el) { const gd = gloveGenesisDef(getEquippedGlove()); if (gd) out.push({ icon: gd.icon, name: gd.counterName, left: st.eclipseUntil - el }); }
+  };
+  pick(fx.ggl, BUFF_GGL, true);
+  pick(fx.agl, BUFF_AGL, false);
+  return out;
+}
+let buffBarLast = 0;
+function renderBuffBar(force) {
+  const t = Date.now();
+  if (!force && t - buffBarLast < 200) return;
+  buffBarLast = t;
+  const host = $(fightHostId());
+  let bar = $('buffBar');
+  if (bar && (!host || bar.parentNode !== host)) { bar.remove(); bar = null; }
+  if (!host) return;
+  const list = activeBuffs();
+  if (!list.length) { if (bar) bar.remove(); return; }
+  if (!bar) { bar = document.createElement('div'); bar.id = 'buffBar'; bar.className = 'buffbar'; host.appendChild(bar); }
+  bar.innerHTML = list.map(b => `<div class="buffchip">${b.icon} ${escHtml(b.name)} <b>${b.left.toFixed(1)}초</b></div>`).join('');
+}
 function floatText(msg) {
-  const hostId = bossFight.isRaid ? 'raidMonBox' : bossFight.isPunch ? 'punchMonBox' : bossFight.isLibrary ? 'libraryMonBox' : bossFight.isWeeklyRaid ? 'worldRaidMonBox' : 'monbox';
+  const hostId = fightHostId();
   const host = $(hostId);
   if (!host) return;
   const el = document.createElement('div');
@@ -10081,7 +10137,7 @@ function updateSubweaponActive() {
     bossFight.dmgBonus = dmgPct;
     bossFight.subActiveEndAt = Date.now() + dur * 1000;
     const aname = subweaponActiveName(sw);
-    floatText(`🗡️ ${aname}!`);
+    
     log(`🗡️ <b>${aname}</b> 발동! 보스 피해량 +${Math.round(dmgPct * 100)}% (${dur.toFixed(1)}초간)`, 'lg-prim');
     genesisSubOnActivate(); // 태초 보조무기(카인의 복수: 표식 가득)
   }
@@ -10094,7 +10150,7 @@ function updateSubweaponActive() {
     const dur = subweaponActiveDuration(sw);
     bossFight.dmgBonus = dmgPct;
     bossFight.subActiveEndAt = Date.now() + dur * 1000;
-    floatText('⏳ 부서진 초침!');
+    
     log(`⏳ <b>부서진 초침</b> — 결전의 기백 재발동! 보스 피해량 +${Math.round(dmgPct * 100)}% (${dur.toFixed(1)}초간)`, 'lg-prim');
   }
   if (bossFight.dmgBonus > 0 && Date.now() >= bossFight.subActiveEndAt) {
@@ -10592,7 +10648,7 @@ function gloveAncientTick(dt) {
       break;
     }
     case 'bulgae':
-      if (!st.eclipseDone && BN.lte(mon.hp, BN.mul(mon.maxHp, p.at))) { st.eclipseDone = true; st.eclipseUntil = el + p.dur; floatText('🐕 월식!'); }
+      if (!st.eclipseDone && BN.lte(mon.hp, BN.mul(mon.maxHp, p.at))) { st.eclipseDone = true; st.eclipseUntil = el + p.dur;  }
       break;
     case 'nyx':
       if (!st.dawnNext) st.dawnNext = p.every;
@@ -10786,7 +10842,7 @@ function gloveGenesisOnPattern(key) {
       if (key) { st.delayed.push({ key, at: el + dur }); return true; } // 이번 패턴은 깨어날 때 온다
       return false;
     }
-    case 'morpheus': st.dreamUntil = el + p.dur; floatText('💭 깨지 않는 꿈!'); return false;
+    case 'morpheus': st.dreamUntil = el + p.dur;  return false;
     case 'baku':
       if (el >= st.digestUntil) {
         st.sat = Math.min(p.max, st.sat + p.eat); st.digestUntil = el + p.digest;
@@ -10809,14 +10865,14 @@ function gloveGenesisOnPattern(key) {
       if (sum > 0) { gglDeal(sum * p.back * x.s); floatText('🗝️ 뒤를 보는 얼굴!'); }
       return false;
     }
-    case 'hermes': st.hermesUntil = el + p.dur; floatText('👟 날개 달린 신발!'); return false;
+    case 'hermes': st.hermesUntil = el + p.dur;  return false;
     case 'tezcatlipoca': {
       if (key === 'stun' || key === 'blind' || key === 'exhaust' || key === 'seal') st.mirrorSpeedUntil = el + p.dur;
       else {
         st.mirrorDmgUntil = el + p.dur;
         if (key === 'timeDrain' || key === 'thorns') bossFight.timeLeft += p.time * x.s;
       }
-      floatText('🌚 연기 나는 거울!');
+      
       return false;
     }
     case 'tsukumogami': {
@@ -10829,11 +10885,11 @@ function gloveGenesisOnPattern(key) {
       const add = Math.min(p.time, p.timeCap - st.timeGained);
       if (add > 0) { st.timeGained += add; bossFight.timeLeft += add; }
       st.tellUntil = el + p.dur;
-      floatText('🪔 이야기는 내일 밤에!');
+      
       return false;
     }
-    case 'artemis': st.arrowUntil = el + p.dur; floatText('🏹 달빛 사냥!'); return false;
-    case 'chang': st.moonUntil = el + p.dur; floatText('🌕 달로 떠오르는 항아!'); return false;
+    case 'artemis': st.arrowUntil = el + p.dur;  return false;
+    case 'chang': st.moonUntil = el + p.dur;  return false;
     case 'tethys':
       if (st.avgAtk > 0) { gglDeal(st.avgAtk * p.pull * x.s); floatText('🐚 심해의 끌어당김!'); }
       return false;
@@ -10841,14 +10897,14 @@ function gloveGenesisOnPattern(key) {
       if (st.avgAtk > 0 && st.feast > 0) { gglDeal(st.avgAtk * st.feast * p.burst * x.s); floatText('🐋 한입에!'); }
       st.feast = 0;
       return false;
-    case 'moirai': st.fateUntil = el + p.dur; floatText('🧵 실을 끊는 가위!'); return false;
+    case 'moirai': st.fateUntil = el + p.dur;  return false;
     case 'kairos': {
       const add = Math.min(p.time, p.timeCap - st.timeGained);
       if (add > 0) { st.timeGained += add; bossFight.timeLeft += add; }
-      st.kairosUntil = el + p.dur; floatText('⏳ 앞머리를 잡다!');
+      st.kairosUntil = el + p.dur; 
       return false;
     }
-    case 'morgana': st.mirageUntil = el + p.dur; floatText('🌫️ 진짜는 하나!'); return false;
+    case 'morgana': st.mirageUntil = el + p.dur;  return false;
     case 'eos':
       if (bd && bd.enraged && !st.eclipsed) {
         st.eclipsed = true; st.eclipseUntil = el + p.dur;
@@ -10865,7 +10921,7 @@ function gloveGenesisOnPattern(key) {
       floatText('🌑 되새김!');
       return false;
     }
-    case 'hecate': st.curseUntil = el + p.dur; floatText('🔮 세 갈래 저주!'); return false;
+    case 'hecate': st.curseUntil = el + p.dur;  return false;
     case 'rahu':
       if (bd && bd.enraged && !st.eclipsed) {
         st.eclipsed = true; st.eclipseUntil = el + p.dur;
@@ -10876,7 +10932,7 @@ function gloveGenesisOnPattern(key) {
       let dur = bd && bd.enraged ? p.enrageDur : p.dur;
       if (key === 'blind' && bd) { const e = bd.list.find(z => z.key === 'blind'); if (e) dur = Math.max(dur, e.base * (bd.enraged ? BOSS_ENRAGE_MULT : 1)); }
       st.darkUntil = Math.max(st.darkUntil, el + dur);
-      floatText('🕳️ 드리우는 장막!');
+      
       return false;
     }
   }
@@ -11268,11 +11324,13 @@ function handleKill(chainDepth) {
 
 /* ===================== 게임 루프 ===================== */
 function tick(dt) {
+  if (!bossFight.active) renderBuffBar(); // 사냥 중 무기 효과 지속시간
   // 보스전 진행 중: 타이머 감소
   if (bossFight.active) {
     bossFight.timeLeft -= dt;
     bossFight.elapsed += dt;
     updateSubweaponActive();
+    renderBuffBar();
     renderBossBtn();
     if (bossFight.isRaid) renderRaidBattleHP();
     else if (bossFight.isPunch) renderPunchBattleHP();
@@ -11329,7 +11387,7 @@ function tick(dt) {
     if (nowDecay >= fx.sporeburstNext) {
       fx.sporeburstUntil = nowDecay + (spirit.dur || 7) * 1000;
       fx.sporeburstNext = nowDecay + (spirit.interval || 10) * 1000;
-      floatText('🍄 포자 만개!');
+      
     }
   }
   // 폭풍우의 강림(고대 에이션트 스피릿): 8초마다 낙뢰 낙하 — 고정 피해 + 짧은 "후폭풍" 공속버프,
@@ -11358,7 +11416,7 @@ function tick(dt) {
       fx.oathNext = nowDecay + (spirit.interval || 12) * 1000;
       fx.oathBuffUntil = nowDecay + (spirit.buffDur || 4) * 1000;
       fx.oathDebuffUntil = fx.oathBuffUntil + (spirit.debuffDur || 4) * 1000;
-      floatText('😈 위험한 서약!');
+      
     }
   }
   // 왓팍의 기생낭(태초의 유물): 전투가 이어지는 동안 주기적으로 분신 스택 증가(상한 없음)
@@ -11727,7 +11785,7 @@ function attack(w) {
     if (now < fx.judgmentUntil) dmg *= (e.buffMult || 2);
     if (Math.random() < (e.buffProc || 0)) {
       fx.judgmentUntil = now + (e.buffDur || 5) * 1000;
-      floatText('⚖️ 심판의 가호!');
+      
     }
   }
   // 피의 갈증(고대 에이션트 스피릿): 공격 시 확률적으로 출혈을 걸고(재발동 시 갱신),
@@ -11736,7 +11794,7 @@ function attack(w) {
     const spirit = ANCIENT_SPIRITS.bloodtribute;
     fx.bloodThirstDot = { dmgPerSec: weaponAtk(w) * (spirit.dmgPerSec || 0), remain: spirit.dur || 5 };
     fx.bloodThirstUntil = now + (spirit.dur || 5) * 1000;
-    floatText('🩸 갈증!');
+    
   }
   // 분노의 폭주(고대 에이션트 스피릿): 공격할 때마다 분노 스택 적립(최대 100). 마지막 공격
   // 시각을 기록해, 3초 이상 공격이 없으면 tick()에서 스택이 전부 초기화되게 한다.
@@ -11762,7 +11820,7 @@ function attack(w) {
   // 늪지의 올가미(고대 에이션트 스피릿): 공격 시 확률적으로 "침수" 부여(재적중 시 갱신)
   if (w.spirit === 'pearl' && Math.random() < (ANCIENT_SPIRITS.pearl.floodProc || 0)) {
     fx.floodUntil = now + (ANCIENT_SPIRITS.pearl.floodDur || 3) * 1000;
-    floatText('🌊 침수!');
+    
   }
   // 균열의 진동(고대 에이션트 스피릿): 공격 12회 누적마다 지진파. 보스가 아닐 때 지진파
   // 피해가 몬스터 체력을 넘으면, 초과분(지진파피해÷몬스터체력, 내림)만큼 몬스터를 추가로

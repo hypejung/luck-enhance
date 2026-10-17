@@ -111,6 +111,7 @@ git fetch origin main && git checkout main && git merge --ff-only origin/main &&
 | 주간 레이드 「세계수의 단말마」 | 전 유저 합산 협동 레이드. 기여도 TOP3에게 보상 ×4/×3/×2와 칭호, TOP3 세팅 보기 |
 | 펀치기계 | 120초 딜 측정(연습용). 밸런스 측정에도 쓴다 |
 | 기타 | 랜덤박스, 도박장(배율 베팅·하이로우·슬롯·주사위), 대장간·분해, 프리셋(컨텐츠별 지정), 명예의 정수 상점, 이스터에그(`EASTER_EGGS.md`) |
+| 지속 효과 표시줄 | 몇 초 지속되는 효과는 floatText 대신 전투 화면 왼쪽 위에 남은 시간과 함께 표시(`renderBuffBar`). 새 지속 효과는 `BUFF_FX`/`BUFF_GGL`/`BUFF_AGL`에 추가 |
 | 능력치 출처 팝업 | 능력치 탭에서 칸을 누르면 출처별 수치(`statSourceInfo`) |
 
 ### 코드 지도 (자주 보는 곳)

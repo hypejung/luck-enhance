@@ -4225,7 +4225,104 @@ const GLOVE_GENESES = [
 그는 다시 한 번 입을 벌린다.
 
 라후(Rahu).` },
-  null, null, null, null, null,
+  { id: 'leviathan', name: '레비아탄의 삼킨 장갑', subtitle: 'Leviathan, the Devourer of the Deep', icon: '🐋',
+    passiveName: '끝없는 허기', counterName: '한입에',
+    passiveText: '삼킨 것이 쌓일수록, 허기는 더 깊어진다.',
+    counterText: '쌓아 둔 모든 것을, 단 한 번의 아가리로 쏟아낸다.',
+    // 명중마다 포식 +1(최대 max), 포식당 피해 +per / 패턴이 오면 포식을 전부 소모해 평균 공격 피해 × 포식 × burst를 고정 피해로
+    p: { max: 40, per: 0.04, burst: 0.5 },
+    lore: `바다 밑에는 바닥이 없다고들 한다.
+그 바닥 없는 곳에 사는 것이 있다.
+
+산을 삼키고 배를 삼키고
+이름 없는 신들도 삼켰으나
+허기는 한 번도 가신 적이 없다.
+
+그는 서두르지 않는다.
+먹은 것이 쌓일 때까지 기다렸다가
+단 한 번 입을 벌린다.
+
+보호막도, 되살아나는 몸도
+그 앞에서는 한 입 거리다.
+
+레비아탄(Leviathan).` },
+  { id: 'moirai', name: '모이라이의 운명 실 장갑', subtitle: 'The Moirai, Spinners of Fate', icon: '🧵',
+    passiveName: '짜이는 운명', counterName: '실을 끊는 가위',
+    passiveText: '약해지라는 저주마저, 운명의 실에 엮이면 힘이 된다.',
+    counterText: '가위가 닫히는 순간, 정해진 것이 한꺼번에 풀려난다.',
+    // 약화 저주로 깎인 공격력(weakenTotal)의 k배만큼 피해 증가 / 패턴이 오면 dur초 동안 피해 +boost
+    p: { base: 0.33, k: 3, dur: 5, boost: 1.65 },
+    lore: `세 자매가 실을 잣는다.
+첫째는 잣고, 둘째는 재고, 셋째는 끊는다.
+
+신들도 그 실을 피하지 못했다.
+깎이고 흩어지는 것조차
+이미 짜여 있던 무늬의 일부다.
+
+물감처럼 번지는 밤하늘 아래서
+그녀들은 오늘도 실을 고른다.
+
+가위가 닫히는 소리가 들리면
+기다리던 모든 것이 한꺼번에 제자리를 찾는다.
+
+모이라이(Moirai).` },
+  { id: 'kairos', name: '카이로스의 찰나 장갑', subtitle: 'Kairos, the Fleeting Moment', icon: '⏳',
+    passiveName: '단 한 번의 때', counterName: '앞머리를 잡다',
+    passiveText: '모래가 줄어들수록, 놓치지 않을 순간은 더 날카로워진다.',
+    counterText: '지나가는 찰나의 앞머리를 붙잡는다.',
+    // 남은 시간 비율이 줄수록 피해 +max까지 / 패턴이 오면 남은 시간 +time초(전투당 최대 timeCap초) + dur초 동안 공속 +speedBoost
+    p: { max: 2.15, time: 2, timeCap: 10, dur: 4, speedBoost: 1.05 },
+    lore: `시간에는 두 얼굴이 있다.
+흘러가는 크로노스,
+그리고 단 한 번 찾아오는 카이로스.
+
+그는 앞머리만 길고 뒤통수는 없다.
+지나간 뒤에 잡으려 하면
+손가락이 허공만 움켜쥔다.
+
+꼬리별이 돌아오는 밤에도
+멈춘 순간 속에서도
+그를 알아보는 이만이 앞머리를 잡는다.
+
+카이로스(Kairos).` },
+  { id: 'morgana', name: '모르가나의 신기루 장갑', subtitle: 'Morgan le Fay, Lady of the Mirage', icon: '🌫️',
+    passiveName: '거짓 호수', counterName: '진짜는 하나',
+    passiveText: '속은 만큼 눈이 밝아져, 다음 한 번은 거짓을 꿰뚫는다.',
+    counterText: '수많은 환영 가운데 진짜를 가려낸 손은 빗나가지 않는다.',
+    // 빗나갈 때마다 다음 명중 피해 +per 누적(최대 max, 명중하면 0) / 패턴이 오면 dur초 동안 빗나가지 않고 보호막·분신에 주는 피해 ×layer
+    p: { base: 0.7, per: 0.2, max: 2.0, dur: 6, layer: 3, boost: 0.8 },
+    lore: `안개 낀 호수 위에 성이 떠 있다.
+다가가면 사라지고, 돌아서면 다시 나타난다.
+
+호수의 여인은 거울 속에서
+수많은 자신을 만들어 낸다.
+어느 쪽이 진짜인지 아는 것은
+오직 그녀뿐이다.
+
+오로라가 커튼처럼 드리운 밤,
+속은 자의 눈은 한 번 더 또렷해진다.
+
+모르가나(Morgan le Fay).` },
+  { id: 'eos', name: '에오스의 새벽 장갑', subtitle: 'Eos, the Rosy-Fingered Dawn', icon: '🌅',
+    passiveName: '밝아오는 하늘', counterName: '장밋빛 손가락',
+    passiveText: '밤이 길어질수록, 동쪽 하늘은 조금씩 붉어진다.',
+    counterText: '그녀가 손을 내밀면, 닫혀 있던 밤이 걷힌다.',
+    // 10초마다 피해 +per(최대 max), 봉인 중에는 절반 / 광폭화 뒤 처음 패턴에서 보스 최대 체력 pct 고정 피해 + dur초 동안 피해 +boost
+    p: { per: 0.6, max: 6, seal: 0.5, dur: 10, boost: 2.5, pct: 0.2 },
+    lore: `새벽의 여신은 매일 아침
+장밋빛 손가락으로 문을 연다.
+
+밤의 주인이 새벽을 금지하고
+왕좌에 오른 날에도
+그녀는 하루도 거르지 않았다.
+
+한 줌씩 하늘이 붉어지고,
+어둠은 조금씩 물러난다.
+
+그녀가 마지막으로 손을 내밀 때
+닫혀 있던 밤이 걷힌다.
+
+에오스(Eos).` },
 ];
 function gloveGenesisDef(g) { return g && g.genesisFloor !== undefined ? GLOVE_GENESES[g.genesisFloor - WORLD3_START_FLOOR] || null : null; }
 function isGenesisGlove(g) { return !!gloveGenesisDef(g); }
@@ -10369,6 +10466,7 @@ function gloveGenesisPassive() { const x = gloveGenesisFx(); return x && bossFig
 function gglState() {
   if (!fx.ggl) fx.ggl = { atkAcc: 0, avgAtk: 0, sleep: 0, sleepUntil: -1, delayed: [], dreamUntil: -1, dreamAcc: 0,
     log: [], janusT: 0, hermesUntil: -1, mirrorSpeedUntil: -1, mirrorDmgUntil: -1, things: 0, thingNext: 0, tellUntil: -1, timeGained: 0,
+    feast: 0, fateUntil: -1, kairosUntil: -1, mirage: 0, mirageUntil: -1,
     arrow: 0, arrowUntil: -1, moonUntil: -1, curseUntil: -1, eclipseUntil: -1, eclipsed: false,
     sat: 0, satNext: 0, digestUntil: -1, darkUntil: -1, lastPattern: GLOVE_GENESIS_FAKE_EVERY * (BD_FIRST_FRAC - 1) };
   return fx.ggl;
@@ -10394,6 +10492,7 @@ function gloveGenesisSpeedMult() {
     return m;
   }
   if (x.id === 'tezcatlipoca' && el < st.mirrorSpeedUntil) return 1 + p.speedBoost * x.s;
+  if (x.id === 'kairos') return el < st.kairosUntil ? 1 + p.speedBoost * x.s : 1;
   if (x.id === 'chang') {
     let m = bdSealed() ? 1 : 1 + p.recover * x.s * (1 - bdSpeedMult());
     if (el < st.moonUntil) m *= 1 + p.speedBoost * x.s;
@@ -10419,6 +10518,7 @@ function gloveGenesisNoMiss() {
   const x = gloveGenesisFx();
   if (!x || !bossFight.active) return false;
   if (x.id === 'artemis') return bossFight.elapsed < gglState().arrowUntil; // 달빛 사냥: 패턴 중에도 빗나가지 않음
+  if (x.id === 'morgana') return bossFight.elapsed < gglState().mirageUntil; // 진짜는 하나
   return !!gloveGenesisPassive() && gloveGenesisDark();
 }
 function gloveGenesisCritAdd() {
@@ -10429,7 +10529,13 @@ function gloveGenesisCritAdd() {
 }
 function gloveGenesisCritDmgAdd() { const x = gloveGenesisPassive(); return x && gloveGenesisDark() ? x.p.critDmg * x.s : 0; }
 // 보호막·환영 분신에 주는 피해 배율(바쿠)
-function gloveGenesisLayerMult() { const x = gloveGenesisPassive(); return x && x.id === 'baku' ? x.p.layerMult : 1; }
+function gloveGenesisLayerMult() {
+  const x = gloveGenesisPassive();
+  if (!x) return 1;
+  if (x.id === 'baku') return x.p.layerMult;
+  if (x.id === 'morgana' && bossFight.elapsed < gglState().mirageUntil) return x.p.layer;
+  return 1;
+}
 function gloveGenesisDmgMult() {
   const x = gloveGenesisFx();
   if (!x || !bossFight.active) return 1;
@@ -10461,6 +10567,20 @@ function gloveGenesisDmgMult() {
       const lost = 1 - BN.toNumber(BN.div(mon.hp, mon.maxHp));
       return passive ? 1 + p.perLost * lost * x.s : 1;
     }
+    case 'leviathan': return passive ? 1 + p.per * st.feast * x.s : 1;
+    case 'moirai': {
+      const w = passive && bd ? bd.weakenTotal : 0;
+      return (1 + (passive ? p.base : 0) * x.s + p.k * w * x.s) * (el < st.fateUntil ? 1 + p.boost * x.s : 1);
+    }
+    case 'kairos': {
+      const left = Math.max(0, bossFight.timeLeft), frac = left / (left + el + 1e-9);
+      return passive ? 1 + p.max * (1 - frac) * x.s : 1;
+    }
+    case 'morgana': return (passive ? 1 + (p.base + st.mirage) * x.s : 1) * (el < st.mirageUntil ? 1 + p.boost * x.s : 1);
+    case 'eos': {
+      const m = (1 + Math.min(p.max, p.per * Math.floor(el / 10)) * x.s * (bdSealed() ? p.seal : 1)) * (el < st.eclipseUntil ? 1 + p.boost * x.s : 1);
+      return m;
+    }
     case 'hecate': return el < st.curseUntil ? 1 + p.boost * x.s : 1;
     case 'rahu': return 1 + p.base * x.s * (bdSealed() ? p.sealMult : 1) + (el < st.eclipseUntil ? p.boost * x.s : 0);
     case 'seirenes': {
@@ -10482,12 +10602,15 @@ function gloveGenesisOnHit() {
   if (x.id === 'hypnos' && bossFight.elapsed >= st.sleepUntil) st.sleep = Math.min(x.p.max, st.sleep + x.p.perHit);
   else if (x.id === 'morpheus') morpheusDream(x, st);
   else if (x.id === 'artemis') st.arrow = 0; // 명중하면 쌓인 화살을 모두 쏜다
+  else if (x.id === 'morgana') st.mirage = 0;
+  else if (x.id === 'leviathan') st.feast = Math.min(x.p.max, st.feast + 1);
 }
 function gloveGenesisOnMiss() {
   const x = gloveGenesisPassive();
   if (!x) return;
   if (x.id === 'morpheus') morpheusDream(x, gglState()); // 꿈은 빗나가지 않는다
   if (x.id === 'artemis') { const st = gglState(); st.arrow = Math.min(x.p.max, st.arrow + x.p.per); }
+  if (x.id === 'morgana') { const st = gglState(); st.mirage = Math.min(x.p.max, st.mirage + x.p.per); }
 }
 // bdTrigger() 맨 앞(key = 패턴, null = 상시 패턴 보스의 가상 발동): true면 이번 패턴을 무효(또는 미룸)
 function gloveGenesisOnPattern(key) {
@@ -10555,6 +10678,24 @@ function gloveGenesisOnPattern(key) {
     case 'chang': st.moonUntil = el + p.dur; floatText('🌕 달로 떠오르는 항아!'); return false;
     case 'tethys':
       if (st.avgAtk > 0) { gglDeal(st.avgAtk * p.pull * x.s); floatText('🐚 심해의 끌어당김!'); }
+      return false;
+    case 'leviathan':
+      if (st.avgAtk > 0 && st.feast > 0) { gglDeal(st.avgAtk * st.feast * p.burst * x.s); floatText('🐋 한입에!'); }
+      st.feast = 0;
+      return false;
+    case 'moirai': st.fateUntil = el + p.dur; floatText('🧵 실을 끊는 가위!'); return false;
+    case 'kairos': {
+      const add = Math.min(p.time, p.timeCap - st.timeGained);
+      if (add > 0) { st.timeGained += add; bossFight.timeLeft += add; }
+      st.kairosUntil = el + p.dur; floatText('⏳ 앞머리를 잡다!');
+      return false;
+    }
+    case 'morgana': st.mirageUntil = el + p.dur; floatText('🌫️ 진짜는 하나!'); return false;
+    case 'eos':
+      if (bd && bd.enraged && !st.eclipsed) {
+        st.eclipsed = true; st.eclipseUntil = el + p.dur;
+        gglDeal(BN.toNumber(mon.maxHp) * p.pct * x.s); floatText('🌅 장밋빛 손가락!');
+      }
       return false;
     case 'hecate': st.curseUntil = el + p.dur; floatText('🔮 세 갈래 저주!'); return false;
     case 'rahu':
@@ -17775,7 +17916,7 @@ const GUIDE_SECTIONS = [
   },
   {
     icon: '🌟', title: '태초 장갑',
-    body: `월드3(성야국) 41~60층마다 그 층에만 있는 <b>태초 장갑</b>이 1종씩 있습니다(지금 41~55층 15종, 나머지는 차례로 추가). 종류는 그 층 보스 장갑과 같고, 대응 스탯이 고대보다 크며(+30에서 주 스탯 115%) <b>🌊 넘치는 대응</b>도 그대로 적용됩니다.
+    body: `월드3(성야국) 41~60층마다 그 층에만 있는 <b>태초 장갑</b>이 1종씩 있습니다(41~60층 20종). 종류는 그 층 보스 장갑과 같고, 대응 스탯이 고대보다 크며(+30에서 주 스탯 115%) <b>🌊 넘치는 대응</b>도 그대로 적용됩니다.
     <br><br><b>고유 효과 2개</b>: 보스전 내내 켜져 있는 <b>패시브</b>와, 보스 패턴이 <b>오는 순간</b> 터지는 <b>반격</b>입니다. 대응 스탯으로 패턴 세기가 0이 돼도 패턴이 오는 순간 반격은 터지고, 패턴이 ${GLOVE_GENESIS_FAKE_EVERY}초 동안 오지 않으면(회피·웅크리기처럼 상시 패턴만 쓰는 보스, 주기가 긴 패턴) 그때도 패턴이 온 것으로 칩니다. 🔇 봉인 중에는 패시브가 멈추지만 반격은 터집니다.
     <br><br>위력은 <b>3강마다 1단계</b>씩(0~10단계) 커지며, 0단계는 최대치의 절반입니다. 화면에는 숫자 대신 효과 문구와 단계만 보입니다.
     <br><br><b>획득</b>: 그 층 몬스터를 처치할 때 극히 낮은 확률로 드롭됩니다(엘리트 5배, 층 보스 10배, 그 층 보스 장갑 세트 3배). 이미 가진 층의 태초 장갑은 다시 나오지 않고, 판매 대상이 아니며 분해하면 🧵 강철실 20,000개(강화 단계에 따라 증가)를 줍니다.

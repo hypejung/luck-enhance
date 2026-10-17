@@ -1,10 +1,10 @@
 // 태초 장갑 측정: 같은 종류 신화 +27 장갑 대비 필요 화력 비율(그 층 보스 / 토벌전 35단계 / 도서관 30서고)
-// 사용법: node tools/test/measure-genesis-glove.js 0,1,2  (GLOVE_GENESES 인덱스, 생략하면 구현된 10종 전부)  [P_JSON: 인덱스별 p 덮어쓰기]
+// 사용법: node tools/test/measure-genesis-glove.js 0,1,2  (GLOVE_GENESES 인덱스, 생략하면 구현된 15종 전부)  [P_JSON: 인덱스별 p 덮어쓰기]
 const env = require('./env.js');
 const { chromium } = require(env.playwright);
 const lib = require('./sim_lib.js');
 const dev = require('./devlib.js');
-const idxs = process.argv[2] ? process.argv[2].split(',').map(Number) : [...Array(10).keys()];
+const idxs = process.argv[2] ? process.argv[2].split(',').map(Number) : [...Array(15).keys()];
 const pOverride = process.argv[3] ? JSON.parse(process.argv[3]) : {};
 (async () => {
   const browser = await chromium.launch({ executablePath: env.chrome, args: ['--no-sandbox'] });
@@ -66,7 +66,7 @@ const pOverride = process.argv[3] ? JSON.parse(process.argv[3]) : {};
         window.__equipGlove(ag);
         const am = window.__reqM(kind, arg);
         res.ratios[kind] = +(bm / am).toFixed(3);
-        res.fx = res.fx || {}; res.fx[kind] = Object.fromEntries(Object.entries(window.__fx).filter(([t]) => /[💤💭🐘🧜🕳🗝👟🌚🪆🪔]/u.test(t)));
+        res.fx = res.fx || {}; res.fx[kind] = Object.fromEntries(Object.entries(window.__fx).filter(([t]) => /[💤💭🐘🧜🕳🗝👟🌚🪆🪔🏹🌕🐚🔮🌑]/u.test(t)));
       }
       const v = Object.values(res.ratios);
       res.geo = +Math.pow(v.reduce((a, b) => a * b, 1), 1 / v.length).toFixed(3);

@@ -160,13 +160,13 @@ DB 규칙은 사용자가 Firebase 콘솔에서 직접 넣는다. 새 경로를 
 - 완료:
   - 월드1~3 사냥터
   - 고대·태초 보조무기 40종
-  - 고대 장갑 20종, 태초 장갑 41~50층 10종
+  - 고대 장갑 20종, 태초 장갑 41~55층 15종
   - 주간 레이드 순위·칭호·세팅 보기, 보스 패턴 첫 발동 앞당김
   - 수집 컨텐츠 획득처 안내
   - 각성 자동 재설정과 최대 희귀도 경고
   - 필멸자의 저항 중복 적용 금지(가장 큰 값 하나만)
 - 다음 후보 / 사용자에게 답을 못 받은 것:
-  - **태초 장갑 51~55층 초안** (설계 절차: `design-notes/ancient-genesis-gloves.md`)
+  - 태초 장갑 56~60층 (설계 절차: `design-notes/ancient-genesis-gloves.md`)
   - 50층 보스 "가시 반격" 패턴 설명 문구를 더 분명하게(시간이 깎이는 건 버그가 아니고 가시 반격 효과)
   - `.claude/skills/luck-enhance-ancient-weapon-balance/SKILL.md`에 적힌 테스트 계정 비밀번호를 지울지
   - 황혼국 경쟁 레이드 A안 「종언의 결투장」 구현(`design-notes/twilight-competitive-raid.md`)

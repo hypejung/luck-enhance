@@ -4126,7 +4126,106 @@ const GLOVE_GENESES = [
 끝을 내지 않는 한, 이 밤은 이어진다.
 
 셰에라자드(Scheherazade).` },
-  null, null, null, null, null, null, null, null, null, null,
+  { id: 'artemis', name: '아르테미스의 은화살 장갑', subtitle: 'Artemis, the Huntress of the Moon', icon: '🏹',
+    passiveName: '빗나간 화살', counterName: '달빛 사냥',
+    passiveText: '과녁을 벗어난 화살도 버려지지 않고, 다음 한 발에 실려 간다.',
+    counterText: '밤의 사냥꾼은 한동안 빗나가는 법을 잊는다.',
+    // 빗나갈 때마다 다음 명중 피해 +per 누적(최대 max, 명중하면 0) / 패턴이 오면 dur초 동안 빗나가지 않고 피해 +boost
+    p: { per: 0.25, max: 2.5, dur: 6, boost: 2.5 },
+    lore: `사냥의 여신은 달빛 아래서만 활을 든다.
+그녀의 화살은 한 번도 주인을 저버리지 않았다.
+
+빗나간 화살은 땅에 떨어지지 않는다.
+허공을 가르며 돌아와
+다음 과녁의 심장에 박힌다.
+
+밤이 깊을수록 그녀의 시위는 팽팽해진다.
+달이 차오르는 동안은
+어떤 짐승도 그 그림자를 벗어나지 못한다.
+
+은빛 갈대 호수에 달이 비친 밤,
+사냥꾼은 물에 비친 제 모습을 겨눈다.
+
+아르테미스(Artemis).` },
+  { id: 'chang', name: '항아의 불사약 장갑', subtitle: "Chang'e, the Lady of the Moon", icon: '🌕',
+    passiveName: '두 번 마신 약', counterName: '달로 떠오르는 항아',
+    passiveText: '지친 몸에 약기운이 두 번 스며들어, 무너진 발걸음을 조금 되찾는다.',
+    counterText: '그녀는 무거운 몸을 버리고 가볍게 달로 날아오른다.',
+    // 탈진으로 줄어든 공속의 recover배만큼 되찾는다 / 패턴이 오면 dur초 동안 공속 +speedBoost, 피해 +boost
+    p: { recover: 0.6, dur: 8, speedBoost: 0.8, boost: 0.5 },
+    lore: `활을 쏘던 명사수의 아내가
+남편 몰래 불사약을 삼켰다.
+
+몸은 가벼워졌지만
+죄는 그녀를 달로 밀어 올렸다.
+
+계수나무 아래에서 그녀는 여전히 기다린다.
+방아 찧는 토끼가 한 번도 쉬지 않는 것은
+그녀가 돌아오기를 바라기 때문이다.
+
+그늘진 나무 아래,
+무거운 발걸음이 다시 가벼워진다.
+
+항아(Chang'e).` },
+  { id: 'tethys', name: '테티스의 바다 장갑', subtitle: 'Thetis, the Sea Mother', icon: '🐚',
+    passiveName: '가라앉는 바다', counterName: '심해의 끌어당김',
+    passiveText: '적이 가라앉을수록, 바다는 더 깊이 끌어당긴다.',
+    counterText: '물결은 흘러간 것을 다시 제 품으로 끌어당긴다.',
+    // 보스 체력이 줄어든 만큼 피해 +perLost(체력 0%일 때 최대) / 패턴이 오면 평균 공격 피해의 pull배를 고정 피해로
+    p: { perLost: 2.2, pull: 20 },
+    lore: `바다의 여신은 아들을 불사로 만들려고
+그를 저승의 강에 담갔다.
+
+손으로 잡은 발목만 물에 닿지 않았다.
+그러나 바다는 한 번 잡은 것을 놓지 않는다.
+
+밀물은 해안을 삼키고
+썰물은 그 흔적을 모두 끌어간다.
+
+부서진 것도, 흘러간 것도
+결국 그녀의 품으로 돌아온다.
+
+테티스(Thetis).` },
+  { id: 'hecate', name: '헤카테의 세 갈래 장갑', subtitle: 'Hecate, the Keeper of Three Ways', icon: '🔮',
+    passiveName: '달의 세 얼굴', counterName: '세 갈래 저주',
+    passiveText: '차오르고, 기울고, 지는 달처럼 세 얼굴로 급소를 본다.',
+    counterText: '세 갈래 길 모두에 저주가 새겨진다.',
+    // 치명타 확률 +crit(x 강화 단계) / 패턴이 오면 dur초 동안 보스가 받는 피해 +boost
+    p: { crit: 0.35, dur: 5, boost: 2.0 },
+    lore: `삼거리에는 밤마다 횃불을 든 여신이 선다.
+누가 어느 길로 갈지는
+그녀가 정한다.
+
+그녀는 달의 세 얼굴을 가졌다.
+차오르는 얼굴은 탄생을,
+기우는 얼굴은 마법을,
+지는 얼굴은 죽음을 본다.
+
+세 갈래 길 위에 놓인 저주는
+어느 길로 가도 피할 수 없다.
+
+헤카테(Hecate).` },
+  { id: 'rahu', name: '라후의 그림자 입 장갑', subtitle: 'Rahu, the Shadow That Swallows Lights', icon: '🌑',
+    passiveName: '그림자의 입', counterName: '삼켜진 달',
+    passiveText: '빛을 삼키는 입은 봉인된 순간에도 그 어둠을 놓지 않는다.',
+    counterText: '광폭해진 그림자가 달을 통째로 삼킨다.',
+    // 공격 피해 +base(x 강화 단계), 봉인 중에는 base×sealMult / 광폭화 뒤 처음 패턴에서 보스 최대 체력 pct 고정 피해 + dur초 동안 피해 +boost
+    p: { base: 1.1, sealMult: 2, dur: 10, boost: 1.5, pct: 0.15 },
+    lore: `해와 달을 삼키는 그림자가 있다.
+그는 신들의 자리에 오르지 못했지만
+하늘의 빛을 가리는 법을 알고 있었다.
+
+달이 그를 피해 달아나려 하면
+그는 목을 길게 뻗어 달을 삼킨다.
+
+삼켜진 달은 잠시 어둠 속에서 빛을 잃고,
+그 안에서 그림자는 더 커진다.
+
+가려진 달의 제단 위에서,
+그는 다시 한 번 입을 벌린다.
+
+라후(Rahu).` },
+  null, null, null, null, null,
 ];
 function gloveGenesisDef(g) { return g && g.genesisFloor !== undefined ? GLOVE_GENESES[g.genesisFloor - WORLD3_START_FLOOR] || null : null; }
 function isGenesisGlove(g) { return !!gloveGenesisDef(g); }
@@ -10270,6 +10369,7 @@ function gloveGenesisPassive() { const x = gloveGenesisFx(); return x && bossFig
 function gglState() {
   if (!fx.ggl) fx.ggl = { atkAcc: 0, avgAtk: 0, sleep: 0, sleepUntil: -1, delayed: [], dreamUntil: -1, dreamAcc: 0,
     log: [], janusT: 0, hermesUntil: -1, mirrorSpeedUntil: -1, mirrorDmgUntil: -1, things: 0, thingNext: 0, tellUntil: -1, timeGained: 0,
+    arrow: 0, arrowUntil: -1, moonUntil: -1, curseUntil: -1, eclipseUntil: -1, eclipsed: false,
     sat: 0, satNext: 0, digestUntil: -1, darkUntil: -1, lastPattern: GLOVE_GENESIS_FAKE_EVERY * (BD_FIRST_FRAC - 1) };
   return fx.ggl;
 }
@@ -10294,6 +10394,11 @@ function gloveGenesisSpeedMult() {
     return m;
   }
   if (x.id === 'tezcatlipoca' && el < st.mirrorSpeedUntil) return 1 + p.speedBoost * x.s;
+  if (x.id === 'chang') {
+    let m = bdSealed() ? 1 : 1 + p.recover * x.s * (1 - bdSpeedMult());
+    if (el < st.moonUntil) m *= 1 + p.speedBoost * x.s;
+    return m;
+  }
   return 1;
 }
 // 헤르메스: 빗나가면 한 번 더 굴린다
@@ -10310,8 +10415,18 @@ function gloveGenesisDark() {
   const el = bossFight.elapsed;
   return el < gglState().darkUntil || !!(bd && el < bd.blindUntil);
 }
-function gloveGenesisNoMiss() { return !!gloveGenesisPassive() && gloveGenesisDark(); }
-function gloveGenesisCritAdd() { return gloveGenesisNoMiss() ? 1 : 0; }
+function gloveGenesisNoMiss() {
+  const x = gloveGenesisFx();
+  if (!x || !bossFight.active) return false;
+  if (x.id === 'artemis') return bossFight.elapsed < gglState().arrowUntil; // 달빛 사냥: 패턴 중에도 빗나가지 않음
+  return !!gloveGenesisPassive() && gloveGenesisDark();
+}
+function gloveGenesisCritAdd() {
+  const x = gloveGenesisPassive();
+  if (!x) return 0;
+  if (x.id === 'hecate') return x.p.crit * x.s;
+  return x.id === 'erebos' && gloveGenesisDark() ? 1 : 0;
+}
 function gloveGenesisCritDmgAdd() { const x = gloveGenesisPassive(); return x && gloveGenesisDark() ? x.p.critDmg * x.s : 0; }
 // 보호막·환영 분신에 주는 피해 배율(바쿠)
 function gloveGenesisLayerMult() { const x = gloveGenesisPassive(); return x && x.id === 'baku' ? x.p.layerMult : 1; }
@@ -10336,6 +10451,18 @@ function gloveGenesisDmgMult() {
       if (el < st.tellUntil) m *= 1 + p.boost * x.s;
       return m;
     }
+    case 'artemis': {
+      let m = passive ? 1 + st.arrow * x.s : 1;
+      if (el < st.arrowUntil) m *= 1 + p.boost * x.s;
+      return m;
+    }
+    case 'chang': return el < st.moonUntil ? 1 + p.boost * x.s : 1;
+    case 'tethys': {
+      const lost = 1 - BN.toNumber(BN.div(mon.hp, mon.maxHp));
+      return passive ? 1 + p.perLost * lost * x.s : 1;
+    }
+    case 'hecate': return el < st.curseUntil ? 1 + p.boost * x.s : 1;
+    case 'rahu': return 1 + p.base * x.s * (bdSealed() ? p.sealMult : 1) + (el < st.eclipseUntil ? p.boost * x.s : 0);
     case 'seirenes': {
       if (!passive) return 1;
       const reduce = bd ? Math.min(0.95, bdStrength('guard')) + bd.weakenTotal : 0;
@@ -10354,10 +10481,13 @@ function gloveGenesisOnHit() {
   const st = gglState();
   if (x.id === 'hypnos' && bossFight.elapsed >= st.sleepUntil) st.sleep = Math.min(x.p.max, st.sleep + x.p.perHit);
   else if (x.id === 'morpheus') morpheusDream(x, st);
+  else if (x.id === 'artemis') st.arrow = 0; // 명중하면 쌓인 화살을 모두 쏜다
 }
 function gloveGenesisOnMiss() {
   const x = gloveGenesisPassive();
-  if (x && x.id === 'morpheus') morpheusDream(x, gglState()); // 꿈은 빗나가지 않는다
+  if (!x) return;
+  if (x.id === 'morpheus') morpheusDream(x, gglState()); // 꿈은 빗나가지 않는다
+  if (x.id === 'artemis') { const st = gglState(); st.arrow = Math.min(x.p.max, st.arrow + x.p.per); }
 }
 // bdTrigger() 맨 앞(key = 패턴, null = 상시 패턴 보스의 가상 발동): true면 이번 패턴을 무효(또는 미룸)
 function gloveGenesisOnPattern(key) {
@@ -10421,6 +10551,18 @@ function gloveGenesisOnPattern(key) {
       floatText('🪔 이야기는 내일 밤에!');
       return false;
     }
+    case 'artemis': st.arrowUntil = el + p.dur; floatText('🏹 달빛 사냥!'); return false;
+    case 'chang': st.moonUntil = el + p.dur; floatText('🌕 달로 떠오르는 항아!'); return false;
+    case 'tethys':
+      if (st.avgAtk > 0) { gglDeal(st.avgAtk * p.pull * x.s); floatText('🐚 심해의 끌어당김!'); }
+      return false;
+    case 'hecate': st.curseUntil = el + p.dur; floatText('🔮 세 갈래 저주!'); return false;
+    case 'rahu':
+      if (bd && bd.enraged && !st.eclipsed) {
+        st.eclipsed = true; st.eclipseUntil = el + p.dur;
+        gglDeal(BN.toNumber(mon.maxHp) * p.pct * x.s); floatText('🌑 삼켜진 달!');
+      }
+      return false;
     case 'erebos': {
       let dur = bd && bd.enraged ? p.enrageDur : p.dur;
       if (key === 'blind' && bd) { const e = bd.list.find(z => z.key === 'blind'); if (e) dur = Math.max(dur, e.base * (bd.enraged ? BOSS_ENRAGE_MULT : 1)); }
@@ -17633,7 +17775,7 @@ const GUIDE_SECTIONS = [
   },
   {
     icon: '🌟', title: '태초 장갑',
-    body: `월드3(성야국) 41~60층마다 그 층에만 있는 <b>태초 장갑</b>이 1종씩 있습니다(지금 41~50층 10종, 나머지는 차례로 추가). 종류는 그 층 보스 장갑과 같고, 대응 스탯이 고대보다 크며(+30에서 주 스탯 115%) <b>🌊 넘치는 대응</b>도 그대로 적용됩니다.
+    body: `월드3(성야국) 41~60층마다 그 층에만 있는 <b>태초 장갑</b>이 1종씩 있습니다(지금 41~55층 15종, 나머지는 차례로 추가). 종류는 그 층 보스 장갑과 같고, 대응 스탯이 고대보다 크며(+30에서 주 스탯 115%) <b>🌊 넘치는 대응</b>도 그대로 적용됩니다.
     <br><br><b>고유 효과 2개</b>: 보스전 내내 켜져 있는 <b>패시브</b>와, 보스 패턴이 <b>오는 순간</b> 터지는 <b>반격</b>입니다. 대응 스탯으로 패턴 세기가 0이 돼도 패턴이 오는 순간 반격은 터지고, 패턴이 ${GLOVE_GENESIS_FAKE_EVERY}초 동안 오지 않으면(회피·웅크리기처럼 상시 패턴만 쓰는 보스, 주기가 긴 패턴) 그때도 패턴이 온 것으로 칩니다. 🔇 봉인 중에는 패시브가 멈추지만 반격은 터집니다.
     <br><br>위력은 <b>3강마다 1단계</b>씩(0~10단계) 커지며, 0단계는 최대치의 절반입니다. 화면에는 숫자 대신 효과 문구와 단계만 보입니다.
     <br><br><b>획득</b>: 그 층 몬스터를 처치할 때 극히 낮은 확률로 드롭됩니다(엘리트 5배, 층 보스 10배, 그 층 보스 장갑 세트 3배). 이미 가진 층의 태초 장갑은 다시 나오지 않고, 판매 대상이 아니며 분해하면 🧵 강철실 20,000개(강화 단계에 따라 증가)를 줍니다.

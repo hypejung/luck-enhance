@@ -106,6 +106,7 @@ git fetch origin main && git checkout main && git merge --ff-only origin/main &&
 | 토벌전(레이드) | 일일 제한 단계형 보스. 21단계 이상은 보스 방해 패턴 |
 | 보스 방해 패턴 `DISRUPTIONS` | 봉인·암흑·보호막·시간 잠식 등. 첫 발동은 주기의 1/4 시점(`BD_FIRST_FRAC`). 층 보스는 시간 배율 0.5, 광폭화 시 ×1.5 |
 | 고대의 도서관 | 주 2회 초기화, 서고 깊이 도전. 정수·각성의 정수 보상 |
+| 종언의 결투장 | 레이드 탭의 ⚔️ 보기. 황혼국 경쟁 레이드(주간 패턴 3개·1회 최고 기록 순위·🌆정수/🌑그림자 보상). `design-notes/twilight-competitive-raid.md` |
 | 주간 레이드 「세계수의 단말마」 | 전 유저 합산 협동 레이드. 기여도 TOP3에게 보상 ×4/×3/×2와 칭호, TOP3 세팅 보기 |
 | 펀치기계 | 120초 딜 측정(연습용). 밸런스 측정에도 쓴다 |
 | 기타 | 랜덤박스, 도박장(배율 베팅·하이로우·슬롯·주사위), 대장간·분해, 프리셋(컨텐츠별 지정), 명예의 정수 상점, 이스터에그(`EASTER_EGGS.md`) |
@@ -134,6 +135,8 @@ git fetch origin main && git checkout main && git merge --ff-only origin/main &&
 | `weeklyRaid2/{주차}/{키}` | 주간 레이드 기여도 |
 | `raidNames/{키}` | 레이드 이름 |
 | `weeklyRaidSetup/{주차}/{키}` | TOP3 세팅 |
+| `duelRecords/{주차}/{키}` | 종언의 결투장 그 주 1회 최고 기록 |
+| `duelSetup/{주차}/{키}` | 종언의 결투장 TOP3 세팅 |
 
 DB 규칙은 사용자가 Firebase 콘솔에서 직접 넣는다. 새 경로를 쓰면 규칙 추가를 부탁해야 한다.
 

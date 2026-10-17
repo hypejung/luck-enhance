@@ -1244,8 +1244,9 @@
 
   <div id="tab-worldraid" style="display:none">
     <div class="panel">
-      <h3>🌳 세계수의 단말마</h3>
+      <h3 id="worldRaidTitle">🌳 세계수의 단말마</h3>
       <div class="content-preset-bar" data-cp="worldraid"></div>
+      <div id="worldRaidTreeIntro">
       <img src="assets/raid/groma.jpg" alt="그르마, 뿌리 끝의 절규" style="width:100%;border-radius:10px;border:1px solid var(--border);margin-bottom:10px;display:block;" onerror="this.style.display='none'">
       <div style="font-size:12px; color:var(--sub); margin-bottom:10px;">
         <div style="font-style:italic;margin-bottom:6px;">니드호그가 끝없이 갉아온 세계수의 뿌리는 이미 돌이킬 수 없이 썩었다. 그 뿌리를 지키던 루멘 아르카조차 신성을 버리고 등을 돌렸다 — 세계수는 스스로를 지킬 힘조차 잃은 것이다.
@@ -1253,12 +1254,14 @@
         <div>모든 사냥꾼이 함께 맞서는 <b style="color:var(--unique)">주간 콘텐츠</b>입니다. <b style="color:#ff7a7a">120초간 실제로 들어간 누적 피해</b>를 측정하며,
         하루 <b style="color:var(--unique)">3회</b> 도전해 그날의 <b>최고 기록</b>이 일일 기록이 되고, 일~토 일일 기록을 합친 값이 <b>주간 기여</b>가 됩니다. 모든 유저의 주간 기여 합이 구간을 넘을 때마다 참여한 모두의 보상이 커지며, 매주 <b>일요일(강화데이) 0시</b>에 정산됩니다.</div>
       </div>
+      </div>
       <div id="worldRaidBattlePanel" style="display:none">
         <div id="worldRaidMonBox">
           <div id="worldRaidMonEmoji">🩸</div>
           <div id="worldRaidMonName"></div>
           <div id="worldRaidHpBarWrap"><div id="worldRaidHpBar"></div></div>
           <div id="worldRaidHpText"></div>
+          <div id="worldRaidDisruptBar"></div>
         </div>
         <div id="worldRaidTimer" style="text-align:center;font-weight:bold;margin:6px 0;"></div>
         <button class="big danger" id="worldRaidFleeBtn" style="width:100%;">🏳️ 도전 중단</button>
@@ -3605,6 +3608,11 @@ function bdTrigger(key) {
 // tick()에서 보스전 타이머 처리 직후 호출
 function bossDisruptionTick(dt) {
   if (!bd || !bossFight.active) return;
+  if (bossFight.isDuel && !bd.enraged && bossFight.elapsed >= DUEL.enrageAt) {
+    bd.enraged = true;
+    floatText('🔥 광폭화!');
+    log(`🔥 베스퍼리아가 <b>광폭화</b>했습니다! 모든 패턴이 ${BOSS_ENRAGE_MULT}배로 강해집니다.`, 'lg-bad');
+  }
   if (bd.enrageable && !bd.enraged && BN.lte(mon.hp, BN.mul(mon.maxHp, BOSS_ENRAGE_HP))) {
     bd.enraged = true;
     floatText('🔥 광폭화!');
@@ -7350,7 +7358,9 @@ function unlockEgg(id) {
 function renderRaidTitleBadge() {
   const el = $('raidTitleBadge');
   if (!el) return;
-  el.innerHTML = activeRaidTitles().map(t => `<span title="세계수의 단말마 칭호 — 이번 주 모든 사냥터 드롭률 +${Math.round(t.luck * 100)}%, 골드 획득 +${Math.round(t.gold * 100)}%" style="margin-left:6px;font-size:12px;cursor:help;color:var(--gold);">${t.emoji} ${t.name}</span>`).join('');
+  const dtt = activeDuelTitle();
+  const duelBadge = dtt ? `<span title="종언의 결투장 칭호 — 이번 주 보조무기 효과 증폭 +${Math.round(dtt.subAmp * 100)}%, 액티브 피해량 +${Math.round(dtt.subActiveDmg * 100)}%p" style="margin-left:6px;" class="raidtitle raidtitle-${dtt.badge}">${dtt.emoji} ${dtt.name}</span>` : '';
+  el.innerHTML = activeRaidTitles().map(t => `<span title="세계수의 단말마 칭호 — 이번 주 모든 사냥터 드롭률 +${Math.round(t.luck * 100)}%, 골드 획득 +${Math.round(t.gold * 100)}%" style="margin-left:6px;font-size:12px;cursor:help;color:var(--gold);">${t.emoji} ${t.name}</span>`).join('') + duelBadge;
 }
 function renderEggBadges() {
   renderRaidTitleBadge();
@@ -7794,6 +7804,9 @@ function newState() {
     gloveGenesisSeen: [],  // 태초 장갑 도감(월드3): index = 층 번호(0=41층)
     gloveAncientSeen: [],  // 고대 장갑 도감(월드3): [true/false, ...] 20개, index = 층 번호(0=41층)
     genesisFeedPending: [], genesisFeedName: '', // 태초 획득 알림: 이름 입력·서버 업로드 대기 목록, 마지막으로 쓴 이름
+    twilightEssence: BN.from(0), // 🌆 황혼의 정수 (종언의 결투장 순위 보상, 황혼 상점 재화)
+    twilightShadow: 0,           // 🌑 황혼의 그림자 (종언의 결투장 순위 보상, 황혼의 악몽 전용 — 상점에서 살 수 없음)
+    duel: { week: null, best: BN.from(0), dayKey: null, dayCount: 0, pushDirty: false, setupPending: null, unsettled: [], lastSettled: null, rankTitle: null, rankTitleWeek: null }, // 종언의 결투장: week=주차키, best=이번 주 1회 최고 피해, dayKey/dayCount=오늘 도전 횟수, setupPending=올릴 세팅 요약, unsettled=정산 대기 [{week,best}], lastSettled=마지막 정산 결과, rankTitle/rankTitleWeek=순위 칭호
     weeklyRaid: { week: null, days: {}, dayKey: null, dayCount: 0, title: null, titleWeek: null, bestRun: null, recordDay: null, rid: null, pushDirty: false, unsettled: [], lastSettled: null, name: '', namePushDirty: false, setupPending: null, rankTitle: null, rankTitleWeek: null }, // 세계수의 단말마(name=레이드 이름, setupPending=올릴 세팅 요약, rankTitle/rankTitleWeek=순위 칭호): week=주차키, days={날짜키: 일일 최고 피해}, dayKey/dayCount=오늘 도전 횟수, title/titleWeek=칭호와 그 칭호가 유효한 주, bestRun=역대 최고 1회 피해, recordDay=기록 보상 받은 날, rid=전체 합산용 익명 id(해시해서 키로 씀), pushDirty=이번 주 기록 업로드 대기, unsettled=전체 정산 대기 [{week,total}], lastSettled=마지막 전체 정산 결과
     honorEssence: BN.from(0), // 명예의 정수 (세계수의 단말마 순위 보상, 명예 상점 재화)
   };
@@ -8381,6 +8394,7 @@ function accEff() {
   // 세계수의 단말마 칭호: 모든 사냥터에 그대로(다른 월드 절반 규칙 없음)
   // 기여 구간 칭호 + 순위 칭호(1~3위)는 따로 붙고 둘 다 적용
   for (const t of activeRaidTitles()) { eff.luck += t.luck; eff.gold += t.gold; }
+  { const dt = activeDuelTitle(); if (dt) { eff.subAmp += dt.subAmp; eff.subActiveDmg += dt.subActiveDmg; } } // 종언의 결투장 순위 칭호(보조무기 쪽)
   eff.atk += trainingValue('atk');
   eff.speed += trainingValue('atkSpeed');
   // 도감 컬렉션 보너스(쌍/타입 풀세트/사냥터 풀세트/보스의 무력) — 전부 1~20층 결부형이라 월드1 한정.
@@ -11054,7 +11068,7 @@ function handleKill(chainDepth) {
     return 'punch';
   }
   if (bossFight.active && bossFight.isWeeklyRaid) {
-    mon.hp = BN.from(PUNCH_DUMMY_HP);
+    mon.hp = BN.from(bossFight.isDuel ? DUEL.refHp : PUNCH_DUMMY_HP);
     return 'weeklyraid';
   }
   if (bossFight.active) {
@@ -11771,7 +11785,7 @@ function attack(w) {
 
 /* ===================== 보스 전투 ===================== */
 const bossFight = {
-  active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0, isPunch: false, isLibrary: false, libraryDepth: 0, isWeeklyRaid: false,
+  active: false, floor: 0, timeLeft: 0, dmgBonus: 0, isRaid: false, raidStage: 0, isPunch: false, isLibrary: false, libraryDepth: 0, isWeeklyRaid: false, isDuel: false,
   // 보조무기 액티브 "결전의 기백"용: 전투 경과 시간(elapsed)이 장착 보조무기의 activeTiming에
   // 도달하면 1회(subActiveUsed) 발동해 dmgBonus를 채우고, subActiveEndAt에 도달하면 꺼진다.
   elapsed: 0, subActiveUsed: false, subActiveEndAt: 0,
@@ -12259,9 +12273,9 @@ async function weeklyRaidPushSetup() {
     if (res.ok && S.weeklyRaid.setupPending === p) { S.weeklyRaid.setupPending = null; save(); }
   } catch (e) { /* 1분 주기 재시도 */ } finally { weeklyRaidSetupPushBusy = false; }
 }
-function raidSetupHtml(name, total, snap) {
+function raidSetupHtml(name, total, snap, label) {
   const head = `<div style="font-size:15px;font-weight:bold;margin-bottom:2px;">${escHtml(name)}</div>
-    <div style="color:var(--sub);margin-bottom:8px;">주간 기여 ${fmt(total)}${snap && snap.at ? ` · 기록 당시 세팅 (${escHtml(new Date(snap.at).toLocaleString())})` : ''}</div>`;
+    <div style="color:var(--sub);margin-bottom:8px;">${label || '주간 기여'} ${fmt(total)}${snap && snap.at ? ` · 기록 당시 세팅 (${escHtml(new Date(snap.at).toLocaleString())})` : ''}</div>`;
   if (snap === undefined) return head + '<div style="color:var(--sub);">세팅 정보를 불러오는 중...</div>';
   if (!snap || typeof snap !== 'object') return head + '<div style="color:var(--sub);">세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.</div>';
   const sec = (title, lines) => {
@@ -12271,17 +12285,18 @@ function raidSetupHtml(name, total, snap) {
   return head + sec('📊 능력치', snap.stats) + sec('🏋️ 훈련', snap.training) + sec('⚔️ 무기', snap.weapon)
     + sec('🗡️ 보조무기', snap.sub) + sec('🧤 장갑', snap.glove) + sec('📿 장신구', snap.accs) + sec('🌫️ 고대의 인장', snap.seals);
 }
-async function showRaidSetup(week, key, name, total) {
-  showCodexPopup(raidSetupHtml(name, total, undefined));
+async function showRaidSetup(week, key, name, total, path, label) {
+  path = path || 'weeklyRaidSetup';
+  showCodexPopup(raidSetupHtml(name, total, undefined, label));
   let snap = null;
   try {
-    const v = await syncFetchJson(`weeklyRaidSetup/${week}/${key}`, 8000);
+    const v = await syncFetchJson(`${path}/${week}/${key}`, 8000);
     if (v && typeof v.s === 'string' && v.s.length < 20000) snap = JSON.parse(v.s);
   } catch (e) {
-    showCodexPopup(raidSetupHtml(name, total, null).replace('세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.', '세팅 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'));
+    showCodexPopup(raidSetupHtml(name, total, null, label).replace('세팅 정보가 없습니다. 이 유저가 다음에 기록을 갱신하면 표시됩니다.', '세팅 정보를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.'));
     return;
   }
-  showCodexPopup(raidSetupHtml(name, total, snap));
+  showCodexPopup(raidSetupHtml(name, total, snap, label));
 }
 
 // 이번 주 기록 업로드(기록 갱신 때 + 실패했으면 1분마다 재시도)
@@ -12461,6 +12476,320 @@ function endWeeklyRaidFight() {
   weeklyRaidPushCurrent(); weeklyRaidPushSetup();
   spawnMonster();
   renderBossBtn(); renderTop(); renderWorldRaidTab(); save();
+}
+
+// ---------- ⚔️ 종언의 결투장 (황혼국 경쟁 레이드) ----------
+// 황혼국이 열려 있으면 들어갈 수 있는 "한 방 승부" 경쟁 콘텐츠. 베스퍼리아를 세계수의 단말마와 같은 방식(체력 사실상
+// 무한, 120초 누적 피해 측정)으로 상대하되, 보스가 매주 바뀌는 방해 패턴 3개(대응 스탯이 서로 다른 것)를 쓴다.
+// 순위 기준은 그 주 1회 최고 기록. 하루 3회 도전, 일요일 0시 결산: 순위에 따라 🌆 황혼의 정수(상점 재화)와
+// 🌑 황혼의 그림자(황혼의 악몽 전용 재료)를 받고, 1~3위는 한 주 동안 보조무기 쪽 칭호 효과를 받는다.
+// 체력은 refHp로 고정(보호막·분신·재생이 최대 체력의 %라서 사실상 무한(1e90)이면 의미가 없다). 처치해도 refHp로 다시 채운다.
+const DUEL_BOSS = { name: '베스퍼리아', subtitle: '황혼을 붙든 자', emoji: '👑' };
+const DUEL = { duration: 120, dailyAttempts: 3, enrageAt: 90, refHp: 1e22, patternCount: 3 };
+const DUEL_TOP_REWARDS = [{ essence: 300, shadow: 30 }, { essence: 220, shadow: 20 }, { essence: 160, shadow: 15 }];
+const DUEL_BANDS = [
+  { frac: 0.1, label: '상위 10%', essence: 100, shadow: 8 },
+  { frac: 0.3, label: '상위 30%', essence: 60, shadow: 4 },
+  { frac: 0.5, label: '상위 50%', essence: 35, shadow: 2 },
+  { frac: 1, label: '참가', essence: 15, shadow: 1 },
+];
+const DUEL_RANK_TITLES = {
+  r1: { name: '황혼을 끝낸 자', emoji: '🌆', subAmp: 0.15, subActiveDmg: 0.15, badge: 't1' },
+  r2: { name: '종언의 종을 울린 자', emoji: '🔔', subAmp: 0.10, subActiveDmg: 0.10, badge: 't2' },
+  r3: { name: '저무는 빛을 지킨 자', emoji: '🕯️', subAmp: 0.05, subActiveDmg: 0.05, badge: 't3' },
+};
+function duelOpen() { return !!S && S.unlocked > WORLD2_START_FLOOR; }
+function activeDuelTitle() {
+  const d = S && S.duel;
+  return d && d.rankTitle && d.rankTitleWeek === weekKey() && DUEL_RANK_TITLES[d.rankTitle] ? DUEL_RANK_TITLES[d.rankTitle] : null;
+}
+function duelRewardFor(rank, n) {
+  if (rank >= 1 && rank <= 3) return Object.assign({ label: `${rank}위` }, DUEL_TOP_REWARDS[rank - 1]);
+  const frac = n > 0 ? rank / n : 1;
+  return DUEL_BANDS.find(b => frac <= b.frac) || DUEL_BANDS[DUEL_BANDS.length - 1];
+}
+// 이번 주 패턴: 주차 키로 고정, 대응 스탯이 서로 다른 DUEL.patternCount개
+function duelPatternKeys(week) {
+  const rand = librarySeededRand((week || weekKey()) * 977 + 41);
+  const keys = Object.keys(DISRUPTIONS);
+  const picked = [], used = new Set();
+  for (let g = 0; picked.length < DUEL.patternCount && g < 1000; g++) {
+    const key = keys[Math.floor(rand() * keys.length)];
+    if (used.has(DISRUPTIONS[key].counter)) continue;
+    used.add(DISRUPTIONS[key].counter);
+    picked.push(key);
+  }
+  return picked;
+}
+function duelPatternList(week) { return disruptionListFromRaw(duelPatternKeys(week)); }
+function duelNormalize() {
+  if (!S.duel || typeof S.duel !== 'object') S.duel = {};
+  const d = S.duel;
+  if (d.week === undefined) d.week = null;
+  d.best = BN.from(d.best || 0);
+  if (!Array.isArray(d.unsettled)) d.unsettled = [];
+  if (d.dayKey === undefined) d.dayKey = null;
+  if (typeof d.dayCount !== 'number') d.dayCount = 0;
+  return d;
+}
+function duelTodayCount() { const d = duelNormalize(); return d.dayKey === todayKey() ? (d.dayCount || 0) : 0; }
+
+// ---- 서버: duelRecords/{주차}/{익명 키} = { m, e, at } (그 주 1회 최고 피해), duelSetup/{주차}/{키} = { s, at } ----
+// 익명 키·이름은 세계수의 단말마와 공유한다(weeklyRaidKey, raidNames).
+async function duelPushEntry(week, best) {
+  if (!syncConfigured()) return;
+  const b = BN.from(best);
+  if (!weeklyRaidEntryValid(b)) return;
+  const key = await weeklyRaidKey();
+  const res = await fetch(`${SYNC_DB_URL}/duelRecords/${week}/${key}.json`, { method: 'PUT', body: JSON.stringify({ m: b.m, e: b.e, at: { '.sv': 'timestamp' } }) });
+  if (!res.ok) { const err = new Error('http ' + res.status); err.status = res.status; throw err; }
+}
+let duelPushBusy = false;
+function duelPushCurrent() {
+  const d = duelNormalize();
+  if (!d.pushDirty || duelPushBusy || !d.week) return;
+  duelPushBusy = true;
+  const week = d.week, best = BN.from(d.best);
+  duelPushEntry(week, best)
+    .then(() => { if (S.duel.week === week && BN.eq(S.duel.best, best)) { S.duel.pushDirty = false; save(); } })
+    .catch(e => { if (e && e.status === 401 && S.duel.week === week && BN.eq(S.duel.best, best)) S.duel.pushDirty = false; })
+    .finally(() => {
+      duelPushBusy = false;
+      if (S.duel.pushDirty && S.duel.week === week && !BN.eq(S.duel.best, best)) duelPushCurrent();
+    });
+}
+let duelSetupPushBusy = false;
+async function duelPushSetup() {
+  const d = duelNormalize();
+  const p = d.setupPending;
+  if (!p || duelSetupPushBusy || !syncConfigured()) return;
+  if (p.week !== d.week) { d.setupPending = null; return; }
+  duelSetupPushBusy = true;
+  try {
+    const key = await weeklyRaidKey();
+    const res = await fetch(`${SYNC_DB_URL}/duelSetup/${p.week}/${key}.json`, { method: 'PUT', body: JSON.stringify({ s: p.s, at: { '.sv': 'timestamp' } }) });
+    if (res.ok && S.duel.setupPending === p) { S.duel.setupPending = null; save(); }
+  } catch (e) { /* 1분 주기 재시도 */ } finally { duelSetupPushBusy = false; }
+}
+let duelLive = null; // { week, node, prevWeek, prevNode, names, myKey, at }
+let duelLiveBusy = false;
+function duelRefreshLive(force) {
+  const wk = weekKey();
+  if (!syncConfigured() || duelLiveBusy) return;
+  if (!force && duelLive && duelLive.week === wk && Date.now() - duelLive.at < 60000) return;
+  duelLiveBusy = true;
+  const pwk = prevWeekKey();
+  Promise.all([syncFetchJson(`duelRecords/${wk}`, 8000), weeklyRaidKey(),
+    syncFetchJson(`duelRecords/${pwk}`, 8000).catch(() => null), syncFetchJson('raidNames', 8000).catch(() => null)])
+    .then(([node, myKey, prevNode, names]) => {
+      duelLive = { week: wk, node: node || {}, myKey, prevWeek: pwk, prevNode: prevNode || {}, names: names || {}, at: Date.now() };
+      const tab = $('tab-worldraid');
+      if (raidTabView === 'duel' && tab && tab.style.display !== 'none' && !bossFight.active) renderWorldRaidTab();
+    })
+    .catch(() => { duelLive = duelLive && duelLive.week === wk ? Object.assign(duelLive, { at: Date.now() }) : { week: wk, node: null, at: Date.now() }; })
+    .finally(() => { duelLiveBusy = false; });
+}
+
+// ---- 결산: 지난주 순위 → 황혼의 정수·그림자(+1~3위 칭호). 오프라인이면 1분마다 재시도, 3주 넘게 못 닿으면 참가 보상 ----
+let duelSettleBusy = false;
+async function duelSettle() {
+  const d = duelNormalize();
+  if (duelSettleBusy || !d.unsettled.length) return;
+  duelSettleBusy = true;
+  try {
+    const entry = d.unsettled[0];
+    const best = BN.from(entry.best);
+    let node = null, offline = false;
+    try {
+      await duelPushEntry(entry.week, best).catch(() => {});
+      node = await syncFetchJson(`duelRecords/${entry.week}`, 8000);
+    } catch (e) { offline = true; }
+    if (offline) {
+      const age = (new Date(weekStart(new Date())) - new Date(Math.floor(entry.week / 10000), Math.floor(entry.week / 100) % 100 - 1, entry.week % 100)) / 86400000;
+      if (syncConfigured() && age < 21) return;
+    }
+    if (S.duel.unsettled[0] !== entry) return;
+    const myKey = await weeklyRaidKey();
+    let rank = 0, n = 1;
+    if (!offline) {
+      const list = weeklyRaidRanking(node, myKey, best);
+      n = list.length;
+      const i = list.findIndex(x => x.me);
+      rank = i >= 0 ? i + 1 : 0;
+    }
+    const r = rank ? duelRewardFor(rank, n) : DUEL_BANDS[DUEL_BANDS.length - 1];
+    S.duel.unsettled.shift();
+    S.twilightEssence = BN.add(S.twilightEssence || BN.from(0), r.essence);
+    S.twilightShadow = (S.twilightShadow || 0) + r.shadow;
+    let titleMsg = '';
+    if (rank >= 1 && rank <= 3 && entry.week === prevWeekKey()) {
+      S.duel.rankTitle = 'r' + rank; S.duel.rankTitleWeek = weekKey();
+      const t = DUEL_RANK_TITLES['r' + rank];
+      titleMsg = ` 칭호 ${t.emoji} <b>[${t.name}]</b> 획득! (이번 주 보조무기 효과 증폭 +${Math.round(t.subAmp * 100)}%, 액티브 피해량 +${Math.round(t.subActiveDmg * 100)}%p)`;
+    }
+    S.duel.lastSettled = { week: entry.week, best: BN.from(best), rank, n, label: r.label, essence: r.essence, shadow: r.shadow };
+    const msg = `⚔️ <b>[종언의 결투장 주간 결산]</b> 내 최고 기록 ${fmt(best)} — ${rank ? `<b style="color:var(--gold)">${n}명 중 ${rank}위</b> (${r.label})` : `참가 (서버 순위를 불러오지 못해 참가 보상)`}! 🌆 황혼의 정수 +${r.essence}, 🌑 황혼의 그림자 +${r.shadow}.${titleMsg}`;
+    log(msg, 'lg-prim');
+    try { showAlertModal(`<p style="text-align:left">${msg}</p><button class="primary" id="alertOkBtn">확인</button>`); $('alertOkBtn').onclick = hideAlertModal; } catch (e) {}
+    renderTop(); renderRaidTitleBadge(); renderWorldRaidTab(); save();
+  } finally {
+    duelSettleBusy = false;
+  }
+  if (S.duel.unsettled.length) setTimeout(duelSettle, 1500);
+}
+function duelEnsureWeek() {
+  const d = duelNormalize();
+  const wk = weekKey();
+  if (d.week !== wk) {
+    if (d.week != null && BN.gt(d.best, 0)) d.unsettled.push({ week: d.week, best: BN.from(d.best) });
+    d.week = wk;
+    d.best = BN.from(0);
+    d.pushDirty = false;
+    d.setupPending = null;
+  }
+  if (d.unsettled.length) duelSettle();
+}
+
+// ---- 전투 ----
+function startDuelFight() {
+  if (bossFight.active) { log('이미 다른 전투가 진행 중입니다.', 'lg-bad'); return; }
+  if (!getEquipped()) { log('장착된 무기가 없습니다!', 'lg-bad'); return; }
+  if (!duelOpen()) { log('종언의 결투장은 황혼국이 열려 있어야 입장할 수 있습니다.', 'lg-bad'); return; }
+  duelEnsureWeek();
+  if (duelTodayCount() >= DUEL.dailyAttempts) { log(`오늘 종언의 결투장 도전 횟수를 모두 사용했습니다. (하루 ${DUEL.dailyAttempts}회)`, 'lg-bad'); return; }
+  const d = S.duel;
+  d.dayCount = duelTodayCount() + 1;
+  d.dayKey = todayKey();
+  resetTimedStacks();
+  startDisruptionList(duelPatternList(d.week), { enrage: false });
+  bossFight.active = true;
+  bossFight.isWeeklyRaid = true; // 펀치기계·세계수와 같은 "누적 피해 측정" 흐름을 그대로 쓴다
+  bossFight.isDuel = true;
+  bossFight.timeLeft = DUEL.duration; // 룬(시간 연장) 미적용
+  mon.unique = false;
+  mon.maxHp = BN.from(DUEL.refHp);
+  mon.hp = BN.from(DUEL.refHp);
+  mon.dead = false;
+  mon.atkTimer = 0;
+  weeklyRaidDealtOverflow = BN.from(0);
+  fx.executionerReady = true;
+  triggerFightStartSpirits();
+  $('worldRaidMonEmoji').textContent = DUEL_BOSS.emoji;
+  $('worldRaidMonEmoji').classList.add('boss-appear');
+  $('worldRaidMonName').innerHTML = `<span class="grade-고대" style="font-size:19px">${DUEL_BOSS.emoji} ${DUEL_BOSS.name}, ${DUEL_BOSS.subtitle}</span> <span style="font-size:12px;color:#ff7cf0;">★ 종언의 결투장 ★</span>`;
+  log(`⚔️ <b>종언의 결투장 — ${DUEL_BOSS.name} 도전!</b> ${DUEL.duration}초간 누적 피해를 겨룹니다. (오늘 ${d.dayCount}/${DUEL.dailyAttempts}) 패턴: ${bd.list.map(e => DISRUPTIONS[e.key].icon + DISRUPTIONS[e.key].name).join(' ')} — ${DUEL.enrageAt}초 이후 광폭화`, 'lg-prim');
+  setTimeout(() => $('worldRaidMonEmoji').classList.remove('boss-appear'), 700);
+  $('worldRaidMonEmoji').classList.add('boss-glow');
+  renderBossBtn(); renderHP(); renderWorldRaidTab(); save();
+}
+function endDuelFight() {
+  const dealt = weeklyRaidDealtOverflow;
+  bossFight.isDuel = false;
+  bd = null;
+  const bar = $('worldRaidDisruptBar'); if (bar) bar.innerHTML = '';
+  $('worldRaidMonEmoji').classList.remove('boss-glow');
+  duelEnsureWeek();
+  const d = S.duel;
+  const isBest = BN.gt(dealt, d.best);
+  if (isBest) {
+    d.best = BN.from(dealt); d.pushDirty = true;
+    try { d.setupPending = { week: d.week, s: JSON.stringify(raidSetupSnapshot()) }; } catch (e) { console.error(e); }
+  }
+  log(`⚔️ <b>종언의 결투장 측정 종료!</b> 이번 시도 피해: <b style="color:var(--gold)">${fmt(dealt)}</b>${isBest ? ' <span class="lg-prim">🎉 이번 주 최고 기록 갱신!</span>' : ` (이번 주 최고: ${fmt(d.best)})`}`, 'lg-prim');
+  duelPushCurrent(); duelPushSetup();
+  spawnMonster();
+  renderBossBtn(); renderTop(); renderWorldRaidTab(); save();
+}
+
+// ---- 레이드 탭 보기 전환(🌳 세계수의 단말마 / ⚔️ 종언의 결투장) + 결투장 화면 ----
+let raidTabView = 'tree';
+function raidViewToggleHtml() {
+  const b = (v, label) => `<button class="raid-view-btn${raidTabView === v ? ' primary' : ''}" data-view="${v}" style="flex:1;font-size:13px;">${label}</button>`;
+  return `<div style="display:flex;gap:6px;margin-bottom:10px;">${b('tree', '🌳 세계수의 단말마')}${b('duel', '⚔️ 종언의 결투장')}</div>`;
+}
+function bindRaidViewToggle(box) {
+  box.querySelectorAll('.raid-view-btn').forEach(b => b.onclick = () => { raidTabView = b.dataset.view; renderWorldRaidTab(); });
+}
+function duelRankHtml(live, best) {
+  const medals = ['🥇', '🥈', '🥉'];
+  weeklyRaidSetupLinks = [];
+  const wr = S.weeklyRaid;
+  const nameLine = weeklyRaidNameValid(wr.name)
+    ? `🏷️ 내 이름: <b>${escHtml(wr.name)}</b> <button id="raidNameBtn" style="font-size:11px;width:auto;padding:2px 8px;">✏️ 바꾸기 (💰${fmt(BN.from(WEEKLY_RAID_NAME.changeCost))})</button>`
+    : `🏷️ 아직 레이드 이름이 없습니다(순위엔 "이름 없는 사냥꾼"). <button id="raidNameBtn" class="primary" style="font-size:11px;width:auto;padding:2px 8px;">✏️ 이름 정하기 (무료)</button>`;
+  const row = (e, i, week, myKey, names, withTitle) => {
+    const name = weeklyRaidNameOf(names, e.key, myKey) || '이름 없는 사냥꾼';
+    weeklyRaidSetupLinks.push({ week, key: e.key, name, total: e.total });
+    const t = withTitle ? DUEL_RANK_TITLES['r' + (i + 1)] : null;
+    return `<div style="display:flex;align-items:center;gap:6px;padding:4px 2px;border-bottom:1px solid var(--border);font-size:13px;">
+      <span style="font-size:16px">${medals[i]}</span>
+      <div style="flex:1;min-width:0;"><b>${escHtml(name)}</b>${e.key === myKey ? ' <span style="color:var(--gold);font-size:11px;">(나)</span>' : ''}${t ? ` <span class="raidtitle raidtitle-${t.badge}">${t.emoji} ${t.name}</span>` : ''}
+        <div style="font-size:11px;color:var(--sub);">최고 기록 ${fmt(e.total)} · <a href="#" class="duel-setup-link" data-idx="${weeklyRaidSetupLinks.length - 1}" style="color:inherit;text-decoration:underline dotted;">세팅 보기</a></div></div>
+    </div>`;
+  };
+  let body;
+  if (!live || !live.node) {
+    body = '<div style="font-size:12px;color:var(--sub);">서버에서 순위를 불러오는 중… (오프라인이면 표시되지 않음)</div>';
+  } else {
+    const list = weeklyRaidRanking(live.node, live.myKey, best);
+    const top = list.slice(0, 3);
+    const mi = list.findIndex(x => x.me);
+    body = (top.length ? top.map((e, i) => row(e, i, live.week, live.myKey, live.names, false)).join('') : '<div style="font-size:12px;color:var(--sub);">아직 이번 주 기록이 없습니다.</div>')
+      + `<div style="font-size:12px;margin-top:6px;">내 순위: ${mi >= 0 ? `<b style="color:var(--gold)">${mi + 1}위</b> / ${list.length}명` : '<span style="color:var(--sub)">아직 이번 주 기록 없음</span>'}</div>`;
+    const prev = weeklyRaidRanking(live.prevNode, null, null).slice(0, 3);
+    if (prev.length) body += `<div style="font-size:13px;margin-top:10px;margin-bottom:4px;">🏛️ 지난주 명예의 전당</div>` + prev.map((e, i) => row(e, i, live.prevWeek, live.myKey, live.names, true)).join('');
+  }
+  return `<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
+    <div style="font-size:13px;margin-bottom:6px;">🏆 이번 주 순위 (1회 최고 기록)</div>
+    <div style="font-size:12px;margin-bottom:8px;">${nameLine}</div>
+    ${body}
+  </div>`;
+}
+function renderDuelTab(box) {
+  duelEnsureWeek();
+  duelRefreshLive();
+  const d = S.duel;
+  const open = duelOpen();
+  const left = DUEL.dailyAttempts - duelTodayCount();
+  const available = open && !bossFight.active && left > 0;
+  const best = BN.from(d.best);
+  const live = duelLive && duelLive.week === d.week ? duelLive : null;
+  const pats = duelPatternKeys(d.week).map(k => `<span style="white-space:nowrap">${DISRUPTIONS[k].icon} ${DISRUPTIONS[k].name} <span style="color:var(--sub)">(${DISRUPT_COUNTERS[DISRUPTIONS[k].counter].icon}${DISRUPT_COUNTERS[DISRUPTIONS[k].counter].name})</span></span>`).join(' · ');
+  const T = activeDuelTitle();
+  const ls = d.lastSettled;
+  const rewardRows = [...DUEL_TOP_REWARDS.map((r, i) => ({ label: `${['🥇', '🥈', '🥉'][i]} ${i + 1}위`, ...r })), ...DUEL_BANDS]
+    .map(r => `<tr><td>${r.label}</td><td>🌆 ${r.essence}</td><td>🌑 ${r.shadow}</td></tr>`).join('');
+  const titleRows = ['r1', 'r2', 'r3'].map((k, i) => { const t = DUEL_RANK_TITLES[k]; return `<tr><td>${['🥇', '🥈', '🥉'][i]}</td><td>${t.emoji} ${t.name}</td><td>보조무기 효과 증폭 +${Math.round(t.subAmp * 100)}%, 액티브 피해량 +${Math.round(t.subActiveDmg * 100)}%p</td></tr>`; }).join('');
+  box.innerHTML = raidViewToggleHtml() + `
+    <div style="font-size:12px;color:var(--sub);margin-bottom:10px;">
+      <div style="font-style:italic;margin-bottom:6px;">황혼을 끝내지 못한 베스퍼리아가 종언의 결투장에서 도전자를 기다린다. 이곳에선 협동이 없다 — 오직 한 판, 가장 깊은 일격을 겨룬다.</div>
+      <div><b style="color:#ff7a7a">${DUEL.duration}초간 실제로 들어간 누적 피해</b>를 측정하며, 그 주 <b>1회 최고 기록</b>으로 순위가 정해집니다. 하루 <b style="color:var(--unique)">${DUEL.dailyAttempts}회</b> 도전, 일요일 0시에 결산됩니다. 보스는 <b>매주 바뀌는 방해 패턴 ${DUEL.patternCount}개</b>(대응 스탯이 서로 다름)를 쓰고 <b>${DUEL.enrageAt}초 이후 광폭화</b>합니다 — 주마다 장갑·보조무기·프리셋을 다시 짜 보세요.</div>
+    </div>
+    <div style="margin-bottom:10px;font-size:13px;">
+      <div>🌆 황혼의 정수: <b style="color:var(--gold)">${fmt(S.twilightEssence || 0)}</b> · 🌑 황혼의 그림자: <b style="color:var(--gold)">${fmt(S.twilightShadow || 0)}</b></div>
+      <div style="margin-top:6px;">⚠️ 이번 주 패턴: ${pats}</div>
+      <div style="margin-top:6px;">오늘 도전: <b>${duelTodayCount()}/${DUEL.dailyAttempts}</b> · 이번 주 내 최고: <b style="color:var(--gold)">${BN.gt(best, 0) ? fmt(best) : '기록 없음'}</b></div>
+      ${T ? `<div style="font-size:12px;margin-top:4px;">현재 칭호: ${T.emoji} <b>${T.name}</b> (보조무기 효과 증폭 +${Math.round(T.subAmp * 100)}%, 액티브 피해량 +${Math.round(T.subActiveDmg * 100)}%p)</div>` : ''}
+      ${ls ? `<div style="font-size:11px;color:var(--sub);margin-top:4px;">지난 결산: ${ls.rank ? `${ls.n}명 중 ${ls.rank}위 (${ls.label})` : '참가'} → 🌆${ls.essence} 🌑${ls.shadow}</div>` : ''}
+    </div>
+    <button class="primary" id="duelChallengeBtn" ${available ? '' : 'disabled'}>⚔️ 베스퍼리아에게 도전 (${DUEL.duration}초)</button>
+    <div style="font-size:12px;color:var(--sub);margin:6px 0 14px;">${!open ? '황혼국이 열려 있어야 입장할 수 있습니다.' : bossFight.active ? '이미 다른 전투가 진행 중입니다.' : left <= 0 ? '오늘 도전 횟수를 모두 사용했습니다. 내일 다시 도전할 수 있습니다.' : `오늘 ${left}회 남았습니다. 시작하면 도전 횟수가 바로 소모됩니다.`}</div>
+    ${duelRankHtml(live, best)}
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
+      <div style="font-size:13px;margin-bottom:6px;">🎁 순위 보상 (일요일 결산)</div>
+      <table class="guide-table"><tr><th>순위</th><th>황혼의 정수</th><th>황혼의 그림자</th></tr>${rewardRows}</table>
+      <div style="font-size:11px;color:var(--sub);margin-top:4px;">🌑 황혼의 그림자는 상점에서 살 수 없는, 순위로만 얻는 재료입니다.</div>
+      <div style="font-size:13px;margin:10px 0 6px;">🏷️ 순위 칭호 (결산 후 한 주 동안)</div>
+      <table class="guide-table"><tr><th>순위</th><th>칭호</th><th>효과</th></tr>${titleRows}</table>
+    </div>`;
+  const btn = $('duelChallengeBtn');
+  if (btn) btn.onclick = startDuelFight;
+  const nb = $('raidNameBtn');
+  if (nb) nb.onclick = openWeeklyRaidNameModal;
+  box.querySelectorAll('.duel-setup-link').forEach(a => {
+    a.onclick = ev => { ev.preventDefault(); const l = weeklyRaidSetupLinks[+a.dataset.idx]; if (l) showRaidSetup(l.week, l.key, l.name, l.total, 'duelSetup', '최고 기록'); };
+  });
+  bindRaidViewToggle(box);
 }
 
 // ---------- 고대의 도서관 전투 흐름 ----------
@@ -12696,6 +13025,10 @@ function renderWorldRaidTab() {
   const battlePanel = $('worldRaidBattlePanel');
   const box = $('worldRaidBox');
   if (!box || !battlePanel) return;
+  const intro = $('worldRaidTreeIntro'), ttl = $('worldRaidTitle');
+  const duelShown = bossFight.active && bossFight.isWeeklyRaid ? bossFight.isDuel : raidTabView === 'duel';
+  if (intro) intro.style.display = duelShown ? 'none' : '';
+  if (ttl) ttl.textContent = duelShown ? '⚔️ 종언의 결투장' : '🌳 세계수의 단말마';
   if (bossFight.active && bossFight.isWeeklyRaid) {
     battlePanel.style.display = '';
     box.style.display = 'none';
@@ -12703,6 +13036,7 @@ function renderWorldRaidTab() {
   }
   battlePanel.style.display = 'none';
   box.style.display = '';
+  if (raidTabView === 'duel') { renderDuelTab(box); return; }
   weeklyRaidEnsureWeek();
   weeklyRaidRefreshLive();
   const wr = S.weeklyRaid;
@@ -12736,7 +13070,7 @@ function renderWorldRaidTab() {
     rows.push(`<tr${k === gTier ? ' style="color:var(--gold);font-weight:bold"' : ''}><td>${k}</td><td>${fmt(weeklyRaidGlobalTierFloor(k))}</td><td>🎖️${r.honor}</td><td>×${r.goldMult}</td><td>🍃${fmt(r.leaves)}</td><td>${r.guards ? `🛡️${r.guards}` : '-'}</td></tr>`);
   }
   const ls = wr.lastSettled;
-  box.innerHTML = `
+  box.innerHTML = raidViewToggleHtml() + `
     <div style="margin-bottom:10px;">
       <div style="font-size:13px;">🌍 이번 주 전체 기여: ${gSum ? `<b style="color:var(--gold)">${fmt(gSum)}</b> (${gCount}명) · <b>전체 ${gTier}구간</b> · 다음 구간까지 ${fmt(gNext)}` : '<span style="color:var(--sub)">서버에서 불러오는 중… (오프라인이면 표시되지 않음)</span>'}</div>
       ${ls ? `<div style="font-size:11px;color:var(--sub);margin-top:2px;">지난 정산: 전체 ${fmt(ls.sum)} (${ls.count}명) → ${ls.tier}구간</div>` : ''}
@@ -12770,6 +13104,7 @@ function renderWorldRaidTab() {
     a.onclick = ev => { ev.preventDefault(); const l = weeklyRaidSetupLinks[+a.dataset.idx]; if (l) showRaidSetup(l.week, l.key, l.name, l.total); };
   });
   box.querySelectorAll('.honor-buy-btn').forEach(b => b.onclick = () => buyHonorShop(b.dataset.id));
+  bindRaidViewToggle(box);
 }
 
 function endBossFight(win) {
@@ -12777,7 +13112,7 @@ function endBossFight(win) {
   $('monemoji').classList.remove('boss-glow');
   if (bossFight.isRaid) { endRaidFight(win); return; }
   if (bossFight.isPunch) { bossFight.isPunch = false; endPunchFight(); return; }
-  if (bossFight.isWeeklyRaid) { bossFight.isWeeklyRaid = false; endWeeklyRaidFight(); return; }
+  if (bossFight.isWeeklyRaid) { bossFight.isWeeklyRaid = false; if (bossFight.isDuel) endDuelFight(); else endWeeklyRaidFight(); return; }
   if (bossFight.isLibrary) { endLibraryFight(win); return; }
   bd = null; // 성야국 사냥터 보스 패턴 정리
   const hb = $('huntDisruptBar'); if (hb) hb.innerHTML = '';
@@ -12953,6 +13288,8 @@ function fleeBoss() {
       ? '펀치기계 측정을 중단하시겠습니까? (지금까지의 누적 데미지로 기록됩니다)'
       : bossFight.isLibrary
         ? '고대의 도서관 도전을 포기하시겠습니까? (이미 소모된 이번 주기 도전 횟수는 돌아오지 않습니다)'
+        : bossFight.isDuel
+          ? '종언의 결투장 도전을 중단하시겠습니까? (오늘 도전 횟수는 돌아오지 않고, 지금까지의 누적 피해가 이번 시도 기록이 됩니다)'
         : bossFight.isWeeklyRaid
           ? '세계수의 단말마 도전을 중단하시겠습니까? (이미 소모된 이번 주 도전 횟수는 돌아오지 않고, 지금까지의 누적 데미지로 기록됩니다)'
           : '보스전을 포기하시겠습니까? (쿨타임 없이 즉시 재도전 가능)';
@@ -15891,6 +16228,8 @@ function renderWorldRaidBattleHP() {
   $('worldRaidHpBar').style.width = Math.min(100, (elapsed / WEEKLY_RAID.duration) * 100) + '%';
   $('worldRaidHpText').textContent = `누적 데미지 ${fmt(weeklyRaidDealtOverflow)}`;
   $('worldRaidTimer').textContent = `⏱ ${Math.ceil(Math.max(0, bossFight.timeLeft))}초 남음`;
+  const bar = $('worldRaidDisruptBar');
+  if (bar) bar.innerHTML = bossFight.isDuel ? bossDisruptionStatusHtml() : '';
 }
 function renderHP() {
   if (bossFight.active && bossFight.isRaid) { renderRaidBattleHP(); return; }
@@ -19127,8 +19466,8 @@ function init() {
   grantOffline();  // 페이지 로드 시에도 확인 (브라우저 재시작 케이스)
 
   // 세계수의 단말마: 주가 바뀌었으면 지난주 기여 정산(로컬). 탭을 켜둔 채 주가 바뀌어도 1분마다 확인.
-  weeklyRaidEnsureWeek(); save();
-  setInterval(() => { const wk = S.weeklyRaid.week; weeklyRaidEnsureWeek(); weeklyRaidPushCurrent(); weeklyRaidPushName(); weeklyRaidPushSetup(); if (S.weeklyRaid.week !== wk) { renderTop(); renderRaidTitleBadge(); save(); } }, 60000);
+  weeklyRaidEnsureWeek(); duelEnsureWeek(); save();
+  setInterval(() => { const wk = S.weeklyRaid.week; weeklyRaidEnsureWeek(); weeklyRaidPushCurrent(); weeklyRaidPushName(); weeklyRaidPushSetup(); duelEnsureWeek(); duelPushCurrent(); duelPushSetup(); if (S.weeklyRaid.week !== wk) { renderTop(); renderRaidTitleBadge(); save(); } }, 60000);
   // 태초 획득 알림: 시작 시 + 5분마다 새로 읽고, 1분마다 하루 지난 것은 배너에서 내린다. 이름을 못 받은 것은 다시 묻는다.
   genesisFeedRefresh(); genesisFeedProcess();
   setInterval(genesisFeedRefresh, 5 * 60000);

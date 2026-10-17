@@ -243,6 +243,9 @@
   .buffbar { position: absolute; left: 6px; top: 6px; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; z-index: 6; pointer-events: none; text-align: left; }
   .buffchip { font-size: 11px; line-height: 1.3; padding: 1px 6px; border-radius: 8px; background: rgba(20, 20, 32, 0.78); border: 1px solid var(--border); color: var(--text); white-space: nowrap; }
   .buffchip b { color: var(--gold); font-variant-numeric: tabular-nums; }
+  .breakstars { font-size: 13px; letter-spacing: 1px; line-height: 1.2; margin: 1px 0 3px; }
+  .breakstars .bs-on { color: var(--gold); text-shadow: 0 0 6px rgba(255, 213, 74, 0.55); }
+  .breakstars .bs-off { color: var(--sub); opacity: 0.55; }
   .floatmsg {
     position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%);
     font-weight: bold; font-size: 15px; color: var(--unique);
@@ -713,6 +716,7 @@
            엉뚱한 위치를 누르게 되어 "중지가 안 된다"는 버그로 체감된다. -->
       <div id="autoEnhanceBox" style="margin-top:8px;"></div>
       <div id="advancedEnhanceBox" style="margin-top:8px;"></div>
+      <div id="breakthroughBox" style="margin-top:8px;"></div>
       <div id="awakeningBox" style="margin-top:8px;"></div>
       <div id="ariadneBox" style="margin-top:8px;"></div>
       <div style="text-align:center; margin-top:8px; font-size:12px; color:var(--sub);">
@@ -4978,7 +4982,7 @@ function worldRaidBossGoldRef() {
   const w = getEquipped();
   if (!w) return 0;
   const f = WORLD2_START_FLOOR - 1;
-  const e = w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   const ae = accEff();
   let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold + awakenStat(w, 'gold'));
   goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
@@ -5196,7 +5200,7 @@ function raidTokenReward(stage) {
 // 장비 투자로 키울 수 있는 레버가 필요하다고 판단해 다시 반영(이전엔 별도 콘텐츠로 분리했었음).
 function raidGoldReward(stage) {
   const w = getEquipped();
-  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   const ae = accEff();
   let goldMul = (e && e.gold ? 1 + e.gold : 1) * (1 + ae.gold + awakenStat(w, 'gold'));
   goldMul *= Math.pow(RUNE_SPECIALS.omnirune.goldMult, weaponSpecialCount(w, 'omnirune'));
@@ -7949,6 +7953,7 @@ function newState() {
     gloveGenesisSeen: [],  // 태초 장갑 도감(월드3): index = 층 번호(0=41층)
     gloveAncientSeen: [],  // 고대 장갑 도감(월드3): [true/false, ...] 20개, index = 층 번호(0=41층)
     genesisFeedPending: [], genesisFeedName: '', // 태초 획득 알림: 이름 입력·서버 업로드 대기 목록, 마지막으로 쓴 이름
+    breakPieces: {},            // 🔸 돌파 조각(등급별): { 5: 신화, 6: 고대, 7: 태초 }
     twilightEssence: BN.from(0), // 🌆 황혼의 정수 (종언의 결투장 순위 보상, 황혼 상점 재화)
     twilightShadow: 0,           // 🌑 황혼의 그림자 (종언의 결투장 순위 보상, 황혼의 악몽 전용 — 상점에서 살 수 없음)
     duel: { week: null, best: BN.from(0), dayKey: null, dayCount: 0, pushDirty: false, setupPending: null, unsettled: [], lastSettled: null, rankTitle: null, rankTitleWeek: null }, // 종언의 결투장: week=주차키, best=이번 주 1회 최고 피해, dayKey/dayCount=오늘 도전 횟수, setupPending=올릴 세팅 요약, unsettled=정산 대기 [{week,best}], lastSettled=마지막 정산 결과, rankTitle/rankTitleWeek=순위 칭호
@@ -7987,6 +7992,49 @@ function genWeapon(gradeIdx) {
   return w;
 }
 
+// ---------- 💎 무기 돌파 (신화 이상) ----------
+// 같은 등급 무기를 분해하면 그 등급의 🔸 돌파 조각(신화 조각·고대 조각·태초 조각)이 나오고, 같은 등급 조각으로 그 등급 무기를
+// 확률적으로 돌파시킨다(1~10단계). 돌파하면 공격력과 고유 효과 수치가 오른다. 실패하면 조각만 사라진다(단계 하락 없음).
+// 등급이 높을수록 단계당 공격력 상승이 크다. 고유 효과 수치 증폭은 신화(EFFECTS)부터 — 고대·태초는 공격력만 적용하고,
+// 효과 증폭은 밸런스 검증 후 effPerStep에 추가한다.
+const BREAK = {
+  maxStep: 10, minEnhance: 10,
+  chance: [90, 80, 68, 55, 42, 30, 19, 11, 6, 3],   // 단계(0→1 … 9→10) 성공 확률(%)
+  cost: [4, 6, 10, 15, 23, 36, 55, 85, 132, 205],  // 단계별 필요 조각
+  yieldBase: { 5: 20, 6: 60, 7: 200 }, yieldPerEnh: 0.2, // 분해 시 조각 = 기본 × (1 + 0.2 × 강화 단계)
+  atkPerStep: { 5: 0.05, 6: 0.06, 7: 0.07 },        // 단계당 공격력 +%
+  effPerStep: { 5: 0.05 },                           // 단계당 고유 효과 수치 +% (신화만)
+  names: { 5: '신화', 6: '고대', 7: '태초' },
+};
+const BREAK_EFFECT_KEYS = ['gold', 'drop', 'extra', 'speed', 'critFromSpeed', 'stackDmg', 'stackBonus', 'bossDmg', 'bossDotAtkMult', 'bossBurstMult', 'normalBurstMult'];
+function breakEligible(w) { return !!w && !isFist(w) && w.grade >= 5 && !!BREAK.yieldBase[w.grade]; }
+function breakStep(w) { return breakEligible(w) ? Math.min(BREAK.maxStep, w.breakthrough || 0) : 0; }
+function breakAtkMult(w) { return 1 + (BREAK.atkPerStep[w && w.grade] || 0) * breakStep(w); }
+function breakEffAmp(w) { return (BREAK.effPerStep[w && w.grade] || 0) * breakStep(w); }
+function breakPiecesOf(grade) { return Math.floor(((S && S.breakPieces) || {})[grade] || 0); }
+function breakPiecesYield(w) { return Math.floor((BREAK.yieldBase[w.grade] || 0) * (1 + BREAK.yieldPerEnh * (w.enhance || 0))); }
+function addBreakPieces(grade, n) { if (!(n > 0)) return; if (!S.breakPieces || typeof S.breakPieces !== 'object') S.breakPieces = {}; S.breakPieces[grade] = (S.breakPieces[grade] || 0) + n; }
+// 고유 효과(EFFECTS) 조회 — 돌파 단계만큼 수치(확률·배율)를 키운 사본. 스택 수·지속시간 같은 구조 값은 그대로.
+const breakEffCache = new WeakMap();
+function weaponEffect(w) {
+  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  if (!e) return null;
+  const amp = breakEffAmp(w);
+  if (!amp) return e;
+  const c = breakEffCache.get(w);
+  if (c && c.e === e && c.amp === amp) return c.obj;
+  const obj = { ...e };
+  for (const k of BREAK_EFFECT_KEYS) if (typeof e[k] === 'number') obj[k] = e[k] * (1 + amp);
+  if (e.crit && typeof e.crit.chance === 'number') obj.crit = { ...e.crit, chance: e.crit.chance * (1 + amp) };
+  breakEffCache.set(w, { e, amp, obj });
+  return obj;
+}
+// 무기 이름 밑 별: 최대 돌파 단계만큼 빈 별(☆), 돌파할 때마다 하나씩 채워진다(★). 신화 이상 무기만.
+function breakStarsHtml(w) {
+  if (!breakEligible(w)) return '';
+  const b = breakStep(w);
+  return `<div class="breakstars" title="돌파 ${b}/${BREAK.maxStep}단계"><span class="bs-on">${'★'.repeat(b)}</span><span class="bs-off">${'☆'.repeat(BREAK.maxStep - b)}</span></div>`;
+}
 function weaponAtk(w) {
   const g = GRADES[w.grade];
   const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
@@ -8032,7 +8080,7 @@ function weaponAtk(w) {
     : 0;
   // 각성 시스템: 언락된 슬롯들의 공격력 관련 효과 합산
   const awakenAtkBonus = awakenStat(w, 'atk');
-  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus() + behemothExcessBonus + luciferAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk') * awakenFinalMult(w, 'finalAtk');
+  return base * enhMult * (1 + accEff().atk + typeTrait(w, 'atk') + resonanceRuneBonus + awakenAtkBonus + pandoraStackAtkBonus() + koscheiAtkBonus() + behemothExcessBonus + luciferAtkBonus()) * (1 + goldAtkBonusPct()) * (1 + tiangouAtkBonusPct()) * (1 + redcapBossAtkBonusPct()) * (1 + nephilimAtkBonusPct()) * pandoraStatMult('atk') * awakenFinalMult(w, 'finalAtk') * breakAtkMult(w);
 }
 // 만물 공명의 룬 전용 카운터 — 현재 걸려있는 주요 도트/버프 효과 개수를 센다.
 function countActiveFxEffects(w) {
@@ -8142,7 +8190,7 @@ function rawWeaponSpeed(w) {
   // 정상 플레이로는 태초 외 무기에 이 필드가 절대 붙지 않으므로 무해하고, 테스트 계정에서
   // 특정 무기의 공격속도를 임의로 고정해야 할 때(예: 파밍 속도 실험) 유용하다.
   const baseSpeed = w.speedOverride != null ? w.speedOverride : t.speed;
-  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   const effSpeed = e && e.speed ? e.speed : 0;
   // 공격속도 계열 효과의 임시 스택/버프 (해당 효과를 장착 중일 때만 적용)
   const now = Date.now();
@@ -9170,7 +9218,7 @@ function spawnMonster() {
 function dropRoll() {
   onGenesisHungerKill(); // 끝없는 허기(글러트니): 처치마다 스택 적립 (장착 중이 아니면 내부에서 무시)
   const w = getEquipped();
-  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   const ae = accEff();
   const luck = ae.luck + awakenStat(w, 'luck');
   let dropMul = (e && e.drop ? 1 + e.drop : 1) * (1 + luck);
@@ -9358,7 +9406,7 @@ const MAT_SLOT_NAMES = ['low', 'mid', 'high'];
 // 같은 슬롯을 대상으로 하는 소스는 여기서 배열에 함께 쌓이고, rollMatBonus()에서 확률/개수를 합산해 1번만 판정한다.
 function matBonusPools(w) {
   const pools = { low: [], mid: [], high: [] };
-  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   if (e && Array.isArray(e.matBonus)) {
     for (const b of e.matBonus) pools[b.slot].push({ chance: b.chance, amount: b.amount });
   }
@@ -9387,7 +9435,7 @@ function rollMatBonus(w, slot) {
 // 신화 무기효과의 "대풍작"과 고대 룬 "대풍요의 룬"은 위 합연산 풀과 무관하게 별도로 추가 판정한다.
 function rollMatJackpot(w, slot) {
   let bonus = 0;
-  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   if (e && e.jackpot && e.jackpot.slot === slot && Math.random() < e.jackpot.chance) {
     bonus += e.jackpot.amount;
     floatText('🌾 대풍작!');
@@ -11372,7 +11420,7 @@ function tick(dt) {
   if (!S.auto && !bossFight.active) return;
   let attacked = false;
   let killedAny = false;
-  const e0 = w.effect ? EFFECTS[w.effect] : null;
+  const e0 = weaponEffect(w);
   // 미다스의 진노(태초 재화): "온라인"(게임 루프가 도는 동안)에만 보유 골드가 매초 복리로 증가.
   // 복리 폭주를 막기 위해 비율은 아주 낮게(초당 0.0015%) 잡혀 있음 — 튜닝 대상.
   if (e0 && e0.interestRate) {
@@ -11621,7 +11669,7 @@ function attack(w) {
   // 지점에서도 참조됨). '폭주하는 힘'이면 여기서 곧바로 피해 배율을 곱해준다.
   const azathothWhim = azathothRollWhim();
   if (azathothWhim === 'power') dmg *= AZATHOTH.powerMult;
-  const e = w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   // 보스전: 보스무기 세트/용살자 효과로 보스 데미지 증가
   if (bossFight.active) {
     dmg *= (1 + bossDmgBonus()) * pandoraStatMult('bossDmg') * awakenFinalMult(w, 'finalBossDmg');
@@ -12008,7 +12056,7 @@ function bossDmgBonus() {
   let bonus = 0;
   const w = getEquipped();
   if (w) {
-    const e = w.effect ? EFFECTS[w.effect] : null;
+    const e = weaponEffect(w);
     if (e && e.bossDmg) bonus += e.bossDmg;
     bonus += weaponRuneStat(w, 'bossDmg') / 100;
     bonus += typeTrait(w, 'bossDmg');
@@ -12154,7 +12202,7 @@ function startBossFight() {
   const b = F.boss;
   // 신살자(태초 보스): 보스전 시작 즉시 보스 체력 고정 비율 삭감
   const eq = getEquipped();
-  const eqEffect = eq && eq.effect ? EFFECTS[eq.effect] : null;
+  const eqEffect = weaponEffect(eq);
   if (eqEffect && eqEffect.openBurstAtkMult) {
     const cut = Math.floor(weaponAtk(eq) * eqEffect.openBurstAtkMult);
     dealMonDamage(cut);
@@ -13394,7 +13442,7 @@ function endBossFight(win) {
     }
     if (sealEquippedHas('endlessMarch')) S.bossFreeRetryReady = true; // 무한진군의 인장: 다음 재도전 1회 무료 충전
     const w = getEquipped();
-    const e = w && w.effect ? EFFECTS[w.effect] : null;
+    const e = weaponEffect(w);
     const ae = accEff();
     // 해당 층 몬스터를 "원킷" 기준으로 1시간(3600초) 동안 사냥했을 때 벌 수 있는 골드와 동일하게 산출
     // (평시 사냥 골드 배율 스택과 동일하게: 무기 효과 골드% + 장신구 골드% + 전능의 룬 + 글러트니 유물)
@@ -16600,6 +16648,7 @@ function toggleEnhanceFx(checked) {
 }
 const EQUIP_TABS_WITH_GLOVE = [{ v: 'weapon', label: '⚔️ 무기' }, { v: 'subweapon', label: '🗡️ 보조무기' }, { v: 'glove', label: '🧤 장갑' }];
 function renderEnhance() {
+  renderBreakthroughBox();
   renderEquipSubTabBar('enhSubTabBar', enhSubTab, (v) => { enhSubTab = v; renderEnhance(); }, EQUIP_TABS_WITH_GLOVE);
   const fxToggle = $('enhFxToggle'); if (fxToggle) fxToggle.checked = S.enhanceFxEnabled;
   $('enhWeaponPanels').style.display = enhSubTab === 'weapon' ? '' : 'none';
@@ -16650,7 +16699,7 @@ function renderEnhance() {
   const dpsLine = isEquippedTarget
     ? `공속 ${weaponSpeed(w).toFixed(1)}/초 → DPS 약 ${fmt(playerDPS())}`
     : `공속 ${weaponSpeed(w).toFixed(1)}/초 → 이 무기 기준 DPS 약 ${fmt(weaponAtk(w) * weaponSpeed(w))} <span style="color:var(--sub)">(미장착 — 참고용)</span>`;
-  box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>
+  box.innerHTML = `<div id="enhweptitle">${gradeTag(w)}</div>${breakStarsHtml(w)}
     ${flavor ? `<div style="font-size:12px;color:var(--sub);margin:2px 0 4px;font-style:italic">${flavor}</div>` : ''}
     <div style="font-size:14px;color:var(--sub)">${dpsLine}</div>
     ${typeInfo ? `<div style="font-size:12px;color:var(--sub)">🗡️ ${typeInfo.name} 특성: ${typeInfo.traitDesc}</div>` : ''}
@@ -17089,7 +17138,7 @@ function renderInventory() {
       : '';
     const priceTag = (isGenesisWeapon(w) || isAncientWeapon(w)) ? '판매 불가' : `판매가 ${fmt(sellPrice(w))}`;
     div.innerHTML = `
-      <div><div class="wn"${hasDetail ? ' style="cursor:pointer"' : ''}>${gradeTag(w)}${hasDetail ? ` <span style="font-size:11px;color:var(--sub)">${expanded ? '▴ 효과 접기' : '▾ 효과 보기'}</span>` : ''}</div>
+      <div><div class="wn"${hasDetail ? ' style="cursor:pointer"' : ''}>${gradeTag(w)}${breakStarsHtml(w)}${hasDetail ? ` <span style="font-size:11px;color:var(--sub)">${expanded ? '▴ 효과 접기' : '▾ 효과 보기'}</span>` : ''}</div>
       <div class="wi">${atkLabel(w)} ${fmt(weaponAtk(w))} · 공속 ${weaponSpeed(w).toFixed(1)}/초 · ${priceTag}</div>
       ${detailHtml}</div>
       <div class="btns"></div>`;
@@ -18020,7 +18069,7 @@ function renderRuneFusion() {
 function computeStats() {
   const w = getEquipped();
   const ae = accEff();
-  const e = w && w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   const atk = w ? weaponAtk(w) : 0;
   const spd = w ? weaponSpeed(w) : 0;
   const now = Date.now();
@@ -18076,7 +18125,7 @@ function statSourceInfo(key) {
   const w = getEquipped();
   if (!w) return null;
   const s = computeStats(), ae = accEff();
-  const e = w.effect ? EFFECTS[w.effect] : null;
+  const e = weaponEffect(w);
   const t = isFist(w) ? FIST : isGenesisWeapon(w) ? GENESIS_WEAPON_TYPE : WEAPON_TYPES.find(x => x.name === w.type);
   const effName = e ? ` (${e.name})` : '';
   const rows = [];
@@ -18856,12 +18905,55 @@ function renderAccTab() {
 // 없으면 다시 드랍된다). 신화는 자동판매처럼 획득 즉시 자동분해(강화 0단계)를 켤 수 있다.
 const DISASSEMBLE_REWARD = { 5: { leaves: 1000, essence: 0 }, 6: { leaves: 200000, essence: 50000 }, 7: { leaves: 2000000, essence: 500000 } };
 const DISASSEMBLE_ENH_GROWTH = 1.08;
+// ---- 돌파 시도 + 패널(강화기 탭, 장착 무기 대상) ----
+function tryBreakthrough() {
+  const w = getEquipped();
+  if (!breakEligible(w)) { log('신화 이상 무기만 돌파할 수 있습니다.', 'lg-bad'); return; }
+  const b = breakStep(w);
+  if (b >= BREAK.maxStep) { log('이미 최대 돌파 단계입니다.', 'lg-bad'); return; }
+  if ((w.enhance || 0) < BREAK.minEnhance) { log(`돌파는 강화 +${BREAK.minEnhance} 이상부터 할 수 있습니다.`, 'lg-bad'); return; }
+  const cost = BREAK.cost[b], chance = BREAK.chance[b];
+  if (breakPiecesOf(w.grade) < cost) { log(`🔸 ${BREAK.names[w.grade]} 조각이 부족합니다 (${cost}개 필요, 보유 ${fmt(breakPiecesOf(w.grade))}개) — ${BREAK.names[w.grade]} 무기를 분해하면 얻습니다`, 'lg-bad'); return; }
+  S.breakPieces[w.grade] -= cost;
+  if (Math.random() * 100 < chance) {
+    w.breakthrough = b + 1;
+    log(`💎✨ <b>돌파 성공!</b> ${gradeTag(w)} — 돌파 ${w.breakthrough}/${BREAK.maxStep}단계 (확률 ${chance}%, 조각 ${cost}개)`, 'lg-prim');
+  } else {
+    log(`💎💨 돌파 실패... 조각 ${cost}개가 사라졌습니다. (확률 ${chance}%)`, 'lg-bad');
+  }
+  renderEnhance(); renderTop(); save();
+}
+function renderBreakthroughBox() {
+  const box = $('breakthroughBox');
+  if (!box) return;
+  const w = getEquipped();
+  if (!breakEligible(w)) { box.innerHTML = '<div style="font-size:12px;color:var(--sub);text-align:center;">💎 돌파는 신화 이상 무기에서만 할 수 있습니다. (같은 등급 무기를 분해해 🔸 조각을 얻습니다)</div>'; return; }
+  const b = breakStep(w), max = b >= BREAK.maxStep;
+  const gname = BREAK.names[w.grade];
+  const have = breakPiecesOf(w.grade);
+  const atkPct = Math.round(BREAK.atkPerStep[w.grade] * 100 * b);
+  const effPct = Math.round((BREAK.effPerStep[w.grade] || 0) * 100 * b);
+  const nextAtk = BREAK.atkPerStep[w.grade] * 100;
+  let body;
+  if (max) body = '<div style="font-size:13px;margin-top:6px;">🏆 최대 돌파 달성!</div>';
+  else {
+    const cost = BREAK.cost[b], chance = BREAK.chance[b];
+    const lowEnh = (w.enhance || 0) < BREAK.minEnhance;
+    body = `<div style="font-size:12px;margin-top:6px;">다음 ${b + 1}단계: 성공 <b style="color:#7de08a">${chance}%</b> · 🔸 ${gname} 조각 <b style="color:${have >= cost ? 'var(--gold)' : '#ff7a7a'}">${cost}개</b> (보유 ${fmt(have)}개) · 성공 시 공격력 +${nextAtk}%p${BREAK.effPerStep[w.grade] ? `, 고유 효과 수치 +${Math.round(BREAK.effPerStep[w.grade] * 100)}%p` : ''}</div>
+      <button class="primary" id="breakBtn" style="width:100%;margin-top:6px;" ${have < cost || lowEnh ? 'disabled' : ''}>💎 돌파 시도 (${chance}%)</button>
+      ${lowEnh ? `<div style="font-size:12px;color:var(--sub);margin-top:4px;">강화 +${BREAK.minEnhance} 이상부터 돌파할 수 있습니다.</div>` : ''}`;
+  }
+  box.innerHTML = `<div style="font-size:13px;">💎 <b>돌파</b> ${breakStarsHtml(w)} <span style="font-size:12px;color:var(--sub)">공격력 +${atkPct}%${BREAK.effPerStep[w.grade] ? ` · 고유 효과 수치 +${effPct}%` : ' · 고유 효과 수치 증폭은 준비 중'}</span></div>${body}`;
+  const btn = $('breakBtn'); if (btn) btn.onclick = tryBreakthrough;
+}
 function disassembleReward(it, kind) {
-  if (kind === 'g') return { leaves: 0, essence: 0, steel: gloveDisassembleSteel(it) };
+  if (kind === 'g') return { leaves: 0, essence: 0, steel: gloveDisassembleSteel(it), pieces: {} };
   const base = DISASSEMBLE_REWARD[it.grade];
   if (!base) return null;
   const m = Math.pow(DISASSEMBLE_ENH_GROWTH, it.enhance || 0);
-  return { leaves: Math.floor(base.leaves * m), essence: Math.floor(base.essence * m), steel: 0 };
+  const isWeapon = kind === 'w' || (kind === undefined && typeof it.type === 'string'); // 보조무기·장갑은 조각이 나오지 않는다
+  const pieces = isWeapon && breakEligible(it) ? { [it.grade]: breakPiecesYield(it) } : {};
+  return { leaves: Math.floor(base.leaves * m), essence: Math.floor(base.essence * m), steel: 0, pieces };
 }
 function disPresetLocked(kind, id) {
   return (S.presets || []).some(p => p && (kind === 'w' ? p.weaponId === id : kind === 'g' ? p.gloveId === id : p.subWeaponId === id));
@@ -18906,7 +18998,12 @@ function autoDisassembleMatch(kind, it) {
   const t = SUBWEAPON_TYPES[it.typeIdx];
   return !!t && d.subTypes.includes(t.name);
 }
+function addDisReward(t, r) {
+  t.leaves += r.leaves; t.essence += r.essence; t.steel += r.steel;
+  for (const g of Object.keys(r.pieces || {})) t.pieces[g] = (t.pieces[g] || 0) + r.pieces[g];
+}
 function grantDisassembleReward(r) {
+  for (const g of Object.keys(r.pieces || {})) addBreakPieces(+g, r.pieces[g]);
   if (r.leaves > 0) S.worldTreeLeaf = BN.add(S.worldTreeLeaf || BN.from(0), r.leaves);
   if (r.essence > 0) S.weaponEssence = BN.add(S.weaponEssence, r.essence);
   if (r.steel > 0) S.steelThread = BN.add(S.steelThread || BN.from(0), r.steel);
@@ -18916,6 +19013,7 @@ function disRewardText(r) {
   if (r.leaves > 0) parts.push(`🍃 ${fmt(r.leaves)}`);
   if (r.essence > 0) parts.push(`📜 ${fmt(r.essence)}`);
   if (r.steel > 0) parts.push(`🧵 ${fmt(r.steel)}`);
+  for (const g of Object.keys(r.pieces || {})) if (r.pieces[g] > 0) parts.push(`🔸 ${BREAK.names[g]} 조각 ${fmt(r.pieces[g])}`);
   return parts.join(' · ') || '🍃 0';
 }
 // 실제 분해(검사·확인은 호출부). 가방에서 빼고 보상 지급.
@@ -18952,8 +19050,8 @@ const DIS_KIND_ICON = { w: '⚔️', s: '🗡️', g: '🧤' };
 function requestDisassemble(entries) {
   entries = entries.filter(e => disassemblable(e.kind, e.it));
   if (!entries.length) { log('분해할 장비가 없습니다.', 'lg-bad'); return; }
-  const total = { leaves: 0, essence: 0, steel: 0 };
-  for (const e of entries) { const r = disassembleReward(e.it, e.kind); total.leaves += r.leaves; total.essence += r.essence; total.steel += r.steel; }
+  const total = { leaves: 0, essence: 0, steel: 0, pieces: {} };
+  for (const e of entries) addDisReward(total, disassembleReward(e.it, e.kind));
   const run = () => {
     let n = 0;
     for (const e of entries) if (disassemblable(e.kind, e.it) && doDisassemble(e.kind, e.it)) n++;
@@ -18996,7 +19094,7 @@ function renderDisassembleTab() {
   const keyOf = e => `${e.kind}:${e.it.id}`;
   for (const k of [...disSelected]) if (!items.some(e => keyOf(e) === k)) disSelected.delete(k);
   const sel = items.filter(e => disSelected.has(keyOf(e)));
-  const selTotal = sel.reduce((a, e) => { const r = disassembleReward(e.it, e.kind); a.leaves += r.leaves; a.essence += r.essence; a.steel += r.steel; return a; }, { leaves: 0, essence: 0, steel: 0 });
+  const selTotal = sel.reduce((a, e) => { addDisReward(a, disassembleReward(e.it, e.kind)); return a; }, { leaves: 0, essence: 0, steel: 0, pieces: {} });
   box.innerHTML = `
     ${disFilterHtml()}
     <div style="font-size:12px;color:var(--sub);margin-bottom:6px;">보유 🍃 ${fmt(S.worldTreeLeaf || 0)} · 📜 ${fmt(S.weaponEssence || 0)} · 🧵 ${fmt(S.steelThread || 0)} — 장착 중이거나 프리셋에 저장된 장비는 목록에 나오지 않습니다. 🧤 장갑은 모든 등급을 분해할 수 있습니다(🧵 강철실, 자동분해는 🎒 가방 → 🧤 장갑의 "판매 대신 분해").</div>
@@ -19707,7 +19805,7 @@ function init() {
       log(`🌙 자리를 비운 동안 사냥터 몬스터를 잡지 못했습니다. (장비를 더 강화하세요!)`);
       return;
     }
-    const e = w && w.effect ? EFFECTS[w.effect] : null;
+    const e = weaponEffect(w);
     const goldMul = (1 + accEff().gold + awakenStat(w, 'gold')) * (1 + (e && e.gold ? e.gold : 0));
     // 신들의 영역(20층) 고대 세트 보너스: 오프라인 효율 +10%p 추가 (1~20층 결부형이라 월드1 한정)
     const offlineEff = Math.min(1, 0.7 + (isWorld1BonusActive() ? codexOfflineBonus() : 0));

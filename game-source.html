@@ -3857,9 +3857,10 @@ const GLOVE_ANCIENT_BASE_CHANCE = 1 / 14000000; // 고대 보조무기와 같은
 const GLOVE_ANCIENT_ESSENCE = { base: 100, growth: 1.3 }; // 강화 시 무기의 정수(+0 100개, 강화당 ×1.3) — 고대 보조무기와 같음
 // 넘치는 대응(고대·태초 장갑 공통): 그 보스가 쓰는 패턴의 대응 스탯이 100%를 넘은 만큼(넘친 %p 합 × K) 주는 피해 증가
 const GLOVE_OVERFLOW_K = 1.0;
-function gloveAncientDef(g) { return g && g.ancientFloor !== undefined ? GLOVE_ANCIENTS[g.ancientFloor - WORLD3_START_FLOOR] || null : null; }
+function gloveAncientDef(g) { if (g && g.nightmare) return g.grade === 6 ? NIGHTMARE_ANCIENT_DEF : null; return g && g.ancientFloor !== undefined ? GLOVE_ANCIENTS[g.ancientFloor - WORLD3_START_FLOOR] || null : null; }
 function isAncientGlove(g) { return !!gloveAncientDef(g); }
 function gloveEssenceCost(g) {
+  if (g && g.nightmare) return 0; // 황혼의 악몽은 무기의 정수 대신 황혼의 그림자를 쓴다
   if (g && g.genesisFloor !== undefined) return Math.ceil(GLOVE_GENESIS_ESSENCE.base * Math.pow(GLOVE_GENESIS_ESSENCE.growth, g.enhance || 0));
   return isAncientGlove(g) ? Math.ceil(GLOVE_ANCIENT_ESSENCE.base * Math.pow(GLOVE_ANCIENT_ESSENCE.growth, g.enhance || 0)) : 0;
 }
@@ -4332,8 +4333,140 @@ const GLOVE_GENESES = [
 
 에오스(Eos).` },
 ];
-function gloveGenesisDef(g) { return g && g.genesisFloor !== undefined ? GLOVE_GENESES[g.genesisFloor - WORLD3_START_FLOOR] || null : null; }
+function gloveGenesisDef(g) { if (g && g.nightmare) return g.grade >= 7 ? NIGHTMARE_GENESIS_DEF : null; return g && g.genesisFloor !== undefined ? GLOVE_GENESES[g.genesisFloor - WORLD3_START_FLOOR] || null : null; }
 function isGenesisGlove(g) { return !!gloveGenesisDef(g); }
+
+// ---------- 🌑 황혼의 악몽 (종언의 결투장 순위 보상 🌑 황혼의 그림자로 만드는 적응형 성장 장갑, 계정당 1개) ----------
+// 신화로 시작해 그림자를 걸어 고대 → 태초로 "성장"한다(확률 = (투입/N)^1.5, N개에서 확정, 실패하면 투입분 소멸).
+// 매주 결투장 패턴 목록의 앞 2개의 대응 스탯이 주·보조 스탯이 되고 장갑 종류도 주 스탯에 맞게 바뀐다(적응).
+// 강화는 같은 등급 일반 장갑과 같은 확률이며 강철실 대신 그림자를 쓴다. 파괴되지 않는다(신화·고대는 +0 초기화, 태초는 하락만).
+const NIGHTMARE = { craftShadow: 10, growN: { 5: 60, 6: 400 }, growExp: 1.5, advancedShadowMult: 3 };
+const NIGHTMARE_ANCIENT_DEF = {
+  name: '황혼의 악몽', icon: '🌑', fx: 'nightmare', fxName: '넘치는 대응', p: {},
+  desc: () => '대응 스탯이 100%를 넘은 만큼 그 패턴을 쓰는 보스에게 주는 피해 증가',
+};
+const NIGHTMARE_GENESIS_DEF = {
+  id: 'nightmare', name: '마라의 악몽 장갑', subtitle: 'Mara, the Night Hag', icon: '🌑',
+  passiveName: '익숙해진 악몽', counterName: '되새김',
+  passiveText: '같은 악몽을 거듭 꿀수록, 악몽은 점점 더 익숙하게 나를 찾아온다.',
+  counterText: '꿈에서 깬 순간, 밤새 쌓인 두려움이 한꺼번에 되새겨진다.',
+  // 공격 피해 +base, 보스 패턴이 올 때마다 적응 +1(이번 주 결투장 패턴이면 +weekly, 최대 max), 적응당 피해 +per /
+  // 패턴이 오면 적응의 절반(올림)을 소모해 평균 공격 피해 × 소모량 × mult를 고정 피해로 주고 dur초 동안 피해 +boost
+  p: { max: 8, base: 0.6, per: 0.5, mult: 10, dur: 3, boost: 2.0, weekly: 2 },
+  lore: `밤마다 가슴 위에 앉는 것이 있다.
+이름은 마라.
+잠든 이의 숨을 무겁게 누르고
+가장 두려운 꿈을 골라 속삭인다.
+
+그녀는 같은 꿈을 두 번 꾸게 하지 않는다.
+사람이 익숙해지는 순간,
+악몽도 함께 모습을 바꾸기 때문이다.
+
+황혼이 끝나지 않는 나라에서
+악몽은 이번 주의 보스를 닮아 간다.
+
+깨어난 자는 알게 된다.
+두려움은 쌓일수록 무기가 된다는 것을.
+
+마라(Mara).`,
+};
+function nightmareGlove() { return (S && Array.isArray(S.gloves) ? S.gloves : []).find(x => x.nightmare) || null; }
+function nightmareShadowCost(g) { return g && g.nightmare ? (g.enhance < 15 ? 0 : g.enhance < 20 ? 1 : 2) : 0; }
+function nightmareGrowthChance(g, n) {
+  const N = NIGHTMARE.growN[g.grade];
+  return N ? Math.min(1, Math.pow(Math.max(0, n) / N, NIGHTMARE.growExp)) : 0;
+}
+// 이번 주 적응: 결투장 패턴 앞 2개의 대응 스탯 → 주·보조 스탯, 종류는 주 스탯에 맞는 일반 장갑 종류(이름·아이콘)
+function nightmareAdapt(force) {
+  const g = nightmareGlove();
+  if (!g) return;
+  const wk = weekKey();
+  if (!force && g.nmWeek === wk && g.nmMain) return;
+  if (bossFight.active && bossFight.isDuel) return;
+  const [c1, c2] = duelPatternKeys(wk).map(k => DISRUPTIONS[k].counter);
+  const changed = g.nmMain !== c1 || g.nmSub !== c2;
+  g.nmMain = c1; g.nmSub = c2; g.nmWeek = wk;
+  const ti = GLOVE_TYPES.findIndex(t => t.main === c1);
+  if (ti >= 0) g.typeIdx = ti;
+  gloveAmpCache.t = 0;
+  if (changed) log(`🌑 <b>황혼의 악몽</b>이 이번 주 결투장 패턴에 적응했습니다: ${DISRUPT_COUNTERS[c1].icon}${DISRUPT_COUNTERS[c1].name}(주) · ${DISRUPT_COUNTERS[c2].icon}${DISRUPT_COUNTERS[c2].name}(보조)`, 'lg-prim');
+}
+function craftNightmare() {
+  if (nightmareGlove()) { log('황혼의 악몽은 계정당 하나만 만들 수 있습니다.', 'lg-bad'); return; }
+  if ((S.twilightShadow || 0) < NIGHTMARE.craftShadow) { log(`🌑 황혼의 그림자가 부족합니다 (필요 ${NIGHTMARE.craftShadow}개)`, 'lg-bad'); return; }
+  S.twilightShadow -= NIGHTMARE.craftShadow;
+  if (!Array.isArray(S.gloves)) S.gloves = [];
+  S.gloves.push({ id: uid++, typeIdx: 0, grade: 5, enhance: 0, nightmare: true });
+  nightmareAdapt(true);
+  log('🌑 <b>황혼의 악몽</b>을 만들었습니다! 🎒 가방 → 🧤 장갑에서 장착하세요. 매주 결투장 패턴에 맞춰 대응 스탯이 바뀝니다.', 'lg-prim');
+  renderGloveInventory(); renderTop(); renderWorldRaidTab(); save();
+}
+let nightmareGrowInput = 0;
+function growNightmare() {
+  const g = nightmareGlove();
+  if (!g) return;
+  const N = NIGHTMARE.growN[g.grade];
+  if (!N) { log('이미 최고 등급입니다.', 'lg-bad'); return; }
+  const n = Math.floor(nightmareGrowInput);
+  if (!(n >= 1) || n > N) { log(`투입할 그림자 개수를 1~${N}개 사이로 정하세요.`, 'lg-bad'); return; }
+  if ((S.twilightShadow || 0) < n) { log('🌑 황혼의 그림자가 부족합니다.', 'lg-bad'); return; }
+  S.twilightShadow -= n;
+  const chance = nightmareGrowthChance(g, n);
+  if (Math.random() < chance) {
+    g.grade++;
+    log(`🌑✨ <b>황혼의 악몽이 성장했습니다!</b> 그림자 ${n}개(성공 확률 ${fmtPct(chance * 100)}) → ${gloveGradeTag(g)}`, 'lg-prim');
+    nightmareGrowInput = 0;
+  } else {
+    log(`🌑💨 성장 실패... 투입한 그림자 ${n}개가 사라졌습니다. (성공 확률 ${fmtPct(chance * 100)})`, 'lg-bad');
+  }
+  gloveAmpCache.t = 0;
+  renderGloveInventory(); renderEnhance(); renderTop(); renderWorldRaidTab(); save();
+}
+function nightmareBoxHtml() {
+  const g = nightmareGlove();
+  const sh = S.twilightShadow || 0;
+  const head = `<div style="font-size:13px;margin-bottom:6px;">🌑 황혼의 악몽 <span style="color:var(--sub);font-size:12px;">(보유 그림자 ${fmt(sh)}개)</span></div>`;
+  const rule = `<div style="font-size:12px;color:var(--sub);margin-bottom:6px;">순위 보상 🌑 황혼의 그림자로 만드는 <b>적응형 성장 장갑</b>(계정당 1개). 매주 결투장 패턴 앞 2개의 대응 스탯이 주·보조 스탯이 되고, 신화로 시작해 그림자를 걸어 <b>고대 → 태초</b>로 성장합니다. 강화는 같은 등급 일반 장갑과 같은 확률이며 강철실 대신 그림자(+15~19는 1개, +20 이상은 2개)를 씁니다. 파괴되지 않습니다(신화·고대는 +0 초기화, 태초는 하락만).</div>`;
+  if (!g) {
+    return `<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">${head}${rule}
+      <button class="primary" id="nmCraftBtn" ${sh >= NIGHTMARE.craftShadow ? '' : 'disabled'}>🌑 황혼의 악몽 만들기 (그림자 ${NIGHTMARE.craftShadow}개)</button></div>`;
+  }
+  const N = NIGHTMARE.growN[g.grade];
+  const eq = S.gloveEquipped === g.id;
+  const stat = k => k ? `${DISRUPT_COUNTERS[k].icon}${DISRUPT_COUNTERS[k].name}` : '-';
+  let grow = '<div style="font-size:12px;margin-top:6px;">🌟 최고 등급(태초)입니다.</div>';
+  if (N) {
+    nightmareGrowInput = Math.max(0, Math.min(N, Math.floor(nightmareGrowInput) || 0));
+    const rows = [0.25, 0.5, 0.75, 1].map(f => { const n = Math.round(N * f); const c = nightmareGrowthChance(g, n); return `<button class="nm-grow-pick" data-n="${n}" style="font-size:11px;width:auto;padding:3px 8px;">${n}개 (${fmtPct(c * 100)})</button>`; }).join(' ');
+    grow = `<div style="font-size:12px;margin-top:8px;">🌱 <b>성장</b> → ${GRADES[g.grade + 1].name} (${N}개에서 확정, 실패하면 투입한 그림자가 전부 사라집니다)</div>
+      <div style="display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap;">${rows}</div>
+      <div style="display:flex;gap:6px;align-items:center;">투입 <input type="number" id="nmGrowInput" min="1" max="${N}" value="${nightmareGrowInput || ''}" style="width:90px;"> 개
+        <span id="nmGrowInfo" style="font-size:12px;color:var(--sub);"></span></div>
+      <button class="primary" id="nmGrowBtn" style="margin-top:6px;">🌱 성장 시도</button>`;
+  }
+  return `<div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">${head}${rule}
+    <div style="font-size:13px;">${gloveGradeTag(g)} ${eq ? '<span style="color:var(--unique);font-size:12px">✅ 장착중</span>' : ''}</div>
+    <div style="font-size:12px;margin-top:2px;">이번 주 적응: <b>${stat(g.nmMain)}</b>(주) · <b>${stat(g.nmSub)}</b>(보조) — ${gloveStatText(g)}</div>
+    ${gloveGenesisDef(g) ? `<div style="font-size:12px;color:var(--prim);margin-top:2px;">${gloveGenesisEffectLines(g)}</div>` : ''}
+    ${eq ? '' : '<button id="nmEquipBtn" style="margin-top:6px;">🧤 장착</button>'}
+    ${grow}</div>`;
+}
+function bindNightmareBox(box) {
+  const c = box.querySelector('#nmCraftBtn'); if (c) c.onclick = craftNightmare;
+  const e = box.querySelector('#nmEquipBtn'); if (e) e.onclick = () => { const g = nightmareGlove(); if (g) { equipGlove(g.id); renderWorldRaidTab(); } };
+  const gb = box.querySelector('#nmGrowBtn'); if (gb) gb.onclick = growNightmare;
+  const inp = box.querySelector('#nmGrowInput'), info = box.querySelector('#nmGrowInfo');
+  const upd = () => {
+    const g = nightmareGlove();
+    if (!inp || !g || !info) return;
+    const n = Math.floor(Number(inp.value) || 0);
+    nightmareGrowInput = n;
+    info.textContent = n >= 1 ? `성공 확률 ${fmtPct(nightmareGrowthChance(g, Math.min(n, NIGHTMARE.growN[g.grade])) * 100)}` : '';
+  };
+  if (inp) { inp.oninput = upd; upd(); }
+  box.querySelectorAll('.nm-grow-pick').forEach(b => b.onclick = () => { nightmareGrowInput = +b.dataset.n; if (inp) inp.value = nightmareGrowInput; upd(); });
+}
+
 // 고유 효과 위력 배율: 0단계 0.5 → 10단계 1.0 (태초 보조무기와 같은 곡선)
 function gloveGenesisScale(g) { return (1 + 0.1 * subPassiveTier(g.enhance || 0)) / 2; }
 function gloveGenesisTierLabel(g) { const t = subPassiveTier(g.enhance || 0); return t >= 10 ? '10단계·최대' : `${t}단계`; }
@@ -4367,10 +4500,12 @@ function rollGenesisGlove(floorIdx, kindMult) {
 }
 function gloveBossInfo(g) { return g && g.bossFloor !== undefined ? GLOVE_BOSS_NAMES[g.bossFloor - WORLD3_START_FLOOR] || null : null; }
 function getEquippedGlove() { return (S && Array.isArray(S.gloves) ? S.gloves : []).find(g => g.id === S.gloveEquipped) || null; }
+// 장갑의 주·보조 대응 스탯 키(황혼의 악몽은 이번 주 적응한 값)
+function gloveKeys(g) { const t = GLOVE_TYPES[g.typeIdx]; return g.nightmare && g.nmMain ? [g.nmMain, g.nmSub] : [t.main, t.sub]; }
 function gloveStats(g) {
-  const t = GLOVE_TYPES[g.typeIdx];
+  const [mk, sk] = gloveKeys(g);
   const main = GLOVE_MAIN_BASE * subGradeMult(g.grade) * (1 + 0.10 * subPassiveTier(g.enhance));
-  return { [t.main]: main, [t.sub]: main / 2 };
+  return { [mk]: main, [sk]: main / 2 };
 }
 // 장갑 보조 스탯·자수 증폭(월드3 장신구·꿈조각) — 주 스탯은 등급·강화로만 오르고(강화 가치 보존),
 // 증폭은 보조 스탯과 자수 수치에만 곱해진다. 패턴 세기를 피해마다 계산하므로 0.5초 캐시
@@ -4387,10 +4522,10 @@ function patternResistCached() { return gloveFxRefresh().r; }
 function gloveCounterValue(key) {
   const g = getEquippedGlove();
   if (!g) return 0;
-  const t = GLOVE_TYPES[g.typeIdx];
+  const [mk, sk] = gloveKeys(g);
   const st = gloveStats(g);
-  const main = t.main === key ? st[key] : 0;
-  const sub = t.sub === key ? st[key] : 0;
+  const main = mk === key ? st[key] : 0;
+  const sub = sk === key ? st[key] : 0;
   const emb = g.embroidery && g.embroidery.key === key ? g.embroidery.value : 0;
   return main + (sub + emb) * (1 + gloveAmpCached());
 }
@@ -4430,6 +4565,7 @@ function gloveAtk(g) {
   return GRADES[g.grade].atk * SUBWEAPON_ATK_MULT * GLOVE_ATK_MULT * enhAtkMult(g.enhance, g.grade);
 }
 function gloveName(g) {
+  if (g.nightmare && g.grade < 6) return '황혼의 악몽';
   const gd = gloveGenesisDef(g);
   if (gd) return gd.name;
   const ad = gloveAncientDef(g);
@@ -4443,17 +4579,17 @@ function gloveGradeTag(g) {
   const boss = g.bossFloor !== undefined && FLOORS[g.bossFloor]
     ? ` <span style="font-size:12px;color:#3ddfff;font-weight:bold">👹[${FLOORS[g.bossFloor].name}]</span>` : '';
   const ad = gloveAncientDef(g), gd = gloveGenesisDef(g);
-  const icon = gd ? `🌟${gd.icon}` : ad ? `🏺${ad.icon}` : GLOVE_TYPES[g.typeIdx].icon;
+  const icon = g.nightmare ? (gd ? `🌟${gd.icon}` : '🌑') : gd ? `🌟${gd.icon}` : ad ? `🏺${ad.icon}` : GLOVE_TYPES[g.typeIdx].icon;
   return `<span class="grade-${gname}">${gname} ${icon} [${gloveName(g)}] +${g.enhance}</span>${boss}`;
 }
 // 보조 스탯·자수는 증폭이 있으면 증폭 후 값을 같이 보여준다 (예: 집중 40% → 58%)
 function gloveStatText(g) {
-  const t = GLOVE_TYPES[g.typeIdx];
+  const [mk, sk] = gloveKeys(g);
   const st = gloveStats(g);
   const amp = gloveAmpCached();
   const amped = v => amp > 0 ? ` → ${fmtRate(v * (1 + amp), 1)}` : '';
   const stat = k => `${DISRUPT_COUNTERS[k].icon} ${DISRUPT_COUNTERS[k].name}`;
-  const parts = [`${stat(t.main)} ${fmtRate(st[t.main], 1)}`, `${stat(t.sub)} ${fmtRate(st[t.sub], 1)}${amped(st[t.sub])}`];
+  const parts = [`${stat(mk)} ${fmtRate(st[mk], 1)}`, `${stat(sk)} ${fmtRate(st[sk], 1)}${amped(st[sk])}`];
   if (g.embroidery) parts.push(embroideryText(g) + amped(g.embroidery.value));
   return parts.join(' · ');
 }
@@ -4461,7 +4597,7 @@ function gloveSellPrice(g) { return Math.round(20 * subGradeMult(g.grade) * (1 +
 function glovePower(g) { return g.grade * 1000 + g.enhance; }
 // 장갑 자동판매: 설정 등급 이하 + 강화 0단계 + 자수 없음. 보스 장갑은 항상 제외.
 function gloveAutoSellMatch(g) {
-  return S.gloveAutoSellGrade != null && g.bossFloor === undefined && g.grade <= S.gloveAutoSellGrade && !g.enhance && !g.embroidery;
+  return S.gloveAutoSellGrade != null && g.bossFloor === undefined && !g.nightmare && g.grade <= S.gloveAutoSellGrade && !g.enhance && !g.embroidery;
 }
 // 가방에 넣었으면 true, 자동판매됐으면 false. 보스 장갑은 어떤 경우에도 자동판매하지 않는다
 // (가방이 꽉 차 있고 팔 수 있는 장갑이 없으면 정원을 넘겨서라도 넣는다).
@@ -4489,7 +4625,7 @@ function addGlove(g) {
   const isBoss = g.bossFloor !== undefined || g.grade >= 6; // 보스·고대·태초 장갑은 정원을 넘겨서라도 넣는다
   if (gloveAutoSellMatch(g)) { gloveAutoDispose(g, '자동'); return false; }
   if (S.gloves.length >= GLOVE_BAG_MAX) {
-    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped && x.bossFloor === undefined && x.grade < 6 && !disPresetLocked('g', x.id));
+    const sellable = S.gloves.filter(x => x.id !== S.gloveEquipped && x.bossFloor === undefined && x.grade < 6 && !x.nightmare && !disPresetLocked('g', x.id));
     const weakest = [...sellable].sort((a, b) => glovePower(a) - glovePower(b))[0];
     if (!isBoss && (!weakest || glovePower(weakest) > glovePower(g))) { gloveAutoDispose(g, '장갑 가방이 가득 차서 새 장갑 자동'); return false; }
     if (weakest) {
@@ -4544,6 +4680,7 @@ function sellGlove(id) {
   if (id === S.gloveEquipped) { log('장착 중인 장갑은 판매할 수 없습니다. 먼저 해제하세요.', 'lg-bad'); return; }
   const g = (S.gloves || []).find(x => x.id === id);
   if (!g) return;
+  if (g.nightmare) { log('황혼의 악몽은 판매할 수 없습니다.', 'lg-bad'); return; }
   if (g.grade >= 6) { log(`${GRADES[g.grade].name} 장갑은 판매할 수 없습니다. (분해기에서 분해할 수 있습니다)`, 'lg-bad'); return; }
   S.gloves = S.gloves.filter(x => x.id !== id);
   S.gold = BN.add(S.gold, gloveSellPrice(g));
@@ -4592,10 +4729,12 @@ function gloveDestroyChance(g) {
   if (enhanceEventActive()) chance = Math.round(chance * ENHANCE_EVENT.destroyMult * 10) / 10;
   return chance;
 }
+function gloveMatText(c, sp) { return c.shadow > 0 || c.steel === 0 ? `🌑${sp}${c.shadow}` : `🧵${sp}${c.steel}`; }
 function gloveTryCost(g, advanced) {
   return {
     gold: gloveEnhanceCost(g) * (advanced ? GLOVE_ENH.advancedGoldMult : 1),
-    steel: gloveSteelCost(g.enhance) * (advanced ? GLOVE_ENH.advancedSteelMult : 1),
+    steel: g.nightmare ? 0 : gloveSteelCost(g.enhance) * (advanced ? GLOVE_ENH.advancedSteelMult : 1),
+    shadow: nightmareShadowCost(g) * (advanced ? NIGHTMARE.advancedShadowMult : 1),
   };
 }
 let gloveEnhanceRevealPending = false;
@@ -4630,6 +4769,7 @@ function autoGloveEnhanceTick() {
   if (g.enhance >= target) { stopAutoGloveEnhance(); log(`⚙️ 장갑 자동 강화 완료! 목표 +${target} 달성`, 'lg-good'); return; }
   const cost = gloveTryCost(g, false);
   if (BN.lt(S.gold, cost.gold)) { stopAutoGloveEnhance(); log(`⚙️ 골드가 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다.`, 'lg-bad'); return; }
+  if ((S.twilightShadow || 0) < cost.shadow) { stopAutoGloveEnhance(); log(`⚙️ 🌑 황혼의 그림자가 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다. (필요 ${cost.shadow}개, 보유 ${fmt(S.twilightShadow || 0)}개)`, 'lg-bad'); return; }
   if (BN.lt(S.steelThread || 0, cost.steel)) { stopAutoGloveEnhance(); log(`⚙️ 🧵 강철실이 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(cost.steel)}, 보유 ${fmt(S.steelThread || 0)})`, 'lg-bad'); return; }
   const essNeed = gloveEssenceCost(g);
   if (essNeed > 0 && BN.lt(S.weaponEssence, essNeed)) { stopAutoGloveEnhance(); log(`⚙️ 📜 무기의 정수가 부족해 장갑 자동 강화(목표 +${target})를 중지했습니다. (필요 ${fmt(essNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad'); return; }
@@ -4664,11 +4804,13 @@ function tryGloveEnhance(advanced) {
   if (advanced && g.enhance < GLOVE_ENH.advancedMinLevel) { log(`고급 강화는 +${GLOVE_ENH.advancedMinLevel} 이상부터 사용할 수 있습니다.`, 'lg-bad'); return; }
   const cost = gloveTryCost(g, advanced);
   if (BN.lt(S.gold, cost.gold)) { log(`골드가 부족합니다 (${fmt(cost.gold)} 필요)`, 'lg-bad'); return; }
+  if ((S.twilightShadow || 0) < cost.shadow) { log(`🌑 황혼의 그림자가 부족합니다 (${cost.shadow}개 필요, 보유 ${fmt(S.twilightShadow || 0)}개) — 종언의 결투장 순위 보상으로 얻습니다`, 'lg-bad'); return; }
   if (BN.lt(S.steelThread, cost.steel)) { log(`🧵 강철실이 부족합니다 (${fmt(cost.steel)}개 필요, 보유 ${fmt(S.steelThread)}개) — 토벌전 21단계 이상에서 획득하세요`, 'lg-bad'); return; }
   const essNeed = gloveEssenceCost(g);
   if (essNeed > 0 && BN.lt(S.weaponEssence, essNeed)) { log(`📜 무기의 정수가 부족합니다 (필요 ${fmt(essNeed)}, 보유 ${fmt(S.weaponEssence)})`, 'lg-bad'); return; }
   S.gold = BN.sub(S.gold, cost.gold);
   S.steelThread = BN.sub(S.steelThread, cost.steel);
+  if (cost.shadow > 0) S.twilightShadow = (S.twilightShadow || 0) - cost.shadow;
   if (essNeed > 0) S.weaponEssence = BN.sub(S.weaponEssence, essNeed);
   renderTop();
   gloveEnhanceRevealPending = true;
@@ -4696,12 +4838,12 @@ function resolveGloveEnhance(g, advanced) {
     if ((destroyHit || !stayHit) && tryUsePenaltyGuard('장갑 강화 실패')) {
       playEnhanceFx('protect', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'dust');
-    } else if (destroyHit && isAncientGlove(g)) {
+    } else if (destroyHit && (isAncientGlove(g) || g.nightmare)) {
       // 고대 장갑은 파괴되지 않는 대신 +0으로 초기화된다(고대 무기·고대 보조무기와 같음)
       g.enhance = 0;
       playEnhanceFx('fail', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'crack');
-      log(`🏺💢 고대 장갑은 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gloveGradeTag(g)} (초기화 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
+      log(`${g.nightmare ? '🌑' : '🏺'}💢 ${g.nightmare ? '황혼의 악몽' : '고대 장갑'}은 파괴되지 않지만, 그 충격으로 +0 초기화됐습니다! ${gloveGradeTag(g)} (초기화 확률이었음: ${dChance.toFixed(1)}%)${advTag}`, 'lg-bad');
     } else if (destroyHit) {
       playEnhanceFx('destroy', attemptLevel, 'gloveEnhBtn', 'gloveEnhFxOverlay');
       playEnhancePanelReveal('gloveEnhPanel', 'crack');
@@ -10481,6 +10623,7 @@ function gglState() {
   if (!fx.ggl) fx.ggl = { atkAcc: 0, avgAtk: 0, sleep: 0, sleepUntil: -1, delayed: [], dreamUntil: -1, dreamAcc: 0,
     log: [], janusT: 0, hermesUntil: -1, mirrorSpeedUntil: -1, mirrorDmgUntil: -1, things: 0, thingNext: 0, tellUntil: -1, timeGained: 0,
     feast: 0, fateUntil: -1, kairosUntil: -1, mirage: 0, mirageUntil: -1,
+    adapt: 0, nightUntil: -1,
     arrow: 0, arrowUntil: -1, moonUntil: -1, curseUntil: -1, eclipseUntil: -1, eclipsed: false,
     sat: 0, satNext: 0, digestUntil: -1, darkUntil: -1, lastPattern: GLOVE_GENESIS_FAKE_EVERY * (BD_FIRST_FRAC - 1) };
   return fx.ggl;
@@ -10595,6 +10738,7 @@ function gloveGenesisDmgMult() {
       const m = (1 + Math.min(p.max, p.per * Math.floor(el / 10)) * x.s * (bdSealed() ? p.seal : 1)) * (el < st.eclipseUntil ? 1 + p.boost * x.s : 1);
       return m;
     }
+    case 'nightmare': return (passive ? 1 + (p.base + p.per * st.adapt) * x.s : 1) * (el < st.nightUntil ? 1 + p.boost * x.s : 1);
     case 'hecate': return el < st.curseUntil ? 1 + p.boost * x.s : 1;
     case 'rahu': return 1 + p.base * x.s * (bdSealed() ? p.sealMult : 1) + (el < st.eclipseUntil ? p.boost * x.s : 0);
     case 'seirenes': {
@@ -10711,6 +10855,16 @@ function gloveGenesisOnPattern(key) {
         gglDeal(BN.toNumber(mon.maxHp) * p.pct * x.s); floatText('🌅 장밋빛 손가락!');
       }
       return false;
+    case 'nightmare': {
+      const weekly = key && duelPatternKeys(weekKey()).includes(key);
+      st.adapt = Math.min(p.max, st.adapt + (weekly ? p.weekly : 1));
+      const use = Math.ceil(st.adapt / 2);
+      st.adapt -= use;
+      st.nightUntil = el + p.dur;
+      if (st.avgAtk > 0) gglDeal(st.avgAtk * use * p.mult * x.s);
+      floatText('🌑 되새김!');
+      return false;
+    }
     case 'hecate': st.curseUntil = el + p.dur; floatText('🔮 세 갈래 저주!'); return false;
     case 'rahu':
       if (bd && bd.enraged && !st.eclipsed) {
@@ -12647,6 +12801,7 @@ function duelEnsureWeek() {
     d.pushDirty = false;
     d.setupPending = null;
   }
+  nightmareAdapt();
   if (d.unsettled.length) duelSettle();
 }
 
@@ -12807,6 +12962,7 @@ function renderDuelTab(box) {
     <button class="primary" id="duelChallengeBtn" ${available ? '' : 'disabled'}>⚔️ 베스퍼리아에게 도전 (${DUEL.duration}초)</button>
     <div style="font-size:12px;color:var(--sub);margin:6px 0 14px;">${!open ? '황혼국이 열려 있어야 입장할 수 있습니다.' : bossFight.active ? '이미 다른 전투가 진행 중입니다.' : left <= 0 ? '오늘 도전 횟수를 모두 사용했습니다. 내일 다시 도전할 수 있습니다.' : `오늘 ${left}회 남았습니다. 시작하면 도전 횟수가 바로 소모됩니다.`}</div>
     ${duelRankHtml(live, best)}
+    ${nightmareBoxHtml()}
     <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:14px;">
       <div style="font-size:13px;margin-bottom:6px;">🎁 순위 보상 (일요일 결산)</div>
       <table class="guide-table"><tr><th>순위</th><th>황혼의 정수</th><th>황혼의 그림자</th></tr>${rewardRows}</table>
@@ -12830,6 +12986,7 @@ function renderDuelTab(box) {
     a.onclick = ev => { ev.preventDefault(); const l = weeklyRaidSetupLinks[+a.dataset.idx]; if (l) showRaidSetup(l.week, l.key, l.name, l.total, 'duelSetup', '최고 기록'); };
   });
   box.querySelectorAll('.twilight-buy-btn').forEach(b => b.onclick = () => buyTwilightShop(b.dataset.id));
+  bindNightmareBox(box);
   bindRaidViewToggle(box);
 }
 
@@ -17394,7 +17551,7 @@ function renderGloveInventory() {
       un.onclick = unequipGlove;
       btns.appendChild(un);
     } else {
-      if (g.grade < 6) {
+      if (g.grade < 6 && !g.nightmare) {
         const sell = document.createElement('button');
         sell.textContent = '판매'; sell.onclick = () => sellGlove(g.id);
         btns.appendChild(sell);
@@ -17432,15 +17589,15 @@ function renderGloveEnhance() {
   $('gloveenhstat').innerHTML = `
     <div>공격력<b>${fmt(gloveAtk(g))}</b></div>
     <div>다음 단계<b style="color:#7de08a">${maxed ? '-' : fmt(gloveAtk(next))}</b></div>
-    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : `${fmt(cost.gold)} + 🧵${cost.steel}`}</b></div>
+    <div>강화 비용<b style="color:var(--gold)">${maxed ? 'MAX' : `${fmt(cost.gold)} + ${gloveMatText(cost, '')}`}</b></div>
     <div>성공 확률<b style="color:#7de08a">${maxed ? '-' : fmtPct(chance)}</b></div>${!maxed && gloveEssenceCost(g) > 0 ? `<div>무기의 정수<b style="color:${BN.gte(S.weaponEssence, gloveEssenceCost(g)) ? '#7de08a' : '#ff7a7a'}">${fmt(S.weaponEssence)}/${fmt(gloveEssenceCost(g))}</b></div>` : ''}`;
   $('gloveenhrates').innerHTML = maxed
     ? `🏆 최대 강화 달성! <b>+${g.enhance}</b>`
-    : `${gen ? '🌟 태초 장갑은 파괴·초기화되지 않습니다. ' : isAncientGlove(g) ? '🏺 고대 장갑은 파괴되지 않습니다. ' : ''}실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${Math.round((100 - dChance) * gloveDowngradeBase(g, false) * enhanceEventDowngradeMult(g.enhance) * 10) / 10}%)</span>${dChance > 0 ? ` · <span class="warn">${isAncientGlove(g) ? '+0 초기화' : '파괴'} 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`
+    : `${gen ? '🌟 태초 장갑은 파괴·초기화되지 않습니다. ' : (isAncientGlove(g) || g.nightmare) ? (g.nightmare ? '🌑 황혼의 악몽은 파괴되지 않습니다. ' : '🏺 고대 장갑은 파괴되지 않습니다. ') : ''}실패 시: 유지 / <span class="warn">단계 -1 (하락 확률 ${Math.round((100 - dChance) * gloveDowngradeBase(g, false) * enhanceEventDowngradeMult(g.enhance) * 10) / 10}%)</span>${dChance > 0 ? ` · <span class="warn">${isAncientGlove(g) ? '+0 초기화' : '파괴'} 확률 ${dChance.toFixed(1)}%</span>` : ' (파괴 없음)'} · 🧵 보유 ${fmt(S.steelThread || 0)}개`
       + ((S.penaltyGuard || 0) > 0 ? `<div style="margin-top:4px;">${penaltyGuardToggleHtml()}</div>` : '');
   bindPenaltyGuardToggles();
   renderGloveAutoEnhance(g, maxed);
-  btn.innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost.gold)} + 🧵 ${cost.steel} (성공 ${chance.toFixed(1)}% / ${gen ? '파괴 없음' : `파괴 ${dChance.toFixed(1)}%`})</span>`;
+  btn.innerHTML = maxed ? '강화하기 (MAX)' : `강화하기<br><span style="font-size:11px">💰 ${fmt(cost.gold)} + ${gloveMatText(cost, ' ')} (성공 ${chance.toFixed(1)}% / ${gen ? '파괴 없음' : `파괴 ${dChance.toFixed(1)}%`})</span>`;
   btn.disabled = maxed || gloveEnhanceRevealPending;
   btn.onclick = () => { if (!maxed) tryGloveEnhance(false); };
   const adv = $('gloveAdvancedEnhanceBox');
@@ -17449,9 +17606,9 @@ function renderGloveEnhance() {
     return;
   }
   const ac = gloveTryCost(g, true);
-  const affordable = BN.gte(S.gold, ac.gold) && BN.gte(S.steelThread || 0, ac.steel) && !gloveEnhanceRevealPending;
+  const affordable = BN.gte(S.gold, ac.gold) && BN.gte(S.steelThread || 0, ac.steel) && (S.twilightShadow || 0) >= ac.shadow && !gloveEnhanceRevealPending;
   adv.innerHTML = `<button class="${affordable ? 'primary' : ''}" id="gloveAdvEnhBtn" style="width:100%;" ${affordable ? '' : 'disabled'}>
-    🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${gen ? `하락 확률 ${fmtRate(gloveDowngradeBase(g, false), 1)} → ${fmtRate(gloveDowngradeBase(g, true), 1)}` : `파괴 확률 ${(dChance * ADVANCED_ENH_DESTROY_MULT).toFixed(1)}%로 절반`}, 💰 ${fmt(ac.gold)} + 🧵 ${ac.steel} 소모)</span></button>`;
+    🛠️ 고급 강화 <span style="font-size:11px;color:var(--sub)">(${gen ? `하락 확률 ${fmtRate(gloveDowngradeBase(g, false), 1)} → ${fmtRate(gloveDowngradeBase(g, true), 1)}` : `파괴 확률 ${(dChance * ADVANCED_ENH_DESTROY_MULT).toFixed(1)}%로 절반`}, 💰 ${fmt(ac.gold)} + ${gloveMatText(ac, ' ')} 소모)</span></button>`;
   $('gloveAdvEnhBtn').onclick = () => tryGloveEnhance(true);
 }
 
@@ -18654,7 +18811,7 @@ function disPresetLocked(kind, id) {
 function disassemblable(kind, it) {
   if (!it) return false;
   if (kind === 'g') {
-    if (it.id === S.gloveEquipped || disPresetLocked('g', it.id)) return false;
+    if (it.id === S.gloveEquipped || it.nightmare || disPresetLocked('g', it.id)) return false;
     if (it.bossFloor !== undefined && !(S.disassemble && S.disassemble.boss)) return false;
     return GLOVE_DISASSEMBLE_STEEL[it.grade] > 0;
   }

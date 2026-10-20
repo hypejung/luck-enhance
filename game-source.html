@@ -18174,7 +18174,7 @@ function computeStats() {
     goldBonus: (goldMul - 1) * 100,
     dropBonus: (dropMul - 1) * 100,
     // 고대·태초 드롭률(genesisAncientDropMult와 같은 식) — 지금 사냥터에서 보스 세트효과가 켜져 있으면 ×3
-    setDropActive: bossSetFloor() === S.floor || subBossSetFloor() === S.floor,
+    setDropActive: bossSetFloor() === S.floor || subBossSetFloor() === S.floor || gloveBossSetFloor() === S.floor,
     rareDropBonus: (genesisAncientDropMult(S.floor) - 1) * 100,
     // 장착 무기의 현재 강화 단계에서 실제로 더해지는 강화확률 보너스(소스마다 기준 단계가 달라 단순 합산은 무의미)
     enhBonus: w && w.enhance < ENH.maxLevel ? enhTierBonus(w.enhance) : 0,
@@ -19649,7 +19649,7 @@ function renderBossAccs() {
     div.className = 'invitem equipped';
     div.innerHTML = `
       <div><div class="wn"><span class="bossacc-stage">${stage}단계 · ${FLOORS[f].name}</span> <span class="grade-신화">신화 👹 [${b.name}]</span> <span style="color:var(--unique);font-size:12px">✅ 상시 장착중</span>${setOn ? ' <span style="color:var(--unique);font-size:12px">✨ 세트 발동중!</span>' : ''}</div>
-      <div class="wi">${accEffText(b.eff)} · 세트 효과: ${FLOORS[f].name}에서 공격력 +30%, 골드 +50%, 드롭률 +50%${wNum === 3 ? ` <span style="color:var(--sub)">(짝: 🧤 ${GLOVE_BOSS_NAMES[f - WORLD3_START_FLOOR].name})</span>` : ', 고대·태초 무기 드롭률 3배'}</div></div>`;
+      <div class="wi">${accEffText(b.eff)} · 세트 효과: ${FLOORS[f].name}에서 공격력 +30%, 골드 +50%, 드롭률 +50%${wNum === 3 ? `, 고대·태초 드롭률 3배 <span style="color:var(--sub)">(짝: 🧤 ${GLOVE_BOSS_NAMES[f - WORLD3_START_FLOOR].name})</span>` : ', 고대·태초 무기 드롭률 3배'}</div></div>`;
     if (best) {
       const partnerLabel = wNum === 1 ? '보스 무기' : wNum === 2 ? '보스 보조무기' : '보스 장갑';
       const isOn = best.id === (wNum === 1 ? S.equipped : wNum === 2 ? S.subEquipped : S.gloveEquipped);
